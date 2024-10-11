@@ -5,13 +5,13 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import dotenv from "dotenv";
-// import express, { Request, Response } from 'express';
-// import axios from 'axios';
+import express from 'express';
 
 import { Config } from '@dcbotTypes';
 import db from '@db';
 import utils from '@utils';
 import { Tomori } from './types';
+import { earthquake_warning } from '@cmd';
 
 import config from './config.json';
 
@@ -97,4 +97,27 @@ tomori.client.on(Events.MessageCreate, async (message) => {
     if (content.includes('該睡覺了，肥貓跟你說晚安')) {
         message.reply('為什麼要睡覺!?<:karyl_fuckyou:1170748129637830708>')
     }
+});
+
+tomori.client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+
+});
+
+const app = express();
+app.use(express.json());
+
+app.get('/', (req, res) => {
+    res.status(200).send('Hello World!');
+})
+
+app.post('/api/earthquake', (req, res) => {
+    utils.consoleLogger(`地震警報，預估震度${req.body.magnitude}級，${req.body.countdown}秒後抵達!!!`);
+    Object.entries(tomori.guildInfo).forEach(async ([guild_id, guild_info]) => {
+        earthquake_warning(guild_info.channels.earthquake, req.body.magnitude as number, req.body.countdown as number);
+    });
+    res.status(200).send('OK');
+})
+
+app.listen(process.env.PORT, () => {
+    utils.consoleLogger(`Express server is running on port ${process.env.PORT}`);
 });

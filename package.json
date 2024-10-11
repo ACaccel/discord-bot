@@ -19,9 +19,11 @@
   "homepage": "https://github.com/ACaccel/discord-bot#readme",
   "dependencies": {
     "@kirdock/discordjs-voice-recorder": "^1.1.1",
+    "@types/express": "^5.0.0",
     "axios": "^1.7.7",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",
+    "express": "^4.21.1",
     "mongoose": "^8.7.0",
     "sodium": "^3.0.2",
     "ts-node": "^10.9.2",
