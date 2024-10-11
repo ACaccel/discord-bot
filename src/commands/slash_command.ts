@@ -1,10 +1,10 @@
-import { 
-    CommandInteraction, 
+import {
     ChannelType, 
     Guild,
     AttachmentBuilder,
     EmbedBuilder,
     GuildMember,
+    ChatInputCommandInteraction,
 } from "discord.js";
 import axios from "axios";
 import fs from "fs";
@@ -17,8 +17,9 @@ import {
     Bot,
     AllowedTextChannel
 } from "@dcbotTypes";
+import utils from "@utils";
 
-export const help = async (interaction: CommandInteraction, bot: Bot) => {
+export const help = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
     await interaction.deferReply();
     try {
         let  helpContent = '## 指令清單\n';
@@ -34,7 +35,7 @@ export const help = async (interaction: CommandInteraction, bot: Bot) => {
     }
 }
 
-export const talk = async (interaction: CommandInteraction, bot: Bot) => {
+export const talk = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
     try {
         let ch = interaction.options.get("頻道")?.value as string;
         let content = interaction.options.get("內容")?.value as string;
@@ -64,8 +65,7 @@ export const talk = async (interaction: CommandInteraction, bot: Bot) => {
         } else {
             await channel.send(content);
 
-            let debugChannel = bot.guildInfo[guild.id].channels.debug as AllowedTextChannel;
-            await debugChannel.send(`${interaction.user.username}：${content}`);
+            await utils.debugChannelLogger(bot.guildInfo[guild.id].channels.debug, `Talk Command Created, ${interaction.user.username}：${content}`, 'system');
         }
     } catch (error) {
         console.error(error);
@@ -73,7 +73,7 @@ export const talk = async (interaction: CommandInteraction, bot: Bot) => {
     }
 }
 
-export const change_avatar = async (interaction: CommandInteraction, bot: Bot) => {
+export const change_avatar = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
     await interaction.deferReply();
     try {
         const guild = interaction.guild;
@@ -107,7 +107,7 @@ export const change_avatar = async (interaction: CommandInteraction, bot: Bot) =
     }
 }
 
-export const random_restaurant = async (interaction: CommandInteraction, bot: Bot) => {
+export const random_restaurant = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
     await interaction.deferReply();
     try {
         var api_route = "https://foodapi-chi.vercel.app/api/restaurants/get";
@@ -121,7 +121,7 @@ export const random_restaurant = async (interaction: CommandInteraction, bot: Bo
     }
 }
 
-export const imgen = async (interaction: CommandInteraction, bot: Bot) => {
+export const imgen = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
     await interaction.deferReply();
     try {
         const imgen_ch_id = bot.guildInfo[interaction.guild?.id as string].channels.imgen.id;
@@ -149,11 +149,11 @@ export const imgen = async (interaction: CommandInteraction, bot: Bot) => {
     }
 }
 
-export const ask_nijika_wakeup = async (interaction: CommandInteraction, bot: Bot) => {
+export const ask_nijika_wakeup = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
     
 }
 
-export const search_anime_scene = async (interaction: CommandInteraction, bot: Bot) => {
+export const search_anime_scene = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
     await interaction.deferReply();
     try {
         const image = interaction.options.get("圖片")?.attachment;
@@ -212,7 +212,7 @@ export const search_anime_scene = async (interaction: CommandInteraction, bot: B
     }
 }
 
-export const pin_message = async (interaction: CommandInteraction, bot: Bot) => {
+export const pin_message = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
     await interaction.deferReply();
     try {
         const act = interaction.options.get("action")?.value as string;
@@ -245,7 +245,7 @@ export const pin_message = async (interaction: CommandInteraction, bot: Bot) => 
     }
 }
 
-export const record = async (interaction: CommandInteraction, bot: Bot) => {
+export const record = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
     await interaction.deferReply();
     try {
         const action = interaction.options.get("action")?.value as string;

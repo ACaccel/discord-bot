@@ -17,9 +17,9 @@ const consoleLogger = (msg: string) => {
     console.log('[ DEBUG ] ' + getDate() + msg);
 }
 
-const debugChannelLogger = (debug_ch: Channel, msg: string, status: string) => {
+const debugChannelLogger = async (debug_ch: Channel, msg: string, status: string) => {
     debug_ch = debug_ch as AllowedTextChannel;
-    debug_ch.send('[ ' + status.toUpperCase() + '] ' + msg);
+    await debug_ch.send('[ ' + status.toUpperCase() + '] ' + msg);
 }
 
 export { consoleLogger, debugChannelLogger };

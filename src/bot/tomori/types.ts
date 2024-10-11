@@ -5,6 +5,7 @@ import {
     Routes,
     Guild,
     Channel,
+    ChatInputCommandInteraction
 } from 'discord.js';
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
 import { 
@@ -102,7 +103,7 @@ export class Tomori implements Bot {
         });
     }
 
-    executeSlashCommands = async (interaction: any) => {
+    executeSlashCommands = async (interaction: ChatInputCommandInteraction) => {
         if (!interaction.isCommand()) return;
 
         const command = this.config.commands.find((cmd) => cmd.name === interaction.commandName);
