@@ -16,7 +16,7 @@ import config from './config.json';
 dotenv.config({ path: './src/bot/tomori/.env' });
 
 // init
-const client: Client = new Client({ intents: [
+const client = new Client({ intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildModeration,
@@ -37,7 +37,7 @@ const client: Client = new Client({ intents: [
     GatewayIntentBits.AutoModerationConfiguration,
     GatewayIntentBits.AutoModerationExecution
 ] });
-const tomori: Tomori = new Tomori(
+const tomori = new Tomori(
     client,
     process.env.TOKEN as string,
     process.env.MONGO_URI as string,
@@ -52,7 +52,6 @@ tomori.client.on(Events.ClientReady, async () => {
 
     // bot online init
     tomori.registerGuild();
-    tomori.initSlashCommands();
     await tomori.registerSlashCommands();
     tomori.initSlashCommandsHandlers();
 

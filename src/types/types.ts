@@ -78,12 +78,6 @@ export class BaseBot {
         }
     }
 
-    public initSlashCommands = () => {
-        this.slashCommands = this.config.commands.map((cmd) => {
-            return buildSlashCommands(cmd);
-        });
-    }
-
     public initSlashCommandsHandlers = () => {
         this.slashCommandsHandler = new Map<string, Function>();
         Object.entries(cmd_handler).forEach(([name, handler]) => {
@@ -96,6 +90,12 @@ export class BaseBot {
     public  registerSlashCommands = async () => {
         utils.consoleLogger("Registering commands...");
 
+        // build slash commands from config
+        this.slashCommands = this.config.commands.map((cmd) => {
+            return buildSlashCommands(cmd);
+        });
+
+        // register slash commands to discord
         const rest = new REST().setToken(this.token)
         Object.entries(this.guildInfo).forEach(async ([guildId, guildInfo]) => {
             await rest.put(
