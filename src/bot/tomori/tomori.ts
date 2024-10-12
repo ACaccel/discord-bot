@@ -46,7 +46,6 @@ const tomori: Tomori = new Tomori(
     process.env.CLIENT_ID as string,
     config as Config
 );
-db.dbConnect(tomori.mongoURI);
 
 // client events
 tomori.login();
@@ -68,14 +67,7 @@ tomori.client.on(Events.ClientReady, async () => {
 tomori.client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.inGuild()) {
         if (interaction.isChatInputCommand()) {
-            let command = interaction as ChatInputCommandInteraction;
-            tomori.executeSlashCommands(command);
-
-            await utils.debugChannelLogger(
-                tomori.guildInfo[interaction.guildId as string].channels.debug,
-                `Interaction created, Command: ${command.commandName}, User: ${command.user.displayName}, Channel: <#${command.channel?.id}>`, 
-                'system'
-            );
+            tomori.executeSlashCommands(tomori, interaction);
         } else {
             if (!interaction.isAutocomplete()) {
                 await interaction.reply({ content: '目前尚不支援此類型的指令喔!', ephemeral: true });
@@ -113,7 +105,7 @@ app.get('/', (req, res) => {
 app.post('/api/earthquake', (req, res) => {
     utils.consoleLogger(`地震警報，預估震度${req.body.magnitude}級，${req.body.countdown}秒後抵達!!!`);
     Object.entries(tomori.guildInfo).forEach(async ([guild_id, guild_info]) => {
-        earthquake_warning(guild_info.channels.earthquake, req.body.magnitude as number, req.body.countdown as number);
+        earthquake_warning(guild_info.channels.earthquake, guild_info.roles.earthquake, req.body.magnitude as number, req.body.countdown as number);
     });
     res.status(200).send('OK');
 })

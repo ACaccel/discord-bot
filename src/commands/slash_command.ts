@@ -14,12 +14,12 @@ import {
 } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
 import { 
-    Bot,
+    BaseBot,
     AllowedTextChannel
 } from "@dcbotTypes";
 import utils from "@utils";
 
-export const help = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
+export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
         let  helpContent = '## 指令清單\n';
@@ -35,7 +35,7 @@ export const help = async (interaction: ChatInputCommandInteraction, bot: Bot) =
     }
 }
 
-export const talk = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
+export const talk = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     try {
         let ch = interaction.options.get("頻道")?.value as string;
         let content = interaction.options.get("內容")?.value as string;
@@ -73,7 +73,7 @@ export const talk = async (interaction: ChatInputCommandInteraction, bot: Bot) =
     }
 }
 
-export const change_avatar = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
+export const change_avatar = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
         const guild = interaction.guild;
@@ -107,7 +107,7 @@ export const change_avatar = async (interaction: ChatInputCommandInteraction, bo
     }
 }
 
-export const random_restaurant = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
+export const random_restaurant = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
         var api_route = "https://foodapi-chi.vercel.app/api/restaurants/get";
@@ -121,7 +121,7 @@ export const random_restaurant = async (interaction: ChatInputCommandInteraction
     }
 }
 
-export const imgen = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
+export const imgen = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
         const imgen_ch_id = bot.guildInfo[interaction.guild?.id as string].channels.imgen.id;
@@ -149,11 +149,11 @@ export const imgen = async (interaction: ChatInputCommandInteraction, bot: Bot) 
     }
 }
 
-export const ask_nijika_wakeup = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
+export const ask_nijika_wakeup = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     
 }
 
-export const search_anime_scene = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
+export const search_anime_scene = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
         const image = interaction.options.get("圖片")?.attachment;
@@ -212,7 +212,7 @@ export const search_anime_scene = async (interaction: ChatInputCommandInteractio
     }
 }
 
-export const pin_message = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
+export const pin_message = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
         const act = interaction.options.get("action")?.value as string;
@@ -245,7 +245,7 @@ export const pin_message = async (interaction: ChatInputCommandInteraction, bot:
     }
 }
 
-export const record = async (interaction: ChatInputCommandInteraction, bot: Bot) => {
+export const record = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
         const action = interaction.options.get("action")?.value as string;

@@ -1,31 +1,144 @@
 import { 
     Client,
+    REST,
     RESTPostAPIChatInputApplicationCommandsJSONBody,
+    Routes,
     Guild,
     Channel,
     TextChannel,
     PublicThreadChannel,
+    ChatInputCommandInteraction
 } from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
+import db from '@db';
+import utils from '@utils';
+import {
+    buildSlashCommands,
+    cmd_handler
+} from '@cmd';
 
-export interface Bot {
-    client: Client;
-    token: string;
-    mongoURI: string;
-    clientId: string;
-    config: Config;
-    guildInfo: Record<string, GuildInfo>;
+export class BaseBot {
+    public client: Client;
+    private token: string;
+    private mongoURI: string;
+    public clientId: string;
+    public config: Config;
+    public guildInfo: Record<string, GuildInfo>;
     
-    slashCommands?: RESTPostAPIChatInputApplicationCommandsJSONBody[];
-    slashCommandsHandler?: Map<string, Function>;
-    voice?: Voice;
+    public slashCommands?: RESTPostAPIChatInputApplicationCommandsJSONBody[];
+    public slashCommandsHandler?: Map<string, Function>;
+    public voice?: Voice;
 
-    login(): void;
-    registerGuild(): void;
-    initSlashCommands(): void;
-    initSlashCommandsHandlers(): void;
-    registerSlashCommands(): void;
+    public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: Config) {
+        this.client = client;
+        this.token = token;
+        this.mongoURI = mongoURI;
+        this.clientId = clientId;
+        this.config = config;
+        this.guildInfo = {};
+    }
+
+    public login = async () => {
+        await this.client.login(this.token);
+        db.dbConnect(this.mongoURI);
+    }
+
+    public registerGuild = () => {
+        utils.consoleLogger("Registering guilds...");
+        try {
+            this.config.guilds.forEach((config) => {
+                // register channels
+                let newChannel: Record<string, Channel> = {};
+                Object.entries(config.channels).forEach(([name, id]) => {
+                    const channel = this.client.channels.cache.get(id);
+                    if (channel) {
+                        newChannel[name] = channel;
+                    }
+                });
+
+                // register roles
+                let newRole: Record<string, string> = {};
+                Object.entries(config.roles).forEach(([name, id]) => {
+                    newRole[name] = id;
+                });
+
+                let newGuild: GuildInfo = {
+                    bot_name: this.client.guilds.cache.get(config.guild_id)?.members.cache.get(this.clientId)?.displayName as string,
+                    guild: this.client.guilds.cache.get(config.guild_id) as Guild,
+                    channels: newChannel,
+                    roles: newRole
+                };
+                this.guildInfo[config.guild_id] = newGuild;
+            });
+
+            utils.consoleLogger("Successfully registered all guilds.");
+        } catch (err) {
+            utils.consoleLogger(`Cannot register guild: ${err}`);
+        }
+    }
+
+    public initSlashCommands = () => {
+        this.slashCommands = this.config.commands.map((cmd) => {
+            return buildSlashCommands(cmd);
+        });
+    }
+
+    public initSlashCommandsHandlers = () => {
+        this.slashCommandsHandler = new Map<string, Function>();
+        Object.entries(cmd_handler).forEach(([name, handler]) => {
+            if (typeof handler === 'function') {
+                this.slashCommandsHandler?.set(name, handler);
+            }
+        });
+    }
+
+    public  registerSlashCommands = async () => {
+        utils.consoleLogger("Registering commands...");
+
+        const rest = new REST().setToken(this.token)
+        Object.entries(this.guildInfo).forEach(async ([guildId, guildInfo]) => {
+            await rest.put(
+                Routes.applicationGuildCommands(this.clientId, guildId), {
+                body: this.slashCommands
+            })
+            .then(() =>
+                utils.consoleLogger(`Successfully register ${this.slashCommands?.length} application (/) commands.`)
+            )
+            .catch((err) => {
+                utils.consoleLogger(`Failed to register application (/) commands: ${err}`);
+            });
+        });
+    }
+
+    public executeSlashCommands = async (bot: BaseBot, interaction: ChatInputCommandInteraction) => {
+        if (!interaction.isCommand()) return;
+
+        const command = this.config.commands.find((cmd) => cmd.name === interaction.commandName);
+        if (command) {
+            try {
+                const handler = this.slashCommandsHandler?.get(interaction.commandName)
+                if (handler) {
+                    await handler(interaction, this);
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        await utils.debugChannelLogger(
+            bot.guildInfo[interaction.guildId as string].channels.debug,
+            `Interaction created, Command: ${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`, 
+            'system'
+        );
+    }
+    
+    public initVoice = () => {
+        this.voice = {
+            recorder: new VoiceRecorder({}, this.client),
+            connection: null
+        }
+    }
 }
 
 export interface Config {
@@ -38,11 +151,13 @@ export interface GuildInfo {
     bot_name: string;
     guild: Guild
     channels: Record<string, Channel>;
+    roles: Record<string, string>;
 }
 
 interface GuildConfig {
     guild_id: string;
     channels: Record<string, string>;
+    roles: Record<string, string>;
 }
 
 interface Identity {

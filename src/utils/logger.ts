@@ -1,5 +1,5 @@
 import { Channel } from "discord.js";
-import { AllowedTextChannel, Bot } from "@dcbotTypes";
+import { AllowedTextChannel } from "@dcbotTypes";
 
 const getDate = () => {
     var date = new Date();
