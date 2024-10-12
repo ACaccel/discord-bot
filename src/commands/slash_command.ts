@@ -13,17 +13,23 @@ import {
     DiscordGatewayAdapterCreator
 } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
+import Mee6LevelsApi from 'mee6-levels-api';
 import { 
     BaseBot,
     AllowedTextChannel
 } from "@dcbotTypes";
 import utils from "@utils";
+import db from "@db";
 
 export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
-        let  helpContent = '## 指令清單\n';
+        if (!bot.config.commands) {
+            await interaction.editReply({ content: "沒有指令清單"});
+            return;
+        }
 
+        let  helpContent = '## 指令清單\n';
         for (let i = 0; i < bot.config.commands.length; i++) {
             helpContent += "* `" + bot.config.commands[i].name + "` : " + bot.config.commands[i].description + "\n";
         }
@@ -32,6 +38,33 @@ export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBo
     } catch (error) {
         console.error(error);
         await interaction.editReply({ content: "無法取得指令清單"});
+    }
+}
+
+export const bug_report = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    try {
+        let content = interaction.options.get("content")?.value as string;
+        if (!content) {
+            await interaction.reply({ content: "請輸入內容", ephemeral: true });
+            return;
+        }
+
+        if (!bot.adminId) {
+            await interaction.reply({ content: "請通知管理員進行管理員設定", ephemeral: true });
+            return;
+        }
+
+        // send message to admin via dm
+        const admin = await interaction.guild?.members.fetch(bot.adminId);
+        if (admin) {
+            await admin.send(`Bug Report from ${interaction.user.username}：${content}`);
+            await interaction.reply({ content: "已通知管理員", ephemeral: true });
+        } else {
+            await interaction.reply({ content: "請通知管理員確認管理員設定", ephemeral: true });
+        }
+    } catch (error) {
+        console.error(error);
+        await interaction.reply({ content: "無法回報問題", ephemeral: true });
     }
 }
 
@@ -77,28 +110,36 @@ export const change_avatar = async (interaction: ChatInputCommandInteraction, bo
     await interaction.deferReply();
     try {
         const guild = interaction.guild;
+        const identities = bot.config.identities;
+
         if (!guild) {
-            return { content: "Cannot find guild" };
+            await interaction.editReply({ content: "找不到伺服器"});
+            return;
+        }
+        if (!identities) {
+            await interaction.editReply({ content: "沒有身份組設定"});
+            return;
         }
 
         const newName = interaction.options.get("identity")?.value as string;
         const oldName = bot.guildInfo[guild?.id].bot_name;
-        const newColorRole = guild?.roles.cache.find(role => role.name === bot.config.identities[newName].color_role);
-        const oldColorRole = guild?.roles.cache.find(role => role.name === bot.config.identities[oldName].color_role);
-
-        // identity assignment
+        const newColorRole = guild?.roles.cache.find(role => role.name === identities[newName].color_role);
+        const oldColorRole = guild?.roles.cache.find(role => role.name === identities[oldName].color_role);
         const userBot = guild.members.cache.get(bot.client.user?.id as string);
-        if (userBot) {
-            // remove old color role and assign new color role
-            if (oldColorRole && userBot.roles.cache.has(oldColorRole?.id as string)) 
-                await userBot.roles.remove(oldColorRole);
-            if (newColorRole) 
-                await userBot.roles.add(newColorRole);
-
-            // change nickname and avatar
-            await userBot.setNickname(newName);
-            await userBot.client.user.setAvatar(bot.config.identities[newName].avator_url);
+        if (!userBot) {
+            await interaction.editReply({ content: "找不到機器人"});
+            return;
         }
+
+        // remove old color role and assign new color role
+        if (oldColorRole && userBot.roles.cache.has(oldColorRole?.id as string)) 
+            await userBot.roles.remove(oldColorRole);
+        if (newColorRole) 
+            await userBot.roles.add(newColorRole);
+
+        // change nickname and avatar
+        await userBot.setNickname(newName);
+        await userBot.client.user.setAvatar(identities[newName].avator_url);
 
         await interaction.editReply({ content: `${oldName}已死，現在正是${newName}復權的時刻` });
     } catch (error) {
@@ -317,5 +358,164 @@ export const record = async (interaction: ChatInputCommandInteraction, bot: Base
 }
 
 export const add_reply = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    const input = interaction.options.get("keyword")?.value;
+    const reply = interaction.options.get("reply")?.value;
 
+    const existPair = await db.Reply.find({ input, reply });
+
+    if (existPair.length === 0) {
+        const newReply = new db.Reply({ input, reply });
+        await newReply.save();
+        await interaction.reply({ content: `已新增 輸入：${input} 回覆：${reply}！` });
+    } else {
+        await interaction.reply({ content: `此配對 輸入：${input} 回覆：${reply} 已經存在！` });
+    }
+}
+
+export const delete_reply = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    const input = interaction.options.get("keyword")?.value;
+    const reply = interaction.options.get("reply")?.value;
+
+    const existPair = await db.Reply.find({ input, reply });
+
+    if (existPair.length === 0) {
+        await interaction.reply({ content: `找不到 輸入：${input} 回覆：${reply}！` });
+    } else {
+        await db.Reply.deleteOne({ input, reply });
+        await interaction.reply({ content: `已刪除 輸入：${input} 回覆：${reply}！` });
+    }
+}
+
+export const give_score = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    const score = `${Math.floor(Math.random() * 11)}/10`;
+    await interaction.reply({ content: score });
+}
+
+export const gay = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    const user = interaction.options.get("user")?.value;
+    if (bot.guildInfo[interaction.guild?.id as string].members[user as string]) {
+        const target = bot.guildInfo[interaction.guild?.id as string].members[user as string];
+        const res = `${target.nickname} ${(Math.random() > 0.05 ? "是" : "不是")} gay`;
+        await interaction.reply({ content: res });
+    }
+}
+
+export const weather_forecast = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        var api_route = "https://dataservice.accuweather.com/forecasts/v1/hourly/1hour/315078?apikey=rVlGI9UbF0ALnbcerU3qKGQeHYjPyTDj&language=zh-tw&details=true";
+        const response = await axios.get(api_route);
+        const weatherForecast = response.data[0];
+        const temperatureCelsius = (weatherForecast.Temperature.Value - 32) * 5 / 9; // Convert Fahrenheit to Celsius
+        const realFeelCelsius = (weatherForecast.RealFeelTemperature.Value - 32) * 5 / 9; // Convert Fahrenheit to Celsius
+        let formattedContent = "每小時天氣預報：\n";
+        formattedContent += `- 預測時間：${weatherForecast.DateTime}\n`;
+        formattedContent += `- 天氣狀況：${weatherForecast.IconPhrase}\n`;
+        formattedContent += `- 降雨機率：${weatherForecast.PrecipitationProbability}%\n`;
+        formattedContent += `- 雷暴機率：${weatherForecast.ThunderstormProbability}%\n`;
+        formattedContent += `- 室外氣溫：${temperatureCelsius}°C\n`;
+        formattedContent += `- 體感溫度：${realFeelCelsius}°C\n`;
+        formattedContent += `- 相對濕度：${weatherForecast.RelativeHumidity}%\n`;
+        
+        const formattedContentWithBackticks = formattedContent;
+        await interaction.editReply({ content: formattedContentWithBackticks });
+    } catch (error) {
+        console.error(error);
+        await interaction.editReply({ content: "無法取得天氣預報" });
+    }
+}
+
+export const update_role = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        let leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
+        let guild = bot.guildInfo[interaction.guild?.id as string].guild;
+        // let alive_role = guild.roles.cache.find(role => role.name === "活人");
+
+        await Promise.all(leaderboard.map(async (member) => {
+            let { id, level } = member;
+            let guildMember = guild.members.cache.get(id);
+
+            if (guildMember) { } else return;
+            // live people role.
+            // if(level >= 6) {
+            // 	if (!guildMember.roles.cache.some(role => role.name === "活人")) {
+            // 		let _ = await guildMember.roles.add(alive_role);
+            // 		interaction.channel.send(`[ SYSTEM ] 給予 ${guildMember.user.tag} 活人`);
+            // 	}
+            // }
+
+            // find corresponding role
+            let roleToAssign = "";
+            for (const roleLevel in bot.config.level_roles) {
+                if (level >= parseInt(roleLevel.split('_')[1])) {
+                    roleToAssign = bot.config.level_roles[roleLevel];
+                } else {
+                    break;
+                }
+            }
+            if (roleToAssign === "") return;
+
+            // test if the role is exist
+            let CorrectRole = guildMember.roles.cache.some(role => role.name === roleToAssign);
+            if (!CorrectRole) {
+                const channel = interaction.channel as AllowedTextChannel;
+
+                // remove old role
+                for (let roleLevel in bot.config.level_roles) {
+                    let roleName = bot.config.level_roles[roleLevel];
+                    let role = guild.roles.cache.find(role => role.name === roleName);
+                    if (role) {
+                        let _ = await guildMember.roles.remove(role);
+                        await channel.send(`[ SYSTEM ] 移除 ${guildMember.user.tag} ${roleName}`);
+                    }
+                }
+
+                // add new role
+                const role = guild.roles.cache.find(role => role.name === roleToAssign);
+                if (role) {
+                    let _ = await guildMember.roles.add(role);
+                    await channel.send(`[ SYSTEM ] 給予 ${guildMember.user.tag} ${roleToAssign}`);
+                }
+            }
+        }));
+        await interaction.editReply({ content: "更新完成" });
+    } catch (error) {
+        console.error(error);
+        await interaction.editReply({ content: "無法更新身份組" });
+    }
+}
+
+export const level_detail = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        const left = interaction.options.get("left")?.value as number;
+        const right = interaction.options.get("right")?.value as number;
+        const rangeSize = right - left;
+
+        if (rangeSize <= 10) {
+            let content = "";
+            const leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
+
+            leaderboard.slice(left - 1, right).forEach((e, i) => {
+                const averageXp = (e.xp.totalXp / e.messageCount).toPrecision(6);
+                content += `> **${e.rank} - ${e.username}﹝Level ${e.level}﹞**\n`;
+                content += `**訊息總數：** ${e.messageCount} `;
+                content += `**當前經驗值：** ${e.xp.userXp} / ${e.xp.levelXp} `;
+                content += `**總經驗值：** ${e.xp.totalXp} `;
+                content += `**平均經驗值：** ${averageXp} \n\n`;
+            });
+
+            if (content.length < 2000) {
+                await interaction.editReply({ content });
+            } else {
+                await interaction.editReply({ content: "太長了...請選短一點的範圍" });
+            }
+        } else {
+            await interaction.editReply({ content: "太長了...請選短一點的範圍" });
+        }
+    } catch (error) {
+        console.error(error);
+        await interaction.editReply({ content: "無法取得等級詳情" });
+    }
 }

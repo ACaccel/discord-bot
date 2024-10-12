@@ -48,8 +48,6 @@ const tomori = new Tomori(
 // client events
 tomori.login();
 tomori.client.on(Events.ClientReady, async () => {
-    utils.consoleLogger(`Logged in as ${tomori.client.user?.username}!`);
-
     // bot online init
     tomori.registerGuild();
     await tomori.registerSlashCommands();
@@ -102,7 +100,12 @@ app.get('/', (req, res) => {
 app.post('/api/earthquake', (req, res) => {
     utils.consoleLogger(`地震警報，預估震度${req.body.magnitude}級，${req.body.countdown}秒後抵達!!!`);
     Object.entries(tomori.guildInfo).forEach(async ([guild_id, guild_info]) => {
-        earthquake_warning(guild_info.channels.earthquake, guild_info.roles.earthquake, req.body.magnitude as number, req.body.countdown as number);
+        earthquake_warning(
+            guild_info.channels.earthquake,
+            guild_info.roles.earthquake.id,
+            req.body.magnitude as number,
+            req.body.countdown as number
+        )
     });
     res.status(200).send('OK');
 })

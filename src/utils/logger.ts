@@ -2,16 +2,8 @@ import { Channel } from "discord.js";
 import { AllowedTextChannel } from "@dcbotTypes";
 
 const getDate = () => {
-    var date = new Date();
-    var str = date.getFullYear() + '-' 
-            + (date.getMonth() + 1) + '-'
-            + date.getDate() + ' ' 
-            + date.getHours() + ':' 
-            + date.getMinutes() + ':' 
-            + date.getSeconds() + ' ';
-    return str;
+    return new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) + ' ';
 }
-
 
 const consoleLogger = (msg: string) => {
     console.log('[ DEBUG ] ' + getDate() + msg);

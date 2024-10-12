@@ -7,7 +7,9 @@ import {
     Channel,
     TextChannel,
     PublicThreadChannel,
-    ChatInputCommandInteraction
+    ChatInputCommandInteraction,
+    GuildMember,
+    Role
 } from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
@@ -19,6 +21,7 @@ import {
 } from '@cmd';
 
 export class BaseBot {
+    public adminId?: string;
     public client: Client;
     private token: string;
     private mongoURI: string;
@@ -40,8 +43,15 @@ export class BaseBot {
     }
 
     public login = async () => {
+        utils.consoleLogger("Logging in...");
         await this.client.login(this.token);
+        utils.consoleLogger(`Logged in as ${this.client.user?.username}!`);
+
         db.dbConnect(this.mongoURI);
+
+        if (this.config.admin) {
+            this.adminId = this.config.admin;
+        }
     }
 
     public registerGuild = () => {
@@ -58,16 +68,24 @@ export class BaseBot {
                 });
 
                 // register roles
-                let newRole: Record<string, string> = {};
+                let newRole: Record<string, Role> = {};
                 Object.entries(config.roles).forEach(([name, id]) => {
-                    newRole[name] = id;
+                    const role = this.client.guilds.cache.get(config.guild_id)?.roles.cache.get(id);
+                    newRole[name] = role as Role;
+                });
+
+                // register guild members
+                let memberList: Record<string, GuildMember> = {};
+                this.client.guilds.cache.get(config.guild_id)?.members.cache.forEach((member) => {
+                    memberList[member.id] = member;
                 });
 
                 let newGuild: GuildInfo = {
                     bot_name: this.client.guilds.cache.get(config.guild_id)?.members.cache.get(this.clientId)?.displayName as string,
                     guild: this.client.guilds.cache.get(config.guild_id) as Guild,
                     channels: newChannel,
-                    roles: newRole
+                    roles: newRole,
+                    members: memberList
                 };
                 this.guildInfo[config.guild_id] = newGuild;
             });
@@ -89,6 +107,11 @@ export class BaseBot {
 
     public  registerSlashCommands = async () => {
         utils.consoleLogger("Registering commands...");
+
+        if (!this.config.commands) {
+            utils.consoleLogger("No commands to register.");
+            return;
+        }
 
         // build slash commands from config
         this.slashCommands = this.config.commands.map((cmd) => {
@@ -113,6 +136,11 @@ export class BaseBot {
 
     public executeSlashCommands = async (bot: BaseBot, interaction: ChatInputCommandInteraction) => {
         if (!interaction.isCommand()) return;
+
+        if (!this.config.commands) {
+            interaction.reply({ content: "No commands to execute.", ephemeral: true });
+            return;
+        }
 
         const command = this.config.commands.find((cmd) => cmd.name === interaction.commandName);
         if (command) {
@@ -142,16 +170,19 @@ export class BaseBot {
 }
 
 export interface Config {
+    admin?: string;
     guilds: GuildConfig[];
-    identities: Record<string, Identity>;
-    commands: Command[];
+    identities?: Record<string, Identity>;
+    commands?: Command[];
+    level_roles?: Record<string, string>;
 }
 
 export interface GuildInfo {
     bot_name: string;
     guild: Guild
     channels: Record<string, Channel>;
-    roles: Record<string, string>;
+    roles: Record<string, Role>;
+    members: Record<string, GuildMember>;
 }
 
 interface GuildConfig {
