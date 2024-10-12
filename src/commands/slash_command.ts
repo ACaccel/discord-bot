@@ -20,6 +20,7 @@ import {
 } from "@dcbotTypes";
 import utils from "@utils";
 import db from "@db";
+import { Tomori } from "bot/tomori/types";
 
 export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
@@ -425,67 +426,6 @@ export const weather_forecast = async (interaction: ChatInputCommandInteraction,
     }
 }
 
-export const update_role = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
-    await interaction.deferReply();
-    try {
-        let leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
-        let guild = bot.guildInfo[interaction.guild?.id as string].guild;
-        // let alive_role = guild.roles.cache.find(role => role.name === "活人");
-
-        await Promise.all(leaderboard.map(async (member) => {
-            let { id, level } = member;
-            let guildMember = guild.members.cache.get(id);
-
-            if (guildMember) { } else return;
-            // live people role.
-            // if(level >= 6) {
-            // 	if (!guildMember.roles.cache.some(role => role.name === "活人")) {
-            // 		let _ = await guildMember.roles.add(alive_role);
-            // 		interaction.channel.send(`[ SYSTEM ] 給予 ${guildMember.user.tag} 活人`);
-            // 	}
-            // }
-
-            // find corresponding role
-            let roleToAssign = "";
-            for (const roleLevel in bot.config.level_roles) {
-                if (level >= parseInt(roleLevel.split('_')[1])) {
-                    roleToAssign = bot.config.level_roles[roleLevel];
-                } else {
-                    break;
-                }
-            }
-            if (roleToAssign === "") return;
-
-            // test if the role is exist
-            let CorrectRole = guildMember.roles.cache.some(role => role.name === roleToAssign);
-            if (!CorrectRole) {
-                const channel = interaction.channel as AllowedTextChannel;
-
-                // remove old role
-                for (let roleLevel in bot.config.level_roles) {
-                    let roleName = bot.config.level_roles[roleLevel];
-                    let role = guild.roles.cache.find(role => role.name === roleName);
-                    if (role) {
-                        let _ = await guildMember.roles.remove(role);
-                        await channel.send(`[ SYSTEM ] 移除 ${guildMember.user.tag} ${roleName}`);
-                    }
-                }
-
-                // add new role
-                const role = guild.roles.cache.find(role => role.name === roleToAssign);
-                if (role) {
-                    let _ = await guildMember.roles.add(role);
-                    await channel.send(`[ SYSTEM ] 給予 ${guildMember.user.tag} ${roleToAssign}`);
-                }
-            }
-        }));
-        await interaction.editReply({ content: "更新完成" });
-    } catch (error) {
-        console.error(error);
-        await interaction.editReply({ content: "無法更新身份組" });
-    }
-}
-
 export const level_detail = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
@@ -517,5 +457,68 @@ export const level_detail = async (interaction: ChatInputCommandInteraction, bot
     } catch (error) {
         console.error(error);
         await interaction.editReply({ content: "無法取得等級詳情" });
+    }
+}
+
+/********** Only for Tomori **********/
+
+export const update_role = async (interaction: ChatInputCommandInteraction, bot: Tomori) => {
+    await interaction.deferReply();
+    try {
+        let leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
+        let guild = bot.guildInfo[interaction.guild?.id as string].guild;
+        // let alive_role = guild.roles.cache.find(role => role.name === "活人");
+
+        await Promise.all(leaderboard.map(async (member) => {
+            let { id, level } = member;
+            let guildMember = guild.members.cache.get(id);
+
+            if (guildMember) { } else return;
+            // live people role.
+            // if(level >= 6) {
+            // 	if (!guildMember.roles.cache.some(role => role.name === "活人")) {
+            // 		let _ = await guildMember.roles.add(alive_role);
+            // 		interaction.channel.send(`[ SYSTEM ] 給予 ${guildMember.user.tag} 活人`);
+            // 	}
+            // }
+
+            // find corresponding role
+            let roleToAssign = "";
+            for (const roleLevel in bot.tomoriConfig.level_roles) {
+                if (level >= parseInt(roleLevel.split('_')[1])) {
+                    roleToAssign = bot.tomoriConfig.level_roles[roleLevel];
+                } else {
+                    break;
+                }
+            }
+            if (roleToAssign === "") return;
+
+            // test if the role is exist
+            let CorrectRole = guildMember.roles.cache.some(role => role.name === roleToAssign);
+            if (!CorrectRole) {
+                const channel = interaction.channel as AllowedTextChannel;
+
+                // remove old role
+                for (let roleLevel in bot.tomoriConfig.level_roles) {
+                    let roleName = bot.tomoriConfig.level_roles[roleLevel];
+                    let role = guild.roles.cache.find(role => role.name === roleName);
+                    if (role) {
+                        let _ = await guildMember.roles.remove(role);
+                        await channel.send(`[ SYSTEM ] 移除 ${guildMember.user.tag} ${roleName}`);
+                    }
+                }
+
+                // add new role
+                const role = guild.roles.cache.find(role => role.name === roleToAssign);
+                if (role) {
+                    let _ = await guildMember.roles.add(role);
+                    await channel.send(`[ SYSTEM ] 給予 ${guildMember.user.tag} ${roleToAssign}`);
+                }
+            }
+        }));
+        await interaction.editReply({ content: "更新完成" });
+    } catch (error) {
+        console.error(error);
+        await interaction.editReply({ content: "無法更新身份組" });
     }
 }

@@ -11,7 +11,7 @@ const consoleLogger = (msg: string) => {
 
 const debugChannelLogger = async (debug_ch: Channel, msg: string, status: string) => {
     debug_ch = debug_ch as AllowedTextChannel;
-    await debug_ch.send('[ ' + status.toUpperCase() + '] ' + msg);
+    await debug_ch.send('_ _\n' + '[ ' + status.toUpperCase() + '] ' + msg);
 }
 
 export { consoleLogger, debugChannelLogger };

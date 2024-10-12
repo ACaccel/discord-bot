@@ -105,7 +105,7 @@ export class BaseBot {
         });
     }
 
-    public  registerSlashCommands = async () => {
+    public registerSlashCommands = async () => {
         utils.consoleLogger("Registering commands...");
 
         if (!this.config.commands) {
@@ -120,7 +120,9 @@ export class BaseBot {
 
         // register slash commands to discord
         const rest = new REST().setToken(this.token)
+        await this.client.application?.commands.set([]);
         Object.entries(this.guildInfo).forEach(async ([guildId, guildInfo]) => {
+            await this.client.guilds.cache.get(guildId)?.commands.set([]);
             await rest.put(
                 Routes.applicationGuildCommands(this.clientId, guildId), {
                 body: this.slashCommands
@@ -174,7 +176,6 @@ export interface Config {
     guilds: GuildConfig[];
     identities?: Record<string, Identity>;
     commands?: Command[];
-    level_roles?: Record<string, string>;
 }
 
 export interface GuildInfo {

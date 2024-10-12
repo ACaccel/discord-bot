@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "tomori": "ts-node src/bot/tomori/tomori.ts"
+    "tomori": "ts-node src/bot/tomori/tomori.ts",
+    "nijika": "ts-node src/bot/nijika/nijika.ts"
   },
   "repository": {
     "type": "git",
