@@ -2,13 +2,11 @@ import {
     Client, 
     GatewayIntentBits, 
     Events,
-    ChatInputCommandInteraction,
 } from 'discord.js';
 import dotenv from "dotenv";
 import express from 'express';
 
 import { Config } from '@dcbotTypes';
-import db from '@db';
 import utils from '@utils';
 import { Tomori } from './types';
 import { earthquake_warning } from '@cmd';
