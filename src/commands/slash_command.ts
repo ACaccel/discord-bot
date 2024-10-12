@@ -37,8 +37,8 @@ export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBo
 
 export const talk = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     try {
-        let ch = interaction.options.get("頻道")?.value as string;
-        let content = interaction.options.get("內容")?.value as string;
+        let ch = interaction.options.get("channel")?.value as string;
+        let content = interaction.options.get("content")?.value as string;
         if (!ch || !content) {
             await interaction.reply({ content: "請輸入頻道和內容", ephemeral: true });
             return;
@@ -81,7 +81,7 @@ export const change_avatar = async (interaction: ChatInputCommandInteraction, bo
             return { content: "Cannot find guild" };
         }
 
-        const newName = interaction.options.get("身分")?.value as string;
+        const newName = interaction.options.get("identity")?.value as string;
         const oldName = bot.guildInfo[guild?.id].bot_name;
         const newColorRole = guild?.roles.cache.find(role => role.name === bot.config.identities[newName].color_role);
         const oldColorRole = guild?.roles.cache.find(role => role.name === bot.config.identities[oldName].color_role);
@@ -129,7 +129,7 @@ export const imgen = async (interaction: ChatInputCommandInteraction, bot: BaseB
             await interaction.editReply({ content: `這個指令只能在 <#${imgen_ch_id}> 頻道使用喔！` });
             return;
         }
-        const content = interaction.options.get("內容")?.value;
+        const content = interaction.options.get("imgae_description")?.value;
         if (!content) {
             await interaction.editReply({ content: "請輸入內容" });
             return;
@@ -141,7 +141,7 @@ export const imgen = async (interaction: ChatInputCommandInteraction, bot: BaseB
             let attachment = new AttachmentBuilder(buffer, { name: 'image.png' });
             await interaction.editReply({ files: [attachment] });
         } catch (error) {
-            await interaction.editReply({ content: "虹夏忙線中，請稍後再試 ❤️ " });
+            await interaction.editReply({ content: "crychic和mygo吵架忙線中，請稍後再試 ❤️ " });
         }
     } catch (error) {
         console.error(error);
@@ -156,7 +156,7 @@ export const ask_nijika_wakeup = async (interaction: ChatInputCommandInteraction
 export const search_anime_scene = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
-        const image = interaction.options.get("圖片")?.attachment;
+        const image = interaction.options.get("image")?.attachment;
         if (!image) {
             await interaction.editReply({ content: "請上傳圖片" });
             return;
@@ -176,10 +176,10 @@ export const search_anime_scene = async (interaction: ChatInputCommandInteractio
                 }
                 let embedarr: EmbedBuilder[] = [];
                 const result = response.data.result as IResult[];
-                const num_results = interaction.options.get("數量")?.value ?
-                    interaction.options.get("數量")?.value as number > result.length ? 
+                const num_results = interaction.options.get("display_num")?.value ?
+                    interaction.options.get("display_num")?.value as number > result.length ? 
                         result.length as number : 
-                        interaction.options.get("數量")?.value as number
+                        interaction.options.get("display_num")?.value as number
                     : 1;
 
                 result.map((e, i) => {
@@ -314,4 +314,8 @@ export const record = async (interaction: ChatInputCommandInteraction, bot: Base
         console.error(error);
         await interaction.editReply({ content: "無法錄音" });
     }
+}
+
+export const add_reply = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+
 }
