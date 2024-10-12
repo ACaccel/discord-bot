@@ -34,8 +34,6 @@ const roll_dice = (expression: string) => {
     // Replace each dice roll expression with its evaluated value
     try {
         expression = expression.replace(diceRegex, function(match, numDice, numSides) {
-            console.log(`Rolling ${numDice}d${numSides}`);
-
             // Roll the dice
             let result = 0;
             let numDiceInt = parseInt(numDice);
@@ -50,7 +48,8 @@ const roll_dice = (expression: string) => {
                 }
             }
 
-            return `${result}` as string;
+            let resultstr = `${result}`;
+            return resultstr;
         });
     } catch (e) {
         console.error(e);
@@ -58,7 +57,7 @@ const roll_dice = (expression: string) => {
     }
 
     // Evaluate the expression using JavaScript's eval function
-    return eval(expression);
+    return eval(expression) as string;
 }
 
 export const auto_reply = async (msg: Message, bot: Nijika) => {
@@ -67,7 +66,7 @@ export const auto_reply = async (msg: Message, bot: Nijika) => {
     // normal reply
     const { reply, success } = await search_reply(msg.content);
     if (success) { 
-        await msg.channel.send(`${reply}`);
+        await msg.channel.send(`${reply as string}`);
     }
 
     // special reply
@@ -75,7 +74,7 @@ export const auto_reply = async (msg: Message, bot: Nijika) => {
         // reply to bad words
         const { reply, success } = await search_reply("[$]");
         if (success) { 
-            await msg.channel.send(`${reply}`);
+            await msg.channel.send(`${reply as string}`);
         }
     }
     if (msg.author.id === "516912789369913371" && Math.random() > (1-0.005)) {
@@ -89,13 +88,13 @@ export const auto_reply = async (msg: Message, bot: Nijika) => {
     if (msg.content.match(/(\d+)d(\d+)/g)) {
         // roll dice
         let res = roll_dice(msg.content);
-        await msg.channel.send(res);
+        await msg.channel.send(`${res}`);
     }
     if (Math.random() > 0.999) {
         // reply to lucky
         const { reply, success } = await search_reply("[*]");
         if (success) { 
-            await msg.channel.send(`${reply}`);
+            await msg.channel.send(`${reply as string}`);
         }
     }
 }
