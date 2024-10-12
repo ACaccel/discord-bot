@@ -156,11 +156,13 @@ export class BaseBot {
             }
         }
 
+        const log = `Interaction created, Command: ${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`;
         await utils.debugChannelLogger(
             bot.guildInfo[interaction.guildId as string].channels.debug,
-            `Interaction created, Command: ${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`, 
+            log,
             'system'
         );
+        utils.consoleLogger(log, this.clientId);
     }
     
     public initVoice = () => {
