@@ -1,17 +1,41 @@
 import { Channel } from "discord.js";
+import fs from 'fs';
 import { AllowedTextChannel } from "@dcbotTypes";
 
 const getDate = () => {
     return new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) + ' ';
 }
 
-const consoleLogger = (msg: string) => {
-    console.log('[ DEBUG ] ' + getDate() + msg);
+export const consoleLogger = (msg: string, bot_id: string) => {
+    console.log(getDate() + msg);
+    logBackup(msg, bot_id);
 }
 
-const debugChannelLogger = async (debug_ch: Channel, msg: string, status: string) => {
+export const debugChannelLogger = async (debug_ch: Channel, msg: string, status: string) => {
     debug_ch = debug_ch as AllowedTextChannel;
     await debug_ch.send('_ _\n' + '[ ' + status.toUpperCase() + '] ' + msg);
 }
 
-export { consoleLogger, debugChannelLogger };
+const logBackup = (msg: string, bot_id: string) => {
+    // backup to the same file until the file size is over 1MB, then create a new file
+    const path = `./logs/${bot_id}/${bot_id}.log`;
+    if (!fs.existsSync(`./logs/${bot_id}/${bot_id}.log`)) {
+        if (!fs.existsSync(`./logs/${bot_id}`)) {
+            fs.mkdirSync(`./logs/${bot_id}`, { recursive: true });
+        }
+        fs.writeFileSync(path, '');
+    }
+
+    // write to file, if file size is over 1MB, write to a new file
+    fs.stat(path, (err, stats) => {
+        if (err) throw err;
+        if (stats.size > 1000000) {
+            fs.rename(path, `./logs/${bot_id}/${new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' })}.log`, (err) => {
+                if (err) throw err;
+            });
+        }
+        fs.appendFile(path, getDate() + msg + '\n', (err) => {
+            if (err) throw err;
+        });
+    });
+}

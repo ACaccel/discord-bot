@@ -98,7 +98,7 @@ app.get('/', (req, res) => {
 })
 
 app.post('/api/earthquake', (req, res) => {
-    utils.consoleLogger(`地震警報，預估震度${req.body.magnitude}級，${req.body.countdown}秒後抵達!!!`);
+    utils.consoleLogger(`地震警報，預估震度${req.body.magnitude}級，${req.body.countdown}秒後抵達!!!`, tomori.clientId);
     Object.entries(tomori.guildInfo).forEach(async ([guild_id, guild_info]) => {
         earthquake_warning(
             guild_info.channels.earthquake,
@@ -111,5 +111,5 @@ app.post('/api/earthquake', (req, res) => {
 })
 
 app.listen(process.env.PORT, () => {
-    utils.consoleLogger(`Express server is running on port ${process.env.PORT}`);
+    utils.consoleLogger(`Express server is running on port ${process.env.PORT}`, tomori.clientId);
 });

@@ -43,11 +43,11 @@ export class BaseBot {
     }
 
     public login = async () => {
-        utils.consoleLogger("Logging in...");
+        utils.consoleLogger("Logging in...", this.clientId);
         await this.client.login(this.token);
-        utils.consoleLogger(`Logged in as ${this.client.user?.username}!`);
+        utils.consoleLogger(`Logged in as ${this.client.user?.username}!`, this.clientId);
 
-        db.dbConnect(this.mongoURI);
+        db.dbConnect(this.mongoURI, this.clientId);
 
         if (this.config.admin) {
             this.adminId = this.config.admin;
@@ -55,7 +55,7 @@ export class BaseBot {
     }
 
     public registerGuild = () => {
-        utils.consoleLogger("Registering guilds...");
+        utils.consoleLogger("Registering guilds...", this.clientId);
         try {
             this.config.guilds.forEach((config) => {
                 // register channels
@@ -90,9 +90,9 @@ export class BaseBot {
                 this.guildInfo[config.guild_id] = newGuild;
             });
 
-            utils.consoleLogger("Successfully registered all guilds.");
+            utils.consoleLogger("Successfully registered all guilds.", this.clientId);
         } catch (err) {
-            utils.consoleLogger(`Cannot register guild: ${err}`);
+            utils.consoleLogger(`Cannot register guild: ${err}`, this.clientId);
         }
     }
 
@@ -106,10 +106,10 @@ export class BaseBot {
     }
 
     public registerSlashCommands = async () => {
-        utils.consoleLogger("Registering commands...");
+        utils.consoleLogger("Registering commands...", this.clientId);
 
         if (!this.config.commands) {
-            utils.consoleLogger("No commands to register.");
+            utils.consoleLogger("No commands to register.", this.clientId);
             return;
         }
 
@@ -128,10 +128,10 @@ export class BaseBot {
                 body: this.slashCommands
             })
             .then(() =>
-                utils.consoleLogger(`Successfully register ${this.slashCommands?.length} application (/) commands.`)
+                utils.consoleLogger(`Successfully register ${this.slashCommands?.length} application (/) commands.`, this.clientId)
             )
             .catch((err) => {
-                utils.consoleLogger(`Failed to register application (/) commands: ${err}`);
+                utils.consoleLogger(`Failed to register application (/) commands: ${err}`, this.clientId);
             });
         });
     }
