@@ -11,7 +11,7 @@ export const consoleLogger = (msg: string, bot_id: string) => {
     logBackup(msg, bot_id);
 }
 
-export const debugChannelLogger = async (debug_ch: Channel, msg: string, status: string) => {
+export const channelLogger = async (debug_ch: Channel, msg: string, status: string) => {
     debug_ch = debug_ch as AllowedTextChannel;
     await debug_ch.send('_ _\n' + '[ ' + status.toUpperCase() + '] ' + msg);
 }

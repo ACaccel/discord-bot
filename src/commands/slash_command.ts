@@ -99,7 +99,7 @@ export const talk = async (interaction: ChatInputCommandInteraction, bot: BaseBo
         } else {
             await channel.send(content);
 
-            await utils.debugChannelLogger(bot.guildInfo[guild.id].channels.debug, `Talk Command Created, ${interaction.user.username}：${content}`, 'system');
+            await utils.channelLogger(bot.guildInfo[guild.id].channels.debug, `Talk Command Created, ${interaction.user.username}：${content}`, 'system');
         }
     } catch (error) {
         console.error(error);

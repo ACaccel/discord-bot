@@ -157,7 +157,7 @@ export class BaseBot {
         }
 
         const log = `Interaction created, Command: ${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`;
-        await utils.debugChannelLogger(
+        await utils.channelLogger(
             bot.guildInfo[interaction.guildId as string].channels.debug,
             log,
             'system'

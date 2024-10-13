@@ -55,7 +55,7 @@ tomori.client.on(Events.ClientReady, async () => {
 
     // reboot message
     Object.entries(tomori.guildInfo).forEach(async ([guild_id, guild]) => {
-        await utils.debugChannelLogger(guild.channels.debug, `${guild.bot_name}重開機囉!`, 'system');
+        await utils.channelLogger(guild.channels.debug, `${guild.bot_name}重開機囉!`, 'system');
     });
 });
 
