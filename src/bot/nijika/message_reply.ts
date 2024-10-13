@@ -48,16 +48,15 @@ const roll_dice = (expression: string) => {
                 }
             }
 
-            let resultstr = `${result}`;
-            return resultstr;
+            return `${result}`;
         });
+        
+        // Evaluate the expression using JavaScript's eval function
+        return eval(expression).toString();
     } catch (e) {
         console.error(e);
         return "NaN";
     }
-
-    // Evaluate the expression using JavaScript's eval function
-    return eval(expression) as string;
 }
 
 export const auto_reply = async (msg: Message, bot: Nijika) => {
