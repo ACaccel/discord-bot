@@ -84,16 +84,20 @@ export const auto_reply = async (msg: Message, bot: Nijika) => {
         // reply to nijika
         await msg.channel.send("晴人杰");
     }
-    if (msg.content.match(/(\d+)d(\d+)/g)) {
-        // roll dice
-        let res = roll_dice(msg.content);
-        await msg.channel.send(`${res}`);
-    }
+    // if (msg.content.match(/(\d+)d(\d+)/g)) {
+    //     // roll dice
+    //     let res = roll_dice(msg.content);
+    //     await msg.channel.send(`${res}`);
+    // }
     if (Math.random() > 0.999) {
         // reply to lucky
         const { reply, success } = await search_reply("[*]");
         if (success) { 
             await msg.channel.send(`${reply as string}`);
         }
+    }
+    const regex = /長髮男(?=\s|$)/;
+    if (regex.test(msg.content)) {
+        await msg.channel.send("去spa");
     }
 }
