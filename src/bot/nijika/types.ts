@@ -78,29 +78,24 @@ export class Nijika extends BaseBot {
                         })
                         if(exists.length === 0 && content !== "") {
                             // console.log(channelName, channelID, content, messageID, username, userID, timestamp);
-                            try {
-                                const newMessage = new db.Message({
-                                    channel: channelName,
-                                    channelID: channelID,
-                                    content: content,
-                                    userID: userID,
-                                    username: username,
-                                    messageID: messageID,
-                                    timestamp: timestamp
-                                })
-                                await newMessage.save();
-                                newMessageCnt++;
-                                if(newMessageCnt % 1000 == 0) {
-                                    await sentMessage.edit(`[ SYSTEM ] on scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
-                                }
-                            }
-                            catch(e) {
-                                // console.log(e);
+                            const newMessage = new db.Message({
+                                channel: channelName,
+                                channelID: channelID,
+                                content: content,
+                                userID: userID,
+                                username: username,
+                                messageID: messageID,
+                                timestamp: timestamp
+                            })
+                            await newMessage.save();
+                            newMessageCnt++;
+                            if(newMessageCnt % 1000 == 0) {
+                                await sentMessage.edit(`[ SYSTEM ] on scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
                             }
                         }
                     }
                 } catch(e) {
-                    // console.log(`Fail at ${channelName}`);
+                    utils.errorLogger(e, this.clientId);
                 }
             })
             await Promise.all(fetchPromise);

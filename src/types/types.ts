@@ -152,7 +152,7 @@ export class BaseBot {
                     await handler(interaction, this);
                 }
             } catch (error) {
-                console.error(error);
+                utils.errorLogger(error, this.clientId);
             }
         }
 
