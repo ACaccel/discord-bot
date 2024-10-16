@@ -4,6 +4,11 @@ A discord bot based on discord.js library. You can customize it by adding your o
 
 ## Content
 
+- [Features](#features)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [License](#license)
+
 ## Features
 
 - Slash Command Handling: Defines commands in the config file and their handlers under the `commands/slash_command.ts` file.
