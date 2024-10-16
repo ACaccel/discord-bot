@@ -31,6 +31,10 @@ yarn <bot-name>
 
 The `config.json` file contains the bot's configuration settings. You can customize the bot's settings by modifying this example.
 
+- `guilds`: An array of guilds that the bot is in. Each guild has its own `channels` and `roles` objects. You can define any channel and role that you want to access in the code.
+- `identities`: Customize the bot's identity, including name, avatar, and color role.
+- `commands`: Define your slash commands here. Each command has a `name`, `description`, and `options(optional)` fields. The `options` defines the command's parameters. There are 5 types of parameters: `user`, `channel`, `string`, `number`, and `attachment`. Each type contains `name`, `description`, `required`, and `choices(optional)` fields.
+
 ```json
 {
   {
@@ -38,24 +42,20 @@ The `config.json` file contains the bot's configuration settings. You can custom
         {
             "guild_id": "your-guild-id",
             "channels": {
-                // put your channel id here which you want to access in the code
                 "debug": "debug-channel-id",
             },
             "roles": {
-                // put your role id here which you want to access in the code
                 "admin": "admin-role-id",
             }
         }
     ],
     "identities": {
-        // customize your bot's identity (name, avator, color role)
         "bot-name": {
             "avator_url": "https://example.com/avator.png",
             "color_role": "green"
         }
     },
     "commands": [
-        // define your slash commands here
         {
             "name": "help",
             "description": "list all commands and their descriptions"
