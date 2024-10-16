@@ -50,7 +50,12 @@ export class Nijika extends BaseBot {
                         limit: 100, 
                         ...(lastID && { after: lastID }) 
                     });
-                    if(fetchedMessages.size === 0) return;
+
+                    if(fetchedMessages.size === 0) {
+                        await sentMessage.edit(`[ SYSTEM ] end scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
+                        return;
+                    }
+                    
                     lastID = fetchedMessages.firstKey();
                     await db.Fetch.findOneAndUpdate({channel: channel.name, channelID: channel.id}, {lastMessageID: lastID});
                     const allMessages = fetchedMessages
