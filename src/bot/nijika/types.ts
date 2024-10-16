@@ -45,11 +45,12 @@ export class Nijika extends BaseBot {
                     
                     // fetch messages
                     var lastID = (await db.Fetch.findOne({channel: channel.name, channelID: channel.id}))?.lastMessageID;
-                    if (channel.type === ChannelType.GuildCategory) return;
+                    if (!channel.isTextBased()) return;
                     const fetchedMessages = await channel.messages.fetch({ 
                         limit: 100, 
                         ...(lastID && { after: lastID }) 
                     });
+                    if(fetchedMessages.size === 0) return;
                     lastID = fetchedMessages.firstKey();
                     await db.Fetch.findOneAndUpdate({channel: channel.name, channelID: channel.id}, {lastMessageID: lastID});
                     const allMessages = fetchedMessages
