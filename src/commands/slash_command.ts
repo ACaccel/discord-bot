@@ -460,6 +460,53 @@ export const level_detail = async (interaction: ChatInputCommandInteraction, bot
     }
 }
 
+export const todo_list = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        const action = interaction.options.get("action")?.value as string;
+        const content = interaction.options.get("content")?.value as string;
+
+        if (!content && action !== "list") {
+            await interaction.editReply({ content: "請輸入待辦事項內容" });
+            return;
+        }
+
+        if (action == "add") {
+            const existPair = await db.Todo.find({ content });
+            if (existPair.length === 0) {
+                const newTodo = new db.Todo({ content });
+                await newTodo.save();
+                await interaction.editReply({ content: `已新增待辦事項：${content}` });
+            } else {
+                await interaction.editReply({ content: `此待辦事項：${content} 已經存在！` });
+            }
+        } else if (action == "delete") {
+            // content is index
+            const todoList = await db.Todo.find({});
+            if (!parseInt(content)) {
+                await interaction.editReply({ content: "請輸入數字" });
+                return;
+            }
+            if (parseInt(content) > todoList.length) {
+                await interaction.editReply({ content: `找不到待辦事項：${content}！` });
+            } else {
+                await db.Todo.deleteOne({ name: todoList[parseInt(content) - 1].content });
+                await interaction.editReply({ content: `已刪除待辦事項：${content}！` });
+            }
+        } else if (action == "list") {
+            const todoList = await db.Todo.find({});
+            let content = "待辦事項：\n";
+            todoList.map((e, i) => {
+                content += `> ${i + 1}. ${e.content}\n`;
+            });
+            await interaction.editReply({ content });
+        }
+    } catch (error) {
+        utils.errorLogger(error, bot.clientId);
+        await interaction.editReply({ content: "無法變更待辦事項" });
+    }
+}
+
 /********** Only for Tomori **********/
 
 export const update_role = async (interaction: ChatInputCommandInteraction, bot: Tomori) => {

@@ -32,7 +32,7 @@ interface IReply extends Document {
 }
 
 interface ITodo extends Document {
-    name: string;
+    content: string;
 }
 
 interface IUser extends Document {
@@ -63,7 +63,7 @@ const ReplySchema = new Schema<IReply>({
 });
 
 const TodoSchema = new Schema<ITodo>({
-    name: string_field
+    content: string_field
 });
 
 const UserSchema = new Schema<IUser>({
