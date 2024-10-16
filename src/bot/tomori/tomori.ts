@@ -10,7 +10,6 @@ import { Config } from '@dcbotTypes';
 import utils from '@utils';
 import { Tomori } from './types';
 import { earthquake_warning } from '@cmd';
-
 import config from './config.json';
 
 dotenv.config({ path: './src/bot/tomori/.env' });

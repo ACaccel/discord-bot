@@ -4,13 +4,11 @@ import {
     Events,
 } from 'discord.js';
 import dotenv from "dotenv";
-import express from 'express';
 
 import { Config } from '@dcbotTypes';
 import utils from '@utils';
 import { Nijika } from './types';
 import { anti_dizzy_react, auto_reply } from './message_reply';
-
 import config from './config.json';
 
 dotenv.config({ path: './src/bot/nijika/.env' });
@@ -52,7 +50,7 @@ nijika.client.on(Events.ClientReady, async () => {
     nijika.registerGuild();
     await nijika.registerSlashCommands();
     nijika.initSlashCommandsHandlers();
-    nijika.messageBackup('1047744170070118400', 10);
+    nijika.messageBackup(nijika.nijikaConfig.backup_server, 5);
 
     // reboot message
     Object.entries(nijika.guildInfo).forEach(async ([guild_id, guild]) => {
@@ -63,7 +61,7 @@ nijika.client.on(Events.ClientReady, async () => {
 nijika.client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.inGuild()) {
         if (interaction.isChatInputCommand()) {
-            nijika.executeSlashCommands(nijika, interaction);
+            await nijika.executeSlashCommands(nijika, interaction);
         } else {
             if (!interaction.isAutocomplete()) {
                 await interaction.reply({ content: '目前尚不支援此類型的指令喔!', ephemeral: true });
@@ -79,18 +77,18 @@ nijika.client.on(Events.InteractionCreate, async (interaction) => {
 nijika.client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot) return;
 
-    anti_dizzy_react(message);
-    auto_reply(message, nijika);
+    await anti_dizzy_react(message);
+    await auto_reply(message, nijika);
 });
 
 nijika.client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
-    nijika.detectMessageUpdate(oldMessage, newMessage);
+    await nijika.detectMessageUpdate(oldMessage, newMessage);
 });
 
 nijika.client.on(Events.MessageDelete, async (message) => {
-    nijika.detectMessageDelete(message);
+    await nijika.detectMessageDelete(message);
 });
 
 nijika.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-    nijika.detectGuildMemberUpdate(oldMember, newMember);
+    await nijika.detectGuildMemberUpdate(oldMember, newMember);
 });

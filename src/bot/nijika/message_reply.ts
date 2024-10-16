@@ -2,13 +2,13 @@ import { Message } from "discord.js";
 import db from "@db";
 import { Nijika } from "./types";
 
-export const anti_dizzy_react = (msg: Message) => {
+export const anti_dizzy_react = async (msg: Message) => {
     const content = msg.content;
     const andyDictionary = [
         /暈/, /她{1}不{0,1}在{1}/, /他{1}不{0,1}在{1}/, /女{1}朋{0,1}友{1}/, /男{1}朋{0,1}友{1}/
     ]
     if(andyDictionary.some((e) => content.match(e))) {
-        msg.react('1067851490271711312');
+        await msg.react('1067851490271711312');
     }
 }
 

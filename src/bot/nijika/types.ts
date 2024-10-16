@@ -158,4 +158,5 @@ export class Nijika extends BaseBot {
 
 interface NijikaConfig {
     bad_words: string[];
+    backup_server: string;
 }
