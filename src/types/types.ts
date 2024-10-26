@@ -43,9 +43,9 @@ export class BaseBot {
     }
 
     public login = async () => {
-        utils.consoleLogger("Logging in...", this.clientId);
+        utils.systemLogger(this.clientId, "Logging in...");
         await this.client.login(this.token);
-        utils.consoleLogger(`Logged in as ${this.client.user?.username}!`, this.clientId);
+        utils.systemLogger(this.clientId, `Logged in as ${this.client.user?.username}!`);
 
         db.dbConnect(this.mongoURI, this.clientId);
 
@@ -55,7 +55,7 @@ export class BaseBot {
     }
 
     public registerGuild = () => {
-        utils.consoleLogger("Registering guilds...", this.clientId);
+        utils.systemLogger(this.clientId, "Registering guilds...");
         try {
             this.config.guilds.forEach((config) => {
                 // register channels
@@ -90,9 +90,9 @@ export class BaseBot {
                 this.guildInfo[config.guild_id] = newGuild;
             });
 
-            utils.consoleLogger("Successfully registered all guilds.", this.clientId);
+            utils.systemLogger(this.clientId, "Successfully registered all guilds.");
         } catch (err) {
-            utils.consoleLogger(`Cannot register guild: ${err}`, this.clientId);
+            utils.systemLogger(this.clientId, `Cannot register guild: ${err}`);
         }
     }
 
@@ -106,10 +106,10 @@ export class BaseBot {
     }
 
     public registerSlashCommands = async () => {
-        utils.consoleLogger("Registering commands...", this.clientId);
+        utils.systemLogger(this.clientId, "Registering commands...");
 
         if (!this.config.commands) {
-            utils.consoleLogger("No commands to register.", this.clientId);
+            utils.systemLogger(this.clientId, "No commands to register.");
             return;
         }
 
@@ -128,10 +128,10 @@ export class BaseBot {
                 body: this.slashCommands
             })
             .then(() =>
-                utils.consoleLogger(`Successfully register ${this.slashCommands?.length} application (/) commands.`, this.clientId)
+                utils.systemLogger(this.clientId, `Successfully register ${this.slashCommands?.length} application (/) commands.`)
             )
             .catch((err) => {
-                utils.consoleLogger(`Failed to register application (/) commands: ${err}`, this.clientId);
+                utils.systemLogger(this.clientId, `Failed to register application (/) commands: ${err}`);
             });
         });
     }
@@ -152,17 +152,19 @@ export class BaseBot {
                     await handler(interaction, this);
                 }
             } catch (error) {
-                utils.errorLogger(error, this.clientId);
+                utils.errorLogger(this.clientId, error);
             }
         }
 
-        const log = `Interaction created, Command: ${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`;
+        const log = `Interaction created, Command: ${interaction.commandName}`;
         await utils.channelLogger(
             bot.guildInfo[interaction.guildId as string].channels.debug,
-            log,
-            'system'
+            'slash_command',
+            interaction.user.username as string,
+            interaction.channel?.id as string,
+            log
         );
-        utils.consoleLogger(log, this.clientId);
+        utils.systemLogger(this.clientId, log);
     }
     
     public initVoice = () => {

@@ -54,7 +54,7 @@ tomori.client.on(Events.ClientReady, async () => {
 
     // reboot message
     Object.entries(tomori.guildInfo).forEach(async ([guild_id, guild]) => {
-        await utils.channelLogger(guild.channels.debug, `${guild.bot_name}重開機囉!`, 'system');
+        await utils.channelLogger(guild.channels.debug, 'system', '', '', `${guild.bot_name}重開機囉!`);
     });
 });
 
@@ -97,7 +97,7 @@ app.get('/', (req, res) => {
 })
 
 app.post('/api/earthquake', (req, res) => {
-    utils.consoleLogger(`地震警報，預估震度${req.body.magnitude}級，${req.body.countdown}秒後抵達!!!`, tomori.clientId);
+    utils.systemLogger(tomori.clientId, `地震警報，預估震度${req.body.magnitude}級，${req.body.countdown}秒後抵達!!!`);
     Object.entries(tomori.guildInfo).forEach(async ([guild_id, guild_info]) => {
         earthquake_warning(
             guild_info.channels.earthquake,
@@ -110,5 +110,5 @@ app.post('/api/earthquake', (req, res) => {
 })
 
 app.listen(process.env.PORT, () => {
-    utils.consoleLogger(`Express server is running on port ${process.env.PORT}`, tomori.clientId);
+    utils.systemLogger(tomori.clientId, `Express server is running on port ${process.env.PORT}`)
 });

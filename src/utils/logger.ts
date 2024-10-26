@@ -1,4 +1,4 @@
-import { Channel } from "discord.js";
+import { Channel, EmbedBuilder } from "discord.js";
 import fs from 'fs';
 import { AllowedTextChannel } from "@dcbotTypes";
 
@@ -6,21 +6,44 @@ const getDate = () => {
     return new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) + ' ';
 }
 
-export const consoleLogger = (msg: string, bot_id: string) => {
-    console.log(getDate() + msg);
-    logBackup(msg, bot_id, 'logs');
+/**
+ * Log channel events to console and backup to *log* file
+ */
+export const eventLogger = (bot_id: string, msgType: string, user: string, channel: string, msg: string) => {
+    msg = msg.replaceAll('\n', '\\n');
+    let new_msg = `[${msgType.toUpperCase()}] User: ${user} | Channel: ${channel} | ${msg}`;
+    console.log(getDate() + new_msg);
+    logBackup(new_msg, bot_id, 'logs');
 }
 
-export const errorLogger = (msg: unknown, bot_id: string) => {
+/**
+ * Log system information to console and backup to *log* file
+ */
+export const systemLogger = (bot_id: string, msg: string) => {
+    let new_msg = `[SYSTEM] ${msg}`;
+    console.log(getDate() + new_msg);
+    logBackup(new_msg, bot_id, 'logs');
+}
+
+/**
+ * Log debug information to console and backup to *error* file
+ */
+export const errorLogger = (bot_id: string, msg: unknown) => {
     console.error(getDate() + msg);
     logBackup(msg, bot_id, 'errors');
 }
 
-export const channelLogger = async (debug_ch: Channel, msg: string, status: string) => {
+/**
+ * Log channel events to guild's channel
+ */
+export const channelLogger = async (debug_ch: Channel, msgType: string, user: string, channel: string, msg: string) => {
     debug_ch = debug_ch as AllowedTextChannel;
-    await debug_ch.send('_ _\n' + '[ ' + status.toUpperCase() + '] ' + msg);
+    await debug_ch.send(`[${msgType.toUpperCase()}] User: ${user} | Channel: ${channel} | ${msg}`);
 }
 
+/**
+ * Backup logs to file under *log_type* folder
+ */
 const logBackup = (msg: unknown, bot_id: string, log_type: string) => {
     // // backup to the same file until the file size is over 1MB, then create a new file
     // const path = `./${log_type}/${bot_id}/${bot_id}.log`;

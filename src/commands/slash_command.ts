@@ -37,7 +37,7 @@ export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBo
 
         await interaction.editReply({ content: helpContent });
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法取得指令清單"});
     }
 }
@@ -64,7 +64,7 @@ export const bug_report = async (interaction: ChatInputCommandInteraction, bot: 
             await interaction.reply({ content: "請通知管理員確認管理員設定", ephemeral: true });
         }
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.reply({ content: "無法回報問題", ephemeral: true });
     }
 }
@@ -99,10 +99,11 @@ export const talk = async (interaction: ChatInputCommandInteraction, bot: BaseBo
         } else {
             await channel.send(content);
 
-            await utils.channelLogger(bot.guildInfo[guild.id].channels.debug, `Talk Command Created, ${interaction.user.username}：${content}`, 'system');
+            // await utils.channelLogger(bot.guildInfo[guild.id].channels.debug, `Talk Command Created, ${interaction.user.username}：${content}`, 'system');
+            await utils.channelLogger(bot.guildInfo[guild.id].channels.debug, 'system', '', '', `Talk Command Created, ${interaction.user.username}：${content}`);
         }
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.reply({ content: "無法傳送訊息", ephemeral: true });
     }
 }
@@ -144,7 +145,7 @@ export const change_avatar = async (interaction: ChatInputCommandInteraction, bo
 
         await interaction.editReply({ content: `${oldName}已死，現在正是${newName}復權的時刻` });
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "更改失敗"});
     }
 }
@@ -158,7 +159,7 @@ export const random_restaurant = async (interaction: ChatInputCommandInteraction
 
         await interaction.editReply({ content: `今天吃 ${resdata.name} 吧！\n地址：${resdata.address}\n(https://www.google.com/maps/search/${encodeURIComponent(resdata.name)})` });
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法取得餐廳"});
     }
 }
@@ -186,7 +187,7 @@ export const imgen = async (interaction: ChatInputCommandInteraction, bot: BaseB
             await interaction.editReply({ content: "crychic和mygo吵架忙線中，請稍後再試 ❤️ " });
         }
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法產生圖片" });
     }
 }
@@ -249,7 +250,7 @@ export const search_anime_scene = async (interaction: ChatInputCommandInteractio
             }
         })
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法搜尋動畫截圖" });
     }
 }
@@ -282,7 +283,7 @@ export const pin_message = async (interaction: ChatInputCommandInteraction, bot:
             await interaction.editReply({ content: "無效的指令" });
         }
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法釘選訊息" });
     }
 }
@@ -353,7 +354,7 @@ export const record = async (interaction: ChatInputCommandInteraction, bot: Base
             await interaction.editReply({ content: "無效的指令" });
         }
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法錄音" });
     }
 }
@@ -421,7 +422,7 @@ export const weather_forecast = async (interaction: ChatInputCommandInteraction,
         const formattedContentWithBackticks = formattedContent;
         await interaction.editReply({ content: formattedContentWithBackticks });
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法取得天氣預報" });
     }
 }
@@ -455,7 +456,7 @@ export const level_detail = async (interaction: ChatInputCommandInteraction, bot
             await interaction.editReply({ content: "太長了...請選短一點的範圍" });
         }
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法取得等級詳情" });
     }
 }
@@ -502,7 +503,7 @@ export const todo_list = async (interaction: ChatInputCommandInteraction, bot: B
             await interaction.editReply({ content });
         }
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法變更待辦事項" });
     }
 }
@@ -565,7 +566,7 @@ export const update_role = async (interaction: ChatInputCommandInteraction, bot:
         }));
         await interaction.editReply({ content: "更新完成" });
     } catch (error) {
-        utils.errorLogger(error, bot.clientId);
+        utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法更新身份組" });
     }
 }

@@ -54,7 +54,7 @@ nijika.client.on(Events.ClientReady, async () => {
 
     // reboot message
     Object.entries(nijika.guildInfo).forEach(async ([guild_id, guild]) => {
-        await utils.channelLogger(guild.channels.debug, `${guild.bot_name}重開機囉!`, 'system');
+        await utils.channelLogger(guild.channels.debug, 'system', '', '', `${guild.bot_name}重開機囉!`);
     });
 });
 

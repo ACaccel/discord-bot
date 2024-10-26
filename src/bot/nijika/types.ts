@@ -101,7 +101,7 @@ export class Nijika extends BaseBot {
                         }
                     }
                 } catch(e) {
-                    utils.errorLogger(e, this.clientId);
+                    utils.errorLogger(this.clientId, e);
                 }
             })
             await Promise.all(fetchPromise);
@@ -117,12 +117,10 @@ export class Nijika extends BaseBot {
         
         if (oldMessage.content !== newMessage.content) {
             const record_ch = this.guildInfo[newMessage.guildId as string].channels.edit_delete_record as AllowedTextChannel;
-            const localTime = new Date(newMessage.createdTimestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-            const log = `Message updated, Old: ${oldMessage.content}, New: ${newMessage.content} ` +
-                `User: ${newMessage.author?.username}, Channel: <#${newMessage.channel.id}> ` +
-                `Time: ${localTime}`;
-            await utils.channelLogger(record_ch, log, 'system');
-            utils.consoleLogger(log, this.clientId);
+            const log = `Old: ${oldMessage.content} ---> New: ${newMessage.content} `;
+
+            await utils.channelLogger(record_ch, 'message_update', newMessage.author?.username as string, newMessage.channel.id as string, log);
+            utils.eventLogger(this.clientId, 'message_update', newMessage.author?.username as string, newMessage.channel.id as string, log);
         }
     }
 
@@ -130,12 +128,10 @@ export class Nijika extends BaseBot {
         if (message.author?.bot) return;
 
         const record_ch = this.guildInfo[message.guildId as string].channels.edit_delete_record as AllowedTextChannel;
-        const localTime = new Date(message.createdTimestamp).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-        const log = `Message deleted, Content: ${message.content} ` +
-            `User: ${message.author?.username}, Channel: <#${message.channel.id}> ` +
-            `Time: ${localTime}`;
-        await utils.channelLogger(record_ch, log, 'system');
-        utils.consoleLogger(log, this.clientId);
+        const log = `Deleted: ${message.content} `;
+
+        await utils.channelLogger(record_ch, 'message_delete', message.author?.username as string, message.channel.id as string, log);
+        utils.eventLogger(this.clientId, 'message_delete', message.author?.username as string, message.channel.id as string, log);
     }
 
     public detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember) => {
@@ -146,12 +142,10 @@ export class Nijika extends BaseBot {
         
         if (addedRoles.size > 0 || removedRoles.size > 0) {
             const debug_ch = this.guildInfo[newMember.guild.id].channels.debug as AllowedTextChannel;
-            const localTime = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-            const log = `Guild member roles updated, Added: ${addedRoles.map(role => role.name).join(', ')}, Removed: ${removedRoles.map(role => role.name).join(', ')} ` +
-                `User: ${newMember.user.username}, Guild: ${newMember.guild.name} ` +
-                `Time: ${localTime}`;
-            await utils.channelLogger(debug_ch, log, 'system');
-            utils.consoleLogger(log, this.clientId);
+            const log = `Added: ${addedRoles.map(role => role.name).join(', ')} | Removed: ${removedRoles.map(role => role.name).join(', ')}`;
+
+            await utils.channelLogger(debug_ch, 'guild_member_role_update', newMember.user.username, newMember.guild.id, log);
+            utils.eventLogger(this.clientId, 'guild_member_role_update', newMember.user.username, newMember.guild.id, log);
         }
     }
 }
