@@ -114,6 +114,7 @@ export class Nijika extends BaseBot {
 
     public detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage) => {
         if (oldMessage.author?.bot) return;
+        if (!this.guildInfo[newMessage.guildId as string].channels.edit_delete_record) return;
         
         if (oldMessage.content !== newMessage.content) {
             const record_ch = this.guildInfo[newMessage.guildId as string].channels.edit_delete_record as AllowedTextChannel;
@@ -126,6 +127,7 @@ export class Nijika extends BaseBot {
 
     public detectMessageDelete = async (message: Message | PartialMessage) => {
         if (message.author?.bot) return;
+        if (!this.guildInfo[message.guildId as string].channels.edit_delete_record) return;
 
         const record_ch = this.guildInfo[message.guildId as string].channels.edit_delete_record as AllowedTextChannel;
         const log = `Deleted: ${message.content} `;
@@ -135,11 +137,12 @@ export class Nijika extends BaseBot {
     }
 
     public detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember) => {
+        if (!this.guildInfo[newMember.guild.id].channels.debug) return;
+        
         const oldRoles = oldMember.roles.cache;
         const newRoles = newMember.roles.cache;
         const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
         const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
-        
         if (addedRoles.size > 0 || removedRoles.size > 0) {
             const debug_ch = this.guildInfo[newMember.guild.id].channels.debug as AllowedTextChannel;
             const log = `Added: ${addedRoles.map(role => role.name).join(', ')} | Removed: ${removedRoles.map(role => role.name).join(', ')}`;

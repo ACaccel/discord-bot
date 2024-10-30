@@ -123,25 +123,29 @@ export const change_avatar = async (interaction: ChatInputCommandInteraction, bo
             return;
         }
 
+        // change nickname and avatar
         const newName = interaction.options.get("identity")?.value as string;
         const oldName = bot.guildInfo[guild?.id].bot_name;
-        const newColorRole = guild?.roles.cache.find(role => role.name === identities[newName].color_role);
-        const oldColorRole = guild?.roles.cache.find(role => role.name === identities[oldName].color_role);
         const userBot = guild.members.cache.get(bot.client.user?.id as string);
         if (!userBot) {
             await interaction.editReply({ content: "找不到機器人"});
             return;
         }
-
-        // remove old color role and assign new color role
-        if (oldColorRole && userBot.roles.cache.has(oldColorRole?.id as string)) 
-            await userBot.roles.remove(oldColorRole);
-        if (newColorRole) 
-            await userBot.roles.add(newColorRole);
-
-        // change nickname and avatar
         await userBot.setNickname(newName);
         await userBot.client.user.setAvatar(identities[newName].avator_url);
+
+        // color roles
+        if (identities[newName].color_role) {
+            const newColorRole = guild?.roles.cache.find(role => role.name === identities[newName].color_role);
+            if (newColorRole) 
+                await userBot.roles.add(newColorRole);
+        }
+
+        if (identities[oldName] && identities[oldName].color_role) {
+            const oldColorRole = guild?.roles.cache.find(role => role.name === identities[oldName].color_role);
+            if (oldColorRole && userBot.roles.cache.has(oldColorRole?.id as string)) 
+                await userBot.roles.remove(oldColorRole);
+        }
 
         await interaction.editReply({ content: `${oldName}已死，現在正是${newName}復權的時刻` });
     } catch (error) {
@@ -397,7 +401,7 @@ export const gay = async (interaction: ChatInputCommandInteraction, bot: BaseBot
     const user = interaction.options.get("user")?.value;
     if (bot.guildInfo[interaction.guild?.id as string].members[user as string]) {
         const target = bot.guildInfo[interaction.guild?.id as string].members[user as string];
-        const res = `${target.nickname} ${(Math.random() > 0.05 ? "是" : "不是")} gay`;
+        const res = `${target.displayName} ${(Math.random() > 0.05 ? "是" : "不是")} gay`;
         await interaction.reply({ content: res });
     }
 }
@@ -505,6 +509,31 @@ export const todo_list = async (interaction: ChatInputCommandInteraction, bot: B
     } catch (error) {
         utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法變更待辦事項" });
+    }
+}
+
+export const get_avatar = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        const user = interaction.options.get("user")?.value as string;
+        const member = bot.guildInfo[interaction.guild?.id as string].members[user];
+        if (member) {
+            let url = member.displayAvatarURL();
+            url = url.replace(".webp", ".png?size=4096");
+
+            const embed = new EmbedBuilder()
+                .setTitle("User Avatar")
+                .setAuthor({ name: member.user.tag, iconURL: url })
+                .setImage(url)
+                .setColor(member.displayHexColor);
+
+            await interaction.editReply({ embeds: [embed] });
+        } else {
+            await interaction.editReply({ content: "找不到使用者" });
+        }
+    } catch (error) {
+        utils.errorLogger(bot.clientId, error);
+        await interaction.editReply({ content: "無法取得頭像" });
     }
 }
 

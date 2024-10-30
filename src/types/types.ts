@@ -127,13 +127,12 @@ export class BaseBot {
                 Routes.applicationGuildCommands(this.clientId, guildId), {
                 body: this.slashCommands
             })
-            .then(() =>
-                utils.systemLogger(this.clientId, `Successfully register ${this.slashCommands?.length} application (/) commands.`)
-            )
             .catch((err) => {
-                utils.systemLogger(this.clientId, `Failed to register application (/) commands: ${err}`);
+                utils.systemLogger(this.clientId, `Failed to register application (/) commands in guild ${guildId}: ${err}`);
             });
         });
+
+        utils.systemLogger(this.clientId, `Successfully register ${this.slashCommands?.length} application (/) commands.`)
     }
 
     public executeSlashCommands = async (bot: BaseBot, interaction: ChatInputCommandInteraction) => {
@@ -198,7 +197,7 @@ interface GuildConfig {
 
 interface Identity {
     avator_url: string;
-    color_role: string;
+    color_role?: string;
 }
 
 export interface Command {
