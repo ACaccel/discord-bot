@@ -11,7 +11,7 @@ const getDate = () => {
  */
 export const guildLogger = (bot_id: string, event_type: string, msg: string, guild_name: string) => {
     msg = msg.replaceAll('\n', '\\n');
-    let new_msg = `[${event_type.toUpperCase()}] ${guild_name} - ${msg}`;
+    let new_msg = `[${event_type.toUpperCase()}] <${guild_name}> - ${msg}`;
     console.log(getDate() + new_msg);
     logBackup(new_msg, bot_id, 'logs');
 }

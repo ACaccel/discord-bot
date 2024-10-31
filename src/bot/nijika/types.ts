@@ -131,7 +131,7 @@ export class Nijika extends BaseBot {
             .setTimestamp();
         utils.channelLogger(this.guildInfo[newMessage.guildId as string].channels.edit_delete_record, embed);
 
-        const log = `User: <@${newMessage.author?.username}>, Channel: <#${newMessage.guild?.channels.cache.get(newMessage.channel.id)?.name}>, Old: ${oldMessage.content}, New: ${newMessage.content}`;
+        const log = `User: ${newMessage.author?.username}, Channel: ${newMessage.guild?.channels.cache.get(newMessage.channel.id)?.name}, Old: ${oldMessage.content}, New: ${newMessage.content}`;
         utils.guildLogger(this.clientId, 'message_update', log, newMessage.guild?.name as string);
     }
 
@@ -160,7 +160,7 @@ export class Nijika extends BaseBot {
         }
         utils.channelLogger(this.guildInfo[message.guildId as string].channels.edit_delete_record, embed);
 
-        const log = `User: <@${message.author?.username}>, Channel: <#${message.guild?.channels.cache.get(message.channel.id)?.name}>, Message: ${message.content}`;
+        const log = `User: ${message.author?.username}, Channel: ${message.guild?.channels.cache.get(message.channel.id)?.name}, Message: ${message.content}`;
         utils.guildLogger(this.clientId, 'message_delete', log, message.guild?.name as string);
     }
 

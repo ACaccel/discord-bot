@@ -490,10 +490,11 @@ export const todo_list = async (interaction: ChatInputCommandInteraction, bot: B
                 return;
             }
             if (parseInt(content) > todoList.length) {
-                await interaction.editReply({ content: `找不到待辦事項：${content}！` });
+                await interaction.editReply({ content: `找不到待辦事項：${content}` });
             } else {
-                await db.Todo.deleteOne({ name: todoList[parseInt(content) - 1].content });
-                await interaction.editReply({ content: `已刪除待辦事項：${content}！` });
+                const deleted_content = todoList[parseInt(content) - 1].content;
+                await db.Todo.deleteOne({ content: deleted_content });
+                await interaction.editReply({ content: `已刪除待辦事項：${deleted_content}` });
             }
         } else if (action == "list") {
             const todoList = await db.Todo.find({});
