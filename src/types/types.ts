@@ -156,7 +156,7 @@ export class BaseBot {
             }
         }
 
-        const log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`;
+        const log = `Command: /${interaction.commandName}, User: <@${interaction.user.username}>, Channel: <#${interaction.channel?.id}>`;
         utils.channelLogger(bot.guildInfo[interaction.guildId as string].channels.debug, undefined, log);
         utils.guildLogger(this.clientId, 'interaction_create', log, interaction.guild?.name as string);
     }
