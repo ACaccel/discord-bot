@@ -7,11 +7,11 @@ const getDate = () => {
 }
 
 /**
- * Log channel events to console and backup to *log* file
+ * Log guild events to console and backup to *log* file
  */
-export const eventLogger = (bot_id: string, msgType: string, user: string, channel: string, msg: string) => {
+export const guildLogger = (bot_id: string, event_type: string, msg: string, guild_name: string) => {
     msg = msg.replaceAll('\n', '\\n');
-    let new_msg = `[${msgType.toUpperCase()}] User: ${user} | Channel: ${channel} | ${msg}`;
+    let new_msg = `[${event_type.toUpperCase()}] ${guild_name} - ${msg}`;
     console.log(getDate() + new_msg);
     logBackup(new_msg, bot_id, 'logs');
 }
@@ -34,11 +34,18 @@ export const errorLogger = (bot_id: string, msg: unknown) => {
 }
 
 /**
- * Log channel events to guild's channel
+ * Log channel events as embedded message to guild's channel.
  */
-export const channelLogger = async (debug_ch: Channel, msgType: string, user: string, channel: string, msg: string) => {
-    debug_ch = debug_ch as AllowedTextChannel;
-    await debug_ch.send(`[${msgType.toUpperCase()}] User: ${user} | Channel: ${channel} | ${msg}`);
+export const channelLogger = async (channel: Channel, embed?: EmbedBuilder, log?: string) => {
+    channel = channel as AllowedTextChannel;
+
+    if (log) {
+        await channel.send(log);
+    }
+
+    if (embed) {
+        await channel.send({ embeds: [embed] });
+    }
 }
 
 /**

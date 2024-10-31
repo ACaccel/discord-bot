@@ -9,7 +9,8 @@ import {
     PublicThreadChannel,
     ChatInputCommandInteraction,
     GuildMember,
-    Role
+    Role,
+    EmbedBuilder
 } from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
@@ -155,15 +156,9 @@ export class BaseBot {
             }
         }
 
-        const log = `Interaction created, Command: ${interaction.commandName}`;
-        await utils.channelLogger(
-            bot.guildInfo[interaction.guildId as string].channels.debug,
-            'slash_command',
-            interaction.user.username as string,
-            interaction.channel?.id as string,
-            log
-        );
-        utils.systemLogger(this.clientId, log);
+        const log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`;
+        utils.channelLogger(bot.guildInfo[interaction.guildId as string].channels.debug, undefined, log);
+        utils.guildLogger(this.clientId, 'interaction_create', log, interaction.guild?.name as string);
     }
     
     public initVoice = () => {

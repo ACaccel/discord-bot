@@ -6,7 +6,7 @@ import {
 import dotenv from "dotenv";
 import express from 'express';
 
-import { Config } from '@dcbotTypes';
+import { Config, AllowedTextChannel } from '@dcbotTypes';
 import utils from '@utils';
 import { Tomori } from './types';
 import { earthquake_warning } from '@cmd';
@@ -54,7 +54,8 @@ tomori.client.on(Events.ClientReady, async () => {
 
     // reboot message
     Object.entries(tomori.guildInfo).forEach(async ([guild_id, guild]) => {
-        await utils.channelLogger(guild.channels.debug, 'system', '', '', `${guild.bot_name}重開機囉!`);
+        const debug_ch = tomori.guildInfo[guild_id].channels.debug as AllowedTextChannel;
+        await debug_ch.send(`${guild.bot_name}重開機囉!`);
     });
 });
 
