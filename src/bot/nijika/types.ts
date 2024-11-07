@@ -25,15 +25,15 @@ export class Nijika extends BaseBot {
 
     public messageBackup = (guiild_id: string, minute: number) => {
         setInterval(async () => {
-            var begin = Date.now();
-            var newMessageCnt = 0;
-            const totalMessageCnt = await db.Message.countDocuments({});
-            const debug_ch = this.guildInfo[guiild_id].channels.debug as AllowedTextChannel;
-            const sentMessage = await debug_ch.send(`[ SYSTEM ] on scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
-            const fetchPromise = this.guildInfo[guiild_id].guild.channels.cache.map(async(channel) => {
-                const channelName = channel.name;
-                try {
+            try {
+                var begin = Date.now();
+                var newMessageCnt = 0;
+                const totalMessageCnt = await db.Message.countDocuments({});
+                const debug_ch = this.guildInfo[guiild_id].channels.debug as AllowedTextChannel;
+                const sentMessage = await debug_ch.send(`[ SYSTEM ] on scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
+                const fetchPromise = this.guildInfo[guiild_id].guild.channels.cache.map(async(channel) => {
                     // check if channel is already in database
+                    const channelName = channel.name;
                     var lastMessageQuery = await db.Fetch.findOne({channel: channelName, channelID: channel.id});
                     if(lastMessageQuery === null) {
                         const lastMessage = new db.Fetch({
@@ -101,15 +101,14 @@ export class Nijika extends BaseBot {
                             }
                         }
                     }
-                } catch(e) {
-                    utils.errorLogger(this.clientId, e);
-                }
-            })
-            await Promise.all(fetchPromise);
-            var end = Date.now();
-            var timeSpent = (end-begin) / 1000;
-            await sentMessage.edit(`[ SYSTEM ] end scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages. (${timeSpent} sec)`);
-
+                });
+                await Promise.all(fetchPromise);
+                var end = Date.now();
+                var timeSpent = (end-begin) / 1000;
+                await sentMessage.edit(`[ SYSTEM ] end scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages. (${timeSpent} sec)`);
+            } catch(e) {
+                utils.errorLogger(this.clientId, e);
+            }
         }, minute * 60 * 1000);
     }
 
