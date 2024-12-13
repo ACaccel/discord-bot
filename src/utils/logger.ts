@@ -1,10 +1,40 @@
-import { Channel, EmbedBuilder } from "discord.js";
+import { Attachment, Channel, EmbedBuilder } from "discord.js";
 import fs from 'fs';
 import { AllowedTextChannel } from "@dcbotTypes";
+import path from 'path';
+import axios from 'axios';
 
 const getDate = () => {
     return new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) + ' ';
 }
+
+/**
+ * (test) save deleted attachments
+ */
+export const attachmentLogger = async (bot_id: string, attachment: Attachment) => {
+    try {
+        // Define the path where the attachment will be saved
+        const filePath = `./assets/${getDate().replaceAll('/', '_').replaceAll(':', '_')}${attachment.name}`;
+
+        // Ensure the directory exists
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+
+        // Fetch the attachment data and save it to the file
+        const response = await axios.get(attachment.url, { responseType: 'stream' });
+
+        // Save the file
+        const writer = fs.createWriteStream(filePath);
+        response.data.pipe(writer);
+
+        // Wait for the file to finish saving
+        await new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+        });
+    } catch (error) {
+        console.error('Error saving attachment:', error);
+    }
+};
 
 /**
  * Log guild events to console and backup to *log* file

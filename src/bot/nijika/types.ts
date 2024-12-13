@@ -116,6 +116,17 @@ export class Nijika extends BaseBot {
         if (oldMessage.author?.bot) return;
         if (!this.guildInfo[newMessage.guildId as string].channels.edit_delete_record) return;
         if (!oldMessage.content || !newMessage.content || oldMessage.content === newMessage.content) return;
+
+        let old_msg = oldMessage.content;
+        let new_msg = newMessage.content;
+        if (old_msg.length > 1000) {
+            old_msg = old_msg.slice(0, 1000);
+            old_msg += '...';
+        }
+        if (new_msg.length > 1000) {
+            new_msg = new_msg.slice(0, 1000);
+            new_msg += '...';
+        }
         
         const embed = new EmbedBuilder()
             .setColor(0x00FF00)
@@ -124,8 +135,8 @@ export class Nijika extends BaseBot {
             .addFields(
                 { name: 'author', value: `<@${newMessage.author?.id}>`, inline: true },
                 { name: 'channel', value: `<#${newMessage.channel.id}>`, inline: true },
-                { name: 'old message', value: oldMessage.content, inline: false },
-                { name: 'new message', value: newMessage.content, inline: false }
+                { name: 'old message', value: old_msg, inline: false },
+                { name: 'new message', value: new_msg, inline: false }
             )
             .setTimestamp();
         utils.channelLogger(this.guildInfo[newMessage.guildId as string].channels.edit_delete_record, embed);
@@ -138,6 +149,16 @@ export class Nijika extends BaseBot {
         if (message.author?.bot) return;
         if (!this.guildInfo[message.guildId as string].channels.edit_delete_record) return;
 
+        let msg = '';
+        if (!message.content) {
+            msg = 'No content';
+        } else if (message.content.length > 1000) {
+            msg = message.content.slice(0, 1000);
+            msg += '...';
+        } else {
+            msg = message.content;
+        }
+
         const embed = new EmbedBuilder()
             .setColor(0xFF0000)
             .setTitle('Message Deleted')
@@ -145,7 +166,7 @@ export class Nijika extends BaseBot {
             .addFields(
                 { name: 'author', value: `<@${message.author?.id}>`, inline: true },
                 { name: 'channel', value: `<#${message.channel.id}>`, inline: true },
-                { name: 'message', value: message.content ? message.content : 'No content', inline: false }
+                { name: 'message', value: msg, inline: false }
             )
             .setTimestamp();
         if (message.attachments.size > 0) {
@@ -155,6 +176,7 @@ export class Nijika extends BaseBot {
                 } else {
                     embed.addFields({ name: 'attachment', value: attachment.url, inline: false });
                 }
+                utils.attachmentLogger(this.clientId, attachment);
             });
         }
         utils.channelLogger(this.guildInfo[message.guildId as string].channels.edit_delete_record, embed);
@@ -194,4 +216,5 @@ export class Nijika extends BaseBot {
 interface NijikaConfig {
     bad_words: string[];
     backup_server: string;
+    blocked_channels: string[];
 }

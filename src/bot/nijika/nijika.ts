@@ -9,6 +9,7 @@ import { Config, AllowedTextChannel } from '@dcbotTypes';
 import { Nijika } from './types';
 import { anti_dizzy_react, auto_reply } from './message_reply';
 import config from './config.json';
+import utils from '@utils';
 
 dotenv.config({ path: './src/bot/nijika/.env' });
 
@@ -77,18 +78,38 @@ nijika.client.on(Events.InteractionCreate, async (interaction) => {
 nijika.client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot) return;
 
-    await anti_dizzy_react(message);
-    await auto_reply(message, nijika);
+    try {
+        await anti_dizzy_react(message);
+        await auto_reply(message, nijika);
+    } catch (e) {
+        utils.errorLogger(nijika.clientId, e);
+    }
 });
 
 nijika.client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
-    await nijika.detectMessageUpdate(oldMessage, newMessage);
+    if (nijika.nijikaConfig.blocked_channels.includes(oldMessage.channel.id)) return;
+
+    try {
+        await nijika.detectMessageUpdate(oldMessage, newMessage);
+    } catch (e) {
+        utils.errorLogger(nijika.clientId, e);
+    }
 });
 
 nijika.client.on(Events.MessageDelete, async (message) => {
-    await nijika.detectMessageDelete(message);
+    if (nijika.nijikaConfig.blocked_channels.includes(message.channel.id)) return;
+
+    try {
+        await nijika.detectMessageDelete(message);
+    } catch (e) {
+        utils.errorLogger(nijika.clientId, e);
+    }
 });
 
 nijika.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-    await nijika.detectGuildMemberUpdate(oldMember, newMember);
+    try {
+        await nijika.detectGuildMemberUpdate(oldMember, newMember);
+    } catch (e) {
+        utils.errorLogger(nijika.clientId, e);
+    }
 });
