@@ -11,7 +11,7 @@ export const earthquake_warning = async(channel: Channel, eq_role: string, magni
         "\n> 為什麼要地震！？");
         // channel.send(`# 有感地震警報，台北預估震度${magnitude}級，${countdown}秒後抵達！！！` +
         // "\n> 為什麼要地震！？");
-    } else {
+    } else if (magnitude >= 1) {
         channel.send(`# 有感地震警報，台北預估震度${magnitude}級，${countdown}秒後抵達！！！` +
         "\n> 為什麼要地震！？");
     }
