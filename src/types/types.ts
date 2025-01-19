@@ -121,15 +121,15 @@ export class BaseBot {
 
         // register slash commands to discord
         const rest = new REST().setToken(this.token)
-        await this.client.application?.commands.set([]);
+        await rest.put(Routes.applicationCommands(this.clientId), { body: [] })
+        .catch((err) => {
+            utils.systemLogger(this.clientId, `Failed to clear application (/) commands: ${err}`);
+        });
+
         Object.entries(this.guildInfo).forEach(async ([guildId, guildInfo]) => {
-            await this.client.guilds.cache.get(guildId)?.commands.set([]);
-            await rest.put(
-                Routes.applicationGuildCommands(this.clientId, guildId), {
-                body: this.slashCommands
-            })
+            await rest.put(Routes.applicationGuildCommands(this.clientId, guildId), { body: this.slashCommands })
             .catch((err) => {
-                utils.systemLogger(this.clientId, `Failed to register application (/) commands in guild ${guildId}: ${err}`);
+                utils.systemLogger(this.clientId, `Failed to register guild (/) commands: ${err}`);
             });
         });
 

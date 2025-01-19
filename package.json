@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "install": "yarn install --frozen-lockfile",
+    "install-lock": "yarn install --frozen-lockfile",
     "test": "echo \"Error: no test specified\" && exit 1",
     "tomori": "ts-node src/bot/tomori/tomori.ts",
     "nijika": "ts-node src/bot/nijika/nijika.ts"
