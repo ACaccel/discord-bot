@@ -58,6 +58,7 @@ export class BaseBot {
     public registerGuild = () => {
         utils.systemLogger(this.clientId, "Registering guilds...");
         try {
+            let guild_num = 0;
             this.config.guilds.forEach((config) => {
                 // register channels
                 let newChannel: Record<string, Channel> = {};
@@ -89,6 +90,8 @@ export class BaseBot {
                     members: memberList
                 };
                 this.guildInfo[config.guild_id] = newGuild;
+                guild_num++;
+                utils.systemLogger(this.clientId, `${guild_num}. ${newGuild.guild.id} - ${newGuild.guild.name}`);
             });
 
             utils.systemLogger(this.clientId, "Successfully registered all guilds.");

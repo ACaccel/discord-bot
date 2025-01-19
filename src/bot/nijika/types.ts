@@ -1,6 +1,5 @@
 import { 
     Client,
-    ChannelType, 
     GuildMember, 
     Message, 
     PartialGuildMember, 
