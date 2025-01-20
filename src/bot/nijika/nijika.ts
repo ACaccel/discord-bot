@@ -52,12 +52,15 @@ nijika.client.on(Events.ClientReady, async () => {
     nijika.registerGuild();
     await nijika.registerSlashCommands();
     nijika.initSlashCommandsHandlers();
-    nijika.messageBackup(nijika.nijikaConfig.backup_server, 10);
 
     // reboot message
     Object.entries(nijika.guildInfo).forEach(async ([guild_id, guild]) => {
-        const debug_ch = nijika.guildInfo[guild_id].channels.debug as AllowedTextChannel;
-        await debug_ch.send(`${guild.bot_name}重開機囉!`);
+        try {
+            const debug_ch = nijika.guildInfo[guild_id].channels.debug as AllowedTextChannel;
+            await debug_ch.send(`${guild.bot_name}重開機囉!`);
+        } catch (error) {
+            utils.errorLogger(nijika.clientId, error);
+        }
     });
 });
 

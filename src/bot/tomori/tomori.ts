@@ -56,8 +56,12 @@ tomori.client.on(Events.ClientReady, async () => {
 
     // reboot message
     Object.entries(tomori.guildInfo).forEach(async ([guild_id, guild]) => {
-        const debug_ch = tomori.guildInfo[guild_id].channels.debug as AllowedTextChannel;
-        await debug_ch.send(`${guild.bot_name}重開機囉!`);
+        try {
+            const debug_ch = tomori.guildInfo[guild_id].channels.debug as AllowedTextChannel;
+            await debug_ch.send(`${guild.bot_name}重開機囉!`);
+        } catch (error) {
+            utils.errorLogger(tomori.clientId, error);
+        }
     });
 });
 
