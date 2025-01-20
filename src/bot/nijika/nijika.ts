@@ -54,14 +54,7 @@ nijika.client.on(Events.ClientReady, async () => {
     nijika.initSlashCommandsHandlers();
 
     // reboot message
-    Object.entries(nijika.guildInfo).forEach(async ([guild_id, guild]) => {
-        try {
-            const debug_ch = nijika.guildInfo[guild_id].channels.debug as AllowedTextChannel;
-            await debug_ch.send(`${guild.bot_name}重開機囉!`);
-        } catch (error) {
-            utils.errorLogger(nijika.clientId, error);
-        }
-    });
+    await nijika.rebootMessage();
 });
 
 nijika.client.on(Events.InteractionCreate, async (interaction) => {

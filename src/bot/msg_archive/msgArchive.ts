@@ -37,12 +37,5 @@ msgArchive.client.on(Events.ClientReady, async () => {
     msgArchive.messageBackup(msgArchive.msgArchiveConfig.backup_server, 10);
 
     // reboot message
-    Object.entries(msgArchive.guildInfo).forEach(async ([guild_id, guild]) => {
-        try {
-            const debug_ch = msgArchive.guildInfo[guild_id].channels.debug as AllowedTextChannel;
-            await debug_ch.send(`${guild.bot_name}重開機囉!`);
-        } catch (error) {
-            utils.errorLogger(msgArchive.clientId, error);
-        }
-    });
+    await msgArchive.rebootMessage();
 });

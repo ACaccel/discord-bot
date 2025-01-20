@@ -171,6 +171,18 @@ export class BaseBot {
             connection: null
         }
     }
+
+    public rebootMessage = async () => {
+        Object.entries(this.guildInfo).forEach(async ([guild_id, guild]) => {
+            try {
+                const debug_ch = this.guildInfo[guild_id].channels.debug as AllowedTextChannel;
+                if (!debug_ch) return;
+                await debug_ch.send(`${guild.bot_name}重開機囉!`);
+            } catch (error) {
+                utils.errorLogger(this.clientId, error);
+            }
+        });
+    }
 }
 
 export interface Config {
