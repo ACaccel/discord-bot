@@ -73,13 +73,6 @@ export const auto_reply = async (msg: Message, bot: Nijika, guild_id: string) =>
     }
 
     // special reply
-    if (bot.nijikaConfig.bad_words.some((e) => { msg.content.includes(e) })) {
-        // reply to bad words
-        const { reply, success } = await search_reply("[$]", bot, guild_id);
-        if (success) { 
-            await msg.channel.send(`${reply as string}`);
-        }
-    }
     if (msg.author.id === "516912789369913371" && Math.random() > (1-0.005)) {
         // reply to fatcat
         await msg.channel.send("肥貓好gay");

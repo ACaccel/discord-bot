@@ -22,7 +22,7 @@ export class Nijika extends BaseBot {
 
     public detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage) => {
         if (oldMessage.author?.bot) return;
-        if (!this.guildInfo[newMessage.guildId as string].channels.edit_delete_record) return;
+        if (!this.guildInfo[newMessage.guildId as string].channels.event) return;
         if (!oldMessage.content || !newMessage.content || oldMessage.content === newMessage.content) return;
 
         let old_msg = oldMessage.content;
@@ -47,7 +47,7 @@ export class Nijika extends BaseBot {
                 { name: 'new message', value: new_msg, inline: false }
             )
             .setTimestamp();
-        utils.channelLogger(this.guildInfo[newMessage.guildId as string].channels.edit_delete_record, embed);
+        utils.channelLogger(this.guildInfo[newMessage.guildId as string].channels.event, embed);
 
         const log = `User: ${newMessage.author?.username}, Channel: ${newMessage.guild?.channels.cache.get(newMessage.channel.id)?.name}, Old: ${oldMessage.content}, New: ${newMessage.content}`;
         utils.guildLogger(this.clientId, 'message_update', log, newMessage.guild?.name as string);
@@ -55,7 +55,7 @@ export class Nijika extends BaseBot {
 
     public detectMessageDelete = async (message: Message | PartialMessage) => {
         if (message.author?.bot) return;
-        if (!this.guildInfo[message.guildId as string].channels.edit_delete_record) return;
+        if (!this.guildInfo[message.guildId as string].channels.event) return;
 
         let msg = '';
         if (!message.content) {
@@ -87,7 +87,7 @@ export class Nijika extends BaseBot {
                 utils.attachmentLogger(this.clientId, attachment);
             });
         }
-        utils.channelLogger(this.guildInfo[message.guildId as string].channels.edit_delete_record, embed);
+        utils.channelLogger(this.guildInfo[message.guildId as string].channels.event, embed);
 
         const log = `User: ${message.author?.username}, Channel: ${message.guild?.channels.cache.get(message.channel.id)?.name}, Message: ${message.content}`;
         utils.guildLogger(this.clientId, 'message_delete', log, message.guild?.name as string);
@@ -114,7 +114,7 @@ export class Nijika extends BaseBot {
                 { name: 'removed roles', value: removedRolesList ? removedRolesList : 'No roles removed', inline: true }
             )
             .setTimestamp();
-        utils.channelLogger(this.guildInfo[newMember.guild.id].channels.debug, embed);
+        utils.channelLogger(this.guildInfo[newMember.guild.id].channels.event, embed);
 
         const log = `User: ${newMember.user.username}, Added: ${addedRolesList}, Removed: ${removedRolesList}`;
         utils.guildLogger(this.clientId, 'guild_member_update', log, newMember.guild.name);
@@ -122,7 +122,6 @@ export class Nijika extends BaseBot {
 }
 
 interface NijikaConfig {
-    bad_words: string[];
     blocked_channels: string[];
     level_roles: Record<string, string>;
 }

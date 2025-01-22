@@ -82,7 +82,7 @@ nijika.client.on(Events.MessageCreate, async (message) => {
     try {
         const content = message.content
         if (content.includes('該睡覺了，肥貓跟你說晚安')) {
-            message.reply('為什麼要睡覺!?<:karyl_fuckyou:1170748129637830708>')
+            await message.reply('為什麼要睡覺!?<:karyl_fuckyou:1170748129637830708>')
         }
 
         await anti_dizzy_react(message);
