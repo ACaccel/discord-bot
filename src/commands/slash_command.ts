@@ -619,13 +619,14 @@ export const raffle = async (interaction: ChatInputCommandInteraction, bot: Base
     }
 }
 
-/********** Only for Tomori **********/
+/********** Only for Nijika **********/
 
 export const update_role = async (interaction: ChatInputCommandInteraction, bot: Nijika) => {
     await interaction.deferReply();
     try {
         let leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
         let guild = bot.guildInfo[interaction.guild?.id as string].guild;
+        const channel = interaction.channel as AllowedTextChannel;
         // let alive_role = guild.roles.cache.find(role => role.name === "活人");
 
         await Promise.all(leaderboard.map(async (member) => {
@@ -652,27 +653,21 @@ export const update_role = async (interaction: ChatInputCommandInteraction, bot:
             }
             if (roleToAssign === "") return;
 
-            // test if the role is exist
-            let CorrectRole = guildMember.roles.cache.some(role => role.name === roleToAssign);
-            if (!CorrectRole) {
-                const channel = interaction.channel as AllowedTextChannel;
-
-                // remove old role
-                for (let roleLevel in bot.nijikaConfig.level_roles) {
-                    let roleName = bot.nijikaConfig.level_roles[roleLevel];
-                    let role = guild.roles.cache.find(role => role.name === roleName);
-                    if (role) {
-                        let _ = await guildMember.roles.remove(role);
-                        await channel.send(`[ SYSTEM ] 移除 ${guildMember.user.tag} ${roleName}`);
-                    }
+            // update role
+            const addedRole = guild.roles.cache.find(role => role.name === roleToAssign);
+            const hasRoleToAssign = guildMember.roles.cache.has(addedRole?.id as string);
+            for (const roleLevel in bot.nijikaConfig.level_roles) {
+                const removedRole = guild.roles.cache.find(role => role.name === bot.nijikaConfig.level_roles[roleLevel]);
+                if (!removedRole) continue;
+                
+                if (guildMember.roles.cache.has(removedRole.id) && removedRole.name !== roleToAssign) {
+                    await guildMember.roles.remove(removedRole);
+                    await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 移除: ${bot.nijikaConfig.level_roles[roleLevel]}`);
                 }
-
-                // add new role
-                const role = guild.roles.cache.find(role => role.name === roleToAssign);
-                if (role) {
-                    let _ = await guildMember.roles.add(role);
-                    await channel.send(`[ SYSTEM ] 給予 ${guildMember.user.tag} ${roleToAssign}`);
-                }
+            }
+            if (addedRole && !hasRoleToAssign) {
+                await guildMember.roles.add(addedRole);
+                await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 獲得: ${roleToAssign}`);
             }
         }));
         await interaction.editReply({ content: "更新完成" });
