@@ -19,7 +19,7 @@ import {
     AllowedTextChannel
 } from "@dcbotTypes";
 import utils from "@utils";
-import { Tomori } from "bot/tomori/types";
+import { Nijika } from "bot/nijika/types";
 
 export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
@@ -127,19 +127,20 @@ export const change_avatar = async (interaction: ChatInputCommandInteraction, bo
             return;
         }
         await userBot.setNickname(newName);
-        await userBot.client.user.setAvatar(identities[newName].avator_url);
+        await userBot.client.user.setAvatar(identities[newName].avatar_url);
+        bot.guildInfo[guild.id].bot_name = newName;
 
         // color roles
-        if (identities[newName].color_role) {
-            const newColorRole = guild?.roles.cache.find(role => role.name === identities[newName].color_role);
-            if (newColorRole) 
-                await userBot.roles.add(newColorRole);
-        }
-
         if (identities[oldName] && identities[oldName].color_role) {
             const oldColorRole = guild?.roles.cache.find(role => role.name === identities[oldName].color_role);
             if (oldColorRole && userBot.roles.cache.has(oldColorRole?.id as string)) 
                 await userBot.roles.remove(oldColorRole);
+        }
+        
+        if (identities[newName] && identities[newName].color_role) {
+            const newColorRole = guild?.roles.cache.find(role => role.name === identities[newName].color_role);
+            if (newColorRole) 
+                await userBot.roles.add(newColorRole);
         }
 
         await interaction.editReply({ content: `${oldName}已死，現在正是${newName}復權的時刻` });
@@ -620,7 +621,7 @@ export const raffle = async (interaction: ChatInputCommandInteraction, bot: Base
 
 /********** Only for Tomori **********/
 
-export const update_role = async (interaction: ChatInputCommandInteraction, bot: Tomori) => {
+export const update_role = async (interaction: ChatInputCommandInteraction, bot: Nijika) => {
     await interaction.deferReply();
     try {
         let leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
@@ -642,9 +643,9 @@ export const update_role = async (interaction: ChatInputCommandInteraction, bot:
 
             // find corresponding role
             let roleToAssign = "";
-            for (const roleLevel in bot.tomoriConfig.level_roles) {
+            for (const roleLevel in bot.nijikaConfig.level_roles) {
                 if (level >= parseInt(roleLevel.split('_')[1])) {
-                    roleToAssign = bot.tomoriConfig.level_roles[roleLevel];
+                    roleToAssign = bot.nijikaConfig.level_roles[roleLevel];
                 } else {
                     break;
                 }
@@ -657,8 +658,8 @@ export const update_role = async (interaction: ChatInputCommandInteraction, bot:
                 const channel = interaction.channel as AllowedTextChannel;
 
                 // remove old role
-                for (let roleLevel in bot.tomoriConfig.level_roles) {
-                    let roleName = bot.tomoriConfig.level_roles[roleLevel];
+                for (let roleLevel in bot.nijikaConfig.level_roles) {
+                    let roleName = bot.nijikaConfig.level_roles[roleLevel];
                     let role = guild.roles.cache.find(role => role.name === roleName);
                     if (role) {
                         let _ = await guildMember.roles.remove(role);

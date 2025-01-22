@@ -10,5 +10,4 @@ export class Tomori extends BaseBot {
 }
 
 interface TomoriConfig {
-    level_roles: Record<string, string>;
 }

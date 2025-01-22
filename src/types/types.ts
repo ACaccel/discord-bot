@@ -227,7 +227,7 @@ interface GuildConfig {
 }
 
 interface Identity {
-    avator_url: string;
+    avatar_url: string;
     color_role?: string;
 }
 
