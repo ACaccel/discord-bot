@@ -100,7 +100,7 @@ export class BaseBot {
 
     public connectGuildDB = async () => {
         utils.systemLogger(this.clientId, "Connecting to MongoDB...");
-        Object.entries(this.guildInfo).forEach(async ([guild_id, guild]) => {
+        const promises = Object.entries(this.guildInfo).map(async ([guild_id, guild]) => {
             try {
                 const database = await db.dbConnect(this.mongoURI, guild_id, this.clientId);
                 if (database) {
@@ -113,6 +113,7 @@ export class BaseBot {
                 utils.systemLogger(this.clientId, `Cannot connect to MongoDB: ${err}`);
             }
         });
+        await Promise.all(promises);
     }
 
     public initSlashCommandsHandlers = () => {

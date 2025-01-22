@@ -4,7 +4,6 @@ import {
     Events,
 } from 'discord.js';
 import dotenv from "dotenv";
-
 import { Config } from '@dcbotTypes';
 import { MsgArchive } from './types';
 import config from './config.json';
@@ -33,8 +32,8 @@ msgArchive.login();
 msgArchive.client.on(Events.ClientReady, async () => {
     // bot online init
     msgArchive.registerGuild();
-    msgArchive.connectGuildDB();
-    msgArchive.messageBackup(msgArchive.msgArchiveConfig.backup_server, 10);
+    await msgArchive.connectGuildDB();
+    await msgArchive.messageBackup(msgArchive.msgArchiveConfig.backup_server, 30);
 
     // reboot message
     await msgArchive.rebootMessage();

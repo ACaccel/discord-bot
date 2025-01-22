@@ -4,7 +4,6 @@ import {
     BaseBot,
     Config
 } from '@dcbotTypes';
-import db from '@db';
 import utils from '@utils';
 import msgArchiveConfig from './config.json';
 
@@ -16,10 +15,14 @@ export class MsgArchive extends BaseBot {
         this.msgArchiveConfig = msgArchiveConfig as MsgArchiveConfig;
     }
 
-    public messageBackup = async (guild_id: string, minute: number) => {
-        await this.backup(guild_id);
-        setInterval(async () => {
+    public messageBackup = async (guild_ids: string[], minute: number) => {
+        for (const guild_id of guild_ids) {
             await this.backup(guild_id);
+        }
+        setInterval(async () => {
+            for (const guild_id of guild_ids) {
+                await this.backup(guild_id);
+            }
         }, minute * 60 * 1000);
     }
 
@@ -27,15 +30,20 @@ export class MsgArchive extends BaseBot {
         try {
             var begin = Date.now();
             var newMessageCnt = 0;
-            const totalMessageCnt = await db.Message.countDocuments({});
+            const db = this.guildInfo[guild_id].db;
+            if (!db) {
+                utils.errorLogger(this.clientId, "Database not found");
+                return;
+            }
+            const totalMessageCnt = await db.models["Message"].countDocuments({});
             const debug_ch = this.guildInfo[guild_id].channels.debug as AllowedTextChannel;
             const sentMessage = await debug_ch.send(`[ SYSTEM ] on scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
             const fetchPromise = this.guildInfo[guild_id].guild.channels.cache.map(async(channel) => {
                 // check if channel is already in database
                 const channelName = channel.name;
-                var lastMessageQuery = await db.Fetch.findOne({channel: channelName, channelID: channel.id});
+                var lastMessageQuery = await db.models["Fetch"].findOne({channel: channelName, channelID: channel.id});
                 if(lastMessageQuery === null) {
-                    const lastMessage = new db.Fetch({
+                    const lastMessage = new db.models["Fetch"]({
                         channel: channelName,
                         channelID:channel.id,
                         lastMessageID: 0
@@ -44,7 +52,7 @@ export class MsgArchive extends BaseBot {
                 }
                 
                 // fetch messages
-                var lastID = (await db.Fetch.findOne({channel: channel.name, channelID: channel.id}))?.lastMessageID;
+                var lastID: string | undefined = (await db.models["Fetch"].findOne({channel: channel.name, channelID: channel.id}))?.lastMessageID;
                 if (!channel.isTextBased()) return;
                 const fetchedMessages = await channel.messages.fetch({ 
                     limit: 100, 
@@ -57,7 +65,7 @@ export class MsgArchive extends BaseBot {
                 }
                 
                 lastID = fetchedMessages.firstKey();
-                await db.Fetch.findOneAndUpdate({channel: channel.name, channelID: channel.id}, {lastMessageID: lastID});
+                await db.models["Fetch"].findOneAndUpdate({channel: channel.name, channelID: channel.id}, {lastMessageID: lastID});
                 const allMessages = fetchedMessages
 
                 // save messages
@@ -69,7 +77,7 @@ export class MsgArchive extends BaseBot {
                     const username = e.author.username;
                     const messageID = e.id;
                     const timestamp = e.createdTimestamp;
-                    const exists = await db.Message.find({
+                    const exists = await db.models["Message"].find({
                         userID: userID, 
                         username: username, 
                         channel: channelName, 
@@ -79,7 +87,7 @@ export class MsgArchive extends BaseBot {
                         timestamp: timestamp
                     })
                     if(exists.length === 0 && content !== "") {
-                        const newMessage = new db.Message({
+                        const newMessage = new db.models["Message"]({
                             channel: channelName,
                             channelID: channelID,
                             content: content,
@@ -107,5 +115,5 @@ export class MsgArchive extends BaseBot {
 }
 
 interface MsgArchiveConfig {
-    backup_server: string;
+    backup_server: string[];
 }
