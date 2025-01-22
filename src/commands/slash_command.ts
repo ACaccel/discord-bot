@@ -19,7 +19,6 @@ import {
     AllowedTextChannel
 } from "@dcbotTypes";
 import utils from "@utils";
-import db from "@db";
 import { Tomori } from "bot/tomori/types";
 
 export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
@@ -364,10 +363,15 @@ export const add_reply = async (interaction: ChatInputCommandInteraction, bot: B
     const input = interaction.options.get("keyword")?.value;
     const reply = interaction.options.get("reply")?.value;
 
-    const existPair = await db.Reply.find({ input, reply });
+    const db = bot.guildInfo[interaction.guild?.id as string].db;
+    if (!db) {
+        await interaction.reply({ content: "找不到資料庫" });
+        return;
+    }
+    const existPair = await db.models["Reply"].find({ input, reply });
 
-    if (existPair.length === 0) {
-        const newReply = new db.Reply({ input, reply });
+    if (existPair && existPair.length === 0) {
+        const newReply = new db.models["Reply"]({ input, reply });
         await newReply.save();
         await interaction.reply({ content: `已新增 輸入：${input} 回覆：${reply}！` });
     } else {
@@ -379,12 +383,17 @@ export const delete_reply = async (interaction: ChatInputCommandInteraction, bot
     const input = interaction.options.get("keyword")?.value;
     const reply = interaction.options.get("reply")?.value;
 
-    const existPair = await db.Reply.find({ input, reply });
+    const db = bot.guildInfo[interaction.guild?.id as string].db;
+    if (!db) {
+        await interaction.reply({ content: "找不到資料庫" });
+        return;
+    }
+    const existPair = await db.models["Reply"].find({ input, reply });
 
     if (existPair.length === 0) {
         await interaction.reply({ content: `找不到 輸入：${input} 回覆：${reply}！` });
     } else {
-        await db.Reply.deleteOne({ input, reply });
+        await db.models["Reply"].deleteOne({ input, reply });
         await interaction.reply({ content: `已刪除 輸入：${input} 回覆：${reply}！` });
     }
 }
@@ -473,10 +482,16 @@ export const todo_list = async (interaction: ChatInputCommandInteraction, bot: B
             return;
         }
 
+        const db = bot.guildInfo[interaction.guild?.id as string].db;
+        if (!db) {
+            await interaction.editReply({ content: "找不到資料庫" });
+            return;
+        }
+
         if (action == "add") {
-            const existPair = await db.Todo.find({ content });
+            const existPair = await db.models["Todo"].find({ content });
             if (existPair.length === 0) {
-                const newTodo = new db.Todo({ content });
+                const newTodo = new db.models["Todo"]({ content });
                 await newTodo.save();
                 await interaction.editReply({ content: `已新增待辦事項：${content}` });
             } else {
@@ -484,7 +499,7 @@ export const todo_list = async (interaction: ChatInputCommandInteraction, bot: B
             }
         } else if (action == "delete") {
             // content is index
-            const todoList = await db.Todo.find({});
+            const todoList = await db.models["Todo"].find({});
             if (!parseInt(content)) {
                 await interaction.editReply({ content: "請輸入數字" });
                 return;
@@ -493,11 +508,11 @@ export const todo_list = async (interaction: ChatInputCommandInteraction, bot: B
                 await interaction.editReply({ content: `找不到待辦事項：${content}` });
             } else {
                 const deleted_content = todoList[parseInt(content) - 1].content;
-                await db.Todo.deleteOne({ content: deleted_content });
+                await db.models["Todo"].deleteOne({ content: deleted_content });
                 await interaction.editReply({ content: `已刪除待辦事項：${deleted_content}` });
             }
         } else if (action == "list") {
-            const todoList = await db.Todo.find({});
+            const todoList = await db.models["Todo"].find({});
             let content = "待辦事項：\n";
             todoList.map((e, i) => {
                 content += `> ${i + 1}. ${e.content}\n`;
@@ -532,6 +547,75 @@ export const get_avatar = async (interaction: ChatInputCommandInteraction, bot: 
     } catch (error) {
         utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "無法取得頭像" });
+    }
+}
+
+export const raffle = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        // const action = interaction.options.get("action")?.value as string;
+        
+        // if (action === "start") {
+        //     const title = interaction.options.get("title")?.value as string;
+        //     const description = interaction.options.get("description")?.value as string;
+        //     const duration = interaction.options.get("duration")?.value as string;
+        //     const winner_num = interaction.options.get("winner_num")?.value as number;
+        //     if (!title || !description || !duration || !winner_num) {
+        //         await interaction.editReply({ content: "請輸入標題、描述、持續時間和得獎人數" });
+        //         return;
+        //     }
+
+        //     // parse duration
+        //     function parseDuration(duration: string): number | null {
+        //         const match = duration.match(/^(\d+)([mhd])$/);
+        //         if (!match) return null;
+            
+        //         const value = parseInt(match[1], 10);
+        //         const unit = match[2];
+            
+        //         switch (unit) {
+        //             case "m": return value * 60 * 1000; // 分鐘
+        //             case "h": return value * 60 * 60 * 1000; // 小時
+        //             case "d": return value * 24 * 60 * 60 * 1000; // 天
+        //             default: return null;
+        //         }
+        //     }
+            
+        //     // send raffle message
+        //     const durationMs = parseDuration(duration);
+        //     if (durationMs === null) {
+        //         await interaction.editReply({ content: "無效的持續時間" });
+        //         return;
+        //     }
+        //     const current_time = Date.now();
+        //     const end_time = current_time + durationMs;
+        //     const embed = new EmbedBuilder()
+        //         .setTitle(`抽獎: ${title}`)
+        //         .addFields(
+        //             { name: "🎁 獎品提供者", value: `<@${interaction.user.id}>`},
+        //             { name: "👤 得獎人數", value: winner_num.toString()},
+        //             { name: "📌 備註", value: description || "無"},
+        //             { name: "⏰ 抽獎結束於", value: `<t:${Math.floor(end_time / 1000)}:F>`}
+        //         )
+        //         .setColor("#00FF00")
+        //         .setFooter({ text: "點擊 🎉 表情符號參加抽獎!" });
+        //     await interaction.editReply({ embeds: [embed] });
+
+        //     // save raffle to db
+        //     const newRaffle = new db.Raffle({
+        //         title,
+        //         winner_num,
+        //         description,
+        //         end_time,
+        //     });
+        //     await newRaffle.save();
+        // } else if (action === "delete") {
+
+        // }
+        await interaction.editReply({ content: "功能尚未實作" });
+    } catch (error) {
+        utils.errorLogger(bot.clientId, error);
+        await interaction.editReply({ content: "無法抽獎" });
     }
 }
 

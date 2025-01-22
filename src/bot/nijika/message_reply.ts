@@ -1,6 +1,6 @@
 import { Message } from "discord.js";
-import db from "@db";
 import { Nijika } from "./types";
+import { BaseBot } from "@dcbotTypes";
 
 export const anti_dizzy_react = async (msg: Message) => {
     const content = msg.content;
@@ -12,9 +12,13 @@ export const anti_dizzy_react = async (msg: Message) => {
     }
 }
 
-const search_reply = async (msg: string) => {
+const search_reply = async (msg: string, bot: BaseBot, guild_id: string) => {
     try {
-        let res = await db.Reply.find({input: msg});
+        const db = bot.guildInfo[guild_id].db;
+        if (!db) {
+            throw new Error("Cannot connect to MongoDB.");
+        }
+        let res = await db.models["Reply"].find({input: msg});
         let success = (res.length !== 0);
         let reply = "";
         if(res.length !== 0) {
@@ -23,7 +27,7 @@ const search_reply = async (msg: string) => {
         return { reply, success };
     } catch (e) {
         let success = false;
-        return { e, success };
+        return { reply: e, success };
     };
 }
 
@@ -59,11 +63,11 @@ const roll_dice = (expression: string) => {
     }
 }
 
-export const auto_reply = async (msg: Message, bot: Nijika) => {
+export const auto_reply = async (msg: Message, bot: Nijika, guild_id: string) => {
     if (!msg.channel.isSendable()) return;
     
     // normal reply
-    const { reply, success } = await search_reply(msg.content);
+    const { reply, success } = await search_reply(msg.content, bot, guild_id);
     if (success) { 
         await msg.channel.send(`${reply as string}`);
     }
@@ -71,7 +75,7 @@ export const auto_reply = async (msg: Message, bot: Nijika) => {
     // special reply
     if (bot.nijikaConfig.bad_words.some((e) => { msg.content.includes(e) })) {
         // reply to bad words
-        const { reply, success } = await search_reply("[$]");
+        const { reply, success } = await search_reply("[$]", bot, guild_id);
         if (success) { 
             await msg.channel.send(`${reply as string}`);
         }
@@ -91,7 +95,7 @@ export const auto_reply = async (msg: Message, bot: Nijika) => {
     // }
     if (Math.random() > 0.999) {
         // reply to lucky
-        const { reply, success } = await search_reply("[*]");
+        const { reply, success } = await search_reply("[*]", bot, guild_id);
         if (success) { 
             await msg.channel.send(`${reply as string}`);
         }

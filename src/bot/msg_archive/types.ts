@@ -1,4 +1,4 @@
-import { Client, GuildMember } from 'discord.js';
+import { Client } from 'discord.js';
 import {
     AllowedTextChannel,
     BaseBot,

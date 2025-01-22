@@ -6,7 +6,7 @@ import {
 import dotenv from "dotenv";
 import express from 'express';
 
-import { Config, AllowedTextChannel } from '@dcbotTypes';
+import { Config } from '@dcbotTypes';
 import utils from '@utils';
 import { Tomori } from './types';
 import { earthquake_warning } from '@cmd';
@@ -51,6 +51,7 @@ tomori.login();
 tomori.client.on(Events.ClientReady, async () => {
     // bot online init
     tomori.registerGuild();
+    tomori.connectGuildDB();
     await tomori.registerSlashCommands();
     tomori.initSlashCommandsHandlers();
 

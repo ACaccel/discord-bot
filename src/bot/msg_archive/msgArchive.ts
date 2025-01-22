@@ -5,10 +5,9 @@ import {
 } from 'discord.js';
 import dotenv from "dotenv";
 
-import { Config, AllowedTextChannel } from '@dcbotTypes';
+import { Config } from '@dcbotTypes';
 import { MsgArchive } from './types';
 import config from './config.json';
-import utils from '@utils';
 
 dotenv.config({ path: './src/bot/msg_archive/.env' });
 
@@ -34,6 +33,7 @@ msgArchive.login();
 msgArchive.client.on(Events.ClientReady, async () => {
     // bot online init
     msgArchive.registerGuild();
+    msgArchive.connectGuildDB();
     msgArchive.messageBackup(msgArchive.msgArchiveConfig.backup_server, 10);
 
     // reboot message

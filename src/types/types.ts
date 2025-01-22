@@ -9,8 +9,7 @@ import {
     PublicThreadChannel,
     ChatInputCommandInteraction,
     GuildMember,
-    Role,
-    EmbedBuilder
+    Role
 } from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
@@ -20,6 +19,7 @@ import {
     buildSlashCommands,
     cmd_handler
 } from '@cmd';
+import { Connection, Model } from 'mongoose';
 
 export class BaseBot {
     public adminId?: string;
@@ -47,8 +47,6 @@ export class BaseBot {
         utils.systemLogger(this.clientId, "Logging in...");
         await this.client.login(this.token);
         utils.systemLogger(this.clientId, `Logged in as ${this.client.user?.username}!`);
-
-        db.dbConnect(this.mongoURI, this.clientId);
 
         if (this.config.admin) {
             this.adminId = this.config.admin;
@@ -98,6 +96,23 @@ export class BaseBot {
         } catch (err) {
             utils.systemLogger(this.clientId, `Cannot register guild: ${err}`);
         }
+    }
+
+    public connectGuildDB = async () => {
+        utils.systemLogger(this.clientId, "Connecting to MongoDB...");
+        Object.entries(this.guildInfo).forEach(async ([guild_id, guild]) => {
+            try {
+                const database = await db.dbConnect(this.mongoURI, guild_id, this.clientId);
+                if (database) {
+                    this.guildInfo[guild_id].db = database;
+                    utils.systemLogger(this.clientId, `MongoDB for guild: ${guild_id}.`);
+                } else {
+                    utils.systemLogger(this.clientId, `Cannot connect to MongoDB for guild ${guild_id}.`);
+                }
+            } catch (err) {
+                utils.systemLogger(this.clientId, `Cannot connect to MongoDB: ${err}`);
+            }
+        });
     }
 
     public initSlashCommandsHandlers = () => {
@@ -198,6 +213,10 @@ export interface GuildInfo {
     channels: Record<string, Channel>;
     roles: Record<string, Role>;
     members: Record<string, GuildMember>;
+    db?: {
+        connection: Connection;
+        models: Record<string, Model<any>>;
+    }
 }
 
 interface GuildConfig {

@@ -35,19 +35,20 @@ interface ITodo extends Document {
     content: string;
 }
 
-interface IUser extends Document {
-    username: string;
-    level: string;
+interface IRaffle extends Document {
+    name: string;
+    winner_num: number;
+    description: string;
+    end_time: number;
 }
 
-// Schemas
-const FetchSchema = new Schema<IFetch>({
+export const Fetch: Model<IFetch> = mongoose.model<IFetch>('Fetch', new Schema<IFetch>({
     channel: string_field,
     channelID: string_field,
     lastMessageID: string_field
-});
+}));
 
-const MessageSchema = new Schema<IMessage>({
+export const Message: Model<IMessage> = mongoose.model<IMessage>('Message', new Schema<IMessage>({
     username: string_field,
     userID: string_field,
     channel: string_field,
@@ -55,33 +56,20 @@ const MessageSchema = new Schema<IMessage>({
     content: string_field,
     messageID: string_field,
     timestamp: string_field
-});
+}));
 
-const ReplySchema = new Schema<IReply>({
+export const Reply: Model<IReply> = mongoose.model<IReply>('Reply', new Schema<IReply>({
     input: string_field,
     reply: string_field
-});
+}));
 
-const TodoSchema = new Schema<ITodo>({
+export const Todo: Model<ITodo> = mongoose.model<ITodo>('Todo', new Schema<ITodo>({
     content: string_field
-});
+}));
 
-const UserSchema = new Schema<IUser>({
-    username: string_field,
-    level: string_field
-});
-
-// Models
-const Message: Model<IMessage> = mongoose.model<IMessage>('Message', MessageSchema);
-const Reply: Model<IReply> = mongoose.model<IReply>('Reply', ReplySchema);
-const Todo: Model<ITodo> = mongoose.model<ITodo>('Todo', TodoSchema);
-const Fetch: Model<IFetch> = mongoose.model<IFetch>('Fetch', FetchSchema);
-const User: Model<IUser> = mongoose.model<IUser>('User', UserSchema);
-
-export {
-    Message,
-    Reply,
-    Todo,
-    Fetch,
-    User
-};
+export const Raffle: Model<IRaffle> = mongoose.model<IRaffle>('Raffle', new Schema<IRaffle>({
+    name: string_field,
+    winner_num: number_field,
+    description: string_field,
+    end_time: number_field
+}));

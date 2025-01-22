@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import dotenv from "dotenv";
 
-import { Config, AllowedTextChannel } from '@dcbotTypes';
+import { Config } from '@dcbotTypes';
 import { Nijika } from './types';
 import { anti_dizzy_react, auto_reply } from './message_reply';
 import config from './config.json';
@@ -50,6 +50,7 @@ nijika.login();
 nijika.client.on(Events.ClientReady, async () => {
     // bot online init
     nijika.registerGuild();
+    nijika.connectGuildDB();
     await nijika.registerSlashCommands();
     nijika.initSlashCommandsHandlers();
 
@@ -78,7 +79,9 @@ nijika.client.on(Events.MessageCreate, async (message) => {
 
     try {
         await anti_dizzy_react(message);
-        await auto_reply(message, nijika);
+
+        if (message.guildId)
+            await auto_reply(message, nijika, message.guildId);
     } catch (e) {
         utils.errorLogger(nijika.clientId, e);
     }
