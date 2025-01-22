@@ -14,7 +14,7 @@ const getDate = () => {
 export const attachmentLogger = async (bot_id: string, attachment: Attachment) => {
     try {
         // Define the path where the attachment will be saved
-        const filePath = `./assets/${getDate().replaceAll('/', '_').replaceAll(':', '_')}${attachment.name}`;
+        const filePath = `./assets/deleted_attachments/${getDate().replaceAll('/', '_').replaceAll(':', '_')}${attachment.name}`;
 
         // Ensure the directory exists
         fs.mkdirSync(path.dirname(filePath), { recursive: true });

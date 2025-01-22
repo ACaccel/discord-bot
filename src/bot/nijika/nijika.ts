@@ -4,12 +4,14 @@ import {
     Events,
 } from 'discord.js';
 import dotenv from "dotenv";
+import express from 'express';
 
 import { Config } from '@dcbotTypes';
 import { Nijika } from './types';
 import { anti_dizzy_react, auto_reply } from './message_reply';
-import config from './config.json';
+import { earthquake_warning } from '@cmd';
 import utils from '@utils';
+import config from './config.json';
 
 dotenv.config({ path: './src/bot/nijika/.env' });
 
@@ -78,6 +80,11 @@ nijika.client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot) return;
 
     try {
+        const content = message.content
+        if (content.includes('該睡覺了，肥貓跟你說晚安')) {
+            message.reply('為什麼要睡覺!?<:karyl_fuckyou:1170748129637830708>')
+        }
+
         await anti_dizzy_react(message);
 
         if (message.guildId)
@@ -113,4 +120,33 @@ nijika.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     } catch (e) {
         utils.errorLogger(nijika.clientId, e);
     }
+});
+
+nijika.client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+
+});
+
+const app = express();
+app.use(express.json());
+
+app.get('/', (req, res) => {
+    res.status(200).send('Hello World!');
+})
+
+app.post('/api/earthquake', (req, res) => {
+    utils.systemLogger(nijika.clientId, `地震警報，預估震度${req.body.magnitude}級，${req.body.countdown}秒後抵達!!!`);
+    Object.entries(nijika.guildInfo).forEach(async ([guild_id, guild_info]) => {
+        if (!guild_info.channels.earthquake || !guild_info.roles.earthquake) return;
+        earthquake_warning(
+            guild_info.channels.earthquake,
+            guild_info.roles.earthquake.id,
+            req.body.magnitude as number,
+            req.body.countdown as number
+        );
+    });
+    res.status(200).send('OK');
+})
+
+app.listen(process.env.PORT, () => {
+    utils.systemLogger(nijika.clientId, `Express server is running on port ${process.env.PORT}`)
 });

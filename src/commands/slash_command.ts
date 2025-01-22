@@ -63,7 +63,7 @@ export const bug_report = async (interaction: ChatInputCommandInteraction, bot: 
         }
     } catch (error) {
         utils.errorLogger(bot.clientId, error);
-        await interaction.reply({ content: "無法回報問題 請嘗試直接私訊我(ACaccel)", ephemeral: true });
+        await interaction.reply({ content: "無法回報問題 請嘗試直接私訊我(@ACaccel)", ephemeral: true });
     }
 }
 

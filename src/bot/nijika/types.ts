@@ -124,4 +124,5 @@ export class Nijika extends BaseBot {
 interface NijikaConfig {
     bad_words: string[];
     blocked_channels: string[];
+    level_roles: Record<string, string>;
 }
