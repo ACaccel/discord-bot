@@ -50,21 +50,20 @@ export const bug_report = async (interaction: ChatInputCommandInteraction, bot: 
         }
 
         if (!bot.adminId) {
-            await interaction.reply({ content: "請通知管理員進行管理員設定", ephemeral: true });
-            return;
+            throw new Error("Admin ID not found");
         }
 
         // send message to admin via dm
         const admin = await interaction.guild?.members.fetch(bot.adminId);
         if (admin) {
             await admin.send(`Bug Report from ${interaction.user.username}：${content}`);
-            await interaction.reply({ content: "已通知管理員", ephemeral: true });
+            await interaction.reply({ content: `問題已回報! 內容: ${content}`, ephemeral: true });
         } else {
-            await interaction.reply({ content: "請通知管理員確認管理員設定", ephemeral: true });
+            throw new Error("Admin not found");
         }
     } catch (error) {
         utils.errorLogger(bot.clientId, error);
-        await interaction.reply({ content: "無法回報問題", ephemeral: true });
+        await interaction.reply({ content: "無法回報問題 請嘗試直接私訊我(ACaccel)", ephemeral: true });
     }
 }
 
