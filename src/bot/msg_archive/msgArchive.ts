@@ -33,7 +33,7 @@ msgArchive.client.on(Events.ClientReady, async () => {
     // bot online init
     msgArchive.registerGuild();
     await msgArchive.connectGuildDB();
-    await msgArchive.messageBackup(msgArchive.msgArchiveConfig.backup_server, 30);
+    await msgArchive.messageBackup(msgArchive.msgArchiveConfig.backup_server, 60);
 
     // reboot message
     await msgArchive.rebootMessage();

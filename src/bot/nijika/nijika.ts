@@ -77,14 +77,13 @@ nijika.client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 nijika.client.on(Events.MessageCreate, async (message) => {
+    const content = message.content
+    if (content.includes('該睡覺了，肥貓跟你說晚安')) {
+        await message.reply('我不要不要不要不要不要睡覺！<:karyl_fuckyou:1170748129637830708>')
+    }
     if (message.author.bot) return;
 
     try {
-        const content = message.content
-        if (content.includes('該睡覺了，肥貓跟你說晚安')) {
-            await message.reply('為什麼要睡覺!?<:karyl_fuckyou:1170748129637830708>')
-        }
-
         await anti_dizzy_react(message);
 
         if (message.guildId)
