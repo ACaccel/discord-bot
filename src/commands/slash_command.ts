@@ -167,7 +167,7 @@ export const random_restaurant = async (interaction: ChatInputCommandInteraction
 export const imgen = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
-        const imgen_ch_id = bot.guildInfo[interaction.guild?.id as string].channels.imgen.id;
+        const imgen_ch_id = bot.guildInfo[interaction.guild?.id as string].channels?.imgen.id;
         if (interaction.channel?.id !== imgen_ch_id) {
             await interaction.editReply({ content: `這個指令只能在 <#${imgen_ch_id}> 頻道使用喔！` });
             return;
@@ -405,9 +405,9 @@ export const give_score = async (interaction: ChatInputCommandInteraction, bot: 
 
 export const gay = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     const user = interaction.options.get("user")?.value;
-    if (bot.guildInfo[interaction.guild?.id as string].members[user as string]) {
-        const target = bot.guildInfo[interaction.guild?.id as string].members[user as string];
-        const res = `${target.displayName} ${(Math.random() > 0.05 ? "是" : "不是")} gay`;
+    if (interaction.guild?.members.cache.has(user as string)) {
+        const target = interaction.guild?.members.cache.get(user as string);
+        const res = `${target?.displayName} ${(Math.random() > 0.05 ? "是" : "不是")} gay`;
         await interaction.reply({ content: res });
     }
 }
@@ -529,7 +529,7 @@ export const get_avatar = async (interaction: ChatInputCommandInteraction, bot: 
     await interaction.deferReply();
     try {
         const user = interaction.options.get("user")?.value as string;
-        const member = bot.guildInfo[interaction.guild?.id as string].members[user];
+        const member = interaction.guild?.members.cache.get(user);
         if (member) {
             let url = member.displayAvatarURL();
             url = url.replace(".webp", ".png?size=4096");

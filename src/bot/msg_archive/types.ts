@@ -35,8 +35,12 @@ export class MsgArchive extends BaseBot {
                 utils.errorLogger(this.clientId, "Database not found");
                 return;
             }
+            if (!this.guildInfo[guild_id].channels || !this.guildInfo[guild_id].channels.debug) {
+                utils.errorLogger(this.clientId, "Debug channel not found");
+                return;
+            }
             const totalMessageCnt = await db.models["Message"].countDocuments({});
-            const debug_ch = this.guildInfo[guild_id].channels.debug as AllowedTextChannel;
+            const debug_ch = this.guildInfo[guild_id].channels["debug"] as AllowedTextChannel;
             const sentMessage = await debug_ch.send(`[ SYSTEM ] on scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
             const fetchPromise = this.guildInfo[guild_id].guild.channels.cache.map(async(channel) => {
                 // check if channel is already in database

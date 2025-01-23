@@ -13,7 +13,7 @@ export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, 
     if (!newMessage.guild || !newMessage.guildId || !newMessage.author || !oldMessage.author) return;
     if (oldMessage.author.bot) return;
 
-    const event_channel = bot.guildInfo[newMessage.guildId as string].channels.event;
+    const event_channel = bot.guildInfo[newMessage.guildId as string].channels?.event;
 
     let old_msg = oldMessage.content;
     let new_msg = newMessage.content;
@@ -44,11 +44,10 @@ export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, 
 }
 
 export const detectMessageDelete = async (message: Message | PartialMessage, bot: BaseBot) => {
-    if (!bot.guildInfo[message.guildId as string].channels.event) return;
     if (!message.guild || !message.guildId || !message.author) return;
     if (message.author.bot) return;
 
-    const event_channel = bot.guildInfo[message.guildId as string].channels.event;
+    const event_channel = bot.guildInfo[message.guildId as string].channels?.event;
 
     let msg = '';
     if (!message.content) {
@@ -88,7 +87,7 @@ export const detectMessageDelete = async (message: Message | PartialMessage, bot
 }
 
 export const detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember, bot: BaseBot) => {
-    const event_channel = bot.guildInfo[newMember.guild.id].channels.event;
+    const event_channel = bot.guildInfo[newMember.guild.id].channels?.event;
     
     const oldRoles = oldMember.roles.cache;
     const newRoles = newMember.roles.cache;

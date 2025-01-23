@@ -22,10 +22,10 @@ import {
 import { Connection, Model } from 'mongoose';
 
 export class BaseBot {
+    private token: string;
+    private mongoURI?: string;
     public adminId?: string;
     public client: Client;
-    private token: string;
-    private mongoURI: string;
     public clientId: string;
     public config: Config;
     public guildInfo: Record<string, GuildInfo>;
@@ -46,7 +46,11 @@ export class BaseBot {
     public login = async () => {
         utils.systemLogger(this.clientId, "Logging in...");
         await this.client.login(this.token);
-        utils.systemLogger(this.clientId, `Logged in as ${this.client.user?.username}!`);
+        if (!this.client.user) {
+            utils.systemLogger(this.clientId, "Cannot login.");
+            return;
+        }
+        utils.systemLogger(this.clientId, `Logged in as ${this.client.user.username}!`);
 
         if (this.config.admin) {
             this.adminId = this.config.admin;
@@ -56,8 +60,16 @@ export class BaseBot {
     public registerGuild = () => {
         utils.systemLogger(this.clientId, "Registering guilds...");
         try {
+            if (!this.config.guilds) {
+                utils.systemLogger(this.clientId, "No guilds to register.");
+                return;
+            }
+            
             let guild_num = 0;
             this.config.guilds.forEach((config) => {
+                const guild = this.client.guilds.cache.get(config.guild_id);
+                if (!guild) return;
+
                 // register channels
                 let newChannel: Record<string, Channel> = {};
                 Object.entries(config.channels).forEach(([name, id]) => {
@@ -70,22 +82,15 @@ export class BaseBot {
                 // register roles
                 let newRole: Record<string, Role> = {};
                 Object.entries(config.roles).forEach(([name, id]) => {
-                    const role = this.client.guilds.cache.get(config.guild_id)?.roles.cache.get(id);
+                    const role = guild.roles.cache.get(id);
                     newRole[name] = role as Role;
                 });
 
-                // register guild members
-                let memberList: Record<string, GuildMember> = {};
-                this.client.guilds.cache.get(config.guild_id)?.members.cache.forEach((member) => {
-                    memberList[member.id] = member;
-                });
-
                 let newGuild: GuildInfo = {
-                    bot_name: this.client.guilds.cache.get(config.guild_id)?.members.cache.get(this.clientId)?.displayName as string,
+                    bot_name: guild.members.cache.get(this.clientId)?.displayName as string,
                     guild: this.client.guilds.cache.get(config.guild_id) as Guild,
                     channels: newChannel,
                     roles: newRole,
-                    members: memberList
                 };
                 this.guildInfo[config.guild_id] = newGuild;
                 guild_num++;
@@ -100,20 +105,25 @@ export class BaseBot {
 
     public connectGuildDB = async () => {
         utils.systemLogger(this.clientId, "Connecting to MongoDB...");
-        const promises = Object.entries(this.guildInfo).map(async ([guild_id, guild]) => {
-            try {
-                const database = await db.dbConnect(this.mongoURI, guild_id, this.clientId);
-                if (database) {
+        if (!this.mongoURI) {
+            utils.systemLogger(this.clientId, "No MongoDB URI.");
+            return;
+        }
+
+        try {
+            await Promise.all(Object.entries(this.guildInfo).map(async ([guild_id, guild]) => {
+
+                const database = await db.dbConnect(this.mongoURI!, guild_id, this.clientId);
+                if (database && this.guildInfo[guild_id]) {
                     this.guildInfo[guild_id].db = database;
                     utils.systemLogger(this.clientId, `MongoDB for guild: ${guild_id}.`);
                 } else {
                     utils.systemLogger(this.clientId, `Cannot connect to MongoDB for guild ${guild_id}.`);
                 }
-            } catch (err) {
-                utils.systemLogger(this.clientId, `Cannot connect to MongoDB: ${err}`);
-            }
-        });
-        await Promise.all(promises);
+            }));
+        } catch (err) {
+            utils.systemLogger(this.clientId, `Cannot connect to MongoDB: ${err}`);
+        }
     }
 
     public initSlashCommandsHandlers = () => {
@@ -152,21 +162,24 @@ export class BaseBot {
             });
         });
 
-        utils.systemLogger(this.clientId, `Successfully register ${this.slashCommands?.length} application (/) commands.`)
+        utils.systemLogger(this.clientId, `Successfully register ${this.slashCommands.length} application (/) commands.`)
     }
 
     public executeSlashCommands = async (bot: BaseBot, interaction: ChatInputCommandInteraction) => {
         if (!interaction.isCommand()) return;
-
         if (!this.config.commands) {
             interaction.reply({ content: "No commands to execute.", ephemeral: true });
+            return;
+        }
+        if (!this.slashCommandsHandler) {
+            interaction.reply({ content: "No command handler found.", ephemeral: true });
             return;
         }
 
         const command = this.config.commands.find((cmd) => cmd.name === interaction.commandName);
         if (command) {
             try {
-                const handler = this.slashCommandsHandler?.get(interaction.commandName)
+                const handler = this.slashCommandsHandler.get(interaction.commandName)
                 if (handler) {
                     await handler(interaction, this);
                 }
@@ -174,9 +187,9 @@ export class BaseBot {
                 utils.errorLogger(this.clientId, error);
             }
         }
-
+        
         const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`;
-        utils.channelLogger(bot.guildInfo[interaction.guildId as string].channels.debug, undefined, channel_log);
+        utils.channelLogger(bot.guildInfo[interaction.guildId as string]?.channels?.debug, undefined, channel_log);
         const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
         utils.guildLogger(this.clientId, 'interaction_create', guild_log, interaction.guild?.name as string);
     }
@@ -191,9 +204,10 @@ export class BaseBot {
     public rebootMessage = async () => {
         Object.entries(this.guildInfo).forEach(async ([guild_id, guild]) => {
             try {
-                const debug_ch = this.guildInfo[guild_id].channels.debug as AllowedTextChannel;
-                if (!debug_ch) return;
-                await debug_ch.send(`${guild.bot_name}重開機囉!`);
+                const debug_ch = this.guildInfo[guild_id]?.channels?.debug as AllowedTextChannel;
+                if (debug_ch) {
+                    await debug_ch.send(`${guild.bot_name}重開機囉!`);
+                }
             } catch (error) {
                 utils.errorLogger(this.clientId, error);
             }
@@ -203,7 +217,7 @@ export class BaseBot {
 
 export interface Config {
     admin?: string;
-    guilds: GuildConfig[];
+    guilds?: GuildConfig[];
     identities?: Record<string, Identity>;
     commands?: Command[];
 }
@@ -211,9 +225,8 @@ export interface Config {
 export interface GuildInfo {
     bot_name: string;
     guild: Guild
-    channels: Record<string, Channel>;
-    roles: Record<string, Role>;
-    members: Record<string, GuildMember>;
+    channels?: Record<string, Channel>;
+    roles?: Record<string, Role>;
     db?: {
         connection: Connection;
         models: Record<string, Model<any>>;
