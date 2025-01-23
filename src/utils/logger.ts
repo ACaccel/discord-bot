@@ -66,13 +66,13 @@ export const errorLogger = (bot_id: string, msg: unknown) => {
 /**
  * Log channel events as embedded message to guild's channel.
  */
-export const channelLogger = async (channel: Channel, embed?: EmbedBuilder, log?: string) => {
+export const channelLogger = async (channel: Channel | undefined, embed?: EmbedBuilder, log?: string) => {
+    if (!channel) return;
     channel = channel as AllowedTextChannel;
 
     if (log) {
         await channel.send(log);
     }
-
     if (embed) {
         await channel.send({ embeds: [embed] });
     }

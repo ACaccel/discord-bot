@@ -8,7 +8,7 @@ import express from 'express';
 
 import { Config } from '@dcbotTypes';
 import { Nijika } from './types';
-import { anti_dizzy_react, auto_reply } from './message_reply';
+import { anti_dizzy_react, auto_reply } from '../../commands/message_reply';
 import { earthquake_warning } from '@cmd';
 import utils from '@utils';
 import config from './config.json';

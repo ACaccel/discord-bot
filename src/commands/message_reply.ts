@@ -1,5 +1,4 @@
 import { Message } from "discord.js";
-import { Nijika } from "./types";
 import { BaseBot } from "@dcbotTypes";
 
 export const anti_dizzy_react = async (msg: Message) => {
@@ -63,7 +62,7 @@ const roll_dice = (expression: string) => {
     }
 }
 
-export const auto_reply = async (msg: Message, bot: Nijika, guild_id: string) => {
+export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) => {
     if (!msg.channel.isSendable()) return;
     
     // normal reply
