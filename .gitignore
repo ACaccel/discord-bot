@@ -1,7 +1,7 @@
 /node_modules
 /logs
 /errors
-/assets
+/data
 /dump
 .env
 config.json

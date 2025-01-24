@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import axios from "axios";
 import fs from "fs";
+import path from "path";
 import { 
     joinVoiceChannel,
     DiscordGatewayAdapterCreator
@@ -340,7 +341,9 @@ export const record = async (interaction: ChatInputCommandInteraction, bot: Base
             }
             
             const timestamp = new Date().toLocaleString().replace(/\/|:|\s/g, "-");
-            const voice_stream = fs.createWriteStream(`./assets/${timestamp}.zip`);
+            const file_path = `./data/voice_record/${interaction.guild?.name}/${timestamp}.zip`;
+            fs.mkdirSync(path.dirname(file_path), { recursive: true });
+            const voice_stream = fs.createWriteStream(file_path);
             await bot.voice.recorder.getRecordedVoice(voice_stream, interaction.guild?.id as string, 'separate', duration);
             const buffer = await bot.voice.recorder.getRecordedVoiceAsBuffer(interaction.guild?.id as string, 'separate', duration);;
 
