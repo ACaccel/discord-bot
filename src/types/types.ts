@@ -59,42 +59,37 @@ export class BaseBot {
 
     public registerGuild = () => {
         utils.systemLogger(this.clientId, "Registering guilds...");
-        try {
-            if (!this.config.guilds) {
-                utils.systemLogger(this.clientId, "No guilds to register.");
-                return;
-            }
-            
+        try {            
             let guild_num = 0;
-            this.config.guilds.forEach((config) => {
-                const guild = this.client.guilds.cache.get(config.guild_id);
-                if (!guild) return;
+            this.client.guilds.cache.forEach((guild) => {
+                if (this.config.guilds?.[guild.id]) {
+                    const config = this.config.guilds[guild.id];
+                    // register channels
+                    let newChannel: Record<string, Channel> = {};
+                    Object.entries(config.channels).forEach(([name, id]) => {
+                        const channel = this.client.channels.cache.get(id);
+                        if (channel) {
+                            newChannel[name] = channel;
+                        }
+                    });
 
-                // register channels
-                let newChannel: Record<string, Channel> = {};
-                Object.entries(config.channels).forEach(([name, id]) => {
-                    const channel = this.client.channels.cache.get(id);
-                    if (channel) {
-                        newChannel[name] = channel;
-                    }
-                });
+                    // register roles
+                    let newRole: Record<string, Role> = {};
+                    Object.entries(config.roles).forEach(([name, id]) => {
+                        const role = guild.roles.cache.get(id);
+                        newRole[name] = role as Role;
+                    });
 
-                // register roles
-                let newRole: Record<string, Role> = {};
-                Object.entries(config.roles).forEach(([name, id]) => {
-                    const role = guild.roles.cache.get(id);
-                    newRole[name] = role as Role;
-                });
-
-                let newGuild: GuildInfo = {
-                    bot_name: guild.members.cache.get(this.clientId)?.displayName as string,
-                    guild: this.client.guilds.cache.get(config.guild_id) as Guild,
-                    channels: newChannel,
-                    roles: newRole,
-                };
-                this.guildInfo[config.guild_id] = newGuild;
+                    let newGuild: GuildInfo = {
+                        bot_name: guild.members.cache.get(this.clientId)?.displayName as string,
+                        guild: guild,
+                        channels: newChannel,
+                        roles: newRole,
+                    };
+                    this.guildInfo[guild.id] = newGuild;
+                }
                 guild_num++;
-                utils.systemLogger(this.clientId, `${guild_num}. ${newGuild.guild.id} - ${newGuild.guild.name}`);
+                utils.systemLogger(this.clientId, `${guild_num}. ${guild.id} - ${guild.name}`);
             });
 
             utils.systemLogger(this.clientId, "Successfully registered all guilds.");
@@ -221,7 +216,7 @@ export class BaseBot {
 
 export interface Config {
     admin?: string;
-    guilds?: GuildConfig[];
+    guilds?: Record<string, GuildConfig>;
     identities?: Record<string, Identity>;
     commands?: Command[];
 }
@@ -238,7 +233,6 @@ export interface GuildInfo {
 }
 
 interface GuildConfig {
-    guild_id: string;
     channels: Record<string, string>;
     roles: Record<string, string>;
 }
