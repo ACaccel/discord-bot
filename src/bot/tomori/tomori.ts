@@ -4,18 +4,17 @@ import {
     Events,
 } from 'discord.js';
 import dotenv from "dotenv";
-import express from 'express';
 
 import { Config } from '@dcbotTypes';
 import { Tomori } from './types';
-import { earthquake_warning } from '@cmd';
+import { anti_dizzy_react, auto_reply } from '../../commands/message_reply';
 import utils from '@utils';
 import config from './config.json';
 
 dotenv.config({ path: './src/bot/tomori/.env' });
 
 // init
-const client = new Client({ 
+const client: Client = new Client({ 
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
@@ -36,7 +35,7 @@ const client = new Client({
         GatewayIntentBits.GuildScheduledEvents,
         GatewayIntentBits.AutoModerationConfiguration,
         GatewayIntentBits.AutoModerationExecution
-    ]
+    ] 
 });
 const tomori = new Tomori(
     client,
@@ -62,7 +61,7 @@ tomori.client.on(Events.ClientReady, async () => {
 tomori.client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.inGuild()) {
         if (interaction.isChatInputCommand()) {
-            tomori.executeSlashCommands(tomori, interaction);
+            await tomori.executeSlashCommands(tomori, interaction);
         } else {
             if (!interaction.isAutocomplete()) {
                 await interaction.reply({ content: '目前尚不支援此類型的指令喔!', ephemeral: true });
@@ -76,41 +75,42 @@ tomori.client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 tomori.client.on(Events.MessageCreate, async (message) => {
-    const content = message.content;
+    if (message.author.bot) return;
 
-    // prevent bot from replying to itself
-    if (message.author.id === tomori.client.user?.id) return;
+    try {
+        await anti_dizzy_react(message);
 
-    if (content.includes('該睡覺了，肥貓跟你說晚安')) {
-        message.reply('為什麼要睡覺!?<:karyl_fuckyou:1170748129637830708>')
+        if (message.guildId)
+            await auto_reply(message, tomori, message.guildId);
+    } catch (e) {
+        utils.errorLogger(tomori.clientId, e);
+    }
+});
+
+tomori.client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
+    try {
+        await tomori.detectMessageUpdate(oldMessage, newMessage);
+    } catch (e) {
+        utils.errorLogger(tomori.clientId, e);
+    }
+});
+
+tomori.client.on(Events.MessageDelete, async (message) => {
+    try {
+        await tomori.detectMessageDelete(message);
+    } catch (e) {
+        utils.errorLogger(tomori.clientId, e);
+    }
+});
+
+tomori.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
+    try {
+        await tomori.detectGuildMemberUpdate(oldMember, newMember);
+    } catch (e) {
+        utils.errorLogger(tomori.clientId, e);
     }
 });
 
 tomori.client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
-});
-
-const app = express();
-app.use(express.json());
-
-app.get('/', (req, res) => {
-    res.status(200).send('Hello World!');
-})
-
-app.post('/api/earthquake', (req, res) => {
-    utils.systemLogger(tomori.clientId, `地震警報，預估震度${req.body.magnitude}級，${req.body.countdown}秒後抵達!!!`);
-    Object.entries(tomori.guildInfo).forEach(async ([guild_id, guild_info]) => {
-        if (!guild_info.channels.earthquake || !guild_info.roles.earthquake) return;
-        earthquake_warning(
-            guild_info.channels.earthquake,
-            guild_info.roles.earthquake.id,
-            req.body.magnitude as number,
-            req.body.countdown as number
-        );
-    });
-    res.status(200).send('OK');
-})
-
-app.listen(process.env.PORT, () => {
-    utils.systemLogger(tomori.clientId, `Express server is running on port ${process.env.PORT}`)
 });
