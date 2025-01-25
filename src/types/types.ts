@@ -144,8 +144,12 @@ export class BaseBot {
         }
 
         // build slash commands from config
-        this.slashCommands = this.config.commands.map((cmd) => {
-            return buildSlashCommands(cmd);
+        this .slashCommands = [];
+        this.config.commands.forEach((cmd) => {
+            let slashCommand = buildSlashCommands(cmd);
+            if (slashCommand) {
+                this.slashCommands?.push(slashCommand);
+            }
         });
 
         // register slash commands to discord

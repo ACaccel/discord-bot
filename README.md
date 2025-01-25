@@ -25,6 +25,9 @@ git clone https://github.com/ACaccel/discord-bot.git
 cd discord-bot
 yarn install
 yarn <bot-name>
+
+# for record command
+sudo apt install ffmpeg
 ```
 
 ## Configuration

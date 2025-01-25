@@ -351,7 +351,7 @@ export const record = async (interaction: ChatInputCommandInteraction, bot: Base
                 await interaction.editReply({ content: "未收到音訊，不儲存音檔" });
             } else {
                 const attachment = new AttachmentBuilder(buffer, { name: `${timestamp}.zip` })
-                await interaction.editReply({ content: `已儲存 ${duration} 分鐘的錄音`, files: [attachment] });
+                await interaction.editReply({ content: `已儲存倒數 ${duration} 分鐘的錄音`, files: [attachment] });
             }
         } else {
             await interaction.editReply({ content: "無效的指令" });
