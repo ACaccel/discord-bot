@@ -193,10 +193,6 @@ export const imgen = async (interaction: ChatInputCommandInteraction, bot: BaseB
     }
 }
 
-export const ask_nijika_wakeup = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
-    
-}
-
 export const search_anime_scene = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {

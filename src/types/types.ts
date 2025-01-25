@@ -62,32 +62,33 @@ export class BaseBot {
         try {            
             let guild_num = 0;
             this.client.guilds.cache.forEach((guild) => {
-                if (this.config.guilds?.[guild.id]) {
-                    const config = this.config.guilds[guild.id];
+                const config = this.config.guilds?.[guild.id];
+                
+                let newChannel: Record<string, Channel> = {};
+                let newRole: Record<string, Role> = {};
+                if (config) {
                     // register channels
-                    let newChannel: Record<string, Channel> = {};
                     Object.entries(config.channels).forEach(([name, id]) => {
                         const channel = this.client.channels.cache.get(id);
                         if (channel) {
                             newChannel[name] = channel;
                         }
                     });
-
+    
                     // register roles
-                    let newRole: Record<string, Role> = {};
                     Object.entries(config.roles).forEach(([name, id]) => {
                         const role = guild.roles.cache.get(id);
                         newRole[name] = role as Role;
                     });
-
-                    let newGuild: GuildInfo = {
-                        bot_name: guild.members.cache.get(this.clientId)?.displayName as string,
-                        guild: guild,
-                        channels: newChannel,
-                        roles: newRole,
-                    };
-                    this.guildInfo[guild.id] = newGuild;
                 }
+
+                let newGuild: GuildInfo = {
+                    bot_name: guild.members.cache.get(this.clientId)?.displayName as string,
+                    guild: guild,
+                    channels: newChannel,
+                    roles: newRole
+                };
+                this.guildInfo[guild.id] = newGuild;
                 guild_num++;
                 utils.systemLogger(this.clientId, `${guild_num}. ${guild.id} - ${guild.name}`);
             });
@@ -111,7 +112,7 @@ export class BaseBot {
                 const database = await db.dbConnect(this.mongoURI!, guild_id, this.clientId);
                 if (database && this.guildInfo[guild_id]) {
                     this.guildInfo[guild_id].db = database;
-                    utils.systemLogger(this.clientId, `MongoDB for guild: ${guild_id}.`);
+                    utils.systemLogger(this.clientId, `MongoDB for guild: ${guild_id} - ${guild.guild.name} connected.`);
                 } else {
                     utils.systemLogger(this.clientId, `Cannot connect to MongoDB for guild ${guild_id}.`);
                 }
@@ -142,9 +143,7 @@ export class BaseBot {
         this .slashCommands = [];
         this.config.commands.forEach((cmd) => {
             let slashCommand = buildSlashCommands(cmd);
-            if (slashCommand) {
-                this.slashCommands?.push(slashCommand);
-            }
+            this.slashCommands?.push(slashCommand);
         });
 
         // register slash commands to discord

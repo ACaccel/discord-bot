@@ -11,7 +11,7 @@ export const buildSlashCommands = (config: Command) => {
         .setName(config.name)
         .setDescription(config.description);
 
-    if (!config.options) return null;
+    if (!config.options) return slashCommand.toJSON();
 
     // build required options first
     if (config.options.user) {
