@@ -79,7 +79,7 @@ nijika.client.on(Events.InteractionCreate, async (interaction) => {
 nijika.client.on(Events.MessageCreate, async (message) => {
     const content = message.content
     if (content.includes('該睡覺了，肥貓跟你說晚安')) {
-        await message.reply('熬夜對健康不好喔！<:ave_uika_bad_for_health:1332426346282090516>')
+        await message.reply('健康に良くない！<:ave_mortis_bad_for_health:1333052644368846878>')
     }
     if (message.author.bot) return;
 
