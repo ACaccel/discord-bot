@@ -549,6 +549,67 @@ export const get_avatar = async (interaction: ChatInputCommandInteraction, bot: 
     }
 }
 
+// require message backup of the guild
+export const emoji_frequency = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        const type = interaction.options.get("type")?.value as string || "static";
+        const frequency = interaction.options.get("frequency")?.value as string || "asc";
+        let top_n = interaction.options.get("top_n")?.value as number || 5;
+        let last_n_months = interaction.options.get("last_n_months")?.value as number || 1;
+        const guild = interaction.guild;
+        if (!guild) {
+            await interaction.editReply({ content: "找不到伺服器" });
+            return;
+        }
+        if (top_n > 40) top_n = 40;
+        if (last_n_months > 6) last_n_months = 6;
+
+        const n_months_ago = new Date();
+        n_months_ago.setMonth(n_months_ago.getMonth() - last_n_months);
+
+        const db = bot.guildInfo[guild.id].db;
+        if (!db) {
+            await interaction.editReply({ content: "找不到資料庫" });
+            return;
+        }
+
+        const emojiMap = new Map<string, number>();
+        guild.emojis.cache.forEach(emoji => {
+            const emojiText = `<${emoji.animated ? "a:" : ":"}${emoji.name}:${emoji.id}>`;
+            emojiMap.set(emojiText, 0);
+        });
+        
+        const messages = await db.models["Message"].find({
+            $expr: { $gte: [{ $toLong: "$timestamp" }, n_months_ago.getTime()] }
+        });
+
+        messages.forEach((message) => {
+            const emojis: string[] = message.content.match(/<a?:\w+:\d+>/g) || [];
+            emojis.forEach(emoji => {
+                if (emojiMap.has(emoji)) {
+                    emojiMap.set(emoji, (emojiMap.get(emoji) || 0) + 1);
+                }
+            });
+        });
+
+        const sortedEmojis = Array.from(emojiMap.entries())
+            .filter(([emoji]) => type === "animated" ? emoji.startsWith("<a:") : emoji.startsWith("<:"))
+            .sort((a, b) => frequency === "asc" ? a[1] - b[1] : b[1] - a[1])
+            .slice(0, top_n);
+
+        let content = `最近${last_n_months}個月內使用頻率${frequency === "asc" ? "最低" : "最高"}的 ${top_n} 個${type === "animated" ? "動態" : "靜態"}表情符號：\n`;
+        sortedEmojis.forEach(([emoji, count], index) => {
+            content += `${index + 1}. ${emoji} - ${count} 次\n`;
+        });
+
+        await interaction.editReply({ content });
+    } catch (error) {
+        utils.errorLogger(bot.clientId, error);
+        await interaction.editReply({ content: "無法取得表情符號使用頻率" });
+    }
+}
+
 export const raffle = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
