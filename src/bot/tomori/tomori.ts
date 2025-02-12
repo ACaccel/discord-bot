@@ -114,3 +114,11 @@ tomori.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 tomori.client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
 });
+
+tomori.client.on(Events.GuildCreate, async (guild) => {
+    try {
+        await tomori.detectGuildCreate(guild);
+    } catch (e) {
+        utils.errorLogger(tomori.clientId, e);
+    }
+});

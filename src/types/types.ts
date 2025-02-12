@@ -140,7 +140,7 @@ export class BaseBot {
         }
 
         // build slash commands from config
-        this .slashCommands = [];
+        this.slashCommands = [];
         this.config.commands.forEach((cmd) => {
             let slashCommand = buildSlashCommands(cmd);
             this.slashCommands?.push(slashCommand);
@@ -210,6 +210,14 @@ export class BaseBot {
                 utils.errorLogger(this.clientId, error);
             }
         });
+    }
+
+    public getToken = () => {
+        return this.token;
+    }
+    
+    public getMongoURI = () => {
+        return this.mongoURI;
     }
 }
 

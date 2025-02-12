@@ -1,5 +1,6 @@
 import { 
     Client,
+    Guild,
     GuildMember, 
     Message, 
     PartialGuildMember, 
@@ -9,7 +10,8 @@ import { BaseBot, Config } from '@dcbotTypes';
 import { 
     detectMessageUpdate, 
     detectMessageDelete,
-    detectGuildMemberUpdate
+    detectGuildMemberUpdate,
+    detectGuildCreate
 } from 'commands';
 import tomoriConfig from './config.json';
 
@@ -30,6 +32,10 @@ export class Tomori extends BaseBot {
     
         public detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember) => {
             detectGuildMemberUpdate(oldMember, newMember, this);
+        }
+
+        public detectGuildCreate = async (guild: Guild) => {
+            detectGuildCreate(guild, this);
         }
 }
 

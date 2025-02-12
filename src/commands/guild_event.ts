@@ -3,10 +3,14 @@ import {
     PartialMessage,
     EmbedBuilder,
     GuildMember,
-    PartialGuildMember
+    PartialGuildMember,
+    Guild,
+    REST,
+    Routes
 } from 'discord.js';
-import { BaseBot } from '@dcbotTypes';
+import { BaseBot, GuildInfo } from '@dcbotTypes';
 import utils from '@utils';
+import db from '@db';
 
 export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage, bot: BaseBot) => {
     if (!oldMessage.content || !newMessage.content || oldMessage.content === newMessage.content) return;
@@ -111,4 +115,38 @@ export const detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGu
 
     const log = `User: ${newMember.user.username}, Added: ${addedRolesList}, Removed: ${removedRolesList}`;
     utils.guildLogger(bot.clientId, 'guild_member_update', log, newMember.guild.name);
+}
+
+export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
+    // guild info initialization
+    let newGuild: GuildInfo = {
+        bot_name: guild.members.cache.get(bot.clientId)?.displayName as string,
+        guild: guild,
+        channels: {},
+        roles: {}
+    };
+    bot.guildInfo[guild.id] = newGuild;
+
+    // DB initialization
+    try {
+        if (!bot.getMongoURI()) {
+            throw new Error('No MongoDB URI.');
+        }
+
+        const database = await db.dbConnect(bot.getMongoURI()!, guild.id, bot.clientId);
+        if (database && bot.guildInfo[guild.id]) {
+            bot.guildInfo[guild.id].db = database;
+        } else {
+            throw new Error(`Cannot connect to MongoDB for guild ${guild.id}.`);
+        }
+    } catch (err) {
+        utils.systemLogger(bot.clientId, `Cannot connect to MongoDB: ${err}`);
+    }
+
+    // register slash commands
+    const rest = new REST().setToken(bot.getToken())
+    await rest.put(Routes.applicationGuildCommands(bot.clientId, guild.id), { body: bot.slashCommands })
+    .catch((err) => {
+        utils.systemLogger(bot.clientId, `Failed to register guild (/) commands: ${err}`);
+    });
 }
