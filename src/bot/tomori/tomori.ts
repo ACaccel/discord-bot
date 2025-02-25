@@ -83,7 +83,7 @@ tomori.client.on(Events.MessageCreate, async (message) => {
         if (message.guildId)
             await auto_reply(message, tomori, message.guildId);
     } catch (e) {
-        utils.errorLogger(tomori.clientId, e);
+        utils.errorLogger(tomori.clientId, message.guild?.id, e);
     }
 });
 
@@ -91,7 +91,7 @@ tomori.client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
     try {
         await tomori.detectMessageUpdate(oldMessage, newMessage);
     } catch (e) {
-        utils.errorLogger(tomori.clientId, e);
+        utils.errorLogger(tomori.clientId, newMessage.guild?.id, e);
     }
 });
 
@@ -99,7 +99,7 @@ tomori.client.on(Events.MessageDelete, async (message) => {
     try {
         await tomori.detectMessageDelete(message);
     } catch (e) {
-        utils.errorLogger(tomori.clientId, e);
+        utils.errorLogger(tomori.clientId, message.guild?.id, e);
     }
 });
 
@@ -107,7 +107,7 @@ tomori.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     try {
         await tomori.detectGuildMemberUpdate(oldMember, newMember);
     } catch (e) {
-        utils.errorLogger(tomori.clientId, e);
+        utils.errorLogger(tomori.clientId, newMember.guild.id, e);
     }
 });
 
@@ -119,6 +119,6 @@ tomori.client.on(Events.GuildCreate, async (guild) => {
     try {
         await tomori.detectGuildCreate(guild);
     } catch (e) {
-        utils.errorLogger(tomori.clientId, e);
+        utils.errorLogger(tomori.clientId, guild.id, e);
     }
 });

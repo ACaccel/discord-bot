@@ -16,7 +16,7 @@ const dbConnect = async (mongoURI: string, guild_id: string, bot_id: string) => 
             models
         };
     } catch (err) {
-        utils.errorLogger(bot_id, `Cannot connect to MongoDB: ${err}`);
+        utils.errorLogger(bot_id, '', `Cannot connect to MongoDB: ${err}`);
         return null;
     }
 };

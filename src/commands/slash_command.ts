@@ -41,7 +41,7 @@ export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBo
 
         await interaction.editReply({ content: helpContent });
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法取得指令清單"});
     }
 }
@@ -67,7 +67,7 @@ export const bug_report = async (interaction: ChatInputCommandInteraction, bot: 
             throw new Error("Admin not found");
         }
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.reply({ content: "無法回報問題 請嘗試直接私訊我(@ACaccel)", ephemeral: true });
     }
 }
@@ -103,7 +103,7 @@ export const talk = async (interaction: ChatInputCommandInteraction, bot: BaseBo
             await channel.send(content);
         }
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.reply({ content: "無法傳送訊息", ephemeral: true });
     }
 }
@@ -150,7 +150,7 @@ export const change_avatar = async (interaction: ChatInputCommandInteraction, bo
 
         await interaction.editReply({ content: `${oldName}已死，現在正是${newName}復權的時刻` });
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "更改失敗"});
     }
 }
@@ -174,7 +174,7 @@ export const change_nickname = async (interaction: ChatInputCommandInteraction, 
 
         await interaction.editReply({ content: `已更改暱稱為：${newName}` });
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "更改失敗"});
     }
 }
@@ -188,7 +188,7 @@ export const random_restaurant = async (interaction: ChatInputCommandInteraction
 
         await interaction.editReply({ content: `今天吃 ${resdata.name} 吧！\n地址：${resdata.address}\n(https://www.google.com/maps/search/${encodeURIComponent(resdata.name)})` });
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法取得餐廳"});
     }
 }
@@ -216,7 +216,7 @@ export const imgen = async (interaction: ChatInputCommandInteraction, bot: BaseB
             await interaction.editReply({ content: "crychic和mygo吵架忙線中，請稍後再試 ❤️ " });
         }
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法產生圖片" });
     }
 }
@@ -275,7 +275,7 @@ export const search_anime_scene = async (interaction: ChatInputCommandInteractio
             }
         })
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法搜尋動畫截圖" });
     }
 }
@@ -308,7 +308,7 @@ export const pin_message = async (interaction: ChatInputCommandInteraction, bot:
             await interaction.editReply({ content: "無效的指令" });
         }
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法釘選訊息" });
     }
 }
@@ -381,7 +381,7 @@ export const record = async (interaction: ChatInputCommandInteraction, bot: Base
             await interaction.editReply({ content: "無效的指令" });
         }
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法錄音" });
     }
 }
@@ -459,7 +459,7 @@ export const weather_forecast = async (interaction: ChatInputCommandInteraction,
         const formattedContentWithBackticks = formattedContent;
         await interaction.editReply({ content: formattedContentWithBackticks });
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法取得天氣預報" });
     }
 }
@@ -493,7 +493,7 @@ export const level_detail = async (interaction: ChatInputCommandInteraction, bot
             await interaction.editReply({ content: "太長了...請選短一點的範圍" });
         }
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法取得等級詳情" });
     }
 }
@@ -547,7 +547,7 @@ export const todo_list = async (interaction: ChatInputCommandInteraction, bot: B
             await interaction.editReply({ content });
         }
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法變更待辦事項" });
     }
 }
@@ -572,7 +572,7 @@ export const get_avatar = async (interaction: ChatInputCommandInteraction, bot: 
             await interaction.editReply({ content: "找不到使用者" });
         }
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法取得頭像" });
     }
 }
@@ -633,7 +633,7 @@ export const emoji_frequency = async (interaction: ChatInputCommandInteraction, 
 
         await interaction.editReply({ content });
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法取得表情符號使用頻率" });
     }
 }
@@ -702,7 +702,7 @@ export const raffle = async (interaction: ChatInputCommandInteraction, bot: Base
         // }
         await interaction.editReply({ content: "功能尚未實作" });
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法抽獎" });
     }
 }
@@ -760,7 +760,7 @@ export const update_role = async (interaction: ChatInputCommandInteraction, bot:
         }));
         await interaction.editReply({ content: "更新完成" });
     } catch (error) {
-        utils.errorLogger(bot.clientId, error);
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法更新身份組" });
     }
 }

@@ -88,7 +88,7 @@ nijika.client.on(Events.MessageCreate, async (message) => {
         if (message.guildId)
             await auto_reply(message, nijika, message.guildId);
     } catch (e) {
-        utils.errorLogger(nijika.clientId, e);
+        utils.errorLogger(nijika.clientId, message.guild?.id, e);
     }
 });
 
@@ -98,7 +98,7 @@ nijika.client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
     try {
         await nijika.detectMessageUpdate(oldMessage, newMessage);
     } catch (e) {
-        utils.errorLogger(nijika.clientId, e);
+        utils.errorLogger(nijika.clientId, oldMessage.guild?.id, e);
     }
 });
 
@@ -108,7 +108,7 @@ nijika.client.on(Events.MessageDelete, async (message) => {
     try {
         await nijika.detectMessageDelete(message);
     } catch (e) {
-        utils.errorLogger(nijika.clientId, e);
+        utils.errorLogger(nijika.clientId, message.guild?.id, e);
     }
 });
 
@@ -116,7 +116,7 @@ nijika.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     try {
         await nijika.detectGuildMemberUpdate(oldMember, newMember);
     } catch (e) {
-        utils.errorLogger(nijika.clientId, e);
+        utils.errorLogger(nijika.clientId, oldMember.guild?.id, e);
     }
 });
 

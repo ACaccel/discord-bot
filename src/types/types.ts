@@ -182,14 +182,16 @@ export class BaseBot {
                     await handler(interaction, this);
                 }
             } catch (error) {
-                utils.errorLogger(this.clientId, error);
+                utils.errorLogger(this.clientId, interaction.guild?.id, error);
             }
         }
         
         const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`;
         utils.channelLogger(bot.guildInfo[interaction.guildId as string]?.channels?.debug, undefined, channel_log);
-        const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
-        utils.guildLogger(this.clientId, 'interaction_create', guild_log, interaction.guild?.name as string);
+        if (interaction.guild) {
+            const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
+            utils.guildLogger(this.clientId, interaction.guild.id, 'interaction_create', guild_log, interaction.guild?.name as string);
+        }
     }
     
     public initVoice = () => {
@@ -207,7 +209,7 @@ export class BaseBot {
                     await debug_ch.send(`${guild.bot_name}重開機囉!`);
                 }
             } catch (error) {
-                utils.errorLogger(this.clientId, error);
+                utils.errorLogger(this.clientId, '', error);
             }
         });
     }
@@ -226,6 +228,7 @@ export interface Config {
     guilds?: Record<string, GuildConfig>;
     identities?: Record<string, Identity>;
     commands?: Command[];
+    // modals?: Modal[];
 }
 
 export interface GuildInfo {
@@ -260,6 +263,11 @@ export interface Command {
         attachment?: CommandOption[];
     };
 }
+
+// export interface Modal {
+//     name: string;
+//     description: string;
+// }
 
 interface CommandOption {
     name: string;

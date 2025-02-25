@@ -15,7 +15,8 @@ import db from '@db';
 export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage, bot: BaseBot) => {
     if (!oldMessage.content || !newMessage.content || oldMessage.content === newMessage.content) return;
     if (!newMessage.guild || !newMessage.guildId || !newMessage.author || !oldMessage.author) return;
-    if (oldMessage.author.bot) return;
+    if (newMessage.author.bot) return;
+    if (!newMessage.guild?.id) return;
 
     const event_channel = bot.guildInfo[newMessage.guildId]?.channels?.event;
 
@@ -44,12 +45,13 @@ export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, 
     utils.channelLogger(event_channel, embed);
 
     const log = `User: ${newMessage.author.username}, Channel: ${newMessage.guild.channels.cache.get(newMessage.channel.id)?.name}, Old: ${oldMessage.content}, New: ${newMessage.content}`;
-    utils.guildLogger(bot.clientId, 'message_update', log, newMessage.guild.name as string);
+    utils.guildLogger(bot.clientId, newMessage.guild?.id, 'message_update', log, newMessage.guild.name as string);
 }
 
 export const detectMessageDelete = async (message: Message | PartialMessage, bot: BaseBot) => {
     if (!message.guild || !message.guildId || !message.author) return;
     if (message.author.bot) return;
+    if (!message.guild?.id) return;
 
     const event_channel = bot.guildInfo[message.guildId as string]?.channels?.event;
 
@@ -87,10 +89,11 @@ export const detectMessageDelete = async (message: Message | PartialMessage, bot
     utils.channelLogger(event_channel, embed);
 
     const log = `User: ${message.author.username}, Channel: ${message.guild.channels.cache.get(message.channel.id)?.name}, Message: ${message.content}`;
-    utils.guildLogger(bot.clientId, 'message_delete', log, message.guild.name as string);
+    utils.guildLogger(bot.clientId, message.guild?.id, 'message_delete', log, message.guild.name as string);
 }
 
 export const detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember, bot: BaseBot) => {
+    if (!newMember.guild.id) return;
     const event_channel = bot.guildInfo[newMember.guild.id]?.channels?.event;
     
     const oldRoles = oldMember.roles.cache;
@@ -114,7 +117,7 @@ export const detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGu
     utils.channelLogger(event_channel, embed);
 
     const log = `User: ${newMember.user.username}, Added: ${addedRolesList}, Removed: ${removedRolesList}`;
-    utils.guildLogger(bot.clientId, 'guild_member_update', log, newMember.guild.name);
+    utils.guildLogger(bot.clientId, newMember.guild.id, 'guild_member_update', log, newMember.guild.name);
 }
 
 export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
