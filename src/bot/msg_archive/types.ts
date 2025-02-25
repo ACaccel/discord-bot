@@ -32,11 +32,11 @@ export class MsgArchive extends BaseBot {
             var newMessageCnt = 0;
             const db = this.guildInfo[guild_id].db;
             if (!db) {
-                utils.errorLogger(this.clientId, "Database not found");
+                utils.errorLogger(this.clientId, '', "Database not found");
                 return;
             }
             if (!this.guildInfo[guild_id].channels || !this.guildInfo[guild_id].channels.debug) {
-                utils.errorLogger(this.clientId, "Debug channel not found");
+                utils.errorLogger(this.clientId, '', "Debug channel not found");
                 return;
             }
             const totalMessageCnt = await db.models["Message"].countDocuments({});
@@ -113,7 +113,7 @@ export class MsgArchive extends BaseBot {
             var timeSpent = (end-begin) / 1000;
             await sentMessage.edit(`[ SYSTEM ] end scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages. (${timeSpent} sec)`);
         } catch(e) {
-            utils.errorLogger(this.clientId, e);
+            utils.errorLogger(this.clientId, '', e);
         }
     }
 }
