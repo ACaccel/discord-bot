@@ -22,6 +22,10 @@ import {
 import utils from "@utils";
 import { Nijika } from "bot/nijika/types";
 
+/************************************/
+/********** slash commands **********/
+/************************************/
+
 export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
@@ -145,6 +149,30 @@ export const change_avatar = async (interaction: ChatInputCommandInteraction, bo
         }
 
         await interaction.editReply({ content: `${oldName}已死，現在正是${newName}復權的時刻` });
+    } catch (error) {
+        utils.errorLogger(bot.clientId, error);
+        await interaction.editReply({ content: "更改失敗"});
+    }
+}
+
+export const change_nickname = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        const guild = interaction.guild;
+        if (!guild) {
+            await interaction.editReply({ content: "找不到伺服器"});
+            return;
+        }
+
+        const newName = interaction.options.get("nickname")?.value as string;
+        const userBot = guild.members.cache.get(bot.client.user?.id as string);
+        if (!userBot) {
+            await interaction.editReply({ content: "找不到機器人"});
+            return;
+        }
+        await userBot.setNickname(newName);
+
+        await interaction.editReply({ content: `已更改暱稱為：${newName}` });
     } catch (error) {
         utils.errorLogger(bot.clientId, error);
         await interaction.editReply({ content: "更改失敗"});
@@ -736,3 +764,7 @@ export const update_role = async (interaction: ChatInputCommandInteraction, bot:
         await interaction.editReply({ content: "無法更新身份組" });
     }
 }
+
+/************************************/
+/********** Modal commands **********/
+/************************************/
