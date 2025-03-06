@@ -132,15 +132,13 @@ app.get('/', (req, res) => {
 })
 
 app.post('/api/earthquake', (req, res) => {
-    utils.systemLogger(nijika.clientId, `地震警報，預估震度${req.body.magnitude}級，${req.body.countdown}秒後抵達!!!`);
+    utils.systemLogger(nijika.clientId, `地震強震警報!!!`);
     Object.entries(nijika.guildInfo).forEach(async ([guild_id, guild_info]) => {
         if (!guild_info.channels || !guild_info.channels.earthquake) return;
         if (!guild_info.roles || !guild_info.roles.earthquake) return;
         earthquake_warning(
             guild_info.channels.earthquake,
-            guild_info.roles.earthquake.id,
-            req.body.magnitude as number,
-            req.body.countdown as number
+            guild_info.roles.earthquake.id
         );
     });
     res.status(200).send('OK');
