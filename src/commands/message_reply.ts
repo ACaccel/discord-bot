@@ -72,7 +72,7 @@ export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) =
     }
 
     // special reply
-    if (msg.author.id === "516912789369913371" && Math.random() > (1-0.005)) {
+    if (msg.author.id === "516912789369913371" && Math.random() > (1-0.01)) {
         // reply to fatcat
         await msg.channel.send("肥貓好gay");
     }
@@ -85,7 +85,7 @@ export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) =
     //     let res = roll_dice(msg.content);
     //     await msg.channel.send(`${res}`);
     // }
-    if (Math.random() > 0.999) {
+    if (Math.random() > 0.995) {
         // reply to lucky
         const { reply, success } = await search_reply("[*]", bot, guild_id);
         if (success) { 

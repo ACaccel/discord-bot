@@ -5,6 +5,12 @@ import {
     EmbedBuilder,
     GuildMember,
     ChatInputCommandInteraction,
+    
+    // modal
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle,
+    ActionRowBuilder,
 } from "discord.js";
 import axios from "axios";
 import fs from "fs";
@@ -638,6 +644,96 @@ export const emoji_frequency = async (interaction: ChatInputCommandInteraction, 
     }
 }
 
+// danger!!! this command should only be used in a trusted server
+// it may cause the bot to be stuck
+export const sticker_frequency = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        const frequency = interaction.options.get("frequency")?.value as string || "asc";
+        let top_n = interaction.options.get("top_n")?.value as number || 5;
+        let last_n_days = interaction.options.get("last_n_days")?.value as number || 1;
+        const guild = interaction.guild;
+
+        if (!guild) {
+            await interaction.editReply({ content: "找不到伺服器" });
+            return;
+        }
+        if (top_n > 50) top_n = 50;
+        if (last_n_days > 5) last_n_days = 5;
+
+        const timeout_limit = 5 * 60; // second
+        const n_days_ago = Date.now() - last_n_days * 24 * 60 * 60 * 1000;
+        const stickerMap = new Map<string, number>();
+
+        // Prepopulate the stickerMap with all stickers in the server
+        guild.stickers.cache.forEach(sticker => {
+            stickerMap.set(sticker.name, 0);
+        });
+
+        const channels = guild.channels.cache.filter(channel => channel.isTextBased());
+        let elapsedSeconds = 0;
+        let timeoutReached = false;
+
+        // Set a timeout for 10 seconds
+        const timeout = setTimeout(() => {
+            timeoutReached = true;
+        }, timeout_limit * 1000);
+
+        // Update the interaction message every second
+        const interval = setInterval(async () => {
+            elapsedSeconds++;
+            await interaction.editReply({ content: `正在搜尋訊息中... 已經過 ${elapsedSeconds} 秒, timeout: ${timeout_limit} 秒` });
+        }, 1000);
+
+        for (const [, channel] of channels) {
+            if (timeoutReached) break;
+            if (!channel.isTextBased()) continue;
+
+            let lastMessageId: string | undefined;
+            while (true) {
+                if (timeoutReached) break;
+
+                const messages = await channel.messages.fetch({ limit: 100, before: lastMessageId });
+                if (messages.size === 0) break;
+
+                for (const [, message] of messages) {
+                    if (message.createdTimestamp < n_days_ago) break;
+
+                    message.stickers.forEach(sticker => {
+                        const stickerName = sticker.name;
+                        stickerMap.set(stickerName, (stickerMap.get(stickerName) || 0) + 1);
+                    });
+                }
+
+                lastMessageId = messages.last()?.id;
+                if (!lastMessageId || messages.last()?.createdTimestamp! < n_days_ago) break;
+            }
+        }
+
+        // Clear the timeout and interval
+        clearTimeout(timeout);
+        clearInterval(interval);
+
+        const sortedStickers = Array.from(stickerMap.entries())
+            .sort((a, b) => frequency === "asc" ? a[1] - b[1] : b[1] - a[1])
+            .slice(0, top_n);
+
+        let content = `最近${last_n_days}天內使用頻率${frequency === "asc" ? "最低" : "最高"}的 ${top_n} 個貼圖：\n`;
+        sortedStickers.forEach(([sticker, count], index) => {
+            content += `${index + 1}. ${sticker} - ${count} 次\n`;
+        });
+
+        if (timeoutReached) {
+            content += `\n⚠️ 搜尋時間超過 ${timeout_limit} 秒，請縮小搜尋範圍`;
+        }
+
+        await interaction.editReply({ content });
+    } catch (error) {
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+        await interaction.editReply({ content: "無法取得貼圖使用頻率" });
+    }
+};
+
 export const raffle = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
@@ -768,3 +864,36 @@ export const update_role = async (interaction: ChatInputCommandInteraction, bot:
 /************************************/
 /********** Modal commands **********/
 /************************************/
+
+// export const modal1 = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+//     // Create the modal
+//     const modal = new ModalBuilder()
+//     .setCustomId('modal1')
+//     .setTitle('My Modal');
+
+//     // Add components to modal
+
+//     // Create the text input components
+//     const favoriteColorInput = new TextInputBuilder()
+//     .setCustomId('favoriteColorInput')
+//     // The label is the prompt the user sees for this input
+//     .setLabel("What's your favorite color?")
+//     // Short means only a single line of text
+//     .setStyle(TextInputStyle.Short);
+
+//     const hobbiesInput = new TextInputBuilder()
+//     .setCustomId('hobbiesInput')
+//     .setLabel("What's some of your favorite hobbies?")
+//     // Paragraph means multiple lines of text.
+//     .setStyle(TextInputStyle.Paragraph);
+
+//     // An action row only holds one text input,
+//     // so you need one action row per text input.
+//     const firstActionRow = new ActionRowBuilder<TextInputBuilder>().addComponents(favoriteColorInput);
+//     const secondActionRow = new ActionRowBuilder<TextInputBuilder>().addComponents(hobbiesInput);
+
+//     // Add inputs to the modal
+//     modal.addComponents(firstActionRow, secondActionRow);
+
+//     await interaction.showModal(modal);
+// }
