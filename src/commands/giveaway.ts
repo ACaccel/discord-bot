@@ -18,11 +18,11 @@ export const giveawayAnnouncement = async (channel: AllowedTextChannel, prize: s
         .setTitle(`🎉 抽獎: ${prize}`)
         .addFields(
             { name: "🎁 獎品提供者", value: `<@${prize_owner_id}>` },
-            { name: "👤 得獎人數", value: winner_num.toString() },
+            { name: "👤 中獎人數", value: winner_num.toString() },
             { name: "⏰ 抽獎結束於", value: `${end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}` },
             { name: "📌 備註", value: description || "無" }
         )
-        .setColor("#00FF00")
+        .setColor("#F9F900")
         .setFooter({ text: "點擊 🎉 表情符號參加抽獎!" });
     
     const message = await channel.send({ embeds: [embed] });
@@ -80,7 +80,7 @@ export const scheduleGiveaway = async (bot: BaseBot, guild_id: string, message_i
         content: 
         `🎉 **抽獎結束!** 🎉\n\n**獎品: ${giveaway.prize}**\n\n${
             winners.length > 0
-                ? `🏆 **得獎者:**\n${winners.map(winner => `<@${winner.id}>`).join('\n')}\n\n恭喜以上得獎者！請與 <@${giveaway.prize_owner_id}> 聯繫領取獎品。`
+                ? `🏆 **得獎者:**\n${winners.map(winner => `<@${winner.id}>`).join('\n')}\n\n恭喜以上得獎者！請與 <@${giveaway.prize_owner_id}> 聯繫領取獎品!`
                 : '😢 **沒有人參加抽獎**'
         }`
     });
