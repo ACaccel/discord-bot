@@ -8,8 +8,8 @@ import {
     TextChannel,
     PublicThreadChannel,
     ChatInputCommandInteraction,
-    GuildMember,
-    Role
+    Role,
+    ModalSubmitInteraction
 } from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
@@ -17,7 +17,8 @@ import db from '@db';
 import utils from '@utils';
 import {
     buildSlashCommands,
-    cmd_handler
+    cmd_handler,
+    modal_handler
 } from '@cmd';
 import { Connection, Model } from 'mongoose';
 
@@ -32,6 +33,7 @@ export class BaseBot {
     
     public slashCommands?: RESTPostAPIChatInputApplicationCommandsJSONBody[];
     public slashCommandsHandler?: Map<string, Function>;
+    public modalHandler?: Map<string, Function>;
     public voice?: Voice;
 
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: Config) {
@@ -193,6 +195,32 @@ export class BaseBot {
             utils.guildLogger(this.clientId, interaction.guild.id, 'interaction_create', guild_log, interaction.guild?.name as string);
         }
     }
+
+    public initModalHandlers = () => {
+        this.modalHandler = new Map<string, Function>();
+        Object.entries(modal_handler).forEach(([name, handler]) => {
+            if (typeof handler === 'function') {
+                this.modalHandler?.set(name, handler);
+            }
+        });
+    }
+
+    public executeModalSubmit = async (bot: BaseBot, interaction: ModalSubmitInteraction) => {
+        if (!interaction.isModalSubmit()) return;
+        if (!this.modalHandler) {
+            interaction.reply({ content: "No modal handler found.", ephemeral: true });
+            return;
+        }
+
+        try {
+            const handler = this.modalHandler.get(interaction.customId);
+            if (handler) {
+                await handler(interaction, this);
+            }
+        } catch (error) {
+            utils.errorLogger(this.clientId, interaction.guild?.id, error);
+        }
+    }
     
     public initVoice = () => {
         this.voice = {
@@ -263,11 +291,6 @@ export interface Command {
         attachment?: CommandOption[];
     };
 }
-
-// export interface Modal {
-//     name: string;
-//     description: string;
-// }
 
 interface CommandOption {
     name: string;

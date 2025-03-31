@@ -51,9 +51,11 @@ nijika.login();
 nijika.client.on(Events.ClientReady, async () => {
     // bot online init
     nijika.registerGuild();
-    nijika.connectGuildDB();
+    await nijika.connectGuildDB();
     await nijika.registerSlashCommands();
     nijika.initSlashCommandsHandlers();
+    nijika.initModalHandlers();
+    nijika.rebootProcess();
 
     // reboot message
     await nijika.rebootMessage();
@@ -63,6 +65,8 @@ nijika.client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.inGuild()) {
         if (interaction.isChatInputCommand()) {
             await nijika.executeSlashCommands(nijika, interaction);
+        } else if (interaction.isModalSubmit()) {
+            await nijika.executeModalSubmit(nijika, interaction);
         } else {
             if (!interaction.isAutocomplete()) {
                 await interaction.reply({ content: '目前尚不支援此類型的指令喔!', ephemeral: true });
@@ -122,6 +126,24 @@ nijika.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
 nijika.client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
+});
+
+nijika.client.on(Events.MessageReactionAdd, async (reaction, user) => {
+    try {
+        if (user.bot) return;
+        nijika.detectReactionAdd(reaction, user);
+    } catch (e) {
+        utils.errorLogger(nijika.clientId, reaction.message.guild?.id, e);
+    }
+});
+
+nijika.client.on(Events.MessageReactionRemove, async (reaction, user) => {
+    try {
+        if (user.bot) return;
+        nijika.detectReactionRemove(reaction, user);
+    } catch (e) {
+        utils.errorLogger(nijika.clientId, reaction.message.guild?.id, e);
+    }
 });
 
 const app = express();

@@ -2,25 +2,34 @@ import {
     Client,
     GuildMember, 
     Message, 
+    MessageReaction, 
     PartialGuildMember, 
-    PartialMessage
+    PartialMessage,
+    PartialMessageReaction,
+    PartialUser,
+    User
 } from 'discord.js';
 import {
     BaseBot,
     Config
 } from '@dcbotTypes';
+import { Job } from 'node-schedule';
 import { 
     detectMessageUpdate, 
     detectMessageDelete,
-    detectGuildMemberUpdate
+    detectGuildMemberUpdate,
+    giveaway
 } from 'commands';
 import nijikaConfig from './config.json';
 
 export class Nijika extends BaseBot {
     public nijikaConfig: NijikaConfig;
+    public giveaway_jobs: Map<string, Job>
+
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: Config) {
         super(client, token, mongoURI, clientId, config);
         this.nijikaConfig = nijikaConfig as NijikaConfig;
+        this.giveaway_jobs = new Map();
     }
 
     public detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage) => {
@@ -34,9 +43,27 @@ export class Nijika extends BaseBot {
     public detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember) => {
         detectGuildMemberUpdate(oldMember, newMember, this);
     }
+
+    public detectReactionAdd = async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
+        const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
+        const fetchedUser = user.partial ? await user.fetch() : user;
+        giveaway.addReactionToGiveaway(fetchedReaction, fetchedUser, this);
+    }
+
+    public detectReactionRemove = async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
+        const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
+        const fetchedUser = user.partial ? await user.fetch() : user;
+        giveaway.removeReactionFromGiveaway(fetchedReaction, fetchedUser, this);
+    }
+
+    // recover the state
+    public rebootProcess = () => {
+        giveaway.rebootGiveawayJobs(this);
+    }
 }
 
 interface NijikaConfig {
     blocked_channels: string[];
+    giveaway_channel_id: string;
     level_roles: Record<string, string>;
 }

@@ -26,6 +26,7 @@ import {
     AllowedTextChannel
 } from "@dcbotTypes";
 import utils from "@utils";
+import { giveaway } from "@cmd";
 import { Nijika } from "bot/nijika/types";
 
 /************************************/
@@ -734,75 +735,6 @@ export const sticker_frequency = async (interaction: ChatInputCommandInteraction
     }
 };
 
-export const raffle = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
-    await interaction.deferReply();
-    try {
-        // const action = interaction.options.get("action")?.value as string;
-        
-        // if (action === "start") {
-        //     const title = interaction.options.get("title")?.value as string;
-        //     const description = interaction.options.get("description")?.value as string;
-        //     const duration = interaction.options.get("duration")?.value as string;
-        //     const winner_num = interaction.options.get("winner_num")?.value as number;
-        //     if (!title || !description || !duration || !winner_num) {
-        //         await interaction.editReply({ content: "請輸入標題、描述、持續時間和得獎人數" });
-        //         return;
-        //     }
-
-        //     // parse duration
-        //     function parseDuration(duration: string): number | null {
-        //         const match = duration.match(/^(\d+)([mhd])$/);
-        //         if (!match) return null;
-            
-        //         const value = parseInt(match[1], 10);
-        //         const unit = match[2];
-            
-        //         switch (unit) {
-        //             case "m": return value * 60 * 1000; // 分鐘
-        //             case "h": return value * 60 * 60 * 1000; // 小時
-        //             case "d": return value * 24 * 60 * 60 * 1000; // 天
-        //             default: return null;
-        //         }
-        //     }
-            
-        //     // send raffle message
-        //     const durationMs = parseDuration(duration);
-        //     if (durationMs === null) {
-        //         await interaction.editReply({ content: "無效的持續時間" });
-        //         return;
-        //     }
-        //     const current_time = Date.now();
-        //     const end_time = current_time + durationMs;
-        //     const embed = new EmbedBuilder()
-        //         .setTitle(`抽獎: ${title}`)
-        //         .addFields(
-        //             { name: "🎁 獎品提供者", value: `<@${interaction.user.id}>`},
-        //             { name: "👤 得獎人數", value: winner_num.toString()},
-        //             { name: "📌 備註", value: description || "無"},
-        //             { name: "⏰ 抽獎結束於", value: `<t:${Math.floor(end_time / 1000)}:F>`}
-        //         )
-        //         .setColor("#00FF00")
-        //         .setFooter({ text: "點擊 🎉 表情符號參加抽獎!" });
-        //     await interaction.editReply({ embeds: [embed] });
-
-        //     // save raffle to db
-        //     const newRaffle = new db.Raffle({
-        //         title,
-        //         winner_num,
-        //         description,
-        //         end_time,
-        //     });
-        //     await newRaffle.save();
-        // } else if (action === "delete") {
-
-        // }
-        await interaction.editReply({ content: "功能尚未實作" });
-    } catch (error) {
-        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
-        await interaction.editReply({ content: "無法抽獎" });
-    }
-}
-
 /********** Only for Nijika **********/
 
 export const update_role = async (interaction: ChatInputCommandInteraction, bot: Nijika) => {
@@ -858,6 +790,117 @@ export const update_role = async (interaction: ChatInputCommandInteraction, bot:
     } catch (error) {
         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法更新身份組" });
+    }
+}
+
+export const giveaway_create = async (interaction: ChatInputCommandInteraction, bot: Nijika) => {
+    await interaction.deferReply();
+    try {
+        const duration = interaction.options.get("duration")?.value as string;
+        const winner_num = interaction.options.get("winner_num")?.value as number;
+        const prize = interaction.options.get("prize")?.value as string;
+        const description = interaction.options.get("description")?.value as string;
+        if (!duration || !winner_num || !prize) {
+            await interaction.editReply({ content: "請輸入持續時間、得獎人數和獎品" });
+            return;
+        }
+        const guild = interaction.guild;
+        if (!guild) {
+            await interaction.editReply({ content: "找不到伺服器" });
+            return;
+        }
+        const channel = interaction.guild.channels.cache.get(bot.nijikaConfig.giveaway_channel_id) as AllowedTextChannel;
+        if (!channel) {
+            await interaction.editReply({ content: "找不到頻道" });
+            return;
+        }
+        const db = bot.guildInfo[guild.id].db;
+        if (!db) {
+            await interaction.editReply({ content: "找不到資料庫" });
+            return;
+        }
+
+        // parse duration
+        function parseDuration(duration: string): number | null {
+            const match = duration.match(/^(\d+)([smhdw])$/);
+            if (!match) return null;
+        
+            const value = parseInt(match[1], 10);
+            const unit = match[2];
+        
+            if (isNaN(value)) return null;
+            switch (unit) {
+                case "s": return value * 1000; // 秒
+                case "m": return value * 60 * 1000; // 分鐘
+                case "h": return value * 60 * 60 * 1000; // 小時
+                case "d": return value * 24 * 60 * 60 * 1000; // 天
+                case "w": return value * 7 * 24 * 60 * 60 * 1000; // 週
+                default: return null;
+            }
+        }
+        
+        const durationMs = parseDuration(duration);
+        if (durationMs === null) {
+            await interaction.editReply({ content: "無效的持續時間" });
+            return;
+        }
+        const current_time = Date.now();
+        const end_time = current_time + durationMs;
+        const end_time_date = new Date(end_time);
+        
+        // create giveaway announcement
+        const message_id = await giveaway.giveawayAnnouncement(
+            channel,
+            prize,
+            interaction.user.id,
+            winner_num,
+            end_time_date,
+            description || "無"
+        );
+        if (!message_id) {
+            await interaction.editReply({ content: "無法建立抽獎" });
+            return;
+        }
+        
+        // save giveaway to database
+        const newGiveaway = new db.models["Giveaway"]({
+            winner_num: winner_num,
+            prize: prize,
+            end_time: end_time,
+            channel_id: channel.id,
+            prize_owner_id: interaction.user.id,
+            participants: [],
+            message_id: message_id
+        });
+        await newGiveaway.save();
+
+        // schedule job to find winner
+        if (await giveaway.findGiveaway(bot, guild.id, message_id)) {
+            const job = utils.scheduleJob(end_time_date, () => giveaway.scheduleGiveaway(bot, guild.id, message_id));
+            bot.giveaway_jobs.set(message_id, job);
+        }
+
+        await interaction.editReply({ content: `抽獎已建立！將於 ${end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })} 結束` });
+    } catch (error) {
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+        await interaction.editReply({ content: "無法抽獎" });
+    }
+}
+
+export const giveaway_delete = async (interaction: ChatInputCommandInteraction, bot: Nijika) => {
+    await interaction.deferReply();
+    try {
+        const message_id = interaction.options.get("message_id")?.value as string;
+        const guild = interaction.guild;
+        if (!guild) {
+            await interaction.editReply({ content: "找不到伺服器" });
+            return;
+        }
+        await giveaway.deleteGiveaway(bot, guild.id, message_id);
+        await interaction.editReply({ content: "抽獎已刪除" });
+    } catch (error) {
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+        await interaction.editReply({ content: "無法刪除抽獎" });
     }
 }
 
