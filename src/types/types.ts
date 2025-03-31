@@ -21,6 +21,7 @@ import {
     modal_handler
 } from '@cmd';
 import { Connection, Model } from 'mongoose';
+import slash_command_config from '../slash_command.json';
 
 export class BaseBot {
     private token: string;
@@ -53,6 +54,12 @@ export class BaseBot {
             return;
         }
         utils.systemLogger(this.clientId, `Logged in as ${this.client.user.username}!`);
+
+        // check configuration files
+        if (!slash_command_config) {
+            utils.systemLogger(this.clientId, "Please setup your slash_command.json file.");
+            return;
+        }
 
         if (this.config.admin) {
             this.adminId = this.config.admin;
@@ -144,8 +151,11 @@ export class BaseBot {
         // build slash commands from config
         this.slashCommands = [];
         this.config.commands.forEach((cmd) => {
-            let slashCommand = buildSlashCommands(cmd);
-            this.slashCommands?.push(slashCommand);
+            const command_config = slash_command_config.find((config) => config.name === cmd);
+            if (command_config) {
+                let slashCommand = buildSlashCommands(command_config);
+                this.slashCommands?.push(slashCommand);
+            }
         });
 
         // register slash commands to discord
@@ -176,7 +186,7 @@ export class BaseBot {
             return;
         }
 
-        const command = this.config.commands.find((cmd) => cmd.name === interaction.commandName);
+        const command = this.config.commands.find((cmd) => cmd === interaction.commandName);
         if (command) {
             try {
                 const handler = this.slashCommandsHandler.get(interaction.commandName)
@@ -254,8 +264,7 @@ export class BaseBot {
 export interface Config {
     admin?: string;
     guilds?: Record<string, GuildConfig>;
-    identities?: Record<string, Identity>;
-    commands?: Command[];
+    commands?: string[];
     // modals?: Modal[];
 }
 
@@ -273,11 +282,6 @@ export interface GuildInfo {
 interface GuildConfig {
     channels: Record<string, string>;
     roles: Record<string, string>;
-}
-
-interface Identity {
-    avatar_url: string;
-    color_role?: string;
 }
 
 export interface Command {

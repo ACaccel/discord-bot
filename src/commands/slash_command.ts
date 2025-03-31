@@ -28,6 +28,8 @@ import {
 import utils from "@utils";
 import { giveaway } from "@cmd";
 import { Nijika } from "bot/nijika/types";
+import slash_command_config from "../slash_command.json";
+import identity_config from "../identity.json";
 
 /************************************/
 /********** slash commands **********/
@@ -42,9 +44,12 @@ export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBo
         }
 
         let  helpContent = '## 指令清單\n';
-        for (let i = 0; i < bot.config.commands.length; i++) {
-            helpContent += "* `" + bot.config.commands[i].name + "` : " + bot.config.commands[i].description + "\n";
-        }
+        bot.config.commands.forEach((command) => {
+            const cmd_config = slash_command_config.find((cmd) => cmd.name === command);
+            if (cmd_config) {
+                helpContent += `* \`/${cmd_config.name}\` : ${cmd_config.description}\n`;
+            }
+        });
 
         await interaction.editReply({ content: helpContent });
     } catch (error) {
@@ -119,13 +124,12 @@ export const change_avatar = async (interaction: ChatInputCommandInteraction, bo
     await interaction.deferReply();
     try {
         const guild = interaction.guild;
-        const identities = bot.config.identities;
 
         if (!guild) {
             await interaction.editReply({ content: "找不到伺服器"});
             return;
         }
-        if (!identities) {
+        if (!identity_config) {
             await interaction.editReply({ content: "沒有身份組設定"});
             return;
         }
@@ -139,21 +143,26 @@ export const change_avatar = async (interaction: ChatInputCommandInteraction, bo
             return;
         }
         await userBot.setNickname(newName);
-        await userBot.client.user.setAvatar(identities[newName].avatar_url);
+        const new_identity = identity_config.find((e) => e.name === newName)
+        if (!new_identity) {
+            await interaction.editReply({ content: "找不到新身份"});
+            return;
+        }
+
+        // change avatar
+        await userBot.client.user.setAvatar(new_identity.avatar_url);
         bot.guildInfo[guild.id].bot_name = newName;
 
-        // color roles
-        if (identities[oldName] && identities[oldName].color_role) {
-            const oldColorRole = guild?.roles.cache.find(role => role.name === identities[oldName].color_role);
-            if (oldColorRole && userBot.roles.cache.has(oldColorRole?.id as string)) 
-                await userBot.roles.remove(oldColorRole);
-        }
-        
-        if (identities[newName] && identities[newName].color_role) {
-            const newColorRole = guild?.roles.cache.find(role => role.name === identities[newName].color_role);
-            if (newColorRole) 
-                await userBot.roles.add(newColorRole);
-        }
+        // change color role
+        identity_config.forEach(async (e) => {
+            const role = guild?.roles.cache.find(role => role.name === e.color_role);
+            if (role) 
+                if (userBot.roles.cache.has(role.id)) 
+                    await userBot.roles.remove(role);
+        });
+        const newColorRole = guild?.roles.cache.find(role => role.name === new_identity.color_role);
+        if (newColorRole)
+            await userBot.roles.add(newColorRole);
 
         await interaction.editReply({ content: `${oldName}已死，現在正是${newName}復權的時刻` });
     } catch (error) {

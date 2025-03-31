@@ -1,0 +1,346 @@
+[
+    {
+        "name": "help",
+        "description": "官方指令清單"
+    },{
+        "name": "bug_report",
+        "description": "回報問題",
+        "options": {
+            "string": [
+                {
+                    "name": "content",
+                    "description": "問題描述",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "change_avatar",
+        "description": "人格變換",
+        "options": {
+            "string": [
+                {
+                    "name": "identity",
+                    "description": "就是身分",
+                    "required": true,
+                    "choices": [
+                        { "name": "高松燈", "value": "高松燈" },
+                        { "name": "千早愛音", "value": "千早愛音" },
+                        { "name": "長崎爽世", "value": "長崎爽世" },
+                        { "name": "要樂奈", "value": "要樂奈" },
+                        { "name": "椎名立希", "value": "椎名立希" },
+                        { "name": "若葉睦", "value": "若葉睦" },
+                        { "name": "豐川祥子", "value": "豐川祥子" },
+                        { "name": "祐天寺にゃむ", "value": "祐天寺にゃむ" },
+                        { "name": "三角初音", "value": "三角初音" },
+                        { "name": "八幡海鈴", "value": "八幡海鈴" },
+                        { "name": "純田真奈", "value": "純田真奈" }
+                    ]
+                }
+            ]
+        }
+    },{
+        "name": "talk",
+        "description": "讓機器人說話",
+        "options": {
+            "channel": [
+                {
+                    "name": "channel",
+                    "description": "選擇頻道",
+                    "required": true
+                }
+            ],
+            "string": [
+                {
+                    "name": "content",
+                    "description": "就是內容",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "change_nickname",
+        "description": "更改bot暱稱",
+        "options": {
+            "string": [
+                {
+                    "name": "nickname",
+                    "description": "新暱稱",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "random_restaurant",
+        "description": "隨機餐廳抽取器 (台北地區)"
+    },{
+        "name": "search_anime_scene",
+        "description": "搜尋動漫截圖來源",
+        "options": {
+            "attachment": [
+                {
+                    "name": "image",
+                    "description": "動漫截圖",
+                    "required": true
+                }
+            ],
+            "number": [
+                {
+                    "name": "display_num",
+                    "description": "顯示幾筆搜尋結果 (optional)",
+                    "required": false
+                }
+            ]
+        }
+    },{
+        "name": "pin_message",
+        "description": "釘選訊息",
+        "options": {
+            "string": [
+                {
+                    "name": "action",
+                    "description": "釘選或取消釘選",
+                    "required": true,
+                    "choices": [
+                        { "name": "釘選", "value": "pin" },
+                        { "name": "取消釘選", "value": "unpin" }
+                    ]
+                },{
+                    "name": "message_link",
+                    "description": "要釘選的訊息連結",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "record",
+        "description": "錄音",
+        "options": {
+            "string": [
+                {
+                    "name": "action",
+                    "description": "開始或停止錄音",
+                    "required": true,
+                    "choices": [
+                        { "name": "開始", "value": "start" },
+                        { "name": "停止", "value": "stop" },
+                        { "name": "儲存音檔 (last n minutes)", "value": "save" }
+                    ]
+                }
+            ],
+            "number": [
+                {
+                    "name": "duration",
+                    "description": "錄音時間長度 (last n minutes) (optional)",
+                    "required": false
+                }
+            ]
+        }
+    },{
+        "name": "add_reply",
+        "description": "新增自動回覆",
+        "options": {
+            "string": [
+                {
+                    "name": "keyword",
+                    "description": "關鍵字",
+                    "required": true
+                },{
+                    "name": "reply",
+                    "description": "回覆",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "delete_reply",
+        "description": "刪除自動回覆",
+        "options": {
+            "string": [
+                {
+                    "name": "keyword",
+                    "description": "關鍵字",
+                    "required": true
+                },{
+                    "name": "reply",
+                    "description": "回覆",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "give_score",
+        "description": "給分"
+    },{
+        "name": "gay",
+        "description": "是不是給",
+        "options": {
+            "user": [
+                {
+                    "name": "user",
+                    "description": "選擇對象",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "weather_forecast",
+        "description": "天氣預報"
+    },{
+        "name": "update_role",
+        "description": "更新身分組"
+    },{
+        "name": "level_detail",
+        "description": "查看等級詳細資訊",
+        "options": {
+            "number": [
+                {
+                    "name": "left",
+                    "description": "左邊界",
+                    "required": true
+                },{
+                    "name": "right",
+                    "description": "右邊界",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "todo_list",
+        "description": "待辦事項",
+        "options": {
+            "string": [
+                {
+                    "name": "action",
+                    "description": "新增或刪除",
+                    "required": true,
+                    "choices": [
+                        { "name": "新增 (+ content: 內容)", "value": "add" },
+                        { "name": "刪除 (+ content: 編號)", "value": "delete" },
+                        { "name": "查看", "value": "list" }
+                    ]
+                },{
+                    "name": "content",
+                    "description": "內容 (optional)",
+                    "required": false
+                }
+            ]
+        }
+    },{
+        "name": "get_avatar",
+        "description": "取得使用者頭像",
+        "options": {
+            "user": [
+                {
+                    "name": "user",
+                    "description": "選擇對象",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "emoji_frequency",
+        "description": "統計表情符號使用頻率",
+        "options": {
+            "string": [
+                {
+                    "name": "frequency",
+                    "description": "頻率順序 (optional)",
+                    "required": false,
+                    "choices": [
+                        { "name": "前n低頻率", "value": "asc" },
+                        { "name": "前n高頻率", "value": "desc" }
+                    ]
+                },{
+                    "name": "type",
+                    "description": "動態或靜態 (optional)",
+                    "required": false,
+                    "choices": [
+                        { "name": "動態", "value": "animated" },
+                        { "name": "靜態", "value": "static" }
+                    ]
+                }
+            ],
+            "number": [
+                {
+                    "name": "top_n",
+                    "description": "前n名 (optional)",
+                    "required": false
+                },{
+                    "name": "last_n_months",
+                    "description": "搜尋過去n個月 (optional)",
+                    "required": false
+                }
+            ]
+        }
+    },{
+        "name": "sticker_frequency",
+        "description": "統計貼圖使用頻率 (實時統計, 尋找區間不應過長, 有timeout)",
+        "options": {
+            "string": [
+                {
+                    "name": "frequency",
+                    "description": "頻率順序 (optional)",
+                    "required": false,
+                    "choices": [
+                        { "name": "前n低頻率", "value": "asc" },
+                        { "name": "前n高頻率", "value": "desc" }
+                    ]
+                }
+            ],
+            "number": [
+                {
+                    "name": "top_n",
+                    "description": "前n名 (optional)",
+                    "required": false
+                },{
+                    "name": "last_n_days",
+                    "description": "搜尋過去n天 (optional)",
+                    "required": false
+                }
+            ]
+        }
+    },{
+        "name": "giveaway_create",
+        "description": "建立抽獎",
+        "options": {
+            "string": [
+                {
+                    "name": "duration",
+                    "description": "抽獎時限 (1s, 1m, 1h, 1d, 1w)",
+                    "required": true
+                },{
+                    "name": "prize",
+                    "description": "獎品",
+                    "required": true
+                },{
+                    "name": "description",
+                    "description": "抽獎描述 (optional)",
+                    "required": false
+                }
+            ],
+            "number": [
+                {
+                    "name": "winner_num",
+                    "description": "中獎人數",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "giveaway_delete",
+        "description": "刪除抽獎",
+        "options": {
+            "string": [
+                {
+                    "name": "message_id",
+                    "description": "抽獎訊息ID (Bot發布的公告)",
+                    "required": true
+                }
+            ]
+        }       
+    },{
+        "name": "modal1",
+        "description": "模態對話框1"
+    }
+]
