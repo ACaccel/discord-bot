@@ -5,12 +5,12 @@ import { giveaway } from '@cmd';
 import utils from '@utils';
 import { Job } from 'node-schedule';
 
-interface IGiveaway {
+interface IGiveawayBot {
     giveaway_jobs: Map<string, Job>
 }
 
 const isGiveawayBot = (bot: BaseBot) => {
-    return (bot as BaseBot & IGiveaway).giveaway_jobs !== undefined;
+    return (bot as BaseBot & IGiveawayBot).giveaway_jobs !== undefined;
 }
 
 export const giveawayAnnouncement = async (channel: AllowedTextChannel, prize: string, prize_owner_id: string, winner_num: number, end_time_date: Date, description: string) => {
@@ -50,7 +50,7 @@ export const findGiveaway = async (bot: BaseBot, guild_id: string, message_id: s
 }
 
 export const scheduleGiveaway = async (bot: BaseBot, guild_id: string, message_id: string) => {
-    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveaway";
+    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveawayBot";
     
     const guild = bot.client.guilds.cache.get(guild_id);
     if (!guild) {
@@ -91,8 +91,8 @@ export const scheduleGiveaway = async (bot: BaseBot, guild_id: string, message_i
     return null;
 }
 
-export const deleteGiveaway = async (bot: BaseBot & IGiveaway, guild_id: string, message_id: string) => {
-    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveaway";
+export const deleteGiveaway = async (bot: BaseBot & IGiveawayBot, guild_id: string, message_id: string) => {
+    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveawayBotBot";
 
     const guild = bot.client.guilds.cache.get(guild_id);
     if (!guild) {
@@ -113,8 +113,8 @@ export const deleteGiveaway = async (bot: BaseBot & IGiveaway, guild_id: string,
     return null;
 }
 
-export const addReactionToGiveaway = async (reaction: MessageReaction, user: User, bot: BaseBot & IGiveaway) => {
-    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveaway";
+export const addReactionToGiveaway = async (reaction: MessageReaction, user: User, bot: BaseBot & IGiveawayBot) => {
+    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveawayBot";
 
     bot.giveaway_jobs.forEach(async (job, message_id) => {
         if (reaction.message.id === message_id) {
@@ -132,8 +132,8 @@ export const addReactionToGiveaway = async (reaction: MessageReaction, user: Use
     return null;
 }
 
-export const removeReactionFromGiveaway = async (reaction: MessageReaction, user: User, bot: BaseBot & IGiveaway) => {
-    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveaway";
+export const removeReactionFromGiveaway = async (reaction: MessageReaction, user: User, bot: BaseBot & IGiveawayBot) => {
+    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveawayBot";
 
     bot.giveaway_jobs.forEach(async (job, message_id) => {
         if (reaction.message.id === message_id) {
