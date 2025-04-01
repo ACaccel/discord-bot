@@ -265,7 +265,6 @@ export interface Config {
     admin?: string;
     guilds?: Record<string, GuildConfig>;
     commands?: string[];
-    // modals?: Modal[];
 }
 
 export interface GuildInfo {
