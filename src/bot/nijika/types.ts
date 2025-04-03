@@ -60,7 +60,7 @@ export class Nijika extends BaseBot {
     // recover the state
     public rebootProcess = () => {
         giveaway.rebootGiveawayJobs(this);
-        scheduleIconChange(this, "1047744170070118400");
+        // scheduleIconChange(this, "1047744170070118400");
     }
 }
 

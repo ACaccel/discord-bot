@@ -61,7 +61,7 @@ tomori.client.on(Events.ClientReady, async () => {
 tomori.client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.inGuild()) {
         if (interaction.isChatInputCommand()) {
-            await tomori.executeSlashCommands(tomori, interaction);
+            await tomori.executeSlashCommands(interaction);
         } else {
             if (!interaction.isAutocomplete()) {
                 await interaction.reply({ content: '目前尚不支援此類型的指令喔!', ephemeral: true });

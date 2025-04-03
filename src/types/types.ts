@@ -9,7 +9,8 @@ import {
     PublicThreadChannel,
     ChatInputCommandInteraction,
     Role,
-    ModalSubmitInteraction
+    ModalSubmitInteraction,
+    ButtonInteraction
 } from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
@@ -18,7 +19,8 @@ import utils from '@utils';
 import {
     buildSlashCommands,
     cmd_handler,
-    modal_handler
+    modal_handler,
+    button_handler
 } from '@cmd';
 import { Connection, Model } from 'mongoose';
 import slash_command_config from '../slash_command.json';
@@ -35,6 +37,7 @@ export class BaseBot {
     public slashCommands?: RESTPostAPIChatInputApplicationCommandsJSONBody[];
     public slashCommandsHandler?: Map<string, Function>;
     public modalHandler?: Map<string, Function>;
+    public buttonHandler?: Map<string, Function>;
     public voice?: Voice;
 
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: Config) {
@@ -131,6 +134,37 @@ export class BaseBot {
         }
     }
 
+    public rebootMessage = async () => {
+        Object.entries(this.guildInfo).forEach(async ([guild_id, guild]) => {
+            try {
+                const debug_ch = this.guildInfo[guild_id]?.channels?.debug as AllowedTextChannel;
+                if (debug_ch) {
+                    await debug_ch.send(`${guild.bot_name}重開機囉!`);
+                }
+            } catch (error) {
+                utils.errorLogger(this.clientId, '', error);
+            }
+        });
+    }
+
+    public initVoice = () => {
+        this.voice = {
+            recorder: new VoiceRecorder({}, this.client),
+            connection: null
+        }
+    }
+
+    public getToken = () => {
+        return this.token;
+    }
+    
+    public getMongoURI = () => {
+        return this.mongoURI;
+    }
+
+    //--------------------------------------------//
+    //-------------- slash commands --------------//
+    //--------------------------------------------//
     public initSlashCommandsHandlers = () => {
         this.slashCommandsHandler = new Map<string, Function>();
         Object.entries(cmd_handler).forEach(([name, handler]) => {
@@ -175,7 +209,7 @@ export class BaseBot {
         utils.systemLogger(this.clientId, `Successfully register ${this.slashCommands.length} application (/) commands.`)
     }
 
-    public executeSlashCommands = async (bot: BaseBot, interaction: ChatInputCommandInteraction) => {
+    public executeSlashCommands = async (interaction: ChatInputCommandInteraction) => {
         if (!interaction.isCommand()) return;
         if (!this.config.commands) {
             interaction.reply({ content: "No commands to execute.", ephemeral: true });
@@ -199,13 +233,16 @@ export class BaseBot {
         }
         
         const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`;
-        utils.channelLogger(bot.guildInfo[interaction.guildId as string]?.channels?.debug, undefined, channel_log);
+        utils.channelLogger(this.guildInfo[interaction.guildId as string]?.channels?.debug, undefined, channel_log);
         if (interaction.guild) {
             const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
             utils.guildLogger(this.clientId, interaction.guild.id, 'interaction_create', guild_log, interaction.guild?.name as string);
         }
     }
 
+    //---------------------------------------------//
+    //-------------- modal commands ---------------//
+    //---------------------------------------------//
     public initModalHandlers = () => {
         this.modalHandler = new Map<string, Function>();
         Object.entries(modal_handler).forEach(([name, handler]) => {
@@ -215,7 +252,7 @@ export class BaseBot {
         });
     }
 
-    public executeModalSubmit = async (bot: BaseBot, interaction: ModalSubmitInteraction) => {
+    public executeModalSubmit = async (interaction: ModalSubmitInteraction) => {
         if (!interaction.isModalSubmit()) return;
         if (!this.modalHandler) {
             interaction.reply({ content: "No modal handler found.", ephemeral: true });
@@ -231,33 +268,35 @@ export class BaseBot {
             utils.errorLogger(this.clientId, interaction.guild?.id, error);
         }
     }
-    
-    public initVoice = () => {
-        this.voice = {
-            recorder: new VoiceRecorder({}, this.client),
-            connection: null
-        }
-    }
 
-    public rebootMessage = async () => {
-        Object.entries(this.guildInfo).forEach(async ([guild_id, guild]) => {
-            try {
-                const debug_ch = this.guildInfo[guild_id]?.channels?.debug as AllowedTextChannel;
-                if (debug_ch) {
-                    await debug_ch.send(`${guild.bot_name}重開機囉!`);
-                }
-            } catch (error) {
-                utils.errorLogger(this.clientId, '', error);
+    //----------------------------------------------//
+    //-------------- button commands ---------------//
+    //----------------------------------------------//
+    public initButtonHandlers = () => {
+        this.buttonHandler = new Map<string, Function>();
+        Object.entries(button_handler).forEach(([name, handler]) => {
+            if (typeof handler === 'function') {
+                this.buttonHandler?.set(name, handler);
             }
         });
     }
 
-    public getToken = () => {
-        return this.token;
-    }
-    
-    public getMongoURI = () => {
-        return this.mongoURI;
+    public executeButton = async (interaction: ButtonInteraction) => {
+        if (!interaction.isButton()) return;
+        if (!this.buttonHandler) {
+            interaction.reply({ content: "No button handler found.", ephemeral: true });
+            return;
+        }
+
+        const button_type = interaction.customId.split('|')[0];
+        try {
+            const handler = this.buttonHandler.get(button_type);
+            if (handler) {
+                await handler(interaction, this);
+            }
+        } catch (error) {
+            utils.errorLogger(this.clientId, interaction.guild?.id, error);
+        }
     }
 }
 

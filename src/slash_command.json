@@ -340,6 +340,18 @@
             ]
         }       
     },{
+        "name": "role_message",
+        "description": "發送身份組領取訊息",
+        "options": {
+            "string": [
+                {
+                    "name": "roles",
+                    "description": "可領取身份組id (用','分隔)",
+                    "required": true
+                }
+            ]
+        }
+    },{
         "name": "modal1",
         "description": "模態對話框1"
     }

@@ -55,6 +55,7 @@ nijika.client.on(Events.ClientReady, async () => {
     await nijika.registerSlashCommands();
     nijika.initSlashCommandsHandlers();
     nijika.initModalHandlers();
+    nijika.initButtonHandlers();
     nijika.rebootProcess();
 
     // reboot message
@@ -64,9 +65,11 @@ nijika.client.on(Events.ClientReady, async () => {
 nijika.client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.inGuild()) {
         if (interaction.isChatInputCommand()) {
-            await nijika.executeSlashCommands(nijika, interaction);
+            await nijika.executeSlashCommands(interaction);
         } else if (interaction.isModalSubmit()) {
-            await nijika.executeModalSubmit(nijika, interaction);
+            await nijika.executeModalSubmit(interaction);
+        } else if (interaction.isButton()) {
+            await nijika.executeButton(interaction);
         } else {
             if (!interaction.isAutocomplete()) {
                 await interaction.reply({ content: '目前尚不支援此類型的指令喔!', ephemeral: true });

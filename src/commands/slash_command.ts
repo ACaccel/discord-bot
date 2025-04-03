@@ -5,12 +5,15 @@ import {
     EmbedBuilder,
     GuildMember,
     ChatInputCommandInteraction,
+    Role,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
     
     // modal
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
-    ActionRowBuilder,
 } from "discord.js";
 import axios from "axios";
 import fs from "fs";
@@ -743,6 +746,63 @@ export const sticker_frequency = async (interaction: ChatInputCommandInteraction
         await interaction.editReply({ content: "無法取得貼圖使用頻率" });
     }
 };
+
+export const role_message = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        const guild = interaction.guild;
+        if (!guild) {
+            await interaction.editReply({ content: "找不到伺服器" });
+            return;
+        }
+        const member = interaction.member as GuildMember;
+        if (!member.roles.cache.has(bot.guildInfo[guild.id].roles?.moderator?.id as string)) {
+            await interaction.editReply({ content: "你沒有權限發送身份組領取訊息" });
+            return;
+        }
+
+        // Verify IDs format and existence
+        const roles = interaction.options.get("roles")?.value as string;
+        if (!roles || !roles.match(/^\d+(,\d+)*$/)) {
+            await interaction.editReply({ content: "格式錯誤！請使用逗號分隔的角色ID: id1,id2, ..." });
+            return;
+        }
+        const roleIds = roles.split(",").map(id => id.trim()).filter(id => id !== "");
+        const validRoles: Role[] = [];
+        for (const roleId of roleIds) {
+            const role = guild.roles.cache.get(roleId);
+            if (!role) {
+                await interaction.editReply({ content: `找不到ID為 ${roleId} 的身份組, 請確認ID是否正確` });
+                return;
+            }
+            validRoles.push(role);
+        }
+        if (validRoles.length === 0) {
+            await interaction.editReply({ content: "請至少提供一個有效的身份組ID" });
+            return;
+        }
+
+        // build buttons
+        const buttons: ButtonBuilder[] = validRoles.map(role => {
+            return new ButtonBuilder()
+                .setCustomId(`toggle_role|${role.id}`)
+                .setLabel(role.name)
+                .setStyle(ButtonStyle.Primary);
+        });
+        const rows :ActionRowBuilder<ButtonBuilder>[] = [];
+        for (let i = 0; i < buttons.length; i += 5) {
+            rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + 5)));
+        }
+
+        await interaction.editReply({
+            content: "請選擇你要領取的身份組：",
+            components: rows
+        });
+    } catch (error) {
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+        await interaction.editReply({ content: "無法發送身份組領取訊息" });
+    }
+}
 
 /********** Only for Nijika **********/
 
