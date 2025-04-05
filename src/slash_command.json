@@ -153,6 +153,18 @@
             ]
         }
     },{
+        "name": "list_reply",
+        "description": "列出自動回覆",
+        "options": {
+            "string": [
+                {
+                    "name": "keyword",
+                    "description": "關鍵字",
+                    "required": true
+                }
+            ]
+        }
+    },{
         "name": "delete_reply",
         "description": "刪除自動回覆",
         "options": {
@@ -351,8 +363,5 @@
                 }
             ]
         }
-    },{
-        "name": "modal1",
-        "description": "模態對話框1"
     }
 ]

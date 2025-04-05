@@ -406,41 +406,78 @@ export const record = async (interaction: ChatInputCommandInteraction, bot: Base
 }
 
 export const add_reply = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
-    const input = interaction.options.get("keyword")?.value;
-    const reply = interaction.options.get("reply")?.value;
+    await interaction.deferReply();
+    try {
+        const input = interaction.options.get("keyword")?.value;
+        const reply = interaction.options.get("reply")?.value;
 
-    const db = bot.guildInfo[interaction.guild?.id as string].db;
-    if (!db) {
-        await interaction.reply({ content: "找不到資料庫" });
-        return;
+        const db = bot.guildInfo[interaction.guild?.id as string].db;
+        if (!db) {
+            await interaction.editReply({ content: "找不到資料庫" });
+            return;
+        }
+        const existPair = await db.models["Reply"].find({ input, reply });
+
+        if (existPair && existPair.length === 0) {
+            const newReply = new db.models["Reply"]({ input, reply });
+            await newReply.save();
+            await interaction.editReply({ content: `已新增 輸入：${input} 回覆：${reply}！` });
+        } else {
+            await interaction.editReply({ content: `此配對 輸入：${input} 回覆：${reply} 已經存在！` });
+        }
+    } catch (error) {
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+        await interaction.editReply({ content: "無法新增訊息回覆配對" });
     }
-    const existPair = await db.models["Reply"].find({ input, reply });
+}
 
-    if (existPair && existPair.length === 0) {
-        const newReply = new db.models["Reply"]({ input, reply });
-        await newReply.save();
-        await interaction.reply({ content: `已新增 輸入：${input} 回覆：${reply}！` });
-    } else {
-        await interaction.reply({ content: `此配對 輸入：${input} 回覆：${reply} 已經存在！` });
+export const list_reply = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        const keyword = interaction.options.get("keyword")?.value;
+        const db = bot.guildInfo[interaction.guild?.id as string].db;
+        if (!db) {
+            await interaction.editReply({ content: "找不到資料庫" });
+            return;
+        }
+        const replyList = await db.models["Reply"].find({ input: keyword });
+        if (replyList.length === 0) {
+            await interaction.editReply({ content: `找不到 輸入：${keyword} 的回覆！` });
+        } else {
+            let content = `輸入：${keyword} 的回覆：\n`;
+            replyList.map((e, i) => {
+                content += `> ${i + 1}. ${e.reply}\n`;
+            });
+            await interaction.editReply({ content });
+        }
+    } catch (error) {
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+        await interaction.reply({ content: "無法列出訊息回覆配對" });
     }
 }
 
 export const delete_reply = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
-    const input = interaction.options.get("keyword")?.value;
-    const reply = interaction.options.get("reply")?.value;
+    await interaction.deferReply();
+    try {
+        const input = interaction.options.get("keyword")?.value;
+        const reply = interaction.options.get("reply")?.value;
 
-    const db = bot.guildInfo[interaction.guild?.id as string].db;
-    if (!db) {
-        await interaction.reply({ content: "找不到資料庫" });
-        return;
-    }
-    const existPair = await db.models["Reply"].find({ input, reply });
+        const db = bot.guildInfo[interaction.guild?.id as string].db;
+        if (!db) {
+            await interaction.editReply({ content: "找不到資料庫" });
+            return;
+        }
+        const existPair = await db.models["Reply"].find({ input, reply });
 
-    if (existPair.length === 0) {
-        await interaction.reply({ content: `找不到 輸入：${input} 回覆：${reply}！` });
-    } else {
-        await db.models["Reply"].deleteOne({ input, reply });
-        await interaction.reply({ content: `已刪除 輸入：${input} 回覆：${reply}！` });
+        if (existPair.length === 0) {
+            await interaction.editReply({ content: `找不到 輸入：${input} 回覆：${reply}！` });
+        } else {
+            await db.models["Reply"].deleteOne({ input, reply });
+            await interaction.editReply({ content: `已刪除 輸入：${input} 回覆：${reply}！` });
+        }
+    } catch (error) {
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+        await interaction.editReply({ content: "無法刪除訊息回覆配對" });
     }
 }
 
