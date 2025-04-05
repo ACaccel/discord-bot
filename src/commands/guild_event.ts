@@ -17,6 +17,10 @@ export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, 
     if (!newMessage.guild || !newMessage.guildId || !newMessage.author || !oldMessage.author) return;
     if (newMessage.author.bot) return;
     if (!newMessage.guild?.id) return;
+    if (oldMessage.partial)
+        await oldMessage.fetch();
+    if (newMessage.partial)
+        await newMessage.fetch();
 
     const event_channel = bot.guildInfo[newMessage.guildId]?.channels?.event;
 
@@ -52,6 +56,8 @@ export const detectMessageDelete = async (message: Message | PartialMessage, bot
     if (!message.guild || !message.guildId || !message.author) return;
     if (message.author.bot) return;
     if (!message.guild?.id) return;
+    if (message.partial)
+        await message.fetch();
 
     const event_channel = bot.guildInfo[message.guildId as string]?.channels?.event;
 
@@ -101,6 +107,10 @@ export const detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGu
     const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
     const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
     if (addedRoles.size === 0 && removedRoles.size === 0) return;
+    if (oldMember.partial)
+        await oldMember.fetch();
+    if (newMember.partial)
+        await newMember.fetch();
 
     const addedRolesList = addedRoles.map(role => `<@&${role.id}>`).join(', ');
     const removedRolesList = removedRoles.map(role => `<@&${role.id}>`).join(', ');
