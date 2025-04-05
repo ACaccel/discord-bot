@@ -83,7 +83,7 @@ export const detectMessageDelete = async (message: Message | PartialMessage, bot
             } else {
                 embed.addFields({ name: 'attachment', value: attachment.url, inline: false });
             }
-            utils.attachmentLogger(message.guild?.name as string, attachment);
+            utils.attachmentLogger(message.guild?.id as string, attachment);
         });
     }
     utils.channelLogger(event_channel, embed);

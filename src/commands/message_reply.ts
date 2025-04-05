@@ -31,6 +31,7 @@ const search_reply = async (msg: string, bot: BaseBot, guild_id: string) => {
 
 export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) => {
     if (!msg.channel.isSendable()) return;
+    if (msg.author.bot) return; // prevent recusive reply
     
     // normal reply
     const { reply, success } = await search_reply(msg.content, bot, guild_id);

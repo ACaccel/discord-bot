@@ -11,10 +11,10 @@ const getDate = () => {
 /**
  * (test) save deleted attachments
  */
-export const attachmentLogger = async (guild_name: string, attachment: Attachment, ) => {
+export const attachmentLogger = async (guild_id: string, attachment: Attachment, ) => {
     try {
         // Define the path where the attachment will be saved
-        const filePath = `./data/deleted_attachments/${guild_name}/${getDate().replaceAll('/', '_').replaceAll(':', '_')}${attachment.name}`;
+        const filePath = `./data/deleted_attachments/${guild_id}/${getDate().replaceAll('/', '_').replaceAll(':', '_')}${attachment.name}`;
 
         // Ensure the directory exists
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
