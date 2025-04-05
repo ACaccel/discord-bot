@@ -131,19 +131,18 @@ export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
     bot.guildInfo[guild.id] = newGuild;
 
     // DB initialization
-    try {
-        if (!bot.getMongoURI()) {
-            throw new Error('No MongoDB URI.');
-        }
+    if (!bot.getMongoURI()) {
+        throw new Error('No MongoDB URI.');
+    }
 
-        const database = await db.dbConnect(bot.getMongoURI()!, guild.id, bot.clientId);
-        if (database && bot.guildInfo[guild.id]) {
-            bot.guildInfo[guild.id].db = database;
-        } else {
-            throw new Error(`Cannot connect to MongoDB for guild ${guild.id}.`);
-        }
-    } catch (err) {
-        utils.systemLogger(bot.clientId, `Cannot connect to MongoDB: ${err}`);
+    const database = await db.dbConnect(bot.getMongoURI()!, guild.id, bot.clientId)
+    .catch((err) => {
+        throw new Error(`Failed to connect to MongoDB: ${err}`);
+    });
+    if (database && bot.guildInfo[guild.id]) {
+        bot.guildInfo[guild.id].db = database;
+    } else {
+        throw new Error(`Cannot connect to MongoDB for guild ${guild.id}.`);
     }
 
     // register slash commands

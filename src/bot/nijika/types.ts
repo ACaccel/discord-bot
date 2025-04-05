@@ -34,10 +34,12 @@ export class Nijika extends BaseBot {
     }
 
     public detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage) => {
+        if (this.nijikaConfig.blocked_channels.includes(oldMessage.channel.id)) return;
         detectMessageUpdate(oldMessage, newMessage, this);
     }
 
     public detectMessageDelete = async (message: Message | PartialMessage) => {
+        if (this.nijikaConfig.blocked_channels.includes(message.channel.id)) return;
         detectMessageDelete(message, this);
     }
 
@@ -48,13 +50,19 @@ export class Nijika extends BaseBot {
     public detectReactionAdd = async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
         const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
         const fetchedUser = user.partial ? await user.fetch() : user;
-        giveaway.addReactionToGiveaway(fetchedReaction, fetchedUser, this);
+        
+        if (!user.bot) {
+            giveaway.addReactionToGiveaway(fetchedReaction, fetchedUser, this);
+        }
     }
 
     public detectReactionRemove = async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
         const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
         const fetchedUser = user.partial ? await user.fetch() : user;
-        giveaway.removeReactionFromGiveaway(fetchedReaction, fetchedUser, this);
+
+        if (!user.bot) {
+            giveaway.removeReactionFromGiveaway(fetchedReaction, fetchedUser, this);
+        }
     }
 
     // recover the state

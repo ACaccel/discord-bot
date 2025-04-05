@@ -1,3 +1,7 @@
+//==================================================//
+// Button Custom ID: <button_type>|<button_value>
+//==================================================// 
+
 import { ButtonInteraction, Guild, GuildMember } from "discord.js";
 import { BaseBot } from "@dcbotTypes";
 

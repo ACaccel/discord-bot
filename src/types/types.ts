@@ -51,9 +51,12 @@ export class BaseBot {
 
     public login = async () => {
         utils.systemLogger(this.clientId, "Logging in...");
-        await this.client.login(this.token);
+        await this.client.login(this.token)
+        .catch((err) => {
+            utils.systemLogger(this.clientId, `Failed to login: ${err}`);
+        });
         if (!this.client.user) {
-            utils.systemLogger(this.clientId, "Cannot login.");
+            utils.systemLogger(this.clientId, "Failed to login: No user found.");
             return;
         }
         utils.systemLogger(this.clientId, `Logged in as ${this.client.user.username}!`);
@@ -120,29 +123,30 @@ export class BaseBot {
 
         try {
             await Promise.all(Object.entries(this.guildInfo).map(async ([guild_id, guild]) => {
-
-                const database = await db.dbConnect(this.mongoURI!, guild_id, this.clientId);
+                const database = await db.dbConnect(this.mongoURI!, guild_id, this.clientId)
+                .catch((err) => {
+                    utils.systemLogger(this.clientId, `Failed to connect to MongoDB for guild ${guild_id}: ${err}`);
+                });
                 if (database && this.guildInfo[guild_id]) {
                     this.guildInfo[guild_id].db = database;
                     utils.systemLogger(this.clientId, `MongoDB for guild: ${guild_id} - ${guild.guild.name} connected.`);
                 } else {
-                    utils.systemLogger(this.clientId, `Cannot connect to MongoDB for guild ${guild_id}.`);
+                    utils.systemLogger(this.clientId, `Failed to connect to MongoDB for guild ${guild_id}.: database is null or guildInfo is null`);
                 }
             }));
         } catch (err) {
-            utils.systemLogger(this.clientId, `Cannot connect to MongoDB: ${err}`);
+            utils.systemLogger(this.clientId, `Failed to connect to MongoDB: ${err}`);
         }
     }
 
     public rebootMessage = async () => {
         Object.entries(this.guildInfo).forEach(async ([guild_id, guild]) => {
-            try {
-                const debug_ch = this.guildInfo[guild_id]?.channels?.debug as AllowedTextChannel;
+            const guildInfo = this.guildInfo[guild_id];
+            if (guildInfo && guildInfo.channels && guildInfo.channels.debug) {
+                const debug_ch = guildInfo.channels.debug as AllowedTextChannel;
                 if (debug_ch) {
                     await debug_ch.send(`${guild.bot_name}重開機囉!`);
                 }
-            } catch (error) {
-                utils.errorLogger(this.clientId, '', error);
             }
         });
     }
@@ -162,9 +166,9 @@ export class BaseBot {
         return this.mongoURI;
     }
 
-    //--------------------------------------------//
-    //-------------- slash commands --------------//
-    //--------------------------------------------//
+    //============================================//
+    //============== slash commands ==============//
+    //============================================//
     public initSlashCommandsHandlers = () => {
         this.slashCommandsHandler = new Map<string, Function>();
         Object.entries(cmd_handler).forEach(([name, handler]) => {
@@ -177,59 +181,53 @@ export class BaseBot {
     public registerSlashCommands = async () => {
         utils.systemLogger(this.clientId, "Registering commands...");
 
-        if (!this.config.commands) {
-            utils.systemLogger(this.clientId, "No commands to register.");
-            return;
-        }
-
-        // build slash commands from config
-        this.slashCommands = [];
-        this.config.commands.forEach((cmd) => {
-            const command_config = slash_command_config.find((config) => config.name === cmd);
-            if (command_config) {
-                let slashCommand = buildSlashCommands(command_config);
-                this.slashCommands?.push(slashCommand);
+        try {
+            if (!this.config.commands) {
+                utils.systemLogger(this.clientId, "No commands to register.");
+                return;
             }
-        });
 
-        // register slash commands to discord
-        const rest = new REST().setToken(this.token)
-        await rest.put(Routes.applicationCommands(this.clientId), { body: [] })
-        .catch((err) => {
-            utils.systemLogger(this.clientId, `Failed to clear application (/) commands: ${err}`);
-        });
-
-        Object.entries(this.guildInfo).forEach(async ([guildId, guildInfo]) => {
-            await rest.put(Routes.applicationGuildCommands(this.clientId, guildId), { body: this.slashCommands })
-            .catch((err) => {
-                utils.systemLogger(this.clientId, `Failed to register guild (/) commands: ${err}`);
+            // build slash commands from config
+            this.slashCommands = [];
+            this.config.commands.forEach((cmd) => {
+                const command_config = slash_command_config.find((config) => config.name === cmd);
+                if (command_config) {
+                    let slashCommand = buildSlashCommands(command_config);
+                    this.slashCommands?.push(slashCommand);
+                }
             });
-        });
 
-        utils.systemLogger(this.clientId, `Successfully register ${this.slashCommands.length} application (/) commands.`)
+            // register slash commands to discord
+            const rest = new REST().setToken(this.token)
+            await rest.put(Routes.applicationCommands(this.clientId), { body: [] })
+            Object.entries(this.guildInfo).forEach(async ([guildId, guildInfo]) => {
+                await rest.put(Routes.applicationGuildCommands(this.clientId, guildId), { body: this.slashCommands })
+            });
+
+            utils.systemLogger(this.clientId, `Successfully register ${this.slashCommands.length} application (/) commands.`)
+        } catch (err) {
+            utils.systemLogger(this.clientId, `Failed to register commands: ${err}`);
+        }
     }
 
     public executeSlashCommands = async (interaction: ChatInputCommandInteraction) => {
-        if (!interaction.isCommand()) return;
         if (!this.config.commands) {
-            interaction.reply({ content: "No commands to execute.", ephemeral: true });
+            interaction.reply({ content: "Config of commands not found.", ephemeral: true });
             return;
         }
         if (!this.slashCommandsHandler) {
-            interaction.reply({ content: "No command handler found.", ephemeral: true });
+            interaction.reply({ content: "Command handler not found.", ephemeral: true });
             return;
         }
 
         const command = this.config.commands.find((cmd) => cmd === interaction.commandName);
         if (command) {
-            try {
-                const handler = this.slashCommandsHandler.get(interaction.commandName)
-                if (handler) {
-                    await handler(interaction, this);
-                }
-            } catch (error) {
-                utils.errorLogger(this.clientId, interaction.guild?.id, error);
+            const handler = this.slashCommandsHandler.get(interaction.commandName)
+            if (handler) {
+                await handler(interaction, this);
             }
+        } else {
+            interaction.reply({ content: "Command not found.", ephemeral: true });
         }
         
         const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`;
@@ -240,11 +238,11 @@ export class BaseBot {
         }
     }
 
-    //---------------------------------------------//
-    //-------------- modal commands ---------------//
-    //---------------------------------------------//
+    //=============================================//
+    //============== modal commands ===============//
+    //=============================================//
     public initModalHandlers = () => {
-        this.modalHandler = new Map<string, Function>();
+        this.modalHandler = new Map<string, Function>()
         Object.entries(modal_handler).forEach(([name, handler]) => {
             if (typeof handler === 'function') {
                 this.modalHandler?.set(name, handler);
@@ -253,25 +251,20 @@ export class BaseBot {
     }
 
     public executeModalSubmit = async (interaction: ModalSubmitInteraction) => {
-        if (!interaction.isModalSubmit()) return;
         if (!this.modalHandler) {
-            interaction.reply({ content: "No modal handler found.", ephemeral: true });
+            interaction.reply({ content: "Modal handler not found.", ephemeral: true });
             return;
         }
 
-        try {
-            const handler = this.modalHandler.get(interaction.customId);
-            if (handler) {
-                await handler(interaction, this);
-            }
-        } catch (error) {
-            utils.errorLogger(this.clientId, interaction.guild?.id, error);
+        const handler = this.modalHandler.get(interaction.customId);
+        if (handler) {
+            await handler(interaction, this);
         }
     }
 
-    //----------------------------------------------//
-    //-------------- button commands ---------------//
-    //----------------------------------------------//
+    //=============================================//
+    //============== button commands ==============//
+    //=============================================//
     public initButtonHandlers = () => {
         this.buttonHandler = new Map<string, Function>();
         Object.entries(button_handler).forEach(([name, handler]) => {
@@ -282,20 +275,16 @@ export class BaseBot {
     }
 
     public executeButton = async (interaction: ButtonInteraction) => {
-        if (!interaction.isButton()) return;
         if (!this.buttonHandler) {
-            interaction.reply({ content: "No button handler found.", ephemeral: true });
+            interaction.reply({ content: "Button handler not found.", ephemeral: true });
             return;
         }
 
+        // customId format: <button_type>|<button_value>
         const button_type = interaction.customId.split('|')[0];
-        try {
-            const handler = this.buttonHandler.get(button_type);
-            if (handler) {
-                await handler(interaction, this);
-            }
-        } catch (error) {
-            utils.errorLogger(this.clientId, interaction.guild?.id, error);
+        const handler = this.buttonHandler.get(button_type);
+        if (handler) {
+            await handler(interaction, this);
         }
     }
 }

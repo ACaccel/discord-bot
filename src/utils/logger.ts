@@ -31,8 +31,8 @@ export const attachmentLogger = async (guild_name: string, attachment: Attachmen
             writer.on('finish', resolve);
             writer.on('error', reject);
         });
-    } catch (error) {
-        console.error('Error saving attachment:', error);
+    } catch (e) {
+        console.error('Error saving attachment:', e);
     }
 };
 
@@ -40,14 +40,18 @@ export const attachmentLogger = async (guild_name: string, attachment: Attachmen
  * Log channel events as embedded message to guild's channel.
  */
 export const channelLogger = async (channel: Channel | undefined, embed?: EmbedBuilder, log?: string) => {
-    if (!channel) return;
-    channel = channel as AllowedTextChannel;
+    try {
+        if (!channel) return;
+        channel = channel as AllowedTextChannel;
 
-    if (log) {
-        await channel.send(log);
-    }
-    if (embed) {
-        await channel.send({ embeds: [embed] });
+        if (log) {
+            await channel.send(log);
+        }
+        if (embed) {
+            await channel.send({ embeds: [embed] });
+        }
+    } catch (e) {
+        console.error(e);
     }
 }
 
@@ -55,19 +59,27 @@ export const channelLogger = async (channel: Channel | undefined, embed?: EmbedB
  * Log guild events to console and backup to *log* file
  */
 export const guildLogger = (bot_id: string, guild_id: string, event_type: string, msg: string, guild_name: string) => {
-    msg = msg.replaceAll('\n', '\\n');
-    let new_msg = `[${event_type.toUpperCase()}] <${guild_name}> - ${msg}`;
-    console.log(getDate() + new_msg);
-    logBackup(new_msg, bot_id, guild_id, 'logs');
+    try {
+        msg = msg.replaceAll('\n', '\\n');
+        let new_msg = `[${event_type.toUpperCase()}] <${guild_name}> - ${msg}`;
+        console.log(getDate() + new_msg);
+        logBackup(new_msg, bot_id, guild_id, 'logs');
+    } catch (e) {
+        console.error(e);
+    }
 }
 
 /**
  * Log system information to console and backup to *log* file
  */
 export const systemLogger = (bot_id: string, msg: string) => {
-    let new_msg = `[SYSTEM] ${msg}`;
-    console.log(getDate() + new_msg);
-    logBackup(new_msg, bot_id, '', 'logs');
+    try {
+        let new_msg = `[SYSTEM] ${msg}`;
+        console.log(getDate() + new_msg);
+        logBackup(new_msg, bot_id, '', 'logs');
+    } catch (e) {
+        console.error(e);
+    }
 }
 
 /**
@@ -75,40 +87,44 @@ export const systemLogger = (bot_id: string, msg: string) => {
  * 
  * guild_id = '' if no guild specified
  */
-export const errorLogger = (bot_id: string, guild_id: string | undefined, msg: unknown) => {
-    if (guild_id === undefined) {
-        guild_id = '';
+export const errorLogger = (bot_id: string, guild_id: string | undefined | null, msg: unknown) => {
+    try {
+        if (guild_id === undefined || guild_id === null) {
+            guild_id = '';
+        }
+        let new_msg = `[ERROR] ${msg}`;
+        console.error(getDate() + new_msg);
+        logBackup(msg, bot_id, guild_id, 'errors');
+    } catch (e) {
+        console.error(e);
     }
-    let new_msg = `[ERROR] ${msg}`;
-    console.error(getDate() + new_msg);
-    logBackup(msg, bot_id, guild_id, 'errors');
 }
 
 /**
  * Backup logs to file under *log_type* folder
  */
 const logBackup = (msg: unknown, bot_id: string, guild_id: string, log_type: string) => {
-    // create a new file every day
-    let path = '';
-    if (guild_id === '') {
-        path = `./${log_type}/${bot_id}/${new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }).replaceAll('/', '_')}.log`;
-        if (!fs.existsSync(path)) {
-            if (!fs.existsSync(`./${log_type}/${bot_id}`)) {
-                fs.mkdirSync(`./${log_type}/${bot_id}`, { recursive: true });
-            }
-            fs.writeFileSync(path, '');
-        }
-    } else {
-        path = `./${log_type}/${bot_id}/${guild_id}/${new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }).replaceAll('/', '_')}.log`;
-        if (!fs.existsSync(path)) {
-            if (!fs.existsSync(`./${log_type}/${bot_id}/${guild_id}`)) {
-                fs.mkdirSync(`./${log_type}/${bot_id}/${guild_id}`, { recursive: true });
-            }
-            fs.writeFileSync(path, '');
-        }
-    }
-
     try {
+        // create a new file every day
+        let path = '';
+        if (guild_id === '') {
+            path = `./${log_type}/${bot_id}/${new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }).replaceAll('/', '_')}.log`;
+            if (!fs.existsSync(path)) {
+                if (!fs.existsSync(`./${log_type}/${bot_id}`)) {
+                    fs.mkdirSync(`./${log_type}/${bot_id}`, { recursive: true });
+                }
+                fs.writeFileSync(path, '');
+            }
+        } else {
+            path = `./${log_type}/${bot_id}/${guild_id}/${new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }).replaceAll('/', '_')}.log`;
+            if (!fs.existsSync(path)) {
+                if (!fs.existsSync(`./${log_type}/${bot_id}/${guild_id}`)) {
+                    fs.mkdirSync(`./${log_type}/${bot_id}/${guild_id}`, { recursive: true });
+                }
+                fs.writeFileSync(path, '');
+            }
+        }
+
         fs.appendFileSync(path, getDate() + msg + '\n');
     } catch (e) {
         console.error(e);

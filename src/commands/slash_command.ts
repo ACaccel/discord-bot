@@ -74,7 +74,7 @@ export const bug_report = async (interaction: ChatInputCommandInteraction, bot: 
         }
 
         // send message to admin via dm
-        const admin = await interaction.guild?.members.fetch(bot.adminId);
+        const admin = await bot.client.users.fetch(bot.adminId);
         if (admin) {
             await admin.send(`Bug Report from ${interaction.user.username}：${content}`);
             await interaction.reply({ content: `問題已回報! 內容: ${content}`, ephemeral: true });
@@ -756,7 +756,7 @@ export const role_message = async (interaction: ChatInputCommandInteraction, bot
             return;
         }
         const member = interaction.member as GuildMember;
-        if (!member.roles.cache.has(bot.guildInfo[guild.id].roles?.moderator?.id as string)) {
+        if (!member.permissions.has("ManageRoles")) {
             await interaction.editReply({ content: "你沒有權限發送身份組領取訊息" });
             return;
         }

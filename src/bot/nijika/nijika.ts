@@ -49,49 +49,48 @@ const nijika = new Nijika(
 // client events
 nijika.login();
 nijika.client.on(Events.ClientReady, async () => {
-    // bot online init
-    nijika.registerGuild();
-    await nijika.connectGuildDB();
-    await nijika.registerSlashCommands();
-    nijika.initSlashCommandsHandlers();
-    nijika.initModalHandlers();
-    nijika.initButtonHandlers();
-    nijika.rebootProcess();
-
-    // reboot message
-    await nijika.rebootMessage();
+    try {
+        nijika.registerGuild();
+        await nijika.connectGuildDB();
+        await nijika.registerSlashCommands();
+        nijika.initSlashCommandsHandlers();
+        nijika.initModalHandlers();
+        nijika.initButtonHandlers();
+        nijika.rebootProcess();
+        
+        await nijika.rebootMessage();
+    } catch (e) {
+        utils.errorLogger(nijika.clientId, null, e);
+    }
 });
 
 nijika.client.on(Events.InteractionCreate, async (interaction) => {
-    if (interaction.inGuild()) {
-        if (interaction.isChatInputCommand()) {
-            await nijika.executeSlashCommands(interaction);
-        } else if (interaction.isModalSubmit()) {
-            await nijika.executeModalSubmit(interaction);
-        } else if (interaction.isButton()) {
-            await nijika.executeButton(interaction);
+    try {
+        if (interaction.inGuild()) {
+            if (interaction.isChatInputCommand()) {
+                await nijika.executeSlashCommands(interaction);
+            } else if (interaction.isModalSubmit()) {
+                await nijika.executeModalSubmit(interaction);
+            } else if (interaction.isButton()) {
+                await nijika.executeButton(interaction);
+            } else {
+                if (!interaction.isAutocomplete()) {
+                    await interaction.reply({ content: '目前尚不支援此類型的指令', ephemeral: true });
+                }
+            }
         } else {
             if (!interaction.isAutocomplete()) {
-                await interaction.reply({ content: '目前尚不支援此類型的指令喔!', ephemeral: true });
+                await interaction.reply({ content: '目前尚不支援在伺服器外使用', ephemeral: true });
             }
         }
-    } else {
-        if (!interaction.isAutocomplete()) {
-            await interaction.reply({ content: '目前尚不支援在伺服器外使用喔!', ephemeral: true });
-        }
+    } catch (e) {
+        utils.errorLogger(nijika.clientId, interaction.guild?.id, e);
     }
 });
 
 nijika.client.on(Events.MessageCreate, async (message) => {
-    const content = message.content
-    if (content.includes('該睡覺了，肥貓跟你說晚安')) {
-        await message.reply('健康に良くない！<:ave_mortis_bad_for_health:1333052644368846878>')
-    }
-    if (message.author.bot) return;
-
     try {
         await anti_dizzy_react(message);
-
         if (message.guildId)
             await auto_reply(message, nijika, message.guildId);
     } catch (e) {
@@ -100,8 +99,6 @@ nijika.client.on(Events.MessageCreate, async (message) => {
 });
 
 nijika.client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
-    if (nijika.nijikaConfig.blocked_channels.includes(oldMessage.channel.id)) return;
-
     try {
         await nijika.detectMessageUpdate(oldMessage, newMessage);
     } catch (e) {
@@ -110,12 +107,26 @@ nijika.client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
 });
 
 nijika.client.on(Events.MessageDelete, async (message) => {
-    if (nijika.nijikaConfig.blocked_channels.includes(message.channel.id)) return;
-
     try {
         await nijika.detectMessageDelete(message);
     } catch (e) {
         utils.errorLogger(nijika.clientId, message.guild?.id, e);
+    }
+});
+
+nijika.client.on(Events.MessageReactionAdd, async (reaction, user) => {
+    try {
+        nijika.detectReactionAdd(reaction, user);
+    } catch (e) {
+        utils.errorLogger(nijika.clientId, reaction.message.guild?.id, e);
+    }
+});
+
+nijika.client.on(Events.MessageReactionRemove, async (reaction, user) => {
+    try {
+        nijika.detectReactionRemove(reaction, user);
+    } catch (e) {
+        utils.errorLogger(nijika.clientId, reaction.message.guild?.id, e);
     }
 });
 
@@ -131,32 +142,17 @@ nijika.client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
 });
 
-nijika.client.on(Events.MessageReactionAdd, async (reaction, user) => {
-    try {
-        if (user.bot) return;
-        nijika.detectReactionAdd(reaction, user);
-    } catch (e) {
-        utils.errorLogger(nijika.clientId, reaction.message.guild?.id, e);
-    }
-});
-
-nijika.client.on(Events.MessageReactionRemove, async (reaction, user) => {
-    try {
-        if (user.bot) return;
-        nijika.detectReactionRemove(reaction, user);
-    } catch (e) {
-        utils.errorLogger(nijika.clientId, reaction.message.guild?.id, e);
-    }
-});
-
+// bot server
 const app = express();
 app.use(express.json());
+const r = express.Router();
+app.use('/discord', r)
 
-app.get('/', (req, res) => {
+r.get('/', (req, res) => {
     res.status(200).send('Hello World!');
 })
 
-app.post('/api/earthquake', (req, res) => {
+r.post('/earthquake', (req, res) => {
     utils.systemLogger(nijika.clientId, `地震強震警報!!!`);
     Object.entries(nijika.guildInfo).forEach(async ([guild_id, guild_info]) => {
         if (!guild_info.channels || !guild_info.channels.earthquake) return;
@@ -170,5 +166,5 @@ app.post('/api/earthquake', (req, res) => {
 })
 
 app.listen(process.env.PORT, () => {
-    utils.systemLogger(nijika.clientId, `Express server is running on port ${process.env.PORT}`)
+    utils.systemLogger(nijika.clientId, `discord bot server is running on port ${process.env.PORT}`)
 });

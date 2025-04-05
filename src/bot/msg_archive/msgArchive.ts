@@ -6,6 +6,7 @@ import {
 import dotenv from "dotenv";
 import { Config } from '@dcbotTypes';
 import { MsgArchive } from './types';
+import utils from '@utils';
 import config from './config.json';
 
 dotenv.config({ path: './src/bot/msg_archive/.env' });
@@ -30,11 +31,14 @@ const msgArchive = new MsgArchive(
 // client events
 msgArchive.login();
 msgArchive.client.on(Events.ClientReady, async () => {
-    // bot online init
-    msgArchive.registerGuild();
-    await msgArchive.connectGuildDB();
-    await msgArchive.messageBackup(msgArchive.msgArchiveConfig.backup_server, 60);
-
-    // reboot message
-    await msgArchive.rebootMessage();
+    try {
+        // bot init process
+        msgArchive.registerGuild();
+        await msgArchive.connectGuildDB();
+        await msgArchive.messageBackup(msgArchive.msgArchiveConfig.backup_server, 60);
+        
+        await msgArchive.rebootMessage();
+    } catch (e) {
+        utils.errorLogger(msgArchive.clientId, null, e);
+    }
 });

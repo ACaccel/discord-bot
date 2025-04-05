@@ -12,54 +12,21 @@ export const anti_dizzy_react = async (msg: Message) => {
 }
 
 const search_reply = async (msg: string, bot: BaseBot, guild_id: string) => {
-    try {
-        const db = bot.guildInfo[guild_id].db;
-        if (!db) {
-            throw new Error("Cannot connect to MongoDB.");
-        }
-        let res = await db.models["Reply"].find({input: msg});
-        let success = (res.length !== 0);
-        let reply = "";
-        if(res.length !== 0) {
-            reply = res[Math.floor(Math.random() * res.length)].reply;
-        }
-        return { reply, success };
-    } catch (e) {
-        let success = false;
-        return { reply: e, success };
-    };
-}
-
-const roll_dice = (expression: string) => {
-    // Regular expression to match the pattern: (XdY), where X and Y are integers
-    const diceRegex = /(\d+)d(\d+)/g;
-    
-    // Replace each dice roll expression with its evaluated value
-    try {
-        expression = expression.replace(diceRegex, function(match, numDice, numSides) {
-            // Roll the dice
-            let result = 0;
-            let numDiceInt = parseInt(numDice);
-            let numSidesInt = parseInt(numSides);
-            if (numDiceInt <= 0 || numSidesInt <= 0) {
-                result = 0;
-            } else if (numDiceInt > 10000) {
-                result = NaN;
-            } else {
-                for (let i = 0; i < numDiceInt; i++) {
-                    result += Math.floor(Math.random() * numSidesInt) + 1;
-                }
-            }
-
-            return `${result}`;
-        });
-        
-        // Evaluate the expression using JavaScript's eval function
-        return eval(expression).toString();
-    } catch (e) {
-        console.error(e);
-        return "NaN";
+    // search reply from database
+    let success = false;
+    const db = bot.guildInfo[guild_id].db;
+    if (!db) {
+        throw new Error("Cannot connect to MongoDB.");
     }
+    let res = await db.models["Reply"].find({input: msg});
+    success = (res.length !== 0);
+    
+    // if number of reply > 1, randomly select one
+    let reply = "";
+    if(res.length !== 0) {
+        reply = res[Math.floor(Math.random() * res.length)].reply;
+    }
+    return { reply, success };
 }
 
 export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) => {
@@ -77,14 +44,9 @@ export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) =
         await msg.channel.send("肥貓好gay");
     }
     if (msg.author.id === "705605105352966144" && Math.random() > (1-0.005)) {
-        // reply to nijika
+        // reply to mubaimu
         await msg.channel.send("晴人杰");
     }
-    // if (msg.content.match(/(\d+)d(\d+)/g)) {
-    //     // roll dice
-    //     let res = roll_dice(msg.content);
-    //     await msg.channel.send(`${res}`);
-    // }
     if (Math.random() > 0.995) {
         // reply to lucky
         const { reply, success } = await search_reply("[*]", bot, guild_id);
@@ -92,6 +54,8 @@ export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) =
             await msg.channel.send(`${reply as string}`);
         }
     }
+
+    // regex reply
     const regex = /長髮男(?=\s|$)/;
     if (regex.test(msg.content)) {
         await msg.channel.send("去spa");

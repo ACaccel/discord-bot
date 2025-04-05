@@ -23,20 +23,20 @@ export class Tomori extends BaseBot {
     }
 
     public detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage) => {
-            detectMessageUpdate(oldMessage, newMessage, this);
-        }
-    
-        public detectMessageDelete = async (message: Message | PartialMessage) => {
-            detectMessageDelete(message, this);
-        }
-    
-        public detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember) => {
-            detectGuildMemberUpdate(oldMember, newMember, this);
-        }
+        detectMessageUpdate(oldMessage, newMessage, this);
+    }
 
-        public detectGuildCreate = async (guild: Guild) => {
-            detectGuildCreate(guild, this);
-        }
+    public detectMessageDelete = async (message: Message | PartialMessage) => {
+        detectMessageDelete(message, this);
+    }
+
+    public detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember) => {
+        detectGuildMemberUpdate(oldMember, newMember, this);
+    }
+
+    public detectGuildCreate = async (guild: Guild) => {
+        detectGuildCreate(guild, this);
+    }
 }
 
 interface TomoriConfig {

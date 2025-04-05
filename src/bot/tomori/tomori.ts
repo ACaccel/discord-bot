@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 
 import { Config } from '@dcbotTypes';
 import { Tomori } from './types';
-import { anti_dizzy_react, auto_reply } from '../../commands/message_reply';
+import { auto_reply } from '@cmd';
 import utils from '@utils';
 import config from './config.json';
 
@@ -48,38 +48,47 @@ const tomori = new Tomori(
 // client events
 tomori.login();
 tomori.client.on(Events.ClientReady, async () => {
-    // bot online init
-    tomori.registerGuild();
-    tomori.connectGuildDB();
-    await tomori.registerSlashCommands();
-    tomori.initSlashCommandsHandlers();
+    try {
+        // bot init process
+        tomori.registerGuild();
+        await tomori.connectGuildDB();
+        await tomori.registerSlashCommands();
+        tomori.initSlashCommandsHandlers();
+        tomori.initModalHandlers();
+        tomori.initButtonHandlers();
 
-    // reboot message
-    await tomori.rebootMessage();
+        await tomori.rebootMessage();
+    } catch (e) {
+        utils.errorLogger(tomori.clientId, null, e);
+    }
 });
 
 tomori.client.on(Events.InteractionCreate, async (interaction) => {
-    if (interaction.inGuild()) {
-        if (interaction.isChatInputCommand()) {
-            await tomori.executeSlashCommands(interaction);
+    try {
+        if (interaction.inGuild()) {
+            if (interaction.isChatInputCommand()) {
+                await tomori.executeSlashCommands(interaction);
+            } else if (interaction.isModalSubmit()) {
+                await tomori.executeModalSubmit(interaction);
+            } else if (interaction.isButton()) {
+                await tomori.executeButton(interaction);
+            } else {
+                if (!interaction.isAutocomplete()) {
+                    await interaction.reply({ content: '目前尚不支援此類型的指令', ephemeral: true });
+                }
+            }
         } else {
             if (!interaction.isAutocomplete()) {
-                await interaction.reply({ content: '目前尚不支援此類型的指令喔!', ephemeral: true });
+                await interaction.reply({ content: '目前尚不支援在伺服器外使用', ephemeral: true });
             }
         }
-    } else {
-        if (!interaction.isAutocomplete()) {
-            await interaction.reply({ content: '目前尚不支援在伺服器外使用喔!', ephemeral: true });
-        }
+    } catch (e) {
+        utils.errorLogger(tomori.clientId, interaction.guild?.id, e);
     }
 });
 
 tomori.client.on(Events.MessageCreate, async (message) => {
-    if (message.author.bot) return;
-
     try {
-        await anti_dizzy_react(message);
-
         if (message.guildId)
             await auto_reply(message, tomori, message.guildId);
     } catch (e) {
@@ -111,14 +120,14 @@ tomori.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     }
 });
 
-tomori.client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
-
-});
-
 tomori.client.on(Events.GuildCreate, async (guild) => {
     try {
         await tomori.detectGuildCreate(guild);
     } catch (e) {
         utils.errorLogger(tomori.clientId, guild.id, e);
     }
+});
+
+tomori.client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+
 });

@@ -2,9 +2,9 @@ import { BaseBot } from '@dcbotTypes';
 import utils from '@utils';
 import guild_profile from '../guild_profile.json'
 
-//--------------------------------//
-//      Change Server Profile     //
-//--------------------------------//
+//========================================//
+//======== Change Server Profile =========//
+//========================================//
 const getRandomImage = () => {
     const index = Math.floor(Math.random() * guild_profile.length);
     return guild_profile[index];
