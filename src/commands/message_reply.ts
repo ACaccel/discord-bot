@@ -31,6 +31,11 @@ const search_reply = async (msg: string, bot: BaseBot, guild_id: string) => {
 
 export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) => {
     if (!msg.channel.isSendable()) return;
+
+    if (msg.content.includes('該睡覺了，肥貓跟你說晚安')) {
+        await msg.reply('健康に良くない！<:ave_mortis_bad_for_health:1333052644368846878>')
+    }
+
     if (msg.author.bot) return; // prevent recusive reply
     
     // normal reply
