@@ -1,5 +1,7 @@
-import { Message } from "discord.js";
+import { AttachmentBuilder, Message, TextChannel } from "discord.js";
 import { BaseBot } from "@dcbotTypes";
+import axios from "axios";
+import * as fs from 'fs/promises';
 
 export const anti_dizzy_react = async (msg: Message) => {
     const content = msg.content;
@@ -8,6 +10,57 @@ export const anti_dizzy_react = async (msg: Message) => {
     ]
     if(andyDictionary.some((e) => content.match(e))) {
         await msg.react('1067851490271711312');
+    }
+}
+
+export const tts_reply = async (msg: Message) => {
+    if (msg.content === "tts") {
+        const tts_api = 'http://localhost:7860/run/predict/';
+        const ref_msg_ch = msg.guild?.channels.cache.get(msg.reference?.channelId as string) as TextChannel;
+        const tts_msg = ref_msg_ch?.messages.cache.get(msg.reference?.messageId as string)?.content;
+        if (!tts_msg) {
+            await msg.reply("Cannot find the message");
+            return;
+        }
+        if (tts_msg.includes(" ")) {
+            await msg.reply("Message cannot contain space");
+            return;
+        }
+
+        const response = await axios.post(tts_api, {
+            "fn_index": 0,
+            "data": [
+                tts_msg,
+                "setsuna_short1+2_wav",
+                "日本語",
+                1
+            ],
+            "session_hash": "s5r78fhbum"
+        });
+
+        // sample response:
+        // {
+        //     "data": [
+        //         "Success",
+        //         {
+        //             "name": "C:\\users\\acaccel\\Temp\\tmpoidxjxg4.wav",
+        //             "data": null,
+        //             "is_file": true
+        //         }
+        //     ],
+        //     "is_generating": false,
+        //     "duration": 0.32135462760925293,
+        //     "average_duration": 0.5213330785433451
+        // }
+
+        // Extract the file name from the response path
+        const old_file_path = response.data.data[1].name; // e.g., "C:\\users\\acaccel\\Temp\\tmpw_21f5gi.wav"
+        const file_name = old_file_path.split(/[\\/]/).pop();
+        const new_file_path = `/home/acaccel/.wine/drive_c/users/acaccel/Temp/${file_name}`;
+        const buffer = await fs.readFile(new_file_path);
+        const timestamp = new Date().toLocaleString().replace(/\/|:|\s/g, "-");
+        const attachment = new AttachmentBuilder(buffer, { name: `${timestamp}.wav` })
+        await msg.reply({ files: [attachment] });
     }
 }
 

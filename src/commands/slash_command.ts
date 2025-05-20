@@ -9,11 +9,6 @@ import {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    
-    // modal
-    ModalBuilder,
-    TextInputBuilder,
-    TextInputStyle,
 } from "discord.js";
 import axios from "axios";
 import fs from "fs";
