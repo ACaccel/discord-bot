@@ -20,7 +20,12 @@ export const attachmentLogger = async (guild_id: string, attachment: Attachment,
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
 
         // Fetch the attachment data and save it to the file
-        const response = await axios.get(attachment.url, { responseType: 'stream' });
+        let response;
+        try {
+            response = await axios.get(attachment.url, { responseType: 'stream' });
+        } catch (err) {
+            return;
+        }
 
         // Save the file
         const writer = fs.createWriteStream(filePath);

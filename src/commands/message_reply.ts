@@ -15,18 +15,29 @@ export const anti_dizzy_react = async (msg: Message) => {
 
 export const tts_reply = async (msg: Message) => {
     if (msg.content === "tts") {
-        const tts_api = 'http://localhost:7860/run/predict/';
         const ref_msg_ch = msg.guild?.channels.cache.get(msg.reference?.channelId as string) as TextChannel;
-        const tts_msg = ref_msg_ch?.messages.cache.get(msg.reference?.messageId as string)?.content;
-        if (!tts_msg) {
+        const ref_msg = ref_msg_ch?.messages.cache.get(msg.reference?.messageId as string)?.content;
+        if (!ref_msg) {
             await msg.reply("Cannot find the message");
+            return;
+        }
+
+        // translate api
+        const request = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=${ref_msg}`;
+        const translate_res = await axios.get(request);
+        const tts_msg = translate_res.data[0][0][0];
+        if (!tts_msg) {
+            await msg.reply("Cannot translate the message");
             return;
         }
         if (tts_msg.includes(" ")) {
             await msg.reply("Message cannot contain space");
             return;
         }
+        console.log(`[TTS] ${ref_msg} -> ${tts_msg}`);
 
+        // tts api
+        const tts_api = 'http://localhost:7860/run/predict/';
         const response = await axios.post(tts_api, {
             "fn_index": 0,
             "data": [
@@ -53,7 +64,7 @@ export const tts_reply = async (msg: Message) => {
         //     "average_duration": 0.5213330785433451
         // }
 
-        // Extract the file name from the response path
+        // read the voice file and send
         const old_file_path = response.data.data[1].name; // e.g., "C:\\users\\acaccel\\Temp\\tmpw_21f5gi.wav"
         const file_name = old_file_path.split(/[\\/]/).pop();
         const new_file_path = `/home/acaccel/.wine/drive_c/users/acaccel/Temp/${file_name}`;
