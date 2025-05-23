@@ -41,7 +41,9 @@ export const help = async (interaction: ChatInputCommandInteraction, bot: BaseBo
             return;
         }
 
-        let  helpContent = '## 指令清單\n';
+        let  helpContent = '## Help Message\n';
+        helpContent += bot.help_msg;
+        helpContent += '### 目前支援的slash command：\n';
         bot.config.commands.forEach((command) => {
             const cmd_config = slash_command_config.find((cmd) => cmd.name === command);
             if (cmd_config) {

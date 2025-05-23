@@ -31,6 +31,9 @@ export class Nijika extends BaseBot {
         super(client, token, mongoURI, clientId, config);
         this.nijikaConfig = nijikaConfig as NijikaConfig;
         this.giveaway_jobs = new Map();
+        this.help_msg = '### 目前支援的功能：\n' +
+                        '1. tts: 回覆一則訊息並輸入tts，bot會產生該訊息的語音檔\n' +
+                        '2. auto reply: bot會根據資料庫的message pair回覆訊息\n';
     }
 
     public detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage) => {

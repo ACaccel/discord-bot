@@ -40,6 +40,8 @@ export class BaseBot {
     public buttonHandler?: Map<string, Function>;
     public voice?: Voice;
 
+    public help_msg: string;
+
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: Config) {
         this.client = client;
         this.token = token;
@@ -47,6 +49,7 @@ export class BaseBot {
         this.clientId = clientId;
         this.config = config;
         this.guildInfo = {};
+        this.help_msg = '';
     }
 
     public login = async () => {

@@ -1,7 +1,6 @@
-import { AttachmentBuilder, Message, TextChannel } from "discord.js";
+import { Message, TextChannel } from "discord.js";
 import { BaseBot } from "@dcbotTypes";
-import axios from "axios";
-import * as fs from 'fs/promises';
+import { tts_api } from "utils/misc";
 
 export const anti_dizzy_react = async (msg: Message) => {
     const content = msg.content;
@@ -19,58 +18,14 @@ export const tts_reply = async (msg: Message) => {
         const ref_msg = ref_msg_ch?.messages.cache.get(msg.reference?.messageId as string)?.content;
         if (!ref_msg) {
             await msg.reply("Cannot find the message");
-            return;
+            return null;
         }
 
-        // translate api
-        const request = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ja&dt=t&q=${ref_msg}`;
-        const translate_res = await axios.get(request);
-        const tts_msg = translate_res.data[0][0][0];
-        if (!tts_msg) {
-            await msg.reply("Cannot translate the message");
+        const attachment = await tts_api(ref_msg);
+        if (!attachment) {
+            await msg.reply("Cannot generate tts");
             return;
         }
-        if (tts_msg.includes(" ")) {
-            await msg.reply("Message cannot contain space");
-            return;
-        }
-        console.log(`[TTS] ${ref_msg} -> ${tts_msg}`);
-
-        // tts api
-        const tts_api = 'http://localhost:7860/run/predict/';
-        const response = await axios.post(tts_api, {
-            "fn_index": 0,
-            "data": [
-                tts_msg,
-                "setsuna_short1+2_wav",
-                "日本語",
-                1
-            ],
-            "session_hash": "s5r78fhbum"
-        });
-
-        // sample response:
-        // {
-        //     "data": [
-        //         "Success",
-        //         {
-        //             "name": "C:\\users\\acaccel\\Temp\\tmpoidxjxg4.wav",
-        //             "data": null,
-        //             "is_file": true
-        //         }
-        //     ],
-        //     "is_generating": false,
-        //     "duration": 0.32135462760925293,
-        //     "average_duration": 0.5213330785433451
-        // }
-
-        // read the voice file and send
-        const old_file_path = response.data.data[1].name; // e.g., "C:\\users\\acaccel\\Temp\\tmpw_21f5gi.wav"
-        const file_name = old_file_path.split(/[\\/]/).pop();
-        const new_file_path = `/home/acaccel/.wine/drive_c/users/acaccel/Temp/${file_name}`;
-        const buffer = await fs.readFile(new_file_path);
-        const timestamp = new Date().toLocaleString().replace(/\/|:|\s/g, "-");
-        const attachment = new AttachmentBuilder(buffer, { name: `${timestamp}.wav` })
         await msg.reply({ files: [attachment] });
     }
 }
@@ -104,8 +59,17 @@ export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) =
     
     // normal reply
     const { reply, success } = await search_reply(msg.content, bot, guild_id);
-    if (success) { 
-        await msg.channel.send(`${reply as string}`);
+    if (success) {
+        let attachment = null;
+        if (!reply.startsWith("http")) {
+            console.log(reply);
+            attachment = await tts_api(reply);
+        }
+        if (attachment) {
+            await msg.channel.send({ content: `${reply as string}`, files: [attachment] });
+        } else {
+            await msg.channel.send(`${reply as string}`);
+        }
     }
 
     // special reply
