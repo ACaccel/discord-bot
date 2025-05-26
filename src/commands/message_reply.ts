@@ -21,9 +21,9 @@ export const tts_reply = async (msg: Message) => {
             return null;
         }
 
-        const attachment = await tts_api(ref_msg);
-        if (!attachment) {
-            await msg.reply("Cannot generate tts");
+        const { attachment, error } = await tts_api(ref_msg);
+        if (error || !attachment) {
+            await msg.reply(error);
             return;
         }
         await msg.reply({ files: [attachment] });
@@ -48,7 +48,7 @@ const search_reply = async (msg: string, bot: BaseBot, guild_id: string) => {
     return { reply, success };
 }
 
-export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) => {
+export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string, use_tts: boolean = false) => {
     if (!msg.channel.isSendable()) return;
 
     if (msg.content.includes('該睡覺了，肥貓跟你說晚安')) {
@@ -60,13 +60,19 @@ export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) =
     // normal reply
     const { reply, success } = await search_reply(msg.content, bot, guild_id);
     if (success) {
-        let attachment = null;
+        let tts_msg = reply;
         if (!reply.startsWith("http")) {
-            console.log(reply);
-            attachment = await tts_api(reply);
+            tts_msg = tts_msg.replace(/<a?:\w+:\d+>/g, "");
+            tts_msg = tts_msg.replace(/:[^:\s]+:/g, "");
         }
-        if (attachment) {
-            await msg.channel.send({ content: `${reply as string}`, files: [attachment] });
+
+        if (use_tts) {
+            const { attachment, error } = await tts_api(tts_msg);
+            if (error || !attachment) {
+                await msg.channel.send(`${reply as string}`);
+            } else {
+                await msg.channel.send({ content: `${reply as string}`, files: [attachment] });
+            }
         } else {
             await msg.channel.send(`${reply as string}`);
         }
@@ -84,8 +90,23 @@ export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) =
     if (Math.random() > 0.995) {
         // reply to lucky
         const { reply, success } = await search_reply("[*]", bot, guild_id);
-        if (success) { 
-            await msg.channel.send(`${reply as string}`);
+        if (success) {
+            let tts_msg = reply;
+            if (!reply.startsWith("http")) {
+                tts_msg = tts_msg.replace(/<a?:\w+:\d+>/g, "");
+                tts_msg = tts_msg.replace(/:[^:\s]+:/g, "");
+            }
+
+            if (use_tts) {
+                const { attachment, error } = await tts_api(tts_msg);
+                if (error || !attachment) {
+                    await msg.channel.send(`${reply as string}`);
+                } else {
+                    await msg.channel.send({ content: `${reply as string}`, files: [attachment] });
+                }
+            } else {
+                await msg.channel.send(`${reply as string}`);
+            }
         }
     }
 

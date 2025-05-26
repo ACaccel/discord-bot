@@ -27,8 +27,8 @@ export const getRandomInterval = (min_second: number, max_second: number) => {
 }
 
 export const tts_api = async (msg: string) => {
-    if (msg.length > 30) {
-        return null;
+    if (msg.length > 40) {
+        return { attachment: null, error: "Message cannot exceed 40 characters." };
     }
 
     // translate api
@@ -36,10 +36,10 @@ export const tts_api = async (msg: string) => {
     const translate_res = await axios.get(request);
     const tts_msg = translate_res.data[0][0][0];
     if (!tts_msg) {
-        return null;
+        return { attachment: null, error: "Cannot translate the message." };
     }
     if (tts_msg.includes(" ")) {
-        return null;
+        return { attachment: null, error: "Message cannot contain spaces." };
     }
     // console.log(`[TTS] ${msg} -> ${tts_msg}`);
 
@@ -49,7 +49,7 @@ export const tts_api = async (msg: string) => {
         "fn_index": 0,
         "data": [
             tts_msg,
-            "setsuna_short1+2_wav",
+            "setsuna_short1-3_wav",
             "日本語",
             1
         ],
@@ -78,5 +78,8 @@ export const tts_api = async (msg: string) => {
     const buffer = await fs.readFile(new_file_path);
     const timestamp = new Date().toLocaleString().replace(/\/|:|\s/g, "-");
     const attachment = new AttachmentBuilder(buffer, { name: `${timestamp}.wav` })
-    return attachment;
+    if (!attachment) {
+        return { attachment: null, error: "Cannot read the file." };
+    }
+    return { attachment, error: "" };
 }

@@ -797,11 +797,13 @@ export const role_message = async (interaction: ChatInputCommandInteraction, bot
 
         // Verify IDs format and existence
         const roles = interaction.options.get("roles")?.value as string;
-        if (!roles || !roles.match(/^\d+(,\d+)*$/)) {
-            await interaction.editReply({ content: "格式錯誤！請使用逗號分隔的角色ID: id1,id2, ..." });
+        if (!roles || !roles.match(/^<@&\d+>(\s*<@&\d+>)*$/)) {
+            await interaction.editReply({ content: "格式錯誤！regex: match(/^<@&\d+>(\s*<@&\d+>)*$/)" });
             return;
         }
-        const roleIds = roles.split(",").map(id => id.trim()).filter(id => id !== "");
+        // Extract role IDs from mentions
+        const roleIds = Array.from(roles.matchAll(/<@&(\d+)>/g)).map(match => match[1]);
+        console.log(roleIds);
         const validRoles: Role[] = [];
         for (const roleId of roleIds) {
             const role = guild.roles.cache.get(roleId);

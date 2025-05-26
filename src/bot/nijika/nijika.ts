@@ -93,7 +93,7 @@ nijika.client.on(Events.MessageCreate, async (message) => {
         await anti_dizzy_react(message);
         await tts_reply(message);
         if (message.guildId)
-            await auto_reply(message, nijika, message.guildId);
+            await auto_reply(message, nijika, message.guildId, true);
     } catch (e) {
         utils.errorLogger(nijika.clientId, message.guild?.id, e);
     }
