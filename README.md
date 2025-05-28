@@ -41,7 +41,6 @@ The `config.json` file contains the bot's configuration settings. You can custom
 
 ```json
 {
-    "admin": "671160708007854120",
     "guilds": {
         "your-guild-id": {
             "channels": {
