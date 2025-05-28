@@ -6,6 +6,9 @@ import guild_profile from '../guild_profile.json'
 //======== Change Server Profile =========//
 //========================================//
 const getRandomImage = () => {
+    if (!guild_profile || guild_profile.length === 0) {
+        throw new Error("No guild profile configuration found, please check guild_profile.json");
+    }
     const index = Math.floor(Math.random() * guild_profile.length);
     return guild_profile[index];
 }

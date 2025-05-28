@@ -80,7 +80,7 @@ export const bug_report = async (interaction: ChatInputCommandInteraction, bot: 
         }
     } catch (error) {
         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
-        await interaction.reply({ content: "無法回報問題 請嘗試直接私訊我(@ACaccel)", ephemeral: true });
+        await interaction.reply({ content: "無法回報問題", ephemeral: true });
     }
 }
 
@@ -651,7 +651,7 @@ export const emoji_frequency = async (interaction: ChatInputCommandInteraction, 
 
         const db = bot.guildInfo[guild.id].db;
         if (!db) {
-            await interaction.editReply({ content: "找不到資料庫" });
+            await interaction.editReply({ content: "請先設定資料庫" });
             return;
         }
 
@@ -841,6 +841,7 @@ export const role_message = async (interaction: ChatInputCommandInteraction, bot
 }
 
 /********** Only for Nijika **********/
+/*** (Custom channel restriction) ****/
 
 export const update_role = async (interaction: ChatInputCommandInteraction, bot: Nijika) => {
     await interaction.deferReply();
@@ -935,11 +936,11 @@ export const giveaway_create = async (interaction: ChatInputCommandInteraction, 
         
             if (isNaN(value)) return null;
             switch (unit) {
-                case "s": return value * 1000; // 秒
-                case "m": return value * 60 * 1000; // 分鐘
-                case "h": return value * 60 * 60 * 1000; // 小時
-                case "d": return value * 24 * 60 * 60 * 1000; // 天
-                case "w": return value * 7 * 24 * 60 * 60 * 1000; // 週
+                case "s": return value * 1000;
+                case "m": return value * 60 * 1000;
+                case "h": return value * 60 * 60 * 1000;
+                case "d": return value * 24 * 60 * 60 * 1000;
+                case "w": return value * 7 * 24 * 60 * 60 * 1000;
                 default: return null;
             }
         }

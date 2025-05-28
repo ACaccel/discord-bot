@@ -15,6 +15,25 @@
             ]
         }
     },{
+        "name": "talk",
+        "description": "讓機器人說話",
+        "options": {
+            "channel": [
+                {
+                    "name": "channel",
+                    "description": "選擇頻道",
+                    "required": true
+                }
+            ],
+            "string": [
+                {
+                    "name": "content",
+                    "description": "就是內容",
+                    "required": true
+                }
+            ]
+        }
+    },{
         "name": "change_avatar",
         "description": "人格變換",
         "options": {
@@ -40,25 +59,6 @@
             ]
         }
     },{
-        "name": "talk",
-        "description": "讓機器人說話",
-        "options": {
-            "channel": [
-                {
-                    "name": "channel",
-                    "description": "選擇頻道",
-                    "required": true
-                }
-            ],
-            "string": [
-                {
-                    "name": "content",
-                    "description": "就是內容",
-                    "required": true
-                }
-            ]
-        }
-    },{
         "name": "change_nickname",
         "description": "更改bot暱稱",
         "options": {
@@ -73,6 +73,18 @@
     },{
         "name": "random_restaurant",
         "description": "隨機餐廳抽取器 (台北地區)"
+    },{
+        "name": "imgen",
+        "description": "圖片生成",
+        "options": {
+            "string": [
+                {
+                    "name": "content",
+                    "description": "生成內容",
+                    "required": true
+                }
+            ]
+        }
     },{
         "name": "search_anime_scene",
         "description": "搜尋動漫截圖來源",
@@ -197,10 +209,7 @@
         }
     },{
         "name": "weather_forecast",
-        "description": "天氣預報"
-    },{
-        "name": "update_role",
-        "description": "更新身分組"
+        "description": "天氣預報(台北)"
     },{
         "name": "level_detail",
         "description": "查看等級詳細資訊",
@@ -313,6 +322,21 @@
             ]
         }
     },{
+        "name": "role_message",
+        "description": "發送身份組領取訊息",
+        "options": {
+            "string": [
+                {
+                    "name": "roles",
+                    "description": "可領取身份組id (ex: @身份組1 @身份組2...)",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "update_role",
+        "description": "更新Mee6等級身分組"
+    },{
         "name": "giveaway_create",
         "description": "建立抽獎",
         "options": {
@@ -351,17 +375,5 @@
                 }
             ]
         }       
-    },{
-        "name": "role_message",
-        "description": "發送身份組領取訊息",
-        "options": {
-            "string": [
-                {
-                    "name": "roles",
-                    "description": "可領取身份組id (ex: @身份組1 @身份組2...)",
-                    "required": true
-                }
-            ]
-        }
     }
 ]
