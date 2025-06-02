@@ -483,37 +483,6 @@ export const give_score = async (interaction: ChatInputCommandInteraction, bot: 
     await interaction.reply({ content: score });
 }
 
-export const bubble_wrap = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
-    const inner_str = interaction.options.get("str")?.value as string;
-    const side_len = 8;
-    if (inner_str.length > side_len * side_len) {
-        await interaction.reply({ content: "字串太長了，請縮短到 64 字元以內" });
-        return;
-    }
-
-    // random permutation of places
-    let places = Array.from({ length: side_len * side_len }, (_, i) => i);
-    for (let i = places.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [places[i], places[j]] = [places[j], places[i]];
-    }
-
-    // fill the board with the inner_str
-    const board = Array(side_len * side_len).fill("||:blank:||");
-    for (let i = 0; i < inner_str.length; i++) {
-        board[places[i]] = "||" + inner_str[i] + "||";
-    }
-
-    // create the string representation of the board
-    let inf = "";
-    for (let i = 0; i < side_len; i++) {
-        inf += board.slice(i * side_len, (i + 1) * side_len).join("") + "\n";
-    }
-
-    await interaction.reply({ content: inf });
-}
-
-
 export const gay = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     const user = interaction.options.get("user")?.value;
     if (interaction.guild?.members.cache.has(user as string)) {
@@ -868,6 +837,91 @@ export const role_message = async (interaction: ChatInputCommandInteraction, bot
     } catch (error) {
         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法發送身份組領取訊息" });
+    }
+}
+
+export const bubble_wrap = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    const inner_str = interaction.options.get("str")?.value as string;
+    const side_len = 8;
+    if (inner_str.length > side_len * side_len) {
+        await interaction.reply({ content: "字串太長了，請縮短到 64 字元以內" });
+        return;
+    }
+
+    // random permutation of places
+    let places = Array.from({ length: side_len * side_len }, (_, i) => i);
+    for (let i = places.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [places[i], places[j]] = [places[j], places[i]];
+    }
+
+    // fill the board with the inner_str
+    const board = Array(side_len * side_len).fill("||:blank:||");
+    for (let i = 0; i < inner_str.length; i++) {
+        board[places[i]] = "||" + inner_str[i] + "||";
+    }
+
+    // create the string representation of the board
+    let inf = "";
+    for (let i = 0; i < side_len; i++) {
+        inf += board.slice(i * side_len, (i + 1) * side_len).join("") + "\n";
+    }
+
+    await interaction.reply({ content: inf });
+}
+
+export const ban_user = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    await interaction.deferReply();
+    try {
+        const BAN_THRESHOLD = 8; // number of votes required to ban
+        const JUDGE_TIME = 3; // minutes to judge
+        const user = interaction.options.get("user")?.value as string;
+        const member = interaction.guild?.members.cache.get(user);
+        if (!member) {
+            await interaction.editReply({ content: "找不到使用者" });
+            return;
+        }
+        
+        let duration = interaction.options.get("duration")?.value as number;
+        if (!duration) duration = 1; // 1 minutes
+        if (duration > 10) duration = 10; // max 10 minutes
+        if (duration < 1) duration = 1; // min 1 minute
+
+        // ban message
+        const ban_msg = `是否禁言 **${member.displayName}** ${duration} 分鐘？\n` +
+                        `**${JUDGE_TIME}** 分鐘後累積 **${BAN_THRESHOLD}** 票則禁言\n` +
+                        `@ban人通知(暫定) 讓他看看豐川家的黑暗！`
+        const judge_msg = await interaction.editReply({ content: ban_msg });
+        await judge_msg.react("👍");
+
+        // judgement time (todo: save to db like giveaway)
+        const current_time = Date.now();
+        const end_time = current_time + JUDGE_TIME * 60 * 1000;
+        const end_time_date = new Date(end_time);
+        const ban_judgement = async () => {
+            const emoji = judge_msg.reactions.resolve("👍");
+            if (!emoji) {
+                await interaction.followUp({ content: "無法取得投票數" });
+                return;
+            }
+
+            const judge_count = emoji.count - 1;
+            if (judge_count >= BAN_THRESHOLD) {
+                try {
+                    await member.timeout(duration * 60 * 1000, "初華大人的禁言裁決！");
+                    await interaction.followUp({ content: `${member.user.tag} 已被初華大人禁言 ${duration} 分鐘` });
+                } catch (error) {
+                    utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+                    await interaction.followUp({ content: "很遺憾的，初華大人無法禁言他" });
+                }
+            } else {
+                await interaction.followUp({ content: `投票數 ${judge_count} 票，未達到禁言門檻 ${BAN_THRESHOLD} 票` });
+            }
+        }
+        utils.scheduleJob(end_time_date, () => ban_judgement());
+    } catch (error) {
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+        await interaction.editReply({ content: "無法禁言使用者" });
     }
 }
 

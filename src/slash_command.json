@@ -165,18 +165,6 @@
             ]
         }
     },{
-        "name": "bubble_wrap",
-        "description": "產生泡泡紙",
-        "options": {
-            "string": [
-                {
-                    "name": "str",
-                    "description": "隱藏字",
-                    "required": true
-                }
-            ]
-        }
-    },{
         "name": "list_reply",
         "description": "列出自動回覆",
         "options": {
@@ -342,6 +330,37 @@
                     "name": "roles",
                     "description": "可領取身份組id (ex: @身份組1 @身份組2...)",
                     "required": true
+                }
+            ]
+        }
+    },{
+        "name": "bubble_wrap",
+        "description": "產生泡泡紙",
+        "options": {
+            "string": [
+                {
+                    "name": "str",
+                    "description": "隱藏字",
+                    "required": true
+                }
+            ]
+        }
+    },{
+        "name": "ban_user",
+        "description": "暫時禁言使用者",
+        "options": {
+            "user": [
+                {
+                    "name": "user",
+                    "description": "被禁言的使用者",
+                    "required": true
+                }
+            ],
+            "number": [
+                {
+                    "name": "duration",
+                    "description": "禁言時限 (單位: 分鐘)",
+                    "required": false
                 }
             ]
         }
