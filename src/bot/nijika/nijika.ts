@@ -68,7 +68,7 @@ nijika.client.on(Events.InteractionCreate, async (interaction) => {
     try {
         if (interaction.inGuild()) {
             if (interaction.isChatInputCommand()) {
-                await nijika.executeSlashCommands(interaction);
+                await nijika.executeSlashCommands(interaction, nijika.nijikaConfig.blocked_channels);
             } else if (interaction.isModalSubmit()) {
                 await nijika.executeModalSubmit(interaction);
             } else if (interaction.isButton()) {

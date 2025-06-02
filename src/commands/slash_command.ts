@@ -842,7 +842,7 @@ export const role_message = async (interaction: ChatInputCommandInteraction, bot
 
 export const bubble_wrap = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     const inner_str = interaction.options.get("str")?.value as string;
-    const side_len = 8;
+    const side_len = 7;
     if (inner_str.length > side_len * side_len) {
         await interaction.reply({ content: "字串太長了，請縮短到 64 字元以內" });
         return;
@@ -856,7 +856,7 @@ export const bubble_wrap = async (interaction: ChatInputCommandInteraction, bot:
     }
 
     // fill the board with the inner_str
-    const board = Array(side_len * side_len).fill("||:blank:||");
+    const board = Array(side_len * side_len).fill("||<:blank:1082500408838205540>||");
     for (let i = 0; i < inner_str.length; i++) {
         board[places[i]] = "||" + inner_str[i] + "||";
     }

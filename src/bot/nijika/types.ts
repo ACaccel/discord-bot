@@ -38,17 +38,11 @@ export class Nijika extends BaseBot {
     }
 
     public detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage) => {
-        const blocked_channels = this.nijikaConfig.blocked_channels;
-        const parentId = (oldMessage.channel as TextChannel).parentId as string;
-        if (blocked_channels.includes(oldMessage.channel.id) || blocked_channels.includes(parentId)) return;
-        detectMessageUpdate(oldMessage, newMessage, this);
+        detectMessageUpdate(oldMessage, newMessage, this, this.nijikaConfig.blocked_channels);
     }
 
     public detectMessageDelete = async (message: Message | PartialMessage) => {
-        const blocked_channels = this.nijikaConfig.blocked_channels;
-        const parentId = (message.channel as TextChannel).parentId as string;
-        if (blocked_channels.includes(message.channel.id) || blocked_channels.includes(parentId)) return;
-        detectMessageDelete(message, this);
+        detectMessageDelete(message, this, this.nijikaConfig.blocked_channels);
     }
 
     public detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember) => {

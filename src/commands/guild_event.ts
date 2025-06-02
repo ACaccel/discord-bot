@@ -6,13 +6,17 @@ import {
     PartialGuildMember,
     Guild,
     REST,
-    Routes
+    Routes,
+    TextChannel
 } from 'discord.js';
 import { BaseBot, GuildInfo } from '@dcbotTypes';
 import utils from '@utils';
 import db from '@db';
 
-export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage, bot: BaseBot) => {
+export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage, bot: BaseBot, blocked_channels?: string[]) => {
+    const parentId = (oldMessage.channel as TextChannel).parentId as string;
+    if (blocked_channels && (blocked_channels.includes(oldMessage.channel.id) || blocked_channels.includes(parentId))) return;
+
     if (!oldMessage.content || !newMessage.content || oldMessage.content === newMessage.content) return;
     if (!newMessage.guild || !newMessage.guildId || !newMessage.author || !oldMessage.author) return;
     if (newMessage.author.bot) return;
@@ -52,7 +56,10 @@ export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, 
     utils.guildLogger(bot.clientId, newMessage.guild?.id, 'message_update', log, newMessage.guild.name as string);
 }
 
-export const detectMessageDelete = async (message: Message | PartialMessage, bot: BaseBot) => {
+export const detectMessageDelete = async (message: Message | PartialMessage, bot: BaseBot, blocked_channels?: string[]) => {
+    const parentId = (message.channel as TextChannel).parentId as string;
+    if (blocked_channels && (blocked_channels.includes(message.channel.id) || blocked_channels.includes(parentId))) return;
+
     if (!message.guild || !message.guildId || !message.author) return;
     if (message.author.bot) return;
     if (!message.guild?.id) return;

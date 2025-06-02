@@ -213,7 +213,7 @@ export class BaseBot {
         }
     }
 
-    public executeSlashCommands = async (interaction: ChatInputCommandInteraction) => {
+    public executeSlashCommands = async (interaction: ChatInputCommandInteraction, blocked_channels?: string[]) => {
         if (!this.config.commands) {
             interaction.reply({ content: "Config of commands not found.", ephemeral: true });
             return;
@@ -233,8 +233,12 @@ export class BaseBot {
             interaction.reply({ content: "Command not found.", ephemeral: true });
         }
         
-        const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channel?.id}>`;
-        utils.channelLogger(this.guildInfo[interaction.guildId as string]?.channels?.debug, undefined, channel_log);
+        
+        const parentId = (interaction.channel as TextChannel).parentId as string;
+        if (!(blocked_channels && (blocked_channels.includes(interaction.channelId) || blocked_channels.includes(parentId)))) {
+            const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channelId}>`;
+            utils.channelLogger(this.guildInfo[interaction.guildId as string]?.channels?.debug, undefined, channel_log);
+        }
         if (interaction.guild) {
             const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
             utils.guildLogger(this.clientId, interaction.guild.id, 'interaction_create', guild_log, interaction.guild?.name as string);
