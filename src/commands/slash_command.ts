@@ -483,6 +483,37 @@ export const give_score = async (interaction: ChatInputCommandInteraction, bot: 
     await interaction.reply({ content: score });
 }
 
+export const bubble_wrap = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    const inner_str = interaction.options.get("str")?.value as string;
+    const side_len = 8;
+    if (inner_str.length > side_len * side_len) {
+        await interaction.reply({ content: "字串太長了，請縮短到 64 字元以內" });
+        return;
+    }
+
+    // random permutation of places
+    let places = Array.from({ length: side_len * side_len }, (_, i) => i);
+    for (let i = places.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [places[i], places[j]] = [places[j], places[i]];
+    }
+
+    // fill the board with the inner_str
+    const board = Array(side_len * side_len).fill("||:blank:||");
+    for (let i = 0; i < inner_str.length; i++) {
+        board[places[i]] = "||" + inner_str[i] + "||";
+    }
+
+    // create the string representation of the board
+    let inf = "";
+    for (let i = 0; i < side_len; i++) {
+        inf += board.slice(i * side_len, (i + 1) * side_len).join("") + "\n";
+    }
+
+    await interaction.reply({ content: inf });
+}
+
+
 export const gay = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     const user = interaction.options.get("user")?.value;
     if (interaction.guild?.members.cache.has(user as string)) {

@@ -165,6 +165,18 @@
             ]
         }
     },{
+        "name": "bubble_wrap",
+        "description": "產生泡泡紙",
+        "options": {
+            "string": [
+                {
+                    "name": "str",
+                    "description": "隱藏字",
+                    "required": true
+                }
+            ]
+        }
+    },{
         "name": "list_reply",
         "description": "列出自動回覆",
         "options": {
