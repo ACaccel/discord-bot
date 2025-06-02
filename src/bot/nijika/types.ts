@@ -7,6 +7,7 @@ import {
     PartialMessage,
     PartialMessageReaction,
     PartialUser,
+    TextChannel,
     User
 } from 'discord.js';
 import {
@@ -37,12 +38,16 @@ export class Nijika extends BaseBot {
     }
 
     public detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage) => {
-        if (this.nijikaConfig.blocked_channels.includes(oldMessage.channel.id)) return;
+        const blocked_channels = this.nijikaConfig.blocked_channels;
+        const parentId = (oldMessage.channel as TextChannel).parentId as string;
+        if (blocked_channels.includes(oldMessage.channel.id) || blocked_channels.includes(parentId)) return;
         detectMessageUpdate(oldMessage, newMessage, this);
     }
 
     public detectMessageDelete = async (message: Message | PartialMessage) => {
-        if (this.nijikaConfig.blocked_channels.includes(message.channel.id)) return;
+        const blocked_channels = this.nijikaConfig.blocked_channels;
+        const parentId = (message.channel as TextChannel).parentId as string;
+        if (blocked_channels.includes(message.channel.id) || blocked_channels.includes(parentId)) return;
         detectMessageDelete(message, this);
     }
 
