@@ -24,7 +24,7 @@ import {
     AllowedTextChannel
 } from "@dcbotTypes";
 import utils from "@utils";
-import { giveaway } from "@cmd";
+import { buildButtonRows, giveaway } from "@cmd";
 import { Nijika } from "bot/nijika/types";
 import slash_command_config from "../slash_command.json";
 import identity_config from "../identity.json";
@@ -803,7 +803,6 @@ export const role_message = async (interaction: ChatInputCommandInteraction, bot
         }
         // Extract role IDs from mentions
         const roleIds = Array.from(roles.matchAll(/<@&(\d+)>/g)).map(match => match[1]);
-        console.log(roleIds);
         const validRoles: Role[] = [];
         for (const roleId of roleIds) {
             const role = guild.roles.cache.get(roleId);
@@ -819,16 +818,11 @@ export const role_message = async (interaction: ChatInputCommandInteraction, bot
         }
 
         // build buttons
-        const buttons: ButtonBuilder[] = validRoles.map(role => {
-            return new ButtonBuilder()
-                .setCustomId(`toggle_role|${role.id}`)
-                .setLabel(role.name)
-                .setStyle(ButtonStyle.Primary);
-        });
-        const rows :ActionRowBuilder<ButtonBuilder>[] = [];
-        for (let i = 0; i < buttons.length; i += 5) {
-            rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + 5)));
-        }
+        const button_config = validRoles.map(role => ({
+            customId: `toggle_role|${role.id}`,
+            label: role.name
+        }))
+        const rows = buildButtonRows(button_config);
 
         await interaction.editReply({
             content: "請選擇你要領取的身份組：",

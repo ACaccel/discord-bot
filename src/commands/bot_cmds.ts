@@ -1,10 +1,33 @@
 import { 
+    ButtonStyle,
     ChannelType
 } from 'discord.js';
-import { SlashCommandBuilder } from '@discordjs/builders';
+import { ActionRowBuilder, ButtonBuilder, SlashCommandBuilder } from '@discordjs/builders';
 import { 
     Command
 } from '@dcbotTypes';
+
+interface ButtonConfig {
+    customId: string;
+    label: string;
+    style?: ButtonStyle;
+}
+
+export const buildButtonRows = (button_config: ButtonConfig[]) => {
+    const buttons: ButtonBuilder[] = button_config.map(button => {
+        return new ButtonBuilder()
+            .setCustomId(button.customId)
+            .setLabel(button.label)
+            .setStyle(button.style || ButtonStyle.Primary);
+    });
+
+    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+    for (let i = 0; i < buttons.length; i += 5) {
+        rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(i, i + 5)));
+    }
+
+    return rows;
+}
 
 export const buildSlashCommands = (config: Command) => {
     const slashCommand = new SlashCommandBuilder()
