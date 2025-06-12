@@ -873,7 +873,7 @@ export const bubble_wrap = async (interaction: ChatInputCommandInteraction, bot:
 export const ban_user = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
-        const BAN_THRESHOLD = 8; // number of votes required to ban
+        const BAN_THRESHOLD = 5; // number of votes required to ban
         const JUDGE_TIME = 3; // minutes to judge
         const user = interaction.options.get("user")?.value as string;
         const member = interaction.guild?.members.cache.get(user);
