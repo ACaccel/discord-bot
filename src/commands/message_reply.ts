@@ -48,6 +48,21 @@ const search_reply = async (msg: string, bot: BaseBot, guild_id: string) => {
     return { reply, success };
 }
 
+const roll_dice = (msg: string | undefined, regex: RegExp) => {
+    if (!msg) return null;
+    if (regex.test(msg)) {
+        const match = msg.match(regex);
+        if (match) {
+            const count = parseInt(match[1]);
+            const sides = parseInt(match[2]);
+            if (count > 0 && sides > 1) {
+                const rolls = Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1);
+                return `🎲 ${count}d${sides}: [${rolls.join(', ')}]`;
+            }
+        }
+    }
+}
+
 export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string, use_tts: boolean = false) => {
     if (!msg.channel.isSendable()) return;
 
@@ -112,5 +127,11 @@ export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string, u
     const regex = /長髮男(?=\s|$)/;
     if (regex.test(msg.content)) {
         await msg.channel.send("去spa");
+    }
+
+    const dice_roll = /^(\d+)d(\d+)$/;
+    const dice_res = roll_dice(msg.content, dice_roll);
+    if (dice_res) {
+        await msg.channel.send(dice_res);
     }
 }
