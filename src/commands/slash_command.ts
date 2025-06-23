@@ -24,7 +24,7 @@ import {
     AllowedTextChannel
 } from "@dcbotTypes";
 import utils from "@utils";
-import { buildButtonRows, giveaway } from "@cmd";
+import { buildButtonRows, giveaway, msgReact } from "@cmd";
 import { Nijika } from "bot/nijika/types";
 import slash_command_config from "../slash_command.json";
 import identity_config from "../identity.json";
@@ -886,7 +886,7 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
                         `**${JUDGE_TIME}** 分鐘後累積 **${BAN_THRESHOLD}** 票則禁言\n` +
                         `@ban人通知(暫定) 讓他看看豐川家的黑暗！`
         const judge_msg = await interaction.editReply({ content: ban_msg });
-        await judge_msg.react("👍");
+        await msgReact(judge_msg, ["👍"]);
 
         // judgement time (todo: save to db like giveaway)
         const current_time = Date.now();
@@ -916,6 +916,46 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
     } catch (error) {
         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法禁言使用者" });
+    }
+}
+
+export const roll_call = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+    try {
+        const users = interaction.options.get("users")?.value as string;
+        if (!users || !users.match(/^<@\d+>(\s*<@\d+>)*$/)) {
+            await interaction.reply({ content: "格式錯誤！regex: match(/^<@&\d+>(\s*<@&\d+>)*$/)", ephemeral: true });
+            return;
+        }
+
+        const userIds = Array.from(users.matchAll(/<@(\d+)>/g)).map(match => match[1]);
+        const validUsers: GuildMember[] = [];
+        for (const userId of userIds) {
+            const user = interaction.guild?.members.cache.get(userId);
+            if (!user) {
+                await interaction.reply({ content: `找不到ID為 ${userId} 的使用者, 請確認ID是否正確`, ephemeral: true });
+                return;
+            }
+            validUsers.push(user);
+        }
+        if (validUsers.length === 0) {
+            await interaction.reply({ content: "請至少提供一個有效的使用者ID", ephemeral: true });
+            return;
+        }
+
+        let announcement = `初華大人的點名簿：<@${interaction.user.id}> 發起了點名！\n`;
+        let id = 1;
+        validUsers.forEach(user => {
+            announcement += `${id}. <@${user.id}>\n`;
+            id += 1;
+        });
+
+        const ch = interaction.channel as AllowedTextChannel;
+        const msg = await ch.send({ content: announcement });
+        msgReact(msg, ["<:slowpoke_wave_lr:1178718404102848573>"])
+        await interaction.reply({ content: "點名已發送！", ephemeral: true })
+    } catch (error) {
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+        await interaction.reply({ content: "無法進行點名", ephemeral: true });
     }
 }
 

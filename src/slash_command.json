@@ -365,6 +365,18 @@
             ]
         }
     },{
+        "name": "roll_call",
+        "description": "點名",
+        "options": {
+            "string": [
+                {
+                    "name": "users",
+                    "description": "被點名者 (ex: @user1 @user2...)",
+                    "required": true
+                }
+            ]
+        }
+    },{
         "name": "update_role",
         "description": "更新Mee6等級身分組"
     },{

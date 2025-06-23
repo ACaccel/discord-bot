@@ -1,7 +1,7 @@
 import { GuildMember, EmbedBuilder, MessageReaction, User } from 'discord.js';
 import { BaseBot, AllowedTextChannel } from '@dcbotTypes';
 import { Nijika } from 'bot/nijika/types';
-import { giveaway } from '@cmd';
+import { giveaway, msgReact } from '@cmd';
 import utils from '@utils';
 import { Job } from 'node-schedule';
 
@@ -28,7 +28,7 @@ export const giveawayAnnouncement = async (channel: AllowedTextChannel, prize: s
     const message = await channel.send({ embeds: [embed] });
     if (!message) return null;
     else {
-        await message.react("🎉")
+        msgReact(message, ['🎉']);
         return message.id;
     }
 }

@@ -23,6 +23,7 @@ import {
     scheduleIconChange
 } from 'commands';
 import nijikaConfig from './config.json';
+import { rollCallReact } from 'commands/reaction_handler';
 
 export class Nijika extends BaseBot {
     public nijikaConfig: NijikaConfig;
@@ -55,7 +56,8 @@ export class Nijika extends BaseBot {
         const fetchedUser = user.partial ? await user.fetch() : user;
         
         if (!user.bot) {
-            giveaway.addReactionToGiveaway(fetchedReaction, fetchedUser, this);
+            await giveaway.addReactionToGiveaway(fetchedReaction, fetchedUser, this);
+            await rollCallReact(fetchedReaction, fetchedUser);
         }
     }
 
@@ -64,13 +66,14 @@ export class Nijika extends BaseBot {
         const fetchedUser = user.partial ? await user.fetch() : user;
 
         if (!user.bot) {
-            giveaway.removeReactionFromGiveaway(fetchedReaction, fetchedUser, this);
+            await giveaway.removeReactionFromGiveaway(fetchedReaction, fetchedUser, this);
+            await rollCallReact(fetchedReaction, fetchedUser);
         }
     }
 
     // recover the state
-    public rebootProcess = () => {
-        giveaway.rebootGiveawayJobs(this);
+    public rebootProcess = async () => {
+        await giveaway.rebootGiveawayJobs(this);
         // scheduleIconChange(this, "1047744170070118400");
     }
 }

@@ -1,6 +1,7 @@
 import { Message, TextChannel } from "discord.js";
 import { BaseBot } from "@dcbotTypes";
 import { tts_api } from "utils/misc";
+import { msgReact } from "./bot_cmds";
 
 export const anti_dizzy_react = async (msg: Message) => {
     const content = msg.content;
@@ -8,7 +9,7 @@ export const anti_dizzy_react = async (msg: Message) => {
         /暈/, /她{1}不{0,1}在{1}/, /他{1}不{0,1}在{1}/, /女{1}朋{0,1}友{1}/, /男{1}朋{0,1}友{1}/
     ]
     if(andyDictionary.some((e) => content.match(e))) {
-        await msg.react('1067851490271711312');
+        msgReact(msg, ['1067851490271711312']);
     }
 }
 

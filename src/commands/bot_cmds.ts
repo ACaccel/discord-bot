@@ -1,6 +1,7 @@
 import { 
     ButtonStyle,
-    ChannelType
+    ChannelType,
+    Message
 } from 'discord.js';
 import { ActionRowBuilder, ButtonBuilder, SlashCommandBuilder } from '@discordjs/builders';
 import { 
@@ -179,4 +180,16 @@ export const buildSlashCommands = (config: Command) => {
     }
 
     return slashCommand.toJSON()
+}
+
+export const msgReact = async (msg: Message, reactions: string[]) => {
+    if (!msg || !reactions || reactions.length === 0) return;
+
+    for (const reaction of reactions) {
+        try {
+            await msg.react(reaction);
+        } catch (error) {
+            console.error(`Failed to react with ${reaction} on message ${msg.id}:`, error);
+        }
+    }
 }
