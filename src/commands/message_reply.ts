@@ -55,7 +55,8 @@ const roll_dice = (msg: string | undefined, regex: RegExp) => {
         if (match) {
             const count = parseInt(match[1]);
             const sides = parseInt(match[2]);
-            if (count > 0 && sides > 1) {
+            if (count > 100 || count <= 0 || sides > 2**30 || sides <= 0) return "out of range (0 < count < 100, 0 < sides < 2^30)";
+            else {
                 const rolls = Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1);
                 return `🎲 ${count}d${sides}: [${rolls.join(', ')}]`;
             }
