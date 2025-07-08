@@ -56,6 +56,7 @@ tomori.client.on(Events.ClientReady, async () => {
         tomori.initSlashCommandsHandlers();
         tomori.initModalHandlers();
         tomori.initButtonHandlers();
+        tomori.initStringSelectMenuHandlers();
 
         await tomori.rebootMessage();
     } catch (e) {

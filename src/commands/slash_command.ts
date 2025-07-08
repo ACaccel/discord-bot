@@ -7,8 +7,8 @@ import {
     ChatInputCommandInteraction,
     Role,
     ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
 } from "discord.js";
 import axios from "axios";
 import fs from "fs";
@@ -142,24 +142,24 @@ export const change_avatar = async (interaction: ChatInputCommandInteraction, bo
             await interaction.editReply({ content: "找不到機器人"});
             return;
         }
-        await userBot.setNickname(newName);
         const new_identity = identity_config.find((e) => e.name === newName)
         if (!new_identity) {
             await interaction.editReply({ content: "找不到新身份"});
             return;
         }
 
-        // change avatar
+        // change nickname and avatar (need to re-login the client)
+        await userBot.setNickname(newName);
         await userBot.client.user.setAvatar(new_identity.avatar_url);
+        await userBot.client.login(bot.getToken());
         bot.guildInfo[guild.id].bot_name = newName;
 
         // change color role
-        identity_config.forEach(async (e) => {
-            const role = guild?.roles.cache.find(role => role.name === e.color_role);
-            if (role) 
-                if (userBot.roles.cache.has(role.id)) 
-                    await userBot.roles.remove(role);
-        });
+        const colorRole = userBot.roles.color;
+        if (colorRole) {
+            await userBot.roles.remove(colorRole);
+        }
+        
         const newColorRole = guild?.roles.cache.find(role => role.name === new_identity.color_role);
         if (newColorRole)
             await userBot.roles.add(newColorRole);
@@ -456,22 +456,102 @@ export const list_reply = async (interaction: ChatInputCommandInteraction, bot: 
 export const delete_reply = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
-        const input = interaction.options.get("keyword")?.value;
-        const reply = interaction.options.get("reply")?.value;
-
+        const key = interaction.options.get("keyword")?.value as string;
         const db = bot.guildInfo[interaction.guild?.id as string].db;
         if (!db) {
             await interaction.editReply({ content: "找不到資料庫" });
             return;
         }
-        const existPair = await db.models["Reply"].find({ input, reply });
+        const existPair = await db.models["Reply"].find({ input: key });
 
-        if (existPair.length === 0) {
-            await interaction.editReply({ content: `找不到 輸入：${input} 回覆：${reply}！` });
-        } else {
-            await db.models["Reply"].deleteOne({ input, reply });
-            await interaction.editReply({ content: `已刪除 輸入：${input} 回覆：${reply}！` });
+        // select menu
+        const select = new StringSelectMenuBuilder()
+            .setCustomId(`delete_reply|${key}`)
+            .setPlaceholder('選擇要刪除的回覆')
+            .addOptions(
+                existPair.map((reply: any, idx: number) =>
+                    new StringSelectMenuOptionBuilder()
+                    .setLabel(reply.reply.length > 60 ? `${idx}. ` + reply.reply.slice(0, 60) + "..." : `${idx}. ` + reply.reply)
+                    .setValue(reply.id)
+                )
+            );
+        const row = new ActionRowBuilder<StringSelectMenuBuilder>()
+            .addComponents(select);
+
+        // image preview
+        let previewContent = "圖片預覽：\n";
+        existPair.forEach((reply: any, idx: number) => {
+            if (typeof reply.reply === "string" && reply.reply.startsWith("http")) {
+                previewContent += `${idx} - ${reply.reply}\n`;
+            }
+        });
+
+        /*
+        // Deprecated! (due to discord cdn image expiration policy, leading to image parse failure)
+        // Generate a preview image with all image replies (local, not external API)
+        // This requires node-canvas and node-fetch for loading images
+        if (imageReplies.length > 0) {
+            try {
+
+            // Limit preview to 10 images for performance
+            const previewImages = imageReplies.slice(0, 10);
+
+            // Image size and layout
+            const imgWidth = 128, imgHeight = 128, padding = 16;
+            const fontSize = 18;
+            const canvasWidth = imgWidth + 400;
+            const canvasHeight = previewImages.length * (imgHeight + padding);
+
+            const canvas = createCanvas(canvasWidth, canvasHeight);
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.font = `${fontSize}px sans-serif`;
+            ctx.fillStyle = "#222";
+
+            for (let i = 0; i < previewImages.length; i++) {
+                const reply = previewImages[i];
+                // Draw text (link)
+                ctx.fillText(reply.reply, imgWidth + 24, i * (imgHeight + padding) + fontSize + 8);
+
+                // Draw image
+                try {
+                    // 用 axios 抓圖片並取得 buffer
+                    const res = await axios.get(reply.reply, { responseType: 'arraybuffer' });
+                    const buffer = Buffer.from(res.data);
+
+                    const img = await loadImage(buffer);
+                    ctx.drawImage(img, 0, i * (imgHeight + padding), imgWidth, imgHeight);
+                } catch (e) {
+                    // Draw a placeholder if image fails
+                    console.log(e);
+                    ctx.fillStyle = "#ccc";
+                    ctx.fillRect(0, i * (imgHeight + padding), imgWidth, imgHeight);
+                    ctx.fillStyle = "#f00";
+                    ctx.fillText("無法載入", 10, i * (imgHeight + padding) + imgHeight / 2);
+                    ctx.fillStyle = "#222";
+                }
+            }
+
+            const buffer = canvas.toBuffer('image/png');
+            const attachment = new AttachmentBuilder(buffer, { name: 'preview.png' });
+            await interaction.followUp({
+                content: '圖片回覆預覽（前10筆）：',
+                files: [attachment],
+                ephemeral: true
+            });
+            } catch (err) {
+                // console.log(err)
+                await interaction.followUp({ content: '無法產生圖片預覽', ephemeral: true });
+            }
         }
+        */
+
+        await interaction.editReply({
+            content: previewContent,
+            components: [row],
+        });
     } catch (error) {
         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法刪除訊息回覆配對" });
@@ -708,7 +788,7 @@ export const sticker_frequency = async (interaction: ChatInputCommandInteraction
         if (top_n > 50) top_n = 50;
         if (last_n_days > 5) last_n_days = 5;
 
-        const timeout_limit = 5 * 60; // second
+        const timeout_limit = 10 * 60; // second
         const n_days_ago = Date.now() - last_n_days * 24 * 60 * 60 * 1000;
         const stickerMap = new Map<string, number>();
 

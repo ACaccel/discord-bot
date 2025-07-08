@@ -185,10 +185,6 @@
                     "name": "keyword",
                     "description": "關鍵字",
                     "required": true
-                },{
-                    "name": "reply",
-                    "description": "回覆",
-                    "required": true
                 }
             ]
         }

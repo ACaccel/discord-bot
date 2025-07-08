@@ -56,6 +56,7 @@ nijika.client.on(Events.ClientReady, async () => {
         nijika.initSlashCommandsHandlers();
         nijika.initModalHandlers();
         nijika.initButtonHandlers();
+        nijika.initStringSelectMenuHandlers();
         nijika.rebootProcess();
         
         await nijika.rebootMessage();
@@ -67,16 +68,24 @@ nijika.client.on(Events.ClientReady, async () => {
 nijika.client.on(Events.InteractionCreate, async (interaction) => {
     try {
         if (interaction.inGuild()) {
-            if (interaction.isChatInputCommand()) {
-                await nijika.executeSlashCommands(interaction, nijika.nijikaConfig.blocked_channels);
-            } else if (interaction.isModalSubmit()) {
-                await nijika.executeModalSubmit(interaction);
-            } else if (interaction.isButton()) {
-                await nijika.executeButton(interaction);
-            } else {
-                if (!interaction.isAutocomplete()) {
-                    await interaction.reply({ content: '目前尚不支援此類型的指令', ephemeral: true });
-                }
+            switch (true) {
+                case interaction.isChatInputCommand():
+                    await nijika.executeSlashCommands(interaction, nijika.nijikaConfig.blocked_channels);
+                    break;
+                case interaction.isModalSubmit():
+                    await nijika.executeModalSubmit(interaction);
+                    break;
+                case interaction.isButton():
+                    await nijika.executeButton(interaction);
+                    break;
+                case interaction.isStringSelectMenu():
+                    await nijika.executeStringSelectMenu(interaction);
+                    break;
+                default:
+                    if (!interaction.isAutocomplete()) {
+                        await interaction.reply({ content: '目前尚不支援此類型的指令', ephemeral: true });
+                    }
+                    break;
             }
         } else {
             if (!interaction.isAutocomplete()) {

@@ -1,8 +1,6 @@
 import { 
     Client,
-    REST,
     RESTPostAPIChatInputApplicationCommandsJSONBody,
-    Routes,
     Guild,
     Channel,
     TextChannel,
@@ -10,7 +8,8 @@ import {
     ChatInputCommandInteraction,
     Role,
     ModalSubmitInteraction,
-    ButtonInteraction
+    ButtonInteraction,
+    StringSelectMenuInteraction
 } from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
@@ -20,7 +19,8 @@ import {
     buildSlashCommands,
     cmd_handler,
     modal_handler,
-    button_handler
+    button_handler,
+    ssm_handler
 } from '@cmd';
 import { Connection, Model } from 'mongoose';
 import slash_command_config from '../slash_command.json';
@@ -38,6 +38,7 @@ export class BaseBot {
     public slashCommandsHandler?: Map<string, Function>;
     public modalHandler?: Map<string, Function>;
     public buttonHandler?: Map<string, Function>;
+    public stringSelectMenuHandler?: Map<string, Function>;
     public voice?: Voice;
 
     public help_msg: string;
@@ -200,12 +201,12 @@ export class BaseBot {
                 }
             });
 
-            // register slash commands to discord
-            const rest = new REST().setToken(this.token)
-            await rest.put(Routes.applicationCommands(this.clientId), { body: [] })
-            Object.entries(this.guildInfo).forEach(async ([guildId, guildInfo]) => {
-                await rest.put(Routes.applicationGuildCommands(this.clientId, guildId), { body: this.slashCommands })
-            });
+            await this.client.application?.commands.set([]);
+            await Promise.all(
+                Object.entries(this.guildInfo).map(async ([guildId, guildInfo]) => {
+                    await this.client.application?.commands.set(this.slashCommands || [], guildId);
+                })
+            );
 
             utils.systemLogger(this.clientId, `Successfully register ${this.slashCommands.length} application (/) commands.`)
         } catch (err) {
@@ -290,6 +291,32 @@ export class BaseBot {
         // customId format: <button_type>|<button_value>
         const button_type = interaction.customId.split('|')[0];
         const handler = this.buttonHandler.get(button_type);
+        if (handler) {
+            await handler(interaction, this);
+        }
+    }
+    
+    //=============================================//
+    //============ string select menu =============//
+    //=============================================//
+    public initStringSelectMenuHandlers = () => {
+        this.stringSelectMenuHandler = new Map<string, Function>();
+        Object.entries(ssm_handler).forEach(([name, handler]) => {
+            if (typeof handler === 'function') {
+                this.stringSelectMenuHandler?.set(name, handler);
+            }
+        });
+    }
+
+    public executeStringSelectMenu = async (interaction: StringSelectMenuInteraction) => {
+        if (!this.stringSelectMenuHandler) {
+            interaction.reply({ content: "String select menu handler not found.", ephemeral: true });
+            return;
+        }
+
+        // customId format: <ssm_type|ssm_value>
+        const ssm_type = interaction.customId.split('|')[0];
+        const handler = this.stringSelectMenuHandler.get(ssm_type);
         if (handler) {
             await handler(interaction, this);
         }

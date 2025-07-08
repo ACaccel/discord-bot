@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
 let string_field = {
     type: String,
@@ -11,13 +11,13 @@ let number_field = {
 };
 
 // Define schema structures once
-const fetchSchema = {
+const fetchSchema = new Schema({
     channel: string_field,
     channelID: string_field,
     lastMessageID: string_field
-};
+});
 
-const messageSchema = {
+const messageSchema = new Schema({
     username: string_field,
     userID: string_field,
     channel: string_field,
@@ -25,18 +25,19 @@ const messageSchema = {
     content: string_field,
     messageID: string_field,
     timestamp: string_field
-};
+});
 
-const replySchema = {
+const replySchema = new Schema({
+    // _id: String,
     input: string_field,
     reply: string_field
-};
+});
 
-const todoSchema = {
+const todoSchema = new Schema({
     content: string_field
-};
+});
 
-const giveawaySchema = {
+const giveawaySchema = new Schema({
     winner_num: number_field,
     prize: string_field,
     end_time: number_field,
@@ -44,18 +45,10 @@ const giveawaySchema = {
     prize_owner_id: string_field,
     participants: [string_field],
     message_id: string_field
-};
+});
 
-// Create document type interfaces from schema structures
-type IFetch = Document & typeof fetchSchema;
-type IMessage = Document & typeof messageSchema;
-type IReply = Document & typeof replySchema;
-type ITodo = Document & typeof todoSchema;
-type IGiveaway = Document & typeof giveawaySchema;
-
-// Create models using the schema structures
-export const Fetch = mongoose.model<IFetch>('Fetch', new Schema(fetchSchema));
-export const Message = mongoose.model<IMessage>('Message', new Schema(messageSchema));
-export const Reply = mongoose.model<IReply>('Reply', new Schema(replySchema));
-export const Todo = mongoose.model<ITodo>('Todo', new Schema(todoSchema));
-export const Giveaway = mongoose.model<IGiveaway>('Giveaway', new Schema(giveawaySchema));
+export const Fetch = mongoose.model('Fetch', fetchSchema);
+export const Message = mongoose.model('Message', messageSchema);
+export const Reply = mongoose.model('Reply', replySchema);
+export const Todo = mongoose.model('Todo', todoSchema);
+export const Giveaway = mongoose.model('Giveaway', giveawaySchema);

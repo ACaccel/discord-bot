@@ -5,8 +5,6 @@ import {
     GuildMember,
     PartialGuildMember,
     Guild,
-    REST,
-    Routes,
     TextChannel
 } from 'discord.js';
 import { BaseBot, GuildInfo } from '@dcbotTypes';
@@ -162,9 +160,7 @@ export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
         throw new Error(`Cannot connect to MongoDB for guild ${guild.id}.`);
     }
 
-    // register slash commands
-    const rest = new REST().setToken(bot.getToken())
-    await rest.put(Routes.applicationGuildCommands(bot.clientId, guild.id), { body: bot.slashCommands })
+    await bot.client.application?.commands.set(bot.slashCommands || [], guild.id)
     .catch((err) => {
         utils.systemLogger(bot.clientId, `Failed to register guild (/) commands: ${err}`);
     });
