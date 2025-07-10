@@ -55,13 +55,14 @@ export class MsgArchive extends BaseBot {
                     await lastMessage.save();
                 }
                 
-                // fetch messages
+                // fetch messages and filter out messages sent by bots
                 var lastID: string | undefined = (await db.models["Fetch"].findOne({channel: channel.name, channelID: channel.id}))?.lastMessageID;
                 if (!channel.isTextBased()) return;
-                const fetchedMessages = await channel.messages.fetch({ 
+                let fetchedMessages = await channel.messages.fetch({ 
                     limit: 100, 
                     ...(lastID && { after: lastID }) 
                 });
+                fetchedMessages = fetchedMessages.filter(msg => !msg.author?.bot);
 
                 if(fetchedMessages.size === 0) {
                     await sentMessage.edit(`[ SYSTEM ] end scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
