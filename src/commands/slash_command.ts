@@ -208,7 +208,7 @@ export const random_restaurant = async (interaction: ChatInputCommandInteraction
         if (!must_contain) {
             pick_res = restaurants[Math.floor(Math.random() * restaurants.length)];
         } else {
-            const filtered_res = restaurants.filter((res) => res.name.includes(must_contain));
+            const filtered_res = restaurants.filter((res) => res.name.includes(must_contain) || res.address.includes(must_contain));
             if (filtered_res.length === 0) {
                 await interaction.editReply({ content: "沒有符合條件的餐廳" });
                 return;
