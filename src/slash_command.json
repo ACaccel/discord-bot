@@ -72,7 +72,16 @@
         }
     },{
         "name": "random_restaurant",
-        "description": "隨機餐廳抽取器 (台北地區)"
+        "description": "隨機餐廳抽取器 (台北地區)",
+        "options": {
+            "string": [
+                {
+                    "name": "text",
+                    "description": "包含字",
+                    "required": false
+                }
+            ]
+        }
     },{
         "name": "imgen",
         "description": "圖片生成",

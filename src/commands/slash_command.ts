@@ -28,6 +28,7 @@ import { buildButtonRows, giveaway, msgReact } from "@cmd";
 import { Nijika } from "bot/nijika/types";
 import slash_command_config from "../slash_command.json";
 import identity_config from "../identity.json";
+import restaurants from "../restaurant.json";
 
 /************************************/
 /********** slash commands **********/
@@ -198,11 +199,24 @@ export const change_nickname = async (interaction: ChatInputCommandInteraction, 
 export const random_restaurant = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
-        var api_route = "https://foodapi-chi.vercel.app/api/restaurants/get";
-        const response = await axios.get(api_route);
-        const resdata = response.data.restaurant;
+        // var api_route = "https://foodapi-chi.vercel.app/api/restaurants/get";
+        // const response = await axios.get(api_route);
+        // const resdata = response.data.restaurant;
 
-        await interaction.editReply({ content: `今天吃 ${resdata.name} 吧！\n地址：${resdata.address}\n(https://www.google.com/maps/search/${encodeURIComponent(resdata.name)})` });
+        const must_contain = interaction.options.get("text")?.value;
+        let pick_res: any;
+        if (!must_contain) {
+            pick_res = restaurants[Math.floor(Math.random() * restaurants.length)];
+        } else {
+            const filtered_res = restaurants.filter((res) => res.name.includes(must_contain));
+            if (filtered_res.length === 0) {
+                await interaction.editReply({ content: "沒有符合條件的餐廳" });
+                return;
+            }
+            pick_res = filtered_res[Math.floor(Math.random() * filtered_res.length)];
+        }
+
+        await interaction.editReply({ content: `今天吃 ${pick_res.name} 吧！\n地址：${pick_res.address}\n(https://www.google.com/maps/search/${encodeURIComponent(pick_res.name)})` });
     } catch (error) {
         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法取得餐廳"});
