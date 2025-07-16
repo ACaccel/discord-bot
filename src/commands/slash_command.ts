@@ -203,7 +203,7 @@ export const random_restaurant = async (interaction: ChatInputCommandInteraction
         // const response = await axios.get(api_route);
         // const resdata = response.data.restaurant;
 
-        const must_contain = interaction.options.get("text")?.value;
+        const must_contain = interaction.options.get("text")?.value as string;
         let pick_res: any;
         if (!must_contain) {
             pick_res = restaurants[Math.floor(Math.random() * restaurants.length)];
@@ -962,7 +962,7 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
     await interaction.deferReply();
     try {
         const BAN_THRESHOLD = 5; // number of votes required to ban
-        const JUDGE_TIME = 3; // minutes to judge
+        const JUDGE_TIME = 1; // minutes to judge
         const user = interaction.options.get("user")?.value as string;
         const member = interaction.guild?.members.cache.get(user);
         if (!member) {
@@ -986,32 +986,23 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
         const current_time = Date.now();
         const end_time = current_time + JUDGE_TIME * 60 * 1000;
         const end_time_date = new Date(end_time);
-        
-        // SPECIAL: delete messages for unbanable users
-        const channels = interaction.guild.channels.cache.filter((channel: any) => channel.isTextBased());
-        const fetch_and_delete = async () => {
-            while (Date.now() < end_time) {
-                channels.forEach(async (channel: any) => {
+
+        // delete message for unbanable users
+        const delete_on_msg_create = async () => {
+            const deleteListener = async (msg: any) => {
+                if (!msg.bot && msg.author?.id === member.id && msg.guild?.id === interaction.guild?.id) {
                     try {
-                        const fetchedMessages = await channel.messages.fetch({ limit: 20 });
-                        fetchedMessages.forEach((msg: any) => {
-                            if (msg.author.id === member.id &&
-                                msg.createdTimestamp >= current_time &&
-                                msg.createdTimestamp <= end_time
-                            ) {
-                                try {
-                                    msg.delete();
-                                } catch (error) {
-                                    utils.errorLogger(bot.clientId, interaction.guild?.id, error);
-                                }
-                            }
-                        });
-                    } catch (error) {
-                        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+                        await msg.delete();
+                    } catch (err) {
+                        utils.errorLogger(bot.clientId, interaction.guild?.id, err);
                     }
-                })
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+                }
+            };
+            bot.client.on("messageCreate", deleteListener);
+
+            setTimeout(() => {
+                bot.client.off("messageCreate", deleteListener);
+            }, duration * 60 * 1000);
         }
 
         const ban_judgement = async () => {
@@ -1027,9 +1018,8 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
                     await member.timeout(duration * 60 * 1000, "初華大人的禁言裁決！");
                     await interaction.followUp({ content: `${member.user.tag} 已被初華大人禁言 ${duration} 分鐘` });
                 } catch (error) {
-                    utils.errorLogger(bot.clientId, interaction.guild?.id, error);
-                    fetch_and_delete();
-                    await interaction.followUp({ content: "很遺憾的，初華大人無法禁言他" });
+                    await interaction.followUp({ content: "很遺憾初華大人無法禁言他，但給予無限刪除之裁決！" });
+                    await delete_on_msg_create();
                 }
             } else {
                 await interaction.followUp({ content: `投票數 ${judge_count} 票，未達到禁言門檻 ${BAN_THRESHOLD} 票` });

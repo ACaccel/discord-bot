@@ -77,7 +77,7 @@
             "string": [
                 {
                     "name": "text",
-                    "description": "包含字",
+                    "description": "地址或名字包含特定字",
                     "required": false
                 }
             ]
