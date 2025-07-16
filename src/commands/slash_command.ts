@@ -986,6 +986,34 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
         const current_time = Date.now();
         const end_time = current_time + JUDGE_TIME * 60 * 1000;
         const end_time_date = new Date(end_time);
+        
+        // SPECIAL: delete messages for unbanable users
+        const channels = interaction.guild.channels.cache.filter((channel: any) => channel.isTextBased());
+        const fetch_and_delete = async () => {
+            while (Date.now() < end_time) {
+                channels.forEach(async (channel: any) => {
+                    try {
+                        const fetchedMessages = await channel.messages.fetch({ limit: 20 });
+                        fetchedMessages.forEach((msg: any) => {
+                            if (msg.author.id === member.id &&
+                                msg.createdTimestamp >= current_time &&
+                                msg.createdTimestamp <= end_time
+                            ) {
+                                try {
+                                    msg.delete();
+                                } catch (error) {
+                                    utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+                                }
+                            }
+                        });
+                    } catch (error) {
+                        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+                    }
+                })
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
         const ban_judgement = async () => {
             const emoji = judge_msg.reactions.resolve("👍");
             if (!emoji) {
@@ -1000,6 +1028,7 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
                     await interaction.followUp({ content: `${member.user.tag} 已被初華大人禁言 ${duration} 分鐘` });
                 } catch (error) {
                     utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+                    fetch_and_delete();
                     await interaction.followUp({ content: "很遺憾的，初華大人無法禁言他" });
                 }
             } else {
