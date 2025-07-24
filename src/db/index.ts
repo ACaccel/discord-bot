@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import * as schema from './schema';
 
-const dbConnect = async (mongoURI: string, guild_id: string, bot_id: string) => {
+const dbConnect = async (mongoURI: string, guild_id: string) => {
     const modifiedURI = mongoURI.replace('/?', `/${guild_id}?`);
     const connection = await mongoose.createConnection(modifiedURI).asPromise();
     const models = Object.keys(schema).reduce((acc, modelName) => {

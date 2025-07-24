@@ -77,21 +77,7 @@ export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string, u
     // normal reply
     const { reply, success } = await search_reply(msg.content, bot, guild_id);
     if (success) {
-        let msg_reply: { content: string; files?: any[] } = { content: reply as string };
-        let tts_msg = reply;
-        if (!reply.startsWith("http")) {
-            tts_msg = tts_msg.replace(/<a?:\w+:\d+>/g, "");
-            tts_msg = tts_msg.replace(/:[^:\s]+:/g, "");
-        }
-
-        if (use_tts) {
-            const { attachment, error } = await tts_api(tts_msg);
-            if (!error && attachment) {
-                msg_reply = { ...msg_reply, files: [attachment] };
-            }
-        }
-
-        await msg.channel.send(msg_reply);
+        await msg.channel.send({ content: reply as string });
     }
 
     // special reply
@@ -107,21 +93,7 @@ export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string, u
         // reply to lucky
         const { reply, success } = await search_reply("[*]", bot, guild_id);
         if (success) {
-            let msg_reply: { content: string; files?: any[] } = { content: reply as string };
-            let tts_msg = reply;
-            if (!reply.startsWith("http")) {
-                tts_msg = tts_msg.replace(/<a?:\w+:\d+>/g, "");
-                tts_msg = tts_msg.replace(/:[^:\s]+:/g, "");
-            }
-    
-            if (use_tts) {
-                const { attachment, error } = await tts_api(tts_msg);
-                if (!error && attachment) {
-                    msg_reply = { ...msg_reply, files: [attachment] };
-                }
-            }
-    
-            await msg.channel.send(msg_reply);
+            await msg.channel.send({ content: reply as string });
         }
     }
 

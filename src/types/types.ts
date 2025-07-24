@@ -127,7 +127,7 @@ export class BaseBot {
 
         try {
             await Promise.all(Object.entries(this.guildInfo).map(async ([guild_id, guild]) => {
-                const database = await db.dbConnect(this.mongoURI!, guild_id, this.clientId)
+                const database = await db.dbConnect(this.mongoURI!, guild_id)
                 .catch((err) => {
                     utils.systemLogger(this.clientId, `Failed to connect to MongoDB for guild ${guild_id}: ${err}`);
                 });

@@ -2,7 +2,7 @@
 /logs
 /errors
 /data
-/dump
+/tools
 .env
 config.json
 guild_profile.json

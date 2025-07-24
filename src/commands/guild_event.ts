@@ -150,7 +150,7 @@ export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
         throw new Error('No MongoDB URI.');
     }
 
-    const database = await db.dbConnect(bot.getMongoURI()!, guild.id, bot.clientId)
+    const database = await db.dbConnect(bot.getMongoURI()!, guild.id)
     .catch((err) => {
         throw new Error(`Failed to connect to MongoDB: ${err}`);
     });
