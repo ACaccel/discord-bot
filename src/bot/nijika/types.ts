@@ -7,14 +7,12 @@ import {
     PartialMessage,
     PartialMessageReaction,
     PartialUser,
-    TextChannel,
     User
 } from 'discord.js';
 import {
     BaseBot,
     Config
 } from '@dcbotTypes';
-import { Job } from 'node-schedule';
 import { 
     detectMessageUpdate, 
     detectMessageDelete,
@@ -27,12 +25,10 @@ import { rollCallReact } from 'commands/reaction_handler';
 
 export class Nijika extends BaseBot {
     public nijikaConfig: NijikaConfig;
-    public giveaway_jobs: Map<string, Job>
 
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: Config) {
         super(client, token, mongoURI, clientId, config);
         this.nijikaConfig = nijikaConfig as NijikaConfig;
-        this.giveaway_jobs = new Map();
         this.help_msg = '### 目前支援的功能：\n' +
                         '1. tts: 回覆一則訊息並輸入tts，bot會產生該訊息的語音檔\n' +
                         '2. auto reply: bot會根據資料庫的message pair回覆訊息\n' + 
@@ -80,6 +76,5 @@ export class Nijika extends BaseBot {
 
 interface NijikaConfig {
     blocked_channels: string[];
-    giveaway_channel_id: string;
     level_roles: Record<string, string>;
 }

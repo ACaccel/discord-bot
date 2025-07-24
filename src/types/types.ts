@@ -13,6 +13,8 @@ import {
 } from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
+import { Connection, Model } from 'mongoose';
+import { Job } from 'node-schedule';
 import db from '@db';
 import utils from '@utils';
 import {
@@ -22,7 +24,6 @@ import {
     button_handler,
     ssm_handler
 } from '@cmd';
-import { Connection, Model } from 'mongoose';
 import slash_command_config from '../slash_command.json';
 
 export class BaseBot {
@@ -42,6 +43,7 @@ export class BaseBot {
     public voice?: Voice;
 
     public help_msg: string;
+    public giveaway_jobs: Map<string, Job>
 
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: Config) {
         this.client = client;
@@ -50,7 +52,9 @@ export class BaseBot {
         this.clientId = clientId;
         this.config = config;
         this.guildInfo = {};
+
         this.help_msg = '';
+        this.giveaway_jobs = new Map();
     }
 
     public login = async () => {

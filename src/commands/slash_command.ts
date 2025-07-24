@@ -227,6 +227,10 @@ export const imgen = async (interaction: ChatInputCommandInteraction, bot: BaseB
     await interaction.deferReply();
     try {
         const imgen_ch_id = bot.guildInfo[interaction.guild?.id as string].channels?.imgen.id;
+        if (!imgen_ch_id) {
+            await interaction.editReply({ content: "沒有設定圖片生成頻道" });
+            return;
+        }
         if (interaction.channel?.id !== imgen_ch_id) {
             await interaction.editReply({ content: `這個指令只能在 <#${imgen_ch_id}> 頻道使用喔！` });
             return;
@@ -965,6 +969,7 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
         const JUDGE_TIME = 1; // minutes to judge
         const user = interaction.options.get("user")?.value as string;
         const member = interaction.guild?.members.cache.get(user);
+        const ban_user_role = bot.guildInfo[interaction.guild?.id as string].roles?.ban_user.id || "role not set";
         if (!member) {
             await interaction.editReply({ content: "找不到使用者" });
             return;
@@ -972,13 +977,13 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
         
         let duration = interaction.options.get("duration")?.value as number;
         if (!duration) duration = 1; // 1 minutes
-        if (duration > 10) duration = 10; // max 10 minutes
+        if (duration > 5) duration = 5; // max 5 minutes
         if (duration < 1) duration = 1; // min 1 minute
 
         // ban message
         const ban_msg = `是否禁言 **${member.displayName}** ${duration} 分鐘？\n` +
                         `**${JUDGE_TIME}** 分鐘後累積 **${BAN_THRESHOLD}** 票則禁言\n` +
-                        `@ban人通知(暫定) 讓他看看豐川家的黑暗！`
+                        `<@&${ban_user_role}> 讓他看看豐川家的黑暗！`
         const judge_msg = await interaction.editReply({ content: ban_msg });
         await msgReact(judge_msg, ["👍"]);
 
@@ -1018,7 +1023,7 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
                     await member.timeout(duration * 60 * 1000, "初華大人的禁言裁決！");
                     await interaction.followUp({ content: `${member.user.tag} 已被初華大人禁言 ${duration} 分鐘` });
                 } catch (error) {
-                    await interaction.followUp({ content: "很遺憾初華大人無法禁言他，但給予無限刪除之裁決！" });
+                    await interaction.followUp({ content: "雖然初華大人無法禁言他，但將予以無限刪除之審判，即刻裁決！" });
                     await delete_on_msg_create();
                 }
             } else {
@@ -1072,66 +1077,7 @@ export const roll_call = async (interaction: ChatInputCommandInteraction, bot: B
     }
 }
 
-/********** Only for Nijika **********/
-/*** (Custom channel restriction) ****/
-
-export const update_role = async (interaction: ChatInputCommandInteraction, bot: Nijika) => {
-    await interaction.deferReply();
-    try {
-        let leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
-        let guild = bot.guildInfo[interaction.guild?.id as string].guild;
-        const channel = interaction.channel as AllowedTextChannel;
-        // let alive_role = guild.roles.cache.find(role => role.name === "活人");
-
-        await Promise.all(leaderboard.map(async (member) => {
-            let { id, level } = member;
-            let guildMember = guild.members.cache.get(id);
-
-            if (guildMember) { } else return;
-            // live people role.
-            // if(level >= 6) {
-            // 	if (!guildMember.roles.cache.some(role => role.name === "活人")) {
-            // 		let _ = await guildMember.roles.add(alive_role);
-            // 		interaction.channel.send(`[ SYSTEM ] 給予 ${guildMember.user.tag} 活人`);
-            // 	}
-            // }
-
-            // find corresponding role
-            let roleToAssign = "";
-            for (const roleLevel in bot.nijikaConfig.level_roles) {
-                if (level >= parseInt(roleLevel.split('_')[1])) {
-                    roleToAssign = bot.nijikaConfig.level_roles[roleLevel];
-                } else {
-                    break;
-                }
-            }
-            if (roleToAssign === "") return;
-
-            // update role
-            const addedRole = guild.roles.cache.find(role => role.name === roleToAssign);
-            const hasRoleToAssign = guildMember.roles.cache.has(addedRole?.id as string);
-            for (const roleLevel in bot.nijikaConfig.level_roles) {
-                const removedRole = guild.roles.cache.find(role => role.name === bot.nijikaConfig.level_roles[roleLevel]);
-                if (!removedRole) continue;
-                
-                if (guildMember.roles.cache.has(removedRole.id) && removedRole.name !== roleToAssign) {
-                    await guildMember.roles.remove(removedRole);
-                    await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 移除: ${bot.nijikaConfig.level_roles[roleLevel]}`);
-                }
-            }
-            if (addedRole && !hasRoleToAssign) {
-                await guildMember.roles.add(addedRole);
-                await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 獲得: ${roleToAssign}`);
-            }
-        }));
-        await interaction.editReply({ content: "更新完成" });
-    } catch (error) {
-        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
-        await interaction.editReply({ content: "無法更新身份組" });
-    }
-}
-
-export const giveaway_create = async (interaction: ChatInputCommandInteraction, bot: Nijika) => {
+export const giveaway_create = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
         const duration = interaction.options.get("duration")?.value as string;
@@ -1147,7 +1093,12 @@ export const giveaway_create = async (interaction: ChatInputCommandInteraction, 
             await interaction.editReply({ content: "找不到伺服器" });
             return;
         }
-        const channel = interaction.guild.channels.cache.get(bot.nijikaConfig.giveaway_channel_id) as AllowedTextChannel;
+        const channel_id = bot.guildInfo[guild.id].channels?.giveaway.id;
+        if (!channel_id) {
+            await interaction.editReply({ content: "抽獎頻道未設定" });
+            return;
+        }
+        const channel = interaction.guild.channels.cache.get(channel_id) as AllowedTextChannel;
         if (!channel) {
             await interaction.editReply({ content: "找不到頻道" });
             return;
@@ -1239,6 +1190,65 @@ export const giveaway_delete = async (interaction: ChatInputCommandInteraction, 
     } catch (error) {
         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法刪除抽獎" });
+    }
+}
+
+/********** Only for Nijika **********/
+/*** (Custom channel restriction) ****/
+
+export const update_role = async (interaction: ChatInputCommandInteraction, bot: Nijika) => {
+    await interaction.deferReply();
+    try {
+        let leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
+        let guild = bot.guildInfo[interaction.guild?.id as string].guild;
+        const channel = interaction.channel as AllowedTextChannel;
+        // let alive_role = guild.roles.cache.find(role => role.name === "活人");
+
+        await Promise.all(leaderboard.map(async (member) => {
+            let { id, level } = member;
+            let guildMember = guild.members.cache.get(id);
+
+            if (guildMember) { } else return;
+            // live people role.
+            // if(level >= 6) {
+            // 	if (!guildMember.roles.cache.some(role => role.name === "活人")) {
+            // 		let _ = await guildMember.roles.add(alive_role);
+            // 		interaction.channel.send(`[ SYSTEM ] 給予 ${guildMember.user.tag} 活人`);
+            // 	}
+            // }
+
+            // find corresponding role
+            let roleToAssign = "";
+            for (const roleLevel in bot.nijikaConfig.level_roles) {
+                if (level >= parseInt(roleLevel.split('_')[1])) {
+                    roleToAssign = bot.nijikaConfig.level_roles[roleLevel];
+                } else {
+                    break;
+                }
+            }
+            if (roleToAssign === "") return;
+
+            // update role
+            const addedRole = guild.roles.cache.find(role => role.name === roleToAssign);
+            const hasRoleToAssign = guildMember.roles.cache.has(addedRole?.id as string);
+            for (const roleLevel in bot.nijikaConfig.level_roles) {
+                const removedRole = guild.roles.cache.find(role => role.name === bot.nijikaConfig.level_roles[roleLevel]);
+                if (!removedRole) continue;
+                
+                if (guildMember.roles.cache.has(removedRole.id) && removedRole.name !== roleToAssign) {
+                    await guildMember.roles.remove(removedRole);
+                    await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 移除: ${bot.nijikaConfig.level_roles[roleLevel]}`);
+                }
+            }
+            if (addedRole && !hasRoleToAssign) {
+                await guildMember.roles.add(addedRole);
+                await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 獲得: ${roleToAssign}`);
+            }
+        }));
+        await interaction.editReply({ content: "更新完成" });
+    } catch (error) {
+        utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+        await interaction.editReply({ content: "無法更新身份組" });
     }
 }
 
