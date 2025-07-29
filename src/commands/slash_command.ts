@@ -9,6 +9,8 @@ import {
     ActionRowBuilder,
     StringSelectMenuBuilder,
     StringSelectMenuOptionBuilder,
+    Events,
+    Message,
 } from "discord.js";
 import axios from "axios";
 import fs from "fs";
@@ -997,8 +999,8 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
 
         // delete message for unbanable users
         const delete_on_msg_create = async () => {
-            const deleteListener = async (msg: any) => {
-                if (!msg.bot && msg.author?.id === member.id && msg.guild?.id === interaction.guild?.id) {
+            const deleteListener = async (msg: Message) => {
+                if (!msg.author.bot && msg.author?.id === member.id && msg.guild?.id === interaction.guild?.id) {
                     try {
                         await msg.delete();
                     } catch (err) {
@@ -1006,7 +1008,7 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
                     }
                 }
             };
-            bot.client.on("messageCreate", deleteListener);
+            bot.client.on(Events.MessageCreate, deleteListener);
 
             setTimeout(() => {
                 bot.client.off("messageCreate", deleteListener);
@@ -1017,6 +1019,10 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
             const emoji = judge_msg.reactions.resolve("👍");
             if (!emoji) {
                 await judge_msg.reply("無法取得投票數");
+                return;
+            }
+            if (member.user.bot) {
+                await judge_msg.reply("還想ban機器人阿");
                 return;
             }
 
