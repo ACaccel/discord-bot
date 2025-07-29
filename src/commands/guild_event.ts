@@ -164,4 +164,7 @@ export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
     .catch((err) => {
         utils.systemLogger(bot.clientId, `Failed to register guild (/) commands: ${err}`);
     });
+
+    // notification
+    utils.systemLogger(bot.clientId, `Bot added to guild: ${guild.name} (${guild.id})`);
 }
