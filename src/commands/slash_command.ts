@@ -981,10 +981,13 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
         if (duration < 1) duration = 1; // min 1 minute
 
         // ban message
-        const ban_msg = `是否禁言 **${member.displayName}** ${duration} 分鐘？\n` +
-                        `**${JUDGE_TIME}** 分鐘後累積 **${BAN_THRESHOLD}** 票則禁言\n` +
-                        `<@&${ban_user_role}> 讓他看看豐川家的黑暗！`
-        const judge_msg = await interaction.editReply({ content: ban_msg });
+        const initiator = interaction.member as GuildMember || interaction.user;
+        const ban_msg = `**${initiator.displayName}** 發起了審判！\n` +
+                        `是否禁言 **${member.displayName}** ${duration} 分鐘？\n` +
+                        `**${JUDGE_TIME}** 分鐘後累積 **${BAN_THRESHOLD}** 票則禁言，<@&${ban_user_role}> 讓他看看豐川家的黑暗！`
+        await interaction.deleteReply();
+        const ch = interaction.channel as AllowedTextChannel;
+        const judge_msg = await ch.send({ content: ban_msg });
         await msgReact(judge_msg, ["👍"]);
 
         // judgement time (todo: save to db like giveaway)
@@ -1013,7 +1016,7 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
         const ban_judgement = async () => {
             const emoji = judge_msg.reactions.resolve("👍");
             if (!emoji) {
-                await interaction.followUp({ content: "無法取得投票數" });
+                await judge_msg.reply("無法取得投票數");
                 return;
             }
 
@@ -1021,13 +1024,13 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
             if (judge_count >= BAN_THRESHOLD) {
                 try {
                     await member.timeout(duration * 60 * 1000, "初華大人的禁言裁決！");
-                    await interaction.followUp({ content: `${member.user.tag} 已被初華大人禁言 ${duration} 分鐘` });
+                    await judge_msg.reply(`${member.user.tag} 已被初華大人禁言 ${duration} 分鐘`);
                 } catch (error) {
-                    await interaction.followUp({ content: "雖然初華大人無法禁言他，但將予以無限刪除之審判，即刻裁決！" });
+                    await judge_msg.reply("雖然初華大人無法禁言他，但將予以無限刪除之審判，即刻裁決！");
                     await delete_on_msg_create();
                 }
             } else {
-                await interaction.followUp({ content: `投票數 ${judge_count} 票，未達到禁言門檻 ${BAN_THRESHOLD} 票` });
+                await judge_msg.reply(`投票數 ${judge_count} 票，未達到禁言門檻 ${BAN_THRESHOLD} 票`);
             }
         }
         utils.scheduleJob(end_time_date, () => ban_judgement());
