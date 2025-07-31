@@ -28,8 +28,6 @@ export class MsgArchive extends BaseBot {
 
     public backup = async (guild_id: string) => {
         try {
-            var begin = Date.now();
-            var newMessageCnt = 0;
             const db = this.guildInfo[guild_id].db;
             if (!db) {
                 utils.errorLogger(this.clientId, '', "Database not found");
@@ -39,81 +37,92 @@ export class MsgArchive extends BaseBot {
                 utils.errorLogger(this.clientId, '', "Debug channel not found");
                 return;
             }
+            
+            // debug message
+            let begin_time = Date.now();
+            let newMessageCnt = 0;
             const totalMessageCnt = await db.models["Message"].countDocuments({});
             const debug_ch = this.guildInfo[guild_id].channels["debug"] as AllowedTextChannel;
             const sentMessage = await debug_ch.send(`[ SYSTEM ] on scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
-            const fetchPromise = this.guildInfo[guild_id].guild.channels.cache.map(async(channel) => {
-                // check if channel is already in database
-                const channelName = channel.name;
-                var lastMessageQuery = await db.models["Fetch"].findOne({channel: channelName, channelID: channel.id});
+
+            // message backup
+            const fetchPromise = this.guildInfo[guild_id].guild.channels.cache.map(async (channel) => {
+                if (!channel.isTextBased()) return;
+
+                // check fetched channel record
+                let lastMessageQuery = await db.models["Fetch"].findOne({channel: channel.name, channelID: channel.id});
                 if(lastMessageQuery === null) {
                     const lastMessage = new db.models["Fetch"]({
-                        channel: channelName,
+                        channel: channel.name,
                         channelID:channel.id,
                         lastMessageID: 0
                     })
                     await lastMessage.save();
                 }
                 
-                // fetch messages and filter out messages sent by bots
-                var lastID: string | undefined = (await db.models["Fetch"].findOne({channel: channel.name, channelID: channel.id}))?.lastMessageID;
-                if (!channel.isTextBased()) return;
+                // fetch messages after ChannelLastMsgID
+                let ChannelLastMsgID: string | undefined = (await db.models["Fetch"].findOne({channel: channel.name, channelID: channel.id}))?.lastMessageID;
                 let fetchedMessages = await channel.messages.fetch({ 
                     limit: 100, 
-                    ...(lastID && { after: lastID }) 
+                    ...(ChannelLastMsgID && { after: ChannelLastMsgID }) 
                 });
-                fetchedMessages = fetchedMessages.filter(msg => !msg.author?.bot);
-
                 if(fetchedMessages.size === 0) {
                     await sentMessage.edit(`[ SYSTEM ] end scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
                     return;
                 }
-                
-                lastID = fetchedMessages.firstKey();
-                await db.models["Fetch"].findOneAndUpdate({channel: channel.name, channelID: channel.id}, {lastMessageID: lastID});
-                const allMessages = fetchedMessages
 
-                // save messages
-                for(const f of allMessages) {
-                    const e = f[1];
-                    const channelID = channel.id;
-                    const content = e.content;
-                    const userID = e.author.id;
-                    const username = e.author.username;
-                    const messageID = e.id;
-                    const timestamp = e.createdTimestamp;
-                    const exists = await db.models["Message"].find({
-                        userID: userID, 
-                        username: username, 
-                        channel: channelName, 
-                        channelID: channelID,
-                        content: content, 
-                        messageID: messageID,
-                        timestamp: timestamp
-                    })
-                    if(exists.length === 0 && content !== "") {
-                        const newMessage = new db.models["Message"]({
-                            channel: channelName,
-                            channelID: channelID,
-                            content: content,
-                            userID: userID,
-                            username: username,
-                            messageID: messageID,
-                            timestamp: timestamp
-                        })
+                // messages filtering
+                fetchedMessages = fetchedMessages.filter(msg => msg.author && !msg.author.bot);
+                
+                // update ChannelLastMsgID
+                ChannelLastMsgID = fetchedMessages.firstKey();
+                await db.models["Fetch"].findOneAndUpdate({channel: channel.name, channelID: channel.id}, {lastMessageID: ChannelLastMsgID});
+
+                // save messages to db
+                fetchedMessages.forEach(async (msg) => {
+                    const newMessage = new db.models["Message"]({
+                        channelId: channel.id,
+                        channelName: channel.name,
+                        content: msg.content,
+                        messageId: msg.id,
+                        userId: msg.author.id,
+                        userName: msg.author.username,
+                        attachments: msg.attachments.map(attachment => ({
+                            id: attachment.id,
+                            name: attachment.name,
+                            url: attachment.url,
+                            contentType: attachment.contentType
+                        })),
+                        reactions: msg.reactions.cache.map(reaction => ({
+                            id: reaction.emoji.id,
+                            name: reaction.emoji.name,
+                            count: reaction.count,
+                            userIds: reaction.users.cache.map(user => user.id)
+                        })),
+                        stickers: msg.stickers.map(sticker => ({
+                            id: sticker.id,
+                            name: sticker.name
+                        })),
+                        timestamp: msg.createdTimestamp
+                    });
+
+                    const existedMsg = await db.models["Message"].findOne({ messageId: msg.id });
+                    if (!existedMsg) {
                         await newMessage.save();
                         newMessageCnt++;
-                        if(newMessageCnt % 1000 == 0) {
-                            await sentMessage.edit(`[ SYSTEM ] on scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
+                        if (newMessageCnt % 50 === 0) {
+                            sentMessage.edit(`[ SYSTEM ] on scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
                         }
                     }
-                }
+                });
             });
             await Promise.all(fetchPromise);
-            var end = Date.now();
-            var timeSpent = (end-begin) / 1000;
-            await sentMessage.edit(`[ SYSTEM ] end scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages. (${timeSpent} sec)`);
-        } catch(e) {
+
+            // update debug message
+            let end_time = Date.now();
+            let duration = (end_time - begin_time) / 1000;
+            await sentMessage.edit(`[ SYSTEM ] end scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages. (${duration} sec)`);
+        } catch (e) {
             utils.errorLogger(this.clientId, '', e);
         }
     }

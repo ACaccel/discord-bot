@@ -1,50 +1,54 @@
 import mongoose, { Schema } from "mongoose";
 
-let string_field = {
-    type: String,
-    required: true
-};
-
-let number_field = {
-    type: Number,
-    required: true
-};
-
-// Define schema structures once
 const fetchSchema = new Schema({
-    channel: string_field,
-    channelID: string_field,
-    lastMessageID: string_field
+    channel: { type: String, required: true },
+    channelID: { type: String, required: true },
+    lastMessageID: { type: String, required: true }
 });
 
 const messageSchema = new Schema({
-    username: string_field,
-    userID: string_field,
-    channel: string_field,
-    channelID: string_field,
-    content: string_field,
-    messageID: string_field,
-    timestamp: string_field
+    channelId: { type: String, required: true },    // channel & thread
+    channelName: { type: String, required: true },
+    content: String,
+    messageId: { type: String, required: true },
+    userId: { type: String, required: true },
+    userName: { type: String, required: true },
+    attachments: [{
+        id: String,
+        name: String,
+        url: String,
+        contentType: String
+    }],
+    reactions: [{
+        id: String,
+        name: String,
+        count: Number,
+        userIds: [String]
+    }],
+    stickers: [{
+        id: String,
+        name: String,
+    }],
+    timestamp: { type: Number, required: true },
 });
 
 const replySchema = new Schema({
-    // _id: String,
-    input: string_field,
-    reply: string_field
+    input: { type: String, required: true },
+    reply: { type: String, required: true }
 });
 
 const todoSchema = new Schema({
-    content: string_field
+    content: { type: String, required: true }
 });
 
 const giveawaySchema = new Schema({
-    winner_num: number_field,
-    prize: string_field,
-    end_time: number_field,
-    channel_id: string_field,
-    prize_owner_id: string_field,
-    participants: [string_field],
-    message_id: string_field
+    winner_num: { type: Number, required: true },
+    prize: { type: String, required: true },
+    end_time: { type: Number, required: true },
+    channel_id: { type: String, required: true },
+    prize_owner_id: { type: String, required: true },
+    participants: [{ type: String, required: true }],
+    message_id: { type: String, required: true }
 });
 
 export const Fetch = mongoose.model('Fetch', fetchSchema);
