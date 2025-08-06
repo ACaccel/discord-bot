@@ -22,6 +22,7 @@ const messageSchema = new Schema({
     reactions: [{
         id: String,
         name: String,
+        animated: Boolean,
         count: Number,
         userIds: [String]
     }],

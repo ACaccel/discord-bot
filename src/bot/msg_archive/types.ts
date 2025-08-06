@@ -96,6 +96,7 @@ export class MsgArchive extends BaseBot {
                         reactions: msg.reactions.cache.map(reaction => ({
                             id: reaction.emoji.id,
                             name: reaction.emoji.name,
+                            animated: reaction.emoji.animated,
                             count: reaction.count,
                             userIds: reaction.users.cache.map(user => user.id)
                         })),
