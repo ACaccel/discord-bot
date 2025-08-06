@@ -749,7 +749,7 @@ export const emoji_frequency = async (interaction: ChatInputCommandInteraction, 
             return;
         }
 
-        if (top_n > 50) top_n = 50;
+        if (top_n > 30) top_n = 30;
         if (last_n_months > 6) last_n_months = 6;
         const n_months_ago = new Date();
         n_months_ago.setMonth(n_months_ago.getMonth() - last_n_months);

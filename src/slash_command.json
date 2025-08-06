@@ -290,7 +290,7 @@
             "number": [
                 {
                     "name": "top_n",
-                    "description": "前n名 (optional, max: 50)",
+                    "description": "前n名 (optional, max: 30)",
                     "required": false
                 },{
                     "name": "last_n_months",
