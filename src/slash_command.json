@@ -290,18 +290,18 @@
             "number": [
                 {
                     "name": "top_n",
-                    "description": "前n名 (optional)",
+                    "description": "前n名 (optional, max: 50)",
                     "required": false
                 },{
                     "name": "last_n_months",
-                    "description": "搜尋過去n個月 (optional)",
+                    "description": "搜尋過去n個月 (optional, max: 6)",
                     "required": false
                 }
             ]
         }
     },{
         "name": "sticker_frequency",
-        "description": "統計貼圖使用頻率 (實時統計, 尋找區間不應過長, 有timeout)",
+        "description": "統計貼圖使用頻率",
         "options": {
             "string": [
                 {
@@ -317,11 +317,11 @@
             "number": [
                 {
                     "name": "top_n",
-                    "description": "前n名 (optional)",
+                    "description": "前n名 (optional, max: 30)",
                     "required": false
                 },{
                     "name": "last_n_days",
-                    "description": "搜尋過去n天 (optional)",
+                    "description": "搜尋過去n個月 (optional, max: 6)",
                     "required": false
                 }
             ]
@@ -352,7 +352,7 @@
         }
     },{
         "name": "ban_user",
-        "description": "暫時禁言使用者",
+        "description": "暫時禁言使用者(ban_threshold: 5 votes, judge_time: 1 min)",
         "options": {
             "user": [
                 {
@@ -364,7 +364,7 @@
             "number": [
                 {
                     "name": "duration",
-                    "description": "禁言時限 (單位: 分鐘)",
+                    "description": "禁言時限 (單位: 分鐘, max: 5)",
                     "required": false
                 }
             ]

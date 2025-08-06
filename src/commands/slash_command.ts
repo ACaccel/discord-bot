@@ -743,45 +743,60 @@ export const emoji_frequency = async (interaction: ChatInputCommandInteraction, 
             await interaction.editReply({ content: "找不到伺服器" });
             return;
         }
-        if (top_n > 40) top_n = 40;
-        if (last_n_months > 6) last_n_months = 6;
-
-        const n_months_ago = new Date();
-        n_months_ago.setMonth(n_months_ago.getMonth() - last_n_months);
-
         const db = bot.guildInfo[guild.id].db;
         if (!db) {
             await interaction.editReply({ content: "請先設定資料庫" });
             return;
         }
 
-        const emojiMap = new Map<string, number>();
+        if (top_n > 50) top_n = 50;
+        if (last_n_months > 6) last_n_months = 6;
+        const n_months_ago = new Date();
+        n_months_ago.setMonth(n_months_ago.getMonth() - last_n_months);
+
+        // emoji count record
+        const textEmoji = new Map<string, number>();
+        const reactionEmoji = new Map<string, number>();
+        const allEmoji = new Map<string, number>();
         guild.emojis.cache.forEach(emoji => {
             const emojiText = `<${emoji.animated ? "a:" : ":"}${emoji.name}:${emoji.id}>`;
-            emojiMap.set(emojiText, 0);
+            textEmoji.set(emojiText, 0);
+            reactionEmoji.set(emojiText, 0);
+            allEmoji.set(emojiText, 0);
         });
         
-        const messages = await db.models["Message"].find({
+        // search emojis in database messages
+        const messages = await db.models['Message'].find({
             $expr: { $gte: [{ $toLong: "$timestamp" }, n_months_ago.getTime()] }
         });
-
         messages.forEach((message) => {
-            const emojis: string[] = message.content.match(/<a?:\w+:\d+>/g) || [];
-            emojis.forEach(emoji => {
-                if (emojiMap.has(emoji)) {
-                    emojiMap.set(emoji, (emojiMap.get(emoji) || 0) + 1);
+            const msgEmojis: string[] = message.content.match(/<a?:\w+:\d+>/g) || [];
+            msgEmojis.forEach(emoji => {
+                if (textEmoji.has(emoji)) {
+                    textEmoji.set(emoji, (textEmoji.get(emoji) || 0) + 1);
+                }
+            });
+
+            const msgReactions: any[] = message.reactions || [];
+            msgReactions.forEach((reaction) => {
+                const emojiText = `<${reaction.animated ? "a:" : ":"}${reaction.name}:${reaction.id}>`;
+                if (reactionEmoji.has(emojiText)) {
+                    reactionEmoji.set(emojiText, (reactionEmoji.get(emojiText) || 0) + reaction.count);
                 }
             });
         });
 
-        const sortedEmojis = Array.from(emojiMap.entries())
+        allEmoji.forEach((_, emojiText) => {
+            allEmoji.set(emojiText, (textEmoji.get(emojiText) || 0) + (reactionEmoji.get(emojiText) || 0));
+        });
+        const sortedEmojis = Array.from(allEmoji.entries())
             .filter(([emoji]) => type === "animated" ? emoji.startsWith("<a:") : emoji.startsWith("<:"))
             .sort((a, b) => frequency === "asc" ? a[1] - b[1] : b[1] - a[1])
             .slice(0, top_n);
 
         let content = `最近${last_n_months}個月內使用頻率${frequency === "asc" ? "最低" : "最高"}的 ${top_n} 個${type === "animated" ? "動態" : "靜態"}表情符號：\n`;
-        sortedEmojis.forEach(([emoji, count], index) => {
-            content += `${index + 1}. ${emoji} - ${count} 次\n`;
+        sortedEmojis.forEach(([emoji, _], index) => {
+            content += `${index + 1}. ${emoji} - 文字內: ${textEmoji.get(emoji)} 次, 訊息反應: ${reactionEmoji.get(emoji)}\n`;
         });
 
         await interaction.editReply({ content });
@@ -791,88 +806,55 @@ export const emoji_frequency = async (interaction: ChatInputCommandInteraction, 
     }
 }
 
-// danger!!! this command should only be used in a trusted server
-// it may cause the bot to be stuck
 export const sticker_frequency = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
         const frequency = interaction.options.get("frequency")?.value as string || "asc";
         let top_n = interaction.options.get("top_n")?.value as number || 5;
-        let last_n_days = interaction.options.get("last_n_days")?.value as number || 1;
+        let last_n_months = interaction.options.get("last_n_months")?.value as number || 1;
         const guild = interaction.guild;
-
         if (!guild) {
             await interaction.editReply({ content: "找不到伺服器" });
             return;
         }
-        if (top_n > 50) top_n = 50;
-        if (last_n_days > 5) last_n_days = 5;
+        const db = bot.guildInfo[guild.id].db;
+        if (!db) {
+            await interaction.editReply({ content: "請先設定資料庫" });
+            return;
+        }
 
-        const timeout_limit = 10 * 60; // second
-        const n_days_ago = Date.now() - last_n_days * 24 * 60 * 60 * 1000;
+        if (top_n > 30) top_n = 30;
+        if (last_n_months > 6) last_n_months = 6;
+        const n_months_ago = new Date();
+        n_months_ago.setMonth(n_months_ago.getMonth() - last_n_months);
+
+        // sticker count record
         const stickerMap = new Map<string, number>();
-
-        // Prepopulate the stickerMap with all stickers in the server
         guild.stickers.cache.forEach(sticker => {
             stickerMap.set(sticker.name, 0);
         });
 
-        const channels = guild.channels.cache.filter(channel => channel.isTextBased());
-        let elapsedSeconds = 0;
-        let timeoutReached = false;
-
-        // Set a timeout for 10 seconds
-        const timeout = setTimeout(() => {
-            timeoutReached = true;
-        }, timeout_limit * 1000);
-
-        // Update the interaction message every second
-        const interval = setInterval(async () => {
-            elapsedSeconds++;
-            await interaction.editReply({ content: `正在搜尋訊息中... 已經過 ${elapsedSeconds} 秒, timeout: ${timeout_limit} 秒` });
-        }, 1000);
-
-        for (const [, channel] of channels) {
-            if (timeoutReached) break;
-            if (!channel.isTextBased()) continue;
-
-            let lastMessageId: string | undefined;
-            while (true) {
-                if (timeoutReached) break;
-
-                const messages = await channel.messages.fetch({ limit: 100, before: lastMessageId });
-                if (messages.size === 0) break;
-
-                for (const [, message] of messages) {
-                    if (message.createdTimestamp < n_days_ago) break;
-
-                    message.stickers.forEach(sticker => {
-                        const stickerName = sticker.name;
-                        stickerMap.set(stickerName, (stickerMap.get(stickerName) || 0) + 1);
-                    });
+        // search stickers in database messages
+        const messages = await db.models['Message'].find({
+            $expr: { $gte: [{ $toLong: "$timestamp" }, n_months_ago.getTime()] }
+        });
+        messages.forEach((message) => {
+            const stickers: any[] = message.stickers || [];
+            stickers.forEach((sticker) => {
+                if (stickerMap.has(sticker.name)) {
+                    stickerMap.set(sticker.name, (stickerMap.get(sticker.name) || 0) + 1);
                 }
-
-                lastMessageId = messages.last()?.id;
-                if (!lastMessageId || messages.last()?.createdTimestamp! < n_days_ago) break;
-            }
-        }
-
-        // Clear the timeout and interval
-        clearTimeout(timeout);
-        clearInterval(interval);
+            });
+        });
 
         const sortedStickers = Array.from(stickerMap.entries())
             .sort((a, b) => frequency === "asc" ? a[1] - b[1] : b[1] - a[1])
             .slice(0, top_n);
 
-        let content = `最近${last_n_days}天內使用頻率${frequency === "asc" ? "最低" : "最高"}的 ${top_n} 個貼圖：\n`;
+        let content = `最近${last_n_months}個月內使用頻率${frequency === "asc" ? "最低" : "最高"}的 ${top_n} 個貼圖：\n`;
         sortedStickers.forEach(([sticker, count], index) => {
             content += `${index + 1}. ${sticker} - ${count} 次\n`;
         });
-
-        if (timeoutReached) {
-            content += `\n⚠️ 搜尋時間超過 ${timeout_limit} 秒，請縮小搜尋範圍`;
-        }
 
         await interaction.editReply({ content });
     } catch (error) {
@@ -880,6 +862,97 @@ export const sticker_frequency = async (interaction: ChatInputCommandInteraction
         await interaction.editReply({ content: "無法取得貼圖使用頻率" });
     }
 };
+
+// Deprecated
+// danger!!! this command should only be used in a trusted server
+// it may cause the bot to be stuck
+// export const sticker_frequency = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
+//     await interaction.deferReply();
+//     try {
+//         const frequency = interaction.options.get("frequency")?.value as string || "asc";
+//         let top_n = interaction.options.get("top_n")?.value as number || 5;
+//         let last_n_days = interaction.options.get("last_n_days")?.value as number || 1;
+//         const guild = interaction.guild;
+
+//         if (!guild) {
+//             await interaction.editReply({ content: "找不到伺服器" });
+//             return;
+//         }
+//         if (top_n > 50) top_n = 50;
+//         if (last_n_days > 5) last_n_days = 5;
+
+//         const timeout_limit = 10 * 60; // second
+//         const n_days_ago = Date.now() - last_n_days * 24 * 60 * 60 * 1000;
+//         const stickerMap = new Map<string, number>();
+
+//         // Prepopulate the stickerMap with all stickers in the server
+//         guild.stickers.cache.forEach(sticker => {
+//             stickerMap.set(sticker.name, 0);
+//         });
+
+//         const channels = guild.channels.cache.filter(channel => channel.isTextBased());
+//         let elapsedSeconds = 0;
+//         let timeoutReached = false;
+
+//         // Set a timeout for 10 seconds
+//         const timeout = setTimeout(() => {
+//             timeoutReached = true;
+//         }, timeout_limit * 1000);
+
+//         // Update the interaction message every second
+//         const interval = setInterval(async () => {
+//             elapsedSeconds++;
+//             await interaction.editReply({ content: `正在搜尋訊息中... 已經過 ${elapsedSeconds} 秒, timeout: ${timeout_limit} 秒` });
+//         }, 1000);
+
+//         for (const [, channel] of channels) {
+//             if (timeoutReached) break;
+//             if (!channel.isTextBased()) continue;
+
+//             let lastMessageId: string | undefined;
+//             while (true) {
+//                 if (timeoutReached) break;
+
+//                 const messages = await channel.messages.fetch({ limit: 100, before: lastMessageId });
+//                 if (messages.size === 0) break;
+
+//                 for (const [, message] of messages) {
+//                     if (message.createdTimestamp < n_days_ago) break;
+
+//                     message.stickers.forEach(sticker => {
+//                         const stickerName = sticker.name;
+//                         stickerMap.set(stickerName, (stickerMap.get(stickerName) || 0) + 1);
+//                     });
+//                 }
+
+//                 lastMessageId = messages.last()?.id;
+//                 if (!lastMessageId || messages.last()?.createdTimestamp! < n_days_ago) break;
+//             }
+//         }
+
+//         // Clear the timeout and interval
+//         clearTimeout(timeout);
+//         clearInterval(interval);
+
+//         const sortedStickers = Array.from(stickerMap.entries())
+//             .sort((a, b) => frequency === "asc" ? a[1] - b[1] : b[1] - a[1])
+//             .slice(0, top_n);
+
+//         let content = `最近${last_n_days}天內使用頻率${frequency === "asc" ? "最低" : "最高"}的 ${top_n} 個貼圖：\n`;
+//         sortedStickers.forEach(([sticker, count], index) => {
+//             content += `${index + 1}. ${sticker} - ${count} 次\n`;
+//         });
+
+//         if (timeoutReached) {
+//             content += `\n⚠️ 搜尋時間超過 ${timeout_limit} 秒，請縮小搜尋範圍`;
+//         }
+
+//         await interaction.editReply({ content });
+//     } catch (error) {
+//         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
+//         await interaction.editReply({ content: "無法取得貼圖使用頻率" });
+//     }
+// };
 
 export const role_message = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
@@ -971,7 +1044,7 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
         const JUDGE_TIME = 1; // minutes to judge
         const user = interaction.options.get("user")?.value as string;
         const member = interaction.guild?.members.cache.get(user);
-        const ban_user_role = bot.guildInfo[interaction.guild?.id as string].roles?.ban_user.id || "role not set";
+        const ban_user_role = bot.guildInfo[interaction.guild?.id as string].roles?.ban_user?.id || "role not set";
         if (!member) {
             await interaction.editReply({ content: "找不到使用者" });
             return;
@@ -1102,7 +1175,7 @@ export const giveaway_create = async (interaction: ChatInputCommandInteraction, 
             await interaction.editReply({ content: "找不到伺服器" });
             return;
         }
-        const channel_id = bot.guildInfo[guild.id].channels?.giveaway.id;
+        const channel_id = bot.guildInfo[guild.id].channels?.giveaway?.id;
         if (!channel_id) {
             await interaction.editReply({ content: "抽獎頻道未設定" });
             return;
