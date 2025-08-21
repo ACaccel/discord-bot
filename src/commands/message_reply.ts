@@ -3,6 +3,7 @@ import { BaseBot } from "@dcbotTypes";
 import { tts_api } from "utils/misc";
 import { msgReact } from "./bot_cmds";
 
+// deprecated!
 export const anti_dizzy_react = async (msg: Message) => {
     const content = msg.content;
     const andyDictionary = [

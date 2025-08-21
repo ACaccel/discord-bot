@@ -8,7 +8,7 @@ import express from 'express';
 
 import { Config } from '@dcbotTypes';
 import { Nijika } from './types';
-import { earthquake_warning, anti_dizzy_react, auto_reply, tts_reply } from '@cmd';
+import { earthquake_warning, auto_reply, tts_reply } from '@cmd';
 import utils from '@utils';
 import config from './config.json';
 
@@ -99,7 +99,6 @@ nijika.client.on(Events.InteractionCreate, async (interaction) => {
 
 nijika.client.on(Events.MessageCreate, async (message) => {
     try {
-        await anti_dizzy_react(message);
         await tts_reply(message);
         if (message.guildId)
             await auto_reply(message, nijika, message.guildId, true);
