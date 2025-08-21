@@ -1044,7 +1044,7 @@ export const ban_user = async (interaction: ChatInputCommandInteraction, bot: Ba
         const JUDGE_TIME = 1; // minutes to judge
         const user = interaction.options.get("user")?.value as string;
         const member = interaction.guild?.members.cache.get(user);
-        const ban_user_role = bot.guildInfo[interaction.guild?.id as string].roles?.ban_user?.id || "role not set";
+        const ban_user_role = bot.guildInfo[interaction.guild?.id as string]?.roles?.ban_user?.id || "role not set";
         if (!member) {
             await interaction.editReply({ content: "找不到使用者" });
             return;
