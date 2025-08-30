@@ -201,11 +201,38 @@ export const change_nickname = async (interaction: ChatInputCommandInteraction, 
 export const random_restaurant = async (interaction: ChatInputCommandInteraction, bot: BaseBot) => {
     await interaction.deferReply();
     try {
-        // var api_route = "https://foodapi-chi.vercel.app/api/restaurants/get";
-        // const response = await axios.get(api_route);
-        // const resdata = response.data.restaurant;
+        var api_route = "https://food-api-kappa-hazel.vercel.app/recommend";
+        const type = interaction.options.get("type")?.value as string;
+        const name_keyword = interaction.options.get("name_keyword")?.value as string;
+        const addr_keyword = interaction.options.get("address_keyword")?.value as string;
+        const budget = interaction.options.get("budget")?.value as Number;
+        const min_rating = interaction.options.get("min_rating")?.value as Number;
+        const max_rating = interaction.options.get("max_rating")?.value as Number;
+        const response = await axios.get(api_route, {
+            params: {
+                type,
+                name_keyword,
+                addr_keyword,
+                budget,
+                min_rating,
+                max_rating
+            }
+        });
+        //console.log(response.data);
+        const message = response.data.message;
+        const address = response.data.restaurant.address;
+        const phone = response.data.restaurant.phone;
+        const price = response.data.restaurant.price;
+        const google_map = response.data.restaurant.google_maps_link;
+        await interaction.editReply({
+            content: `「${message ?? "沒有描述"}」\n\n` +
+                    `${price ? `價位：${price}\n` : ""}` +
+                    `${address ? `地址：${address}\n` : ""}` +
+                    `${phone ? `電話：${phone}\n` : ""}` +
+                    `${google_map ? `地圖：${google_map}` : ""}`
+        });
 
-        const must_contain = interaction.options.get("text")?.value as string;
+        /*const must_contain = interaction.options.get("text")?.value as string;
         let pick_res: any;
         if (!must_contain) {
             pick_res = restaurants[Math.floor(Math.random() * restaurants.length)];
@@ -218,10 +245,19 @@ export const random_restaurant = async (interaction: ChatInputCommandInteraction
             pick_res = filtered_res[Math.floor(Math.random() * filtered_res.length)];
         }
 
-        await interaction.editReply({ content: `今天吃 ${pick_res.name} 吧！\n地址：${pick_res.address}\n(https://www.google.com/maps/search/${encodeURIComponent(pick_res.name)})` });
+        await interaction.editReply({ content: `今天吃 ${pick_res.name} 吧！\n地址：${pick_res.address}\n(https://www.google.com/maps/search/${encodeURIComponent(pick_res.name)})` });*/
     } catch (error) {
         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
-        await interaction.editReply({ content: "無法取得餐廳"});
+
+        const now = new Date();
+        // 換算成台灣時間 (UTC+8)
+        const hourTPE = (now.getUTCHours() + 8) % 24;
+        console.log(hourTPE)
+        if (hourTPE >= 0 && hourTPE < 6) {
+            await interaction.editReply({ content: "現在半夜 餐廳都關門了啦🈹" });
+        } else {
+            await interaction.editReply({ content: "找不到符合您條件的餐廳呢" });
+        }
     }
 }
 

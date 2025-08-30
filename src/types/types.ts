@@ -59,6 +59,9 @@ export class BaseBot {
 
     public login = async () => {
         utils.systemLogger(this.clientId, "Logging in...");
+        console.log(this.token);
+        console.log(this.mongoURI);
+        console.log(this.clientId);
         await this.client.login(this.token)
         .catch((err) => {
             utils.systemLogger(this.clientId, `Failed to login: ${err}`);

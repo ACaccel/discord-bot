@@ -72,12 +72,66 @@
         }
     },{
         "name": "random_restaurant",
-        "description": "隨機餐廳抽取器 (台北地區)",
+        "description": "隨機餐廳抽取器 (台北/部分新北地區)",
         "options": {
             "string": [
                 {
-                    "name": "text",
-                    "description": "地址或名字包含特定字",
+                    "name": "type",
+                    "description": "餐廳種類",
+                    "required": false,
+                    "choices": [
+                        { "name": "壽司", "value": "壽司" },
+                        { "name": "美式", "value": "美式" },
+                        { "name": "中式", "value": "中式" },
+                        { "name": "日式", "value": "日式" },
+                        { "name": "韓式", "value": "韓式" },
+                        { "name": "義式", "value": "義式" },
+                        { "name": "泰式", "value": "泰式" },
+                        { "name": "拉麵", "value": "拉麵" },
+                        { "name": "燒烤", "value": "燒烤" },
+                        { "name": "咖啡", "value": "咖啡" },
+                        { "name": "早餐", "value": "早餐" },
+                        { "name": "早午餐", "value": "早午餐" },
+                        { "name": "自助餐", "value": "自助餐" },
+                        { "name": "吃到飽", "value": "吃到飽" },
+                        { "name": "貓咖", "value": "貓咖" },
+                        { "name": "酒吧", "value": "酒吧" },
+                        { "name": "甜點店", "value": "甜點店" },
+                        { "name": "速食", "value": "速食" },
+                        { "name": "法式", "value": "法式" },
+                        { "name": "印度", "value": "印度" },
+                        { "name": "印尼", "value": "印尼" },
+                        { "name": "地中海", "value": "地中海" },
+                        { "name": "披薩", "value": "披薩" },
+                        { "name": "海鮮", "value": "海鮮" },
+                        { "name": "牛排", "value": "牛排" }
+                    ]
+                },
+                {
+                    "name": "name_keyword",
+                    "description": "餐廳名稱關鍵字",
+                    "required": false
+                },
+                {
+                    "name": "address_keyword",
+                    "description": "餐廳地址關鍵字",
+                    "required": false
+                }
+            ],
+            "number": [
+                {
+                    "name": "budget",
+                    "description": "預算（整數）",
+                    "required": false
+                },
+                {
+                    "name": "min_rating",
+                    "description": "最低評分",
+                    "required": false
+                },
+                {
+                    "name": "max_rating",
+                    "description": "最高評分",
                     "required": false
                 }
             ]
