@@ -521,18 +521,22 @@ export const delete_reply = async (interaction: ChatInputCommandInteraction, bot
         const existPair = await db.models["Reply"].find({ input: key });
 
         // select menu
-        const select = new StringSelectMenuBuilder()
-            .setCustomId(`delete_reply|${key}`)
-            .setPlaceholder('選擇要刪除的回覆')
-            .addOptions(
-                existPair.map((reply: any, idx: number) =>
-                    new StringSelectMenuOptionBuilder()
-                    .setLabel(reply.reply.length > 60 ? `${idx}. ` + reply.reply.slice(0, 60) + "..." : `${idx}. ` + reply.reply)
-                    .setValue(reply.id)
-                )
-            );
-        const row = new ActionRowBuilder<StringSelectMenuBuilder>()
-            .addComponents(select);
+        let selectRows = []
+        for (let i = 0; i < existPair.length; i += 25) {
+            const select = new StringSelectMenuBuilder()
+                .setCustomId(`delete_reply|${key}|${i/25}`)
+                .setPlaceholder('選擇要刪除的回覆')
+                .addOptions(
+                    existPair.slice(i, i + 25).map((reply: any, idx: number) =>
+                        new StringSelectMenuOptionBuilder()
+                        .setLabel(reply.reply.length > 60 ? `${i + idx + 1}. ` + reply.reply.slice(0, 60) + "..." : `${i + idx + 1}. ` + reply.reply)
+                        .setValue(reply.id)
+                    )
+                );
+            const row = new ActionRowBuilder<StringSelectMenuBuilder>()
+                .addComponents(select);
+            selectRows.push(row);
+        }
 
         // image preview
         let previewContent = "圖片預覽：\n";
@@ -606,7 +610,7 @@ export const delete_reply = async (interaction: ChatInputCommandInteraction, bot
 
         await interaction.editReply({
             content: previewContent,
-            components: [row],
+            components: [...selectRows]
         });
     } catch (error) {
         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
