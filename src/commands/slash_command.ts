@@ -542,7 +542,7 @@ export const delete_reply = async (interaction: ChatInputCommandInteraction, bot
         let previewContent = "圖片預覽：\n";
         existPair.forEach((reply: any, idx: number) => {
             if (typeof reply.reply === "string" && reply.reply.startsWith("http")) {
-                previewContent += `${idx} - ${reply.reply}\n`;
+                previewContent += `${idx+1} - ${reply.reply}\n`;
             }
         });
 
