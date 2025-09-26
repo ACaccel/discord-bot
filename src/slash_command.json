@@ -374,7 +374,7 @@
                     "description": "前n名 (optional, max: 30)",
                     "required": false
                 },{
-                    "name": "last_n_days",
+                    "name": "last_n_months",
                     "description": "搜尋過去n個月 (optional, max: 6)",
                     "required": false
                 }
