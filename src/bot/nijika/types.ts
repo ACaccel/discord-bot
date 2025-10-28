@@ -13,13 +13,15 @@ import {
     BaseBot,
     Config
 } from '@dcbotTypes';
-import { 
-    detectMessageUpdate, 
-    detectMessageDelete,
-    detectGuildMemberUpdate,
+import {
     giveaway,
     scheduleIconChange
 } from 'commands';
+import {
+    detectMessageUpdate,
+    detectMessageDelete,
+    detectGuildMemberUpdate
+} from '@event';
 import nijikaConfig from './config.json';
 import { rollCallReact } from 'commands/reaction_handler';
 

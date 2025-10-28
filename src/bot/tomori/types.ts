@@ -12,7 +12,7 @@ import {
     detectMessageDelete,
     detectGuildMemberUpdate,
     detectGuildCreate
-} from 'commands';
+} from '@event';
 import tomoriConfig from './config.json';
 
 export class Tomori extends BaseBot {
