@@ -2,7 +2,8 @@ import mongoose from 'mongoose';
 import * as schema from './schema';
 
 const dbConnect = async (mongoURI: string, guild_id: string) => {
-    const modifiedURI = mongoURI.replace('/?', `/${guild_id}?`);
+    // const modifiedURI = mongoURI.replace('/?', `/${guild_id}?`);
+    const modifiedURI = mongoURI + guild_id + '?authSource=admin';
     const connection = await mongoose.createConnection(modifiedURI).asPromise();
     const models = Object.keys(schema).reduce((acc, modelName) => {
         acc[modelName] = connection.model(modelName, (schema as any)[modelName].schema);
