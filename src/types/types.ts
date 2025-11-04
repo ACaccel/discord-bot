@@ -379,3 +379,15 @@ export interface Voice {
 }
 
 export type AllowedTextChannel = TextChannel | PublicThreadChannel;
+
+export interface CanvasOptions {
+    itemsPerRow: number;
+    itemSize: number;
+    padding: number;
+    textHeight: number;
+}
+
+export interface CanvasContent {
+    url: string;
+    text: string;
+}

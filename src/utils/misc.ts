@@ -2,6 +2,8 @@ import axios from "axios";
 import { AttachmentBuilder, Guild } from "discord.js";
 import schedule from 'node-schedule';
 import * as fs from 'fs/promises';
+import { createCanvas, loadImage } from 'canvas';
+import { CanvasContent, CanvasOptions } from "@dcbotTypes";
 
 export const listChannels = (guild: Guild | undefined) => {
     if (!guild) {
@@ -82,4 +84,53 @@ export const tts_api = async (msg: string) => {
         return { attachment: null, error: "Cannot read the file." };
     }
     return { attachment, error: "" };
+}
+
+export const listInOneImage = async (content: CanvasContent[], options?: Partial<CanvasOptions>) => {
+    let attachment = null;
+    if (content.length > 0) {
+        const itemsPerRow = options?.itemsPerRow || 5;
+        const itemSize = options?.itemSize || 100;
+        const padding = options?.padding || 20;
+        const textHeight = options?.textHeight || 30;
+        const canvasWidth = itemsPerRow * (itemSize + padding) + padding;
+        const rows = Math.ceil(content.length / itemsPerRow);
+        const canvasHeight = rows * (itemSize + textHeight + padding) + padding;
+        
+        const canvas = createCanvas(canvasWidth, canvasHeight);
+        const ctx = canvas.getContext('2d');
+        
+        // Background
+        ctx.fillStyle = "#2f3136";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        for (let i = 0; i < content.length; i++) {
+            const { url, text } = content[i];
+            const row = Math.floor(i / itemsPerRow);
+            const col = i % itemsPerRow;
+            const x = col * (itemSize + padding) + padding;
+            const y = row * (itemSize + textHeight + padding) + padding;
+            
+            // Draw content
+            try {
+                const response = await axios.get(url, { responseType: 'arraybuffer' });
+                const buffer = Buffer.from(response.data);
+                const img = await loadImage(buffer);
+                ctx.drawImage(img, x, y, itemSize, itemSize);
+            } catch (err) {
+                // Draw placeholder if image fails to load
+                ctx.fillStyle = "#40444b";
+                ctx.fillRect(x, y, itemSize, itemSize);
+            }
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "16px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(text, x + itemSize / 2, y + itemSize + 20);
+        }
+        
+        const buffer = canvas.toBuffer('image/png');
+        attachment = new AttachmentBuilder(buffer, { name: 'listInOneImage.png' });
+    }
+
+    return attachment;
 }

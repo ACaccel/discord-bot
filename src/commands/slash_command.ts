@@ -23,7 +23,9 @@ import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
 import Mee6LevelsApi from 'mee6-levels-api';
 import { 
     BaseBot,
-    AllowedTextChannel
+    AllowedTextChannel,
+    CanvasOptions,
+    CanvasContent
 } from "@dcbotTypes";
 import utils from "@utils";
 import { buildButtonRows, giveaway, msgReact } from "@cmd";
@@ -790,7 +792,7 @@ export const emoji_frequency = async (interaction: ChatInputCommandInteraction, 
         }
 
         if (top_n > 30) top_n = 30;
-        if (last_n_months > 6) last_n_months = 6;
+        if (last_n_months > 24) last_n_months = 24;
         const n_months_ago = new Date();
         n_months_ago.setMonth(n_months_ago.getMonth() - last_n_months);
 
@@ -806,14 +808,27 @@ export const emoji_frequency = async (interaction: ChatInputCommandInteraction, 
         });
         
         // search emojis in database messages
-        const messages = await db.models['Message'].find({
-            $expr: { $gte: [{ $toLong: "$timestamp" }, n_months_ago.getTime()] }
-        });
-        messages.forEach((message) => {
+        // Process messages month by month to avoid heap limit
+        for (let monthOffset = 0; monthOffset < last_n_months; monthOffset++) {
+            const monthStart = new Date();
+            monthStart.setMonth(monthStart.getMonth() - monthOffset - 1);
+            const monthEnd = new Date();
+            monthEnd.setMonth(monthEnd.getMonth() - monthOffset);
+            
+            const messages = await db.models['Message'].find({
+            $expr: {
+                $and: [
+                { $gte: [{ $toLong: "$timestamp" }, monthStart.getTime()] },
+                { $lt: [{ $toLong: "$timestamp" }, monthEnd.getTime()] }
+                ]
+            }
+            });
+            
+            messages.forEach((message) => {
             const msgEmojis: string[] = message.content.match(/<a?:\w+:\d+>/g) || [];
             msgEmojis.forEach(emoji => {
                 if (textEmoji.has(emoji)) {
-                    textEmoji.set(emoji, (textEmoji.get(emoji) || 0) + 1);
+                textEmoji.set(emoji, (textEmoji.get(emoji) || 0) + 1);
                 }
             });
 
@@ -821,10 +836,14 @@ export const emoji_frequency = async (interaction: ChatInputCommandInteraction, 
             msgReactions.forEach((reaction) => {
                 const emojiText = `<${reaction.animated ? "a:" : ":"}${reaction.name}:${reaction.id}>`;
                 if (reactionEmoji.has(emojiText)) {
-                    reactionEmoji.set(emojiText, (reactionEmoji.get(emojiText) || 0) + reaction.count);
+                reactionEmoji.set(emojiText, (reactionEmoji.get(emojiText) || 0) + reaction.count);
                 }
             });
-        });
+            });
+            
+            // Update progress
+            await interaction.editReply({ content: `正在處理第 ${monthOffset + 1} / ${last_n_months} 個月的資料...` });
+        }
 
         allEmoji.forEach((_, emojiText) => {
             allEmoji.set(emojiText, (textEmoji.get(emojiText) || 0) + (reactionEmoji.get(emojiText) || 0));
@@ -835,11 +854,20 @@ export const emoji_frequency = async (interaction: ChatInputCommandInteraction, 
             .slice(0, top_n);
 
         let content = `最近${last_n_months}個月內使用頻率${frequency === "asc" ? "最低" : "最高"}的 ${top_n} 個${type === "animated" ? "動態" : "靜態"}表情符號：\n`;
-        sortedEmojis.forEach(([emoji, _], index) => {
-            content += `${index + 1}. ${emoji} - 文字內: ${textEmoji.get(emoji)} 次, 訊息反應: ${reactionEmoji.get(emoji)}\n`;
-        });
-
-        await interaction.editReply({ content });
+        for (let i = 0; i < sortedEmojis.length; i++) {
+            const [emoji, _] = sortedEmojis[i];
+            content += `${i + 1}. ${emoji} - 總共: ${allEmoji.get(emoji)} 次, 文字內: ${textEmoji.get(emoji)} 次, 訊息反應: ${reactionEmoji.get(emoji)} 次\n`;
+            
+            // Send every 10 emojis or at the end
+            if ((i + 1) % 10 === 0 || i === sortedEmojis.length - 1) {
+                await interaction.followUp({ content });
+                content = "";
+            }
+        }
+        
+        if (content === "") {
+            await interaction.editReply({ content: "處理完成！" });
+        }
     } catch (error) {
         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法取得表情符號使用頻率" });
@@ -864,7 +892,7 @@ export const sticker_frequency = async (interaction: ChatInputCommandInteraction
         }
 
         if (top_n > 30) top_n = 30;
-        if (last_n_months > 6) last_n_months = 6;
+        if (last_n_months > 24) last_n_months = 24;
         const n_months_ago = new Date();
         n_months_ago.setMonth(n_months_ago.getMonth() - last_n_months);
 
@@ -875,17 +903,34 @@ export const sticker_frequency = async (interaction: ChatInputCommandInteraction
         });
 
         // search stickers in database messages
-        const messages = await db.models['Message'].find({
-            $expr: { $gte: [{ $toLong: "$timestamp" }, n_months_ago.getTime()] }
-        });
-        messages.forEach((message) => {
+        // Process messages month by month to avoid heap limit
+        for (let monthOffset = 0; monthOffset < last_n_months; monthOffset++) {
+            const monthStart = new Date();
+            monthStart.setMonth(monthStart.getMonth() - monthOffset - 1);
+            const monthEnd = new Date();
+            monthEnd.setMonth(monthEnd.getMonth() - monthOffset);
+            
+            const messages = await db.models['Message'].find({
+            $expr: {
+                $and: [
+                { $gte: [{ $toLong: "$timestamp" }, monthStart.getTime()] },
+                { $lt: [{ $toLong: "$timestamp" }, monthEnd.getTime()] }
+                ]
+            }
+            });
+            
+            messages.forEach((message) => {
             const stickers: any[] = message.stickers || [];
             stickers.forEach((sticker) => {
                 if (stickerMap.has(sticker.name)) {
-                    stickerMap.set(sticker.name, (stickerMap.get(sticker.name) || 0) + 1);
+                stickerMap.set(sticker.name, (stickerMap.get(sticker.name) || 0) + 1);
                 }
             });
-        });
+            });
+            
+            // update progress
+            await interaction.editReply({ content: `正在處理第 ${monthOffset + 1} / ${last_n_months} 個月的資料...` });
+        }
 
         const sortedStickers = Array.from(stickerMap.entries())
             .sort((a, b) => frequency === "asc" ? a[1] - b[1] : b[1] - a[1])
@@ -896,7 +941,21 @@ export const sticker_frequency = async (interaction: ChatInputCommandInteraction
             content += `${index + 1}. ${sticker} - ${count} 次\n`;
         });
 
-        await interaction.editReply({ content });
+        // create a preview image
+        let canvasContent: CanvasContent[] = [];
+        for (let i = 0; i < sortedStickers.length; i++) {
+            const [stickerName, count] = sortedStickers[i];
+            const sticker = guild.stickers.cache.find(s => s.name === stickerName);
+            if (sticker) {
+                canvasContent.push({
+                    url: sticker.url,
+                    text: `${i + 1}: ${count}次`
+                });
+            }
+        }
+        const attachment = await utils.listInOneImage(canvasContent);
+
+        await interaction.editReply({ content: content, files: attachment ? [attachment] : [] });
     } catch (error) {
         utils.errorLogger(bot.clientId, interaction.guild?.id, error);
         await interaction.editReply({ content: "無法取得貼圖使用頻率" });

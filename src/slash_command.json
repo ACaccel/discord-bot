@@ -348,7 +348,7 @@
                     "required": false
                 },{
                     "name": "last_n_months",
-                    "description": "搜尋過去n個月 (optional, max: 6)",
+                    "description": "搜尋過去n個月 (optional, max: 24)",
                     "required": false
                 }
             ]
@@ -375,7 +375,7 @@
                     "required": false
                 },{
                     "name": "last_n_months",
-                    "description": "搜尋過去n個月 (optional, max: 6)",
+                    "description": "搜尋過去n個月 (optional, max: 24)",
                     "required": false
                 }
             ]
