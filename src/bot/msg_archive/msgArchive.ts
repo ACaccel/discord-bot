@@ -1,44 +1,162 @@
 import { 
-    Client, 
-    GatewayIntentBits, 
-    Events,
+    Client,
+    Message,
+    PartialMessage,
+    GuildMember,
+    PartialGuildMember,
+    MessageReaction,
+    PartialMessageReaction
 } from 'discord.js';
-import dotenv from "dotenv";
-import { Config } from '@dcbotTypes';
-import { MsgArchive } from './types';
-import utils from '@utils';
-import config from './config.json';
+import { BaseBot, Config } from '@bot';
+import { logger } from '@utils';
 
-dotenv.config({ path: './src/bot/msg_archive/.env' });
+interface MsgArchiveConfig extends Config {
+    backup_server: string[];
+}
 
-// init
-const client: Client = new Client({ 
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ] 
-});
-const msgArchive = new MsgArchive(
-    client,
-    process.env.TOKEN as string,
-    process.env.MONGO_URI as string,
-    process.env.CLIENT_ID as string,
-    config as Config
-);
-
-// client events
-msgArchive.login();
-msgArchive.client.on(Events.ClientReady, async () => {
-    try {
-        // bot init process
-        msgArchive.registerGuild();
-        await msgArchive.connectGuildDB();
-        await msgArchive.messageBackup(msgArchive.msgArchiveConfig.backup_server, 60);
-        
-        await msgArchive.rebootMessage();
-    } catch (e) {
-        utils.errorLogger(msgArchive.clientId, null, e);
+export class MsgArchive extends BaseBot<MsgArchiveConfig> {
+    public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: MsgArchiveConfig) {
+        super(client, token, mongoURI, clientId, config);
     }
-});
+
+    public override interactionEventListener = async (interaction: any): Promise<void> => {
+    }
+
+    public override messageCreateListener = async (message: Message): Promise<void> => {
+    }
+
+    public override messageUpdateListener = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage): Promise<void> => {
+    }
+
+    public override messageDeleteListener = async (message: Message | PartialMessage): Promise<void> => {
+    }
+
+    public override messageReactionAddListener = async (reaction: MessageReaction | PartialMessageReaction, user: any): Promise<void> => {
+    }
+
+    public override messageReactionRemoveListener = async (reaction: MessageReaction | PartialMessageReaction, user: any): Promise<void> => {
+    }
+
+    public override guildMemberUpdateListener = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember): Promise<void> => {
+    }
+
+    public override guildCreateListener = async (guild: any): Promise<void> => {
+    }
+
+    public messageBackup = async (guild_ids: string[], minute: number) => {
+        for (const guild_id of guild_ids) {
+            await this.backup(guild_id);
+        }
+        setInterval(async () => {
+            for (const guild_id of guild_ids) {
+                await this.backup(guild_id);
+            }
+        }, minute * 60 * 1000);
+    }
+
+    public backup = async (guild_id: string) => {
+        try {
+            const db = this.guildInfo[guild_id].db;
+            if (!db) {
+                logger.errorLogger(this.clientId, '', "Database not found");
+                return;
+            }
+            if (!this.guildInfo[guild_id].channels || !this.guildInfo[guild_id].channels.debug) {
+                logger.errorLogger(this.clientId, '', "Debug channel not found");
+                return;
+            }
+            
+            // debug message
+            let begin_time = Date.now();
+            let newMessageCnt = 0;
+            const totalMessageCnt = await db.models["Message"].countDocuments({});
+            const debug_ch = this.guildInfo[guild_id].channels["debug"];
+            if (!debug_ch.isSendable()) {
+                logger.errorLogger(this.clientId, guild_id, "Debug channel is not sendable");
+                return;
+            }
+            const sentMessage = await debug_ch.send(`[ SYSTEM ] on scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
+
+            // message backup
+            const fetchPromise = this.guildInfo[guild_id].guild.channels.cache.map(async (channel) => {
+                if (!channel.isTextBased()) return;
+
+                // check fetched channel record
+                let lastMessageQuery = await db.models["Fetch"].findOne({channel: channel.name, channelID: channel.id});
+                if(lastMessageQuery === null) {
+                    const lastMessage = new db.models["Fetch"]({
+                        channel: channel.name,
+                        channelID:channel.id,
+                        lastMessageID: 0
+                    })
+                    await lastMessage.save();
+                }
+                
+                // fetch messages after ChannelLastMsgID
+                let ChannelLastMsgID: string | undefined = (await db.models["Fetch"].findOne({channel: channel.name, channelID: channel.id}))?.lastMessageID;
+                let fetchedMessages = await channel.messages.fetch({ 
+                    limit: 100, 
+                    ...(ChannelLastMsgID && { after: ChannelLastMsgID }) 
+                });
+                if(fetchedMessages.size === 0) {
+                    await sentMessage.edit(`[ SYSTEM ] end scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
+                    return;
+                }
+
+                // messages filtering
+                fetchedMessages = fetchedMessages.filter(msg => msg.author && !msg.author.bot);
+                
+                // update ChannelLastMsgID
+                ChannelLastMsgID = fetchedMessages.firstKey();
+                await db.models["Fetch"].findOneAndUpdate({channel: channel.name, channelID: channel.id}, {lastMessageID: ChannelLastMsgID});
+
+                // save messages to db
+                fetchedMessages.forEach(async (msg) => {
+                    const newMessage = new db.models["Message"]({
+                        channelId: channel.id,
+                        channelName: channel.name,
+                        content: msg.content,
+                        messageId: msg.id,
+                        userId: msg.author.id,
+                        userName: msg.author.username,
+                        attachments: msg.attachments.map(attachment => ({
+                            id: attachment.id,
+                            name: attachment.name,
+                            url: attachment.url,
+                            contentType: attachment.contentType
+                        })),
+                        reactions: msg.reactions.cache.map(reaction => ({
+                            id: reaction.emoji.id,
+                            name: reaction.emoji.name,
+                            animated: reaction.emoji.animated,
+                            count: reaction.count,
+                            userIds: reaction.users.cache.map(user => user.id)
+                        })),
+                        stickers: msg.stickers.map(sticker => ({
+                            id: sticker.id,
+                            name: sticker.name
+                        })),
+                        timestamp: msg.createdTimestamp
+                    });
+
+                    const existedMsg = await db.models["Message"].findOne({ messageId: msg.id });
+                    if (!existedMsg) {
+                        await newMessage.save();
+                        newMessageCnt++;
+                        if (newMessageCnt % 50 === 0) {
+                            sentMessage.edit(`[ SYSTEM ] on scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages.`);
+                        }
+                    }
+                });
+            });
+            await Promise.all(fetchPromise);
+
+            // update debug message
+            let end_time = Date.now();
+            let duration = (end_time - begin_time) / 1000;
+            await sentMessage.edit(`[ SYSTEM ] end scheduled backup process. The database now contains ( ${totalMessageCnt}+${newMessageCnt} ) messages. (${duration} sec)`);
+        } catch (e) {
+            logger.errorLogger(this.clientId, '', e);
+        }
+    }
+}

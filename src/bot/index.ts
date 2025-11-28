@@ -88,9 +88,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         this.giveaway_jobs = new Map<string, Job>();
     }
 
-    public run = async () => {
+    public run = async (callback?: () => Promise<void>) => {
         await this.login();
-        await this.init();
+        await this.init(callback);
         await this.listen();
     }
 
@@ -117,7 +117,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         }
     }
 
-    public init = async () => {
+    public init = async (callback?: () => Promise<void>) => {
         this.client.once(Events.ClientReady, async () => {
             try {
                 this.registerGuild();
@@ -128,6 +128,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 await registerModals(this);
 
                 await this.rebootMessage();
+                if (callback) {
+                    await callback();
+                }
             } catch (err) {
                 logger.errorLogger(this.clientId, null, err);
             }

@@ -1,134 +1,98 @@
 import { 
-    Client, 
-    GatewayIntentBits, 
-    Events,
+    Client,
+    Message,
+    PartialMessage,
+    GuildMember,
+    PartialGuildMember,
+    MessageReaction,
+    PartialMessageReaction
 } from 'discord.js';
-import dotenv from "dotenv";
+import { BaseBot, Config } from '@bot';
+import { 
+    auto_reply, 
+    detectGuildCreate, 
+    detectGuildMemberUpdate, 
+    detectMessageDelete, 
+    detectMessageUpdate,
+} from '@event';
+import { executeSlashCommand } from '@cmd';
+import { executeButton } from '@button';
+import { giveaway } from '@utils';
+import { rollCallReact } from '@reaction';
+import { executeModal } from '@modal';
+import { executeSSM } from '@ssm';
 
-import { Config } from '@dcbotTypes';
-import { Tomori } from './types';
-import { auto_reply } from '@cmd';
-import utils from '@utils';
-import config from './config.json';
+interface TomoriConfig extends Config {
 
-dotenv.config({ path: './src/bot/tomori/.env' });
+}
 
-// init
-const client: Client = new Client({ 
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildModeration,
-        GatewayIntentBits.GuildEmojisAndStickers,
-        GatewayIntentBits.GuildIntegrations,
-        GatewayIntentBits.GuildWebhooks,
-        GatewayIntentBits.GuildInvites,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildPresences,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildMessageTyping,
-        GatewayIntentBits.DirectMessages,
-        GatewayIntentBits.DirectMessageReactions,
-        GatewayIntentBits.DirectMessageTyping,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildScheduledEvents,
-        GatewayIntentBits.AutoModerationConfiguration,
-        GatewayIntentBits.AutoModerationExecution
-    ] 
-});
-const tomori = new Tomori(
-    client,
-    process.env.TOKEN as string,
-    process.env.MONGO_URI as string,
-    process.env.CLIENT_ID as string,
-    config as Config
-);
-
-// client events
-tomori.login();
-tomori.client.on(Events.ClientReady, async () => {
-    try {
-        // bot init process
-        tomori.registerGuild();
-        await tomori.connectGuildDB();
-        await tomori.registerSlashCommands();
-        tomori.initSlashCommandsHandlers();
-        tomori.initModalHandlers();
-        tomori.initButtonHandlers();
-        tomori.initStringSelectMenuHandlers();
-
-        await tomori.rebootMessage();
-    } catch (e) {
-        utils.errorLogger(tomori.clientId, null, e);
+export class Tomori extends BaseBot<TomoriConfig> {
+    public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: TomoriConfig) {
+        super(client, token, mongoURI, clientId, config);
     }
-});
 
-tomori.client.on(Events.InteractionCreate, async (interaction) => {
-    try {
-        if (interaction.inGuild()) {
-            if (interaction.isChatInputCommand()) {
-                await tomori.executeSlashCommand(interaction);
-            } else if (interaction.isModalSubmit()) {
-                await tomori.executeModalSubmit(interaction);
-            } else if (interaction.isButton()) {
-                await tomori.executeButton(interaction);
-            } else {
+    public override interactionEventListener = async (interaction: any): Promise<void> => {
+        switch (true) {
+            case interaction.isChatInputCommand():
+                await executeSlashCommand(interaction, this);
+                break;
+            case interaction.isModalSubmit():
+                await executeModal(interaction, this);
+                break;
+            case interaction.isButton():
+                await executeButton(interaction, this);
+                break;
+            case interaction.isStringSelectMenu():
+                await executeSSM(interaction, this);
+                break;
+            default:
                 if (!interaction.isAutocomplete()) {
                     await interaction.reply({ content: '目前尚不支援此類型的指令', ephemeral: true });
                 }
-            }
-        } else {
-            if (!interaction.isAutocomplete()) {
-                await interaction.reply({ content: '目前尚不支援在伺服器外使用', ephemeral: true });
-            }
+                break;
         }
-    } catch (e) {
-        utils.errorLogger(tomori.clientId, interaction.guild?.id, e);
     }
-});
 
-tomori.client.on(Events.MessageCreate, async (message) => {
-    try {
+    public override messageCreateListener = async (message: Message): Promise<void> => {
         if (message.guildId)
-            await auto_reply(message, tomori, message.guildId);
-    } catch (e) {
-        utils.errorLogger(tomori.clientId, message.guild?.id, e);
+            await auto_reply(message, this, message.guildId, true);
     }
-});
 
-tomori.client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
-    try {
-        await tomori.detectMessageUpdate(oldMessage, newMessage);
-    } catch (e) {
-        utils.errorLogger(tomori.clientId, newMessage.guild?.id, e);
+    public override messageUpdateListener = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage): Promise<void> => {
+        await detectMessageUpdate(oldMessage, newMessage, this);
     }
-});
 
-tomori.client.on(Events.MessageDelete, async (message) => {
-    try {
-        await tomori.detectMessageDelete(message);
-    } catch (e) {
-        utils.errorLogger(tomori.clientId, message.guild?.id, e);
+    public override messageDeleteListener = async (message: Message | PartialMessage): Promise<void> => {
+        await detectMessageDelete(message, this);
     }
-});
 
-tomori.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-    try {
-        await tomori.detectGuildMemberUpdate(oldMember, newMember);
-    } catch (e) {
-        utils.errorLogger(tomori.clientId, newMember.guild.id, e);
+    public override messageReactionAddListener = async (reaction: MessageReaction | PartialMessageReaction, user: any): Promise<void> => {
+        // todo: whether to build reaction handler as other event handlers
+        const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
+        const fetchedUser = user.partial ? await user.fetch() : user;
+
+        if (!user.bot) {
+            await giveaway.addReactionToGiveaway(fetchedReaction, fetchedUser, this);
+            await rollCallReact(fetchedReaction, fetchedUser);
+        }
     }
-});
 
-tomori.client.on(Events.GuildCreate, async (guild) => {
-    try {
-        await tomori.detectGuildCreate(guild);
-    } catch (e) {
-        utils.errorLogger(tomori.clientId, guild.id, e);
+    public override messageReactionRemoveListener = async (reaction: MessageReaction | PartialMessageReaction, user: any): Promise<void> => {
+        // todo: whether to build reaction handler as other event handlers
+        const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
+        const fetchedUser = user.partial ? await user.fetch() : user;
+
+        if (!user.bot) {
+            await giveaway.removeReactionFromGiveaway(fetchedReaction, fetchedUser, this);
+            await rollCallReact(fetchedReaction, fetchedUser);
+        }
     }
-});
 
-tomori.client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+    public override guildMemberUpdateListener = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember): Promise<void> => {
+        detectGuildMemberUpdate(oldMember, newMember, this);
+    }
 
-});
+    public override guildCreateListener = async (guild: any): Promise<void> => {
+        detectGuildCreate(guild, this);
+    }
+}

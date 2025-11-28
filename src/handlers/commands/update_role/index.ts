@@ -2,10 +2,14 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import Mee6LevelsApi from 'mee6-levels-api';
-import { BaseBot } from '@bot';
+import { BaseBot, Config } from '@bot';
 import { SlashCommand } from '@cmd';
 import { logger } from '@utils';
-import { Nijika } from 'bot/nijika/nijika';
+// import { Nijika } from 'bot/nijika/nijika';
+
+interface UpdateRoleConfig extends Config {
+    level_roles: Record<string, string>;
+}
 
 // only for Nijika
 export default class update_role extends SlashCommand {
@@ -20,7 +24,18 @@ export default class update_role extends SlashCommand {
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply();
         try {
-            if (!(bot instanceof Nijika)) return;
+            // if (!(bot instanceof Nijika)) return;
+            // if (!bot.config.level_roles) {
+            //     await interaction.editReply({ content: "設定檔中未找到等級身分組配置" });
+            //     return;
+            // }
+            let botConfig: UpdateRoleConfig;
+            if ('level_roles' in bot.config) {
+                botConfig = bot.config as UpdateRoleConfig;
+            } else {
+                await interaction.editReply({ content: "設定檔中未找到等級身分組配置" });
+                return;
+            }
 
             let leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
             let guild = bot.guildInfo[interaction.guild?.id as string].guild;
@@ -43,9 +58,9 @@ export default class update_role extends SlashCommand {
     
                 // find corresponding role
                 let roleToAssign = "";
-                for (const roleLevel in bot.config.level_roles) {
+                for (const roleLevel in botConfig.level_roles) {
                     if (level >= parseInt(roleLevel.split('_')[1])) {
-                        roleToAssign = bot.config.level_roles[roleLevel];
+                        roleToAssign = botConfig.level_roles[roleLevel];
                     } else {
                         break;
                     }
@@ -55,13 +70,13 @@ export default class update_role extends SlashCommand {
                 // update role
                 const addedRole = guild.roles.cache.find(role => role.name === roleToAssign);
                 const hasRoleToAssign = guildMember.roles.cache.has(addedRole?.id as string);
-                for (const roleLevel in bot.config.level_roles) {
-                    const removedRole = guild.roles.cache.find(role => role.name === bot.config.level_roles[roleLevel]);
+                for (const roleLevel in botConfig.level_roles) {
+                    const removedRole = guild.roles.cache.find(role => role.name === botConfig.level_roles[roleLevel]);
                     if (!removedRole) continue;
                     
                     if (guildMember.roles.cache.has(removedRole.id) && removedRole.name !== roleToAssign) {
                         await guildMember.roles.remove(removedRole);
-                        await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 移除: ${bot.config.level_roles[roleLevel]}`);
+                        await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 移除: ${botConfig.level_roles[roleLevel]}`);
                     }
                 }
                 if (addedRole && !hasRoleToAssign) {
