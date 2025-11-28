@@ -1,9 +1,11 @@
 import * as logger from './logger';
 import * as misc from './misc';
+import * as bot_cmd from './bot_cmd';
+import * as giveaway from './giveaway';
 
-const utils = {
-    ...logger,
-    ...misc
-}
-
-export default utils;
+export {
+    logger,
+    misc,
+    bot_cmd,
+    giveaway
+};

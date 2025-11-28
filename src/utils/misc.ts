@@ -3,7 +3,21 @@ import { AttachmentBuilder, Guild } from "discord.js";
 import schedule from 'node-schedule';
 import * as fs from 'fs/promises';
 import { createCanvas, loadImage } from 'canvas';
-import { CanvasContent, CanvasOptions } from "@dcbotTypes";
+import { BaseBot } from "@bot";
+import { logger } from "@utils";
+import guild_profile from '../guild_profile.json';
+
+export interface CanvasOptions {
+    itemsPerRow: number;
+    itemSize: number;
+    padding: number;
+    textHeight: number;
+}
+
+export interface CanvasContent {
+    url: string;
+    text: string;
+}
 
 export const listChannels = (guild: Guild | undefined) => {
     if (!guild) {
@@ -133,4 +147,39 @@ export const listInOneImage = async (content: CanvasContent[], options?: Partial
     }
 
     return attachment;
+}
+
+//========================================//
+//======== Change Server Profile =========//
+//========================================//
+const getRandomImage = () => {
+    if (!guild_profile || guild_profile.length === 0) {
+        throw new Error("No guild profile configuration found, please check guild_profile.json");
+    }
+    const index = Math.floor(Math.random() * guild_profile.length);
+    return guild_profile[index];
+}
+
+async function updateServerIcon(bot: BaseBot, guildId: string) {
+    const guild = bot.client.guilds.cache.get(guildId);
+    if (!guild) {
+        console.error("cannot find guild");
+        return;
+    }
+    const profile = getRandomImage();
+    try {
+        await guild.setIcon(profile.url);
+        await guild.setName(profile.name);
+    } catch (error) {
+        logger.errorLogger(bot.clientId, guildId, error);
+    }
+}
+
+export const scheduleIconChange = (bot: BaseBot, guildId: string) => {
+    const interval = getRandomInterval(60, 10*60);
+    console.log(`Next icon change in ${interval / 60 / 1000} minutes`);
+    setTimeout(async () => {
+        await updateServerIcon(bot, guildId);
+        scheduleIconChange(bot, guildId);
+    }, interval);
 }

@@ -68,7 +68,7 @@ tomori.client.on(Events.InteractionCreate, async (interaction) => {
     try {
         if (interaction.inGuild()) {
             if (interaction.isChatInputCommand()) {
-                await tomori.executeSlashCommands(interaction);
+                await tomori.executeSlashCommand(interaction);
             } else if (interaction.isModalSubmit()) {
                 await tomori.executeModalSubmit(interaction);
             } else if (interaction.isButton()) {

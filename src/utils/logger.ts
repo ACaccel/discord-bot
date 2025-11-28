@@ -1,6 +1,5 @@
 import { Attachment, Channel, EmbedBuilder } from "discord.js";
 import fs from 'fs';
-import { AllowedTextChannel } from "@dcbotTypes";
 import path from 'path';
 import axios from 'axios';
 
@@ -47,8 +46,8 @@ export const attachmentLogger = async (guild_id: string, attachment: Attachment,
 export const channelLogger = async (channel: Channel | undefined, embed?: EmbedBuilder, log?: string) => {
     try {
         if (!channel) return;
-        channel = channel as AllowedTextChannel;
-
+        if (!channel.isSendable()) return;
+        
         if (log) {
             await channel.send(log);
         }

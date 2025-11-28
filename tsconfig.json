@@ -35,8 +35,12 @@
     "rootDir": ".",                                  /* Specify the root folder within your source files. */
     "baseUrl": "src",                                  /* Specify the base directory to resolve non-relative module names. */
     "paths": {
-      "@dcbotTypes": ["types/types.ts"],
-      "@cmd": ["commands/index"],
+      "@bot": ["bot/index"],
+      "@cmd": ["handlers/commands/index"],
+      "@button": ["handlers/buttons/index"],
+      "@ssm": ["handlers/string_select_menu/index"],
+      "@modal": ["handlers/modals/index"],
+      "@reaction": ["handlers/reaction_handlers"],
       "@utils": ["utils/index"],
       "@db": ["db/index"],
       "@event": ["events/index"]

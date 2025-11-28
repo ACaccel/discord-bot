@@ -6,9 +6,9 @@
   "scripts": {
     "install-lock": "yarn install --frozen-lockfile",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "tomori": "ts-node src/bot/tomori/tomori.ts",
-    "nijika": "ts-node src/bot/nijika/nijika.ts",
-    "msg_archive": "ts-node src/bot/msg_archive/msgArchive.ts"
+    "tomori": "ts-node src/bot/tomori/index.ts",
+    "nijika": "ts-node src/bot/nijika/index.ts",
+    "msg_archive": "ts-node src/bot/msg_archive/index.ts"
   },
   "repository": {
     "type": "git",

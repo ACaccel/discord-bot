@@ -8,3 +8,5 @@ config.json
 guild_profile.json
 avatar_url_list.txt
 remove_list.txt
+snippet.ts
+/old_src

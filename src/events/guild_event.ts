@@ -7,8 +7,9 @@ import {
     Guild,
     TextChannel
 } from 'discord.js';
-import { BaseBot, GuildInfo } from '@dcbotTypes';
-import utils from '@utils';
+import { BaseBot, GuildInfo } from '@bot';
+import { getSlashCommandJsonBody } from '@cmd';
+import { logger } from '@utils';
 import db from '@db';
 
 export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage, bot: BaseBot, blocked_channels?: string[]) => {
@@ -48,10 +49,10 @@ export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, 
             { name: 'new message', value: new_msg, inline: false }
         )
         .setTimestamp();
-    utils.channelLogger(event_channel, embed);
+    logger.channelLogger(event_channel, embed);
 
     const log = `User: ${newMessage.author.username}, Channel: ${newMessage.guild.channels.cache.get(newMessage.channel.id)?.name}, Old: ${oldMessage.content}, New: ${newMessage.content}`;
-    utils.guildLogger(bot.clientId, newMessage.guild?.id, 'message_update', log, newMessage.guild.name as string);
+    logger.guildLogger(bot.clientId, newMessage.guild?.id, 'message_update', log, newMessage.guild.name as string);
 }
 
 export const detectMessageDelete = async (message: Message | PartialMessage, bot: BaseBot, blocked_channels?: string[]) => {
@@ -94,13 +95,13 @@ export const detectMessageDelete = async (message: Message | PartialMessage, bot
             } else {
                 embed.addFields({ name: 'attachment', value: attachment.url, inline: false });
             }
-            utils.attachmentLogger(message.guild?.id as string, attachment);
+            logger.attachmentLogger(message.guild?.id as string, attachment);
         });
     }
-    utils.channelLogger(event_channel, embed);
+    logger.channelLogger(event_channel, embed);
 
     const log = `User: ${message.author.username}, Channel: ${message.guild.channels.cache.get(message.channel.id)?.name}, Message: ${message.content}`;
-    utils.guildLogger(bot.clientId, message.guild?.id, 'message_delete', log, message.guild.name as string);
+    logger.guildLogger(bot.clientId, message.guild?.id, 'message_delete', log, message.guild.name as string);
 }
 
 export const detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember, bot: BaseBot) => {
@@ -129,10 +130,10 @@ export const detectGuildMemberUpdate = async (oldMember: GuildMember | PartialGu
             { name: 'removed roles', value: removedRolesList ? removedRolesList : 'No roles removed', inline: true }
         )
         .setTimestamp();
-    utils.channelLogger(event_channel, embed);
+    logger.channelLogger(event_channel, embed);
 
     const log = `User: ${newMember.user.username}, Added: ${addedRolesList}, Removed: ${removedRolesList}`;
-    utils.guildLogger(bot.clientId, newMember.guild.id, 'guild_member_update', log, newMember.guild.name);
+    logger.guildLogger(bot.clientId, newMember.guild.id, 'guild_member_update', log, newMember.guild.name);
 }
 
 export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
@@ -160,11 +161,12 @@ export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
         throw new Error(`Cannot connect to MongoDB for guild ${guild.id}.`);
     }
 
-    await bot.client.application?.commands.set(bot.slashCommands || [], guild.id)
+    const rest_commands = getSlashCommandJsonBody(bot.slashCommandHandlers, bot);
+    bot.client.application?.commands.set(rest_commands, guild.id)
     .catch((err) => {
-        utils.systemLogger(bot.clientId, `Failed to register guild (/) commands: ${err}`);
+        logger.systemLogger(bot.clientId, `Failed to register guild (/) commands: ${err}`);
     });
 
     // notification
-    utils.systemLogger(bot.clientId, `Bot added to guild: ${guild.name} (${guild.id})`);
+    logger.systemLogger(bot.clientId, `Bot added to guild: ${guild.name} (${guild.id})`);
 }
