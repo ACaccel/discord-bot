@@ -3,7 +3,7 @@ import {
 } from 'discord.js';
 import Mee6LevelsApi from 'mee6-levels-api';
 import { BaseBot, Config } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 // import { Nijika } from 'bot/nijika/nijika';
 
@@ -12,7 +12,7 @@ interface UpdateRoleConfig extends Config {
 }
 
 // only for Nijika
-export default class update_role extends SlashCommand {
+export default class update_role extends Command {
     constructor() {
         super();
         this.setConfig({

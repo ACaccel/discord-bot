@@ -2,10 +2,10 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 
-export default class add_reply extends SlashCommand {
+export default class add_reply extends Command {
     constructor() {
         super();
         this.setConfig({

@@ -3,10 +3,10 @@ import {
 } from 'discord.js';
 import axios from 'axios';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 
-export default class weather_forecast extends SlashCommand {
+export default class weather_forecast extends Command {
     constructor() {
         super();
         this.setConfig({

@@ -3,11 +3,11 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 
 // deprecated, discord has added native pin permission
-export default class pin_message extends SlashCommand {
+export default class pin_message extends Command {
     constructor() {
         super();
         this.setConfig({

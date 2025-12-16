@@ -3,10 +3,10 @@ import {
 } from 'discord.js';
 import Mee6LevelsApi from 'mee6-levels-api';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 
-export default class level_detail extends SlashCommand {
+export default class level_detail extends Command {
     constructor() {
         super();
         this.setConfig({

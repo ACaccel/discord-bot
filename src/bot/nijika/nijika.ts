@@ -2,23 +2,17 @@ import {
     Client,
     Message,
     PartialMessage,
-    GuildMember,
-    PartialGuildMember,
-    MessageReaction,
-    PartialMessageReaction
+    Interaction
 } from 'discord.js';
 import { BaseBot, Config } from '@bot';
 import { 
-    auto_reply, 
-    detectGuildMemberUpdate, 
+    auto_reply,
     detectMessageDelete, 
     detectMessageUpdate, 
     tts_reply,
 } from '@event';
-import { executeSlashCommand } from '@cmd';
+import { executeCommand } from '@cmd';
 import { executeButton } from '@button';
-import { giveaway } from '@utils';
-import { rollCallReact } from '@reaction';
 import { executeModal } from '@modal';
 import { executeSSM } from '@ssm';
 
@@ -36,10 +30,10 @@ export class Nijika extends BaseBot<NijikaConfig> {
                         '3. roll dice: 輸入範例-> `2d5`, 在1~5隨機選擇兩個數字\n';
     }
 
-    public override interactionEventListener = async (interaction: any): Promise<void> => {
+    public override interactionEventListener = async (interaction: Interaction): Promise<void> => {
         switch (true) {
-            case interaction.isChatInputCommand():
-                await executeSlashCommand(interaction, this, this.config.blocked_channels);
+            case interaction.isChatInputCommand() || interaction.isContextMenuCommand():
+                await executeCommand(interaction, this, this.config.blocked_channels);
                 break;
             case interaction.isModalSubmit():
                 await executeModal(interaction, this);
@@ -61,7 +55,7 @@ export class Nijika extends BaseBot<NijikaConfig> {
     public override messageCreateListener = async (message: Message): Promise<void> => {
         await tts_reply(message);
         if (message.guildId)
-            await auto_reply(message, this, message.guildId, true);
+            await auto_reply(message, this, message.guildId);
     }
 
     public override messageUpdateListener = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage): Promise<void> => {
@@ -70,35 +64,5 @@ export class Nijika extends BaseBot<NijikaConfig> {
 
     public override messageDeleteListener = async (message: Message | PartialMessage): Promise<void> => {
         await detectMessageDelete(message, this, this.config.blocked_channels);
-    }
-
-    public override messageReactionAddListener = async (reaction: MessageReaction | PartialMessageReaction, user: any): Promise<void> => {
-        // todo: whether to build reaction handler as other event handlers
-        const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
-        const fetchedUser = user.partial ? await user.fetch() : user;
-
-        if (!user.bot) {
-            await giveaway.addReactionToGiveaway(fetchedReaction, fetchedUser, this);
-            await rollCallReact(fetchedReaction, fetchedUser);
-        }
-    }
-
-    public override messageReactionRemoveListener = async (reaction: MessageReaction | PartialMessageReaction, user: any): Promise<void> => {
-        // todo: whether to build reaction handler as other event handlers
-        const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
-        const fetchedUser = user.partial ? await user.fetch() : user;
-
-        if (!user.bot) {
-            await giveaway.removeReactionFromGiveaway(fetchedReaction, fetchedUser, this);
-            await rollCallReact(fetchedReaction, fetchedUser);
-        }
-    }
-
-    public override guildMemberUpdateListener = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember): Promise<void> => {
-        detectGuildMemberUpdate(oldMember, newMember, this);
-    }
-
-    public override guildCreateListener = async (guild: any): Promise<void> => {
-
     }
 }

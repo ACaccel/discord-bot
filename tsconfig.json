@@ -40,7 +40,7 @@
       "@button": ["handlers/buttons/index"],
       "@ssm": ["handlers/string_select_menu/index"],
       "@modal": ["handlers/modals/index"],
-      "@reaction": ["handlers/reaction_handlers"],
+      "@reaction": ["handlers/reactions/index"],
       "@utils": ["utils/index"],
       "@db": ["db/index"],
       "@event": ["events/index"]

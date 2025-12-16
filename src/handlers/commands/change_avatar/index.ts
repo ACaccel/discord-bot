@@ -2,11 +2,11 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 import identity_config from './identity.json';
 
-export default class change_avatar extends SlashCommand {
+export default class change_avatar extends Command {
     constructor() {
         super();
         this.setConfig({

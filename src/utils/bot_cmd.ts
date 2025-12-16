@@ -1,11 +1,12 @@
 import { 
+    ApplicationCommandType,
     ButtonStyle,
     ChannelType,
     Message
 } from 'discord.js';
-import { ActionRowBuilder, ButtonBuilder, SlashCommandBuilder } from '@discordjs/builders';
-import { 
-    Command
+import { ActionRowBuilder, ButtonBuilder, ContextMenuCommandBuilder, SlashCommandBuilder } from '@discordjs/builders';
+import {
+    CommandConfig
 } from '@cmd';
 
 interface ButtonConfig {
@@ -30,157 +31,94 @@ export const buildButtonRows = (button_config: ButtonConfig[]) => {
     return rows;
 }
 
-export const buildSlashCommandJsonBody = (config: Command) => {
+export const buildCommandJsonBody = (config: CommandConfig) => {
+    // Context menu
+    if (
+        config.type === ApplicationCommandType.User ||
+        config.type === ApplicationCommandType.Message
+    ) {
+        return new ContextMenuCommandBuilder()
+            .setName(config.name)
+            .setType(config.type)
+            .toJSON();
+    }
+
     const slashCommand = new SlashCommandBuilder()
         .setName(config.name)
         .setDescription(config.description);
 
     if (!config.options) return slashCommand.toJSON();
 
-    // build required options first
-    if (config.options.user) {
-        config.options.user.forEach(e => {
-            if (e.required) {
-                slashCommand.addUserOption(f =>
-                    f.setName(e.name)
-                    .setDescription(e.description)
-                    .setRequired(e.required)
-                );
-            }
-        });
-    }
-    if (config.options.channel) {
-        config.options.channel.forEach(e => {
-            if (e.required) {
-                slashCommand.addChannelOption(f =>
-                    f.setName(e.name)
-                    .setDescription(e.description)
-                    .setRequired(e.required)
-                    .addChannelTypes(ChannelType.GuildText)
-                    .addChannelTypes(ChannelType.GuildVoice)
-                    .addChannelTypes(ChannelType.PublicThread)
-                    .addChannelTypes(ChannelType.GuildForum)
-                );
-            }
-        });
-    }
-    if (config.options.string) {
-        config.options.string.forEach(e => {
-            if (e.required) {
+    const channelTypes = [
+        ChannelType.GuildText,
+        ChannelType.GuildVoice,
+        ChannelType.PublicThread,
+        ChannelType.GuildForum,
+    ] as const;    
+
+    const optionHandlers = {
+        user: (e: any) =>
+            slashCommand.addUserOption(o =>
+                o.setName(e.name)
+                 .setDescription(e.description)
+                 .setRequired(e.required)
+            ),
+
+        channel: (e: any) =>
+            slashCommand.addChannelOption(o =>
+                o.setName(e.name)
+                 .setDescription(e.description)
+                 .setRequired(e.required)
+                 .addChannelTypes(...channelTypes)
+            ),
+
+        string: (e: any) =>
+            slashCommand.addStringOption(o => {
+                o.setName(e.name)
+                 .setDescription(e.description)
+                 .setRequired(e.required);
+
                 if (e.choices) {
-                    slashCommand.addStringOption(f =>
-                        f.setName(e.name)
-                        .setDescription(e.description)
-                        .setRequired(e.required)
-                        .addChoices(...(e.choices) ?? [])
-                    );
+                    o.addChoices(...e.choices);
                 }
-                else {
-                    slashCommand.addStringOption(f =>
-                        f.setName(e.name)
-                        .setDescription(e.description)
-                        .setRequired(e.required)
-                    );
-                }
-            }
-        });
-    }
-    if (config.options.number) {
-        config.options.number.forEach(e => {
-            if (e.required) {
-                slashCommand.addIntegerOption(f => 
-                    f.setName(e.name)
-                    .setDescription(e.description)
-                    .setRequired(e.required)
-                );
-            }
-        });
-    }
-    if (config.options.attachment) {
-        config.options.attachment.forEach(e => {
-            if (e.required) {
-                slashCommand.addAttachmentOption(f =>
-                    f.setName(e.name)
-                    .setDescription(e.description)
-                    .setRequired(e.required)
-                );
-            }
-        });
+                return o;
+            }),
+
+        number: (e: any) =>
+            slashCommand.addIntegerOption(o =>
+                o.setName(e.name)
+                 .setDescription(e.description)
+                 .setRequired(e.required)
+            ),
+
+        attachment: (e: any) =>
+            slashCommand.addAttachmentOption(o =>
+                o.setName(e.name)
+                 .setDescription(e.description)
+                 .setRequired(e.required)
+            )
+    } as const;
+
+    // required first, optional second
+    const allOptions: { type: keyof typeof optionHandlers; data: any }[] = [];
+    for (const [type, options] of Object.entries(config.options)) {
+        const handler = optionHandlers[type as keyof typeof optionHandlers];
+        if (!handler) continue;
+
+        options.forEach(opt =>
+            allOptions.push({ type: type as keyof typeof optionHandlers, data: opt })
+        );
     }
 
-    // build optional options
-    if (config.options.user) {
-        config.options.user.forEach(e => {
-            if (!e.required) {
-                slashCommand.addUserOption(f =>
-                    f.setName(e.name)
-                    .setDescription(e.description)
-                    .setRequired(e.required)
-                );
-            }
-        });
-    }
-    if (config.options.channel) {
-        config.options.channel.forEach(e => {
-            if (!e.required) {
-                slashCommand.addChannelOption(f =>
-                    f.setName(e.name)
-                    .setDescription(e.description)
-                    .setRequired(e.required)
-                    .addChannelTypes(ChannelType.GuildText)
-                    .addChannelTypes(ChannelType.GuildVoice)
-                    .addChannelTypes(ChannelType.PublicThread)
-                    .addChannelTypes(ChannelType.GuildForum)
-                );
-            }
-        });
-    }
-    if (config.options.string) {
-        config.options.string.forEach(e => {
-            if (!e.required) {
-                if (e.choices) {
-                    slashCommand.addStringOption(f =>
-                        f.setName(e.name)
-                        .setDescription(e.description)
-                        .setRequired(e.required)
-                        .addChoices(...(e.choices) ?? [])
-                    );
-                }
-                else {
-                    slashCommand.addStringOption(f =>
-                        f.setName(e.name)
-                        .setDescription(e.description)
-                        .setRequired(e.required)
-                    );
-                }
-            }
-        });
-    }
-    if (config.options.number) {
-        config.options.number.forEach(e => {
-            if (!e.required) {
-                slashCommand.addIntegerOption(f => 
-                    f.setName(e.name)
-                    .setDescription(e.description)
-                    .setRequired(e.required)
-                );
-            }
-        });
-    }
-    if (config.options.attachment) {
-        config.options.attachment.forEach(e => {
-            if (!e.required) {
-                slashCommand.addAttachmentOption(f =>
-                    f.setName(e.name)
-                    .setDescription(e.description)
-                    .setRequired(e.required)
-                );
-            }
-        });
-    }
+allOptions
+    .sort((a, b) => Number(b.data.required) - Number(a.data.required))
+    .forEach(({ type, data }) => {
+        optionHandlers[type](data);
+    });
 
-    return slashCommand.toJSON()
-}
+
+    return slashCommand.toJSON();
+};
 
 export const msgReact = async (msg: Message, reactions: string[]) => {
     if (!msg || !reactions || reactions.length === 0) return;

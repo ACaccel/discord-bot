@@ -5,10 +5,10 @@ import {
     StringSelectMenuOptionBuilder,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 
-export default class delete_reply extends SlashCommand {
+export default class delete_reply extends Command {
     constructor() {
         super();
         this.setConfig({

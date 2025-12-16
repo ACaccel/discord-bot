@@ -7,7 +7,7 @@ interface IGiveawayBot {
     giveaway_jobs: Map<string, Job>
 }
 
-const isGiveawayBot = (bot: BaseBot) => {
+export const isGiveawayBot = (bot: BaseBot) => {
     return (bot as BaseBot & IGiveawayBot).giveaway_jobs !== undefined;
 }
 
@@ -109,44 +109,6 @@ export const deleteGiveaway = async (bot: BaseBot & IGiveawayBot, guild_id: stri
         bot.giveaway_jobs.delete(message_id);
     }
     await db.models["Giveaway"].deleteOne({ message_id });
-
-    return null;
-}
-
-export const addReactionToGiveaway = async (reaction: MessageReaction, user: User, bot: BaseBot & IGiveawayBot) => {
-    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveawayBot";
-
-    bot.giveaway_jobs.forEach(async (job, message_id) => {
-        if (reaction.message.id === message_id) {
-            const db = bot.guildInfo[reaction.message.guild?.id as string].db
-            if (!db) return "Database not found";
-            db.models["Giveaway"].findOne({ message_id }).then(async (giveaway: any) => {
-                if (!giveaway) return "Giveaway not found";
-                if (giveaway.participants.includes(user.id)) return "User already participated";
-                giveaway.participants.push(user.id);
-                await giveaway.save();
-            });
-        }
-    });
-
-    return null;
-}
-
-export const removeReactionFromGiveaway = async (reaction: MessageReaction, user: User, bot: BaseBot & IGiveawayBot) => {
-    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveawayBot";
-
-    bot.giveaway_jobs.forEach(async (job, message_id) => {
-        if (reaction.message.id === message_id) {
-            const db = bot.guildInfo[reaction.message.guild?.id as string].db
-            if (!db) return "Database not found";
-            db.models["Giveaway"].findOne({ message_id }).then(async (giveaway: any) => {
-                if (!giveaway) return "Giveaway not found";
-                if (!giveaway.participants.includes(user.id)) return "User did not participate";
-                giveaway.participants = giveaway.participants.filter((id: string) => id !== user.id);
-                await giveaway.save();
-            });
-        }
-    });
 
     return null;
 }

@@ -8,7 +8,7 @@ import {
     TextChannel
 } from 'discord.js';
 import { BaseBot, GuildInfo } from '@bot';
-import { getSlashCommandJsonBody } from '@cmd';
+import { getCommandJsonBody } from '@cmd';
 import { logger } from '@utils';
 import db from '@db';
 
@@ -161,7 +161,7 @@ export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
         throw new Error(`Cannot connect to MongoDB for guild ${guild.id}.`);
     }
 
-    const rest_commands = getSlashCommandJsonBody(bot.slashCommandHandlers, bot);
+    const rest_commands = getCommandJsonBody(bot.commandHandlers, bot);
     bot.client.application?.commands.set(rest_commands, guild.id)
     .catch((err) => {
         logger.systemLogger(bot.clientId, `Failed to register guild (/) commands: ${err}`);

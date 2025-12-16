@@ -10,21 +10,24 @@ import {
     PartialGuildMember,
     MessageReaction,
     PartialMessageReaction,
+    Interaction,
+    User,
+    PartialUser,
 } from "discord.js";
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
 import { Connection, Model } from "mongoose";
 import { Job } from 'node-schedule';
-import { 
-    SlashCommand,
-    registerSlashCommands
-} from "@cmd";
+import { Command, registerCommands, executeCommand } from "@cmd";
+import { ButtonHandler, registerButtons, executeButton } from '@button';
+import { ModalHandler, registerModals, executeModal } from '@modal';
+import { registerSSMs, SSMHandler, executeSSM } from '@ssm';
 import db from '@db';
-import { logger } from "@utils";
-import { ButtonHandler, registerButtons } from "@button";
-import { registerSSMs, SSMHandler } from "@ssm";
-import { ModalHandler, registerModals } from "@modal";
+import { giveaway, logger } from "@utils";
+import { auto_reply, detectGuildCreate, detectGuildMemberUpdate, detectMessageDelete, detectMessageUpdate } from "@event";
+import { executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
 import slash_command_config from '../slash_command.json';
+import { ReactionHandler } from "handlers/reactions";
 
 export interface Config {
     admin?: string;
@@ -62,10 +65,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public config: TConfig;
     public guildInfo: Record<string, GuildInfo>;
 
-    public slashCommandHandlers: Map<string, SlashCommand>;
+    public commandHandlers: Map<string, Command>;
     public buttonHandler: Map<string, ButtonHandler>;
     public ssmHandler: Map<string, SSMHandler>;
     public modalHandler: Map<string, ModalHandler>;
+    public reactionHandler: Map<string, ReactionHandler>;
     public voice?: Voice;
 
     public help_msg: string;
@@ -79,10 +83,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         this.config = config;
         this.guildInfo = {};
 
-        this.slashCommandHandlers = new Map<string, SlashCommand>();
+        this.commandHandlers = new Map<string, Command>();
         this.buttonHandler = new Map<string, ButtonHandler>();
         this.ssmHandler = new Map<string, SSMHandler>();
         this.modalHandler = new Map<string, ModalHandler>();
+        this.reactionHandler = new Map<string, ReactionHandler>();
 
         this.help_msg = '';
         this.giveaway_jobs = new Map<string, Job>();
@@ -122,10 +127,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             try {
                 this.registerGuild();
                 await this.connectGuildDB();
-                await registerSlashCommands(this);
+                await registerCommands(this);
                 await registerButtons(this);
                 await registerSSMs(this);
                 await registerModals(this);
+                await registerReactions(this);
 
                 await this.rebootMessage();
                 if (callback) {
@@ -270,12 +276,65 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     }
 
     /********** Event Listeners **********/
-    public abstract interactionEventListener(interaction: any): Promise<void>;
-    public abstract messageCreateListener(message: Message): Promise<void>;
-    public abstract messageUpdateListener(oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage): Promise<void>;
-    public abstract messageDeleteListener(message: Message | PartialMessage): Promise<void>;
-    public abstract messageReactionAddListener(reaction: MessageReaction | PartialMessageReaction, user: any): Promise<void>;
-    public abstract messageReactionRemoveListener(reaction: MessageReaction | PartialMessageReaction, user: any): Promise<void>;
-    public abstract guildMemberUpdateListener(oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember): Promise<void>;
-    public abstract guildCreateListener(guild: Guild): Promise<void>;
+
+    public interactionEventListener = async (interaction: Interaction): Promise<void> => {
+        switch (true) {
+            case interaction.isChatInputCommand() || interaction.isContextMenuCommand():
+                await executeCommand(interaction, this);
+                break;
+            case interaction.isModalSubmit():
+                await executeModal(interaction, this);
+                break;
+            case interaction.isButton():
+                await executeButton(interaction, this);
+                break;
+            case interaction.isStringSelectMenu():
+                await executeSSM(interaction, this);
+                break;
+            default:
+                if (!interaction.isAutocomplete()) {
+                    await interaction.reply({ content: '目前尚不支援此類型的指令', ephemeral: true });
+                }
+                break;
+        }
+    }
+
+    public messageCreateListener = async (message: Message): Promise<void> => {
+        if (message.guildId)
+            await auto_reply(message, this, message.guildId);
+    }
+
+    public messageUpdateListener = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage): Promise<void> => {
+        await detectMessageUpdate(oldMessage, newMessage, this);
+    }
+
+    public messageDeleteListener = async (message: Message | PartialMessage): Promise<void> => {
+        await detectMessageDelete(message, this);
+    }
+
+    public messageReactionAddListener = async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser): Promise<void> => {
+        const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
+        const fetchedUser = user.partial ? await user.fetch() : user;
+
+        if (!user.bot) {
+            await executeReactionAdded(fetchedReaction, fetchedUser, this);
+        }
+    }
+
+    public messageReactionRemoveListener = async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser): Promise<void> => {
+        const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
+        const fetchedUser = user.partial ? await user.fetch() : user;
+
+        if (!user.bot) {
+            await executeReactionRemoved(fetchedReaction, fetchedUser, this);
+        }
+    }
+
+    public guildMemberUpdateListener = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember): Promise<void> => {
+        detectGuildMemberUpdate(oldMember, newMember, this);
+    }
+
+    public guildCreateListener = async (guild: any): Promise<void> => {
+        detectGuildCreate(guild, this);
+    }
 }

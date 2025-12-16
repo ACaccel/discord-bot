@@ -2,10 +2,10 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger, giveaway } from '@utils';
 
-export default class giveaway_delete extends SlashCommand {
+export default class giveaway_delete extends Command {
     constructor() {
         super();
         this.setConfig({

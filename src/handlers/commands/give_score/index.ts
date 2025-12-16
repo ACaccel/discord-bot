@@ -2,9 +2,9 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 
-export default class give_score extends SlashCommand {
+export default class give_score extends Command {
     constructor() {
         super();
         this.setConfig({

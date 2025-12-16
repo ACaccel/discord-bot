@@ -2,10 +2,10 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 
-export default class help extends SlashCommand {
+export default class help extends Command {
     constructor() {
         super();
         this.setConfig({
@@ -25,7 +25,7 @@ export default class help extends SlashCommand {
             let  helpContent = '## Help Message\n';
             helpContent += bot.help_msg;
             helpContent += '### 目前支援的slash command：\n';
-            bot.slashCommandHandlers.forEach((cmd) => {
+            bot.commandHandlers.forEach((cmd) => {
                 if (cmd.config) {
                     helpContent += `* \`/${cmd.config.name}\` : ${cmd.config.description}\n`;
                 }

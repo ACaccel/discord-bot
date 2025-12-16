@@ -1,14 +1,17 @@
 import { 
+    ApplicationCommandDataResolvable,
     ChatInputCommandInteraction,
-    RESTPostAPIChatInputApplicationCommandsJSONBody
+    ContextMenuCommandInteraction,
+    ContextMenuCommandType,
 } from "discord.js";
 import { BaseBot } from "@bot";
 import { logger, bot_cmd } from "@utils";
 import { HandlerFactory } from "handlers";
 
-export interface Command {
+export interface CommandConfig {
     name: string;
     description: string;
+    type?: ContextMenuCommandType;   // for context menu commands, default is Chat Input
     options?: {
         string?: CommandOption[];
         number?: CommandOption[];
@@ -30,34 +33,34 @@ interface CommandChoice {
     value: string;
 }
 
-export abstract class SlashCommand {
-    public config: Command | null;
+export abstract class Command {
+    public config: CommandConfig;
 
     public constructor() {
-        this.config = null;
+        this.config = { name: "", description: "" };
     }
 
-    public setConfig(config: Command): void {
+    public setConfig(config: CommandConfig): void {
         this.config = config;
     }
 
-    public abstract execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void>;
+    public abstract execute(interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot): Promise<void>;
 }
 
-export const getSlashCommandJsonBody = (slashCommandHandlers: Map<string, SlashCommand>, bot: BaseBot) => {
-    const rest_commands: RESTPostAPIChatInputApplicationCommandsJSONBody[] = Array.from(slashCommandHandlers.values())
-        .filter((cmd: SlashCommand) => {
+export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: BaseBot) => {
+    const rest_commands: ApplicationCommandDataResolvable[] = Array.from(commandHandlers.values())
+        .filter((cmd: Command) => {
             if (!cmd.config) {
                 logger.errorLogger(bot.clientId, null, `Command ${cmd} has no config.`);
                 return false;
             }
             return true;
         })
-        .map((cmd: SlashCommand) => bot_cmd.buildSlashCommandJsonBody(cmd.config!));
+        .map((cmd: Command) => bot_cmd.buildCommandJsonBody(cmd.config));
     return rest_commands;
 }
 
-export const registerSlashCommands = async (bot: BaseBot) => {
+export const registerCommands = async (bot: BaseBot) => {
     logger.systemLogger(bot.clientId, "Registering commands...");
 
     try {
@@ -66,42 +69,42 @@ export const registerSlashCommands = async (bot: BaseBot) => {
             return;
         }
 
-        // build slash commands from config
+        // build commands from config
         bot.config.commands.forEach((name) => {
-            const newSlashCommand = createSlashCommand(name);
-            if (newSlashCommand) {
-                bot.slashCommandHandlers.set(name, newSlashCommand);
+            const newCommand = createCommand(name);
+            if (newCommand) {
+                bot.commandHandlers.set(name, newCommand);
             }
         });
 
-        // register slash commands to Discord API
+        // register commands to Discord API
         await bot.client.application?.commands.set([]);
-        const rest_commands = getSlashCommandJsonBody(bot.slashCommandHandlers, bot);
+        const rest_commands = getCommandJsonBody(bot.commandHandlers, bot);
         await Promise.all(
             Object.entries(bot.guildInfo).map(async ([guildId]) => {
                 await bot.client.application?.commands.set(rest_commands, guildId);
             })
         );
 
-        logger.systemLogger(bot.clientId, `Successfully register ${bot.slashCommandHandlers.size} application (/) commands.`)
+        logger.systemLogger(bot.clientId, `Successfully register ${bot.commandHandlers.size} application (/) commands.`)
     } catch (err) {
         logger.systemLogger(bot.clientId, `Failed to register commands: ${err}`);
     }
 }
 
-export const executeSlashCommand = async (interaction: ChatInputCommandInteraction, bot: BaseBot, blocked_channels?: string[]) => {
+export const executeCommand = async (interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot, blocked_channels?: string[]) => {
     if (!bot.config.commands) {
         interaction.reply({ content: "Config of commands not found.", ephemeral: true });
         return;
     }
-    if (!bot.slashCommandHandlers) {
+    if (!bot.commandHandlers) {
         interaction.reply({ content: "Command handler not found.", ephemeral: true });
         return;
     }
 
     const command = bot.config.commands.find((cmd) => cmd === interaction.commandName);
     if (command) {
-        const handler = bot.slashCommandHandlers.get(interaction.commandName)
+        const handler = bot.commandHandlers.get(interaction.commandName)
         if (handler) {
             await handler.execute(interaction, bot);
         }
@@ -120,17 +123,10 @@ export const executeSlashCommand = async (interaction: ChatInputCommandInteracti
     }
 }
 
-// const buttonHandlerFactory = new HandlerFactory<ButtonHandler>();
-// const buttonDir = __dirname;
-// buttonHandlerFactory.register(buttonDir);
-
-// export const getButtonHandlerClass = (name: string) => buttonHandlerFactory.getConstructor(name);
-// export const createButtonHandler = (name: string) => buttonHandlerFactory.create(name);
-// export const createAllButtonHandlers = () => buttonHandlerFactory.createAll();
-const commandHandlerFactory = new HandlerFactory<SlashCommand>();
+const commandHandlerFactory = new HandlerFactory<Command>();
 const commandsDir = __dirname;
 commandHandlerFactory.register(commandsDir);
 
 export const getSlashCommandClass = (name: string) => commandHandlerFactory.getConstructor(name);
-export const createSlashCommand = (name: string) => commandHandlerFactory.create(name);
+export const createCommand = (name: string) => commandHandlerFactory.create(name);
 export const createAllSlashCommands = () => commandHandlerFactory.createAll();

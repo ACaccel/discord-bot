@@ -11,10 +11,10 @@ import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
 import fs from 'fs';
 import path from 'path';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 
-export default class record extends SlashCommand {
+export default class record extends Command {
     constructor() {
         super();
         this.setConfig({

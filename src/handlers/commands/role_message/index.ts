@@ -4,10 +4,10 @@ import {
     Role,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger, bot_cmd } from '@utils';
 
-export default class role_message extends SlashCommand {
+export default class role_message extends Command {
     constructor() {
         super();
         this.setConfig({

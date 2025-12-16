@@ -5,10 +5,10 @@ import {
     Message,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger, bot_cmd, misc } from '@utils';
 
-export default class ban_user extends SlashCommand {
+export default class ban_user extends Command {
     constructor() {
         super();
         this.setConfig({

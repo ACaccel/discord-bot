@@ -3,10 +3,10 @@ import {
 } from 'discord.js';
 import axios from 'axios';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 
-export default class random_restaurant extends SlashCommand {
+export default class random_restaurant extends Command {
     constructor() {
         super();
         this.setConfig({

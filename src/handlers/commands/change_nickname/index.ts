@@ -2,10 +2,10 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 
-export default class change_nickname extends SlashCommand {
+export default class change_nickname extends Command {
     constructor() {
         super();
         this.setConfig({

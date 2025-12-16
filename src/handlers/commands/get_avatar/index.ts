@@ -3,10 +3,10 @@ import {
     EmbedBuilder,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 
-export default class get_avatar extends SlashCommand {
+export default class get_avatar extends Command {
     constructor() {
         super();
         this.setConfig({

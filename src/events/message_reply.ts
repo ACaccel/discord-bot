@@ -65,7 +65,7 @@ const roll_dice = (msg: string | undefined, regex: RegExp) => {
     }
 }
 
-export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string, use_tts: boolean = false) => {
+export const auto_reply = async (msg: Message, bot: BaseBot, guild_id: string) => {
     if (!msg.channel.isSendable()) return;
 
     if (msg.content.includes('該睡覺了，肥貓跟你說晚安')) {

@@ -3,10 +3,10 @@ import {
     Guild,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 import { logger } from '@utils';
 
-export default class talk extends SlashCommand {
+export default class talk extends Command {
     constructor() {
         super();
         this.setConfig({

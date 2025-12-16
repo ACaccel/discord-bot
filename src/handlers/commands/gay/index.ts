@@ -2,9 +2,9 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SlashCommand } from '@cmd';
+import { Command } from '@cmd';
 
-export default class gay extends SlashCommand {
+export default class gay extends Command {
     constructor() {
         super();
         this.setConfig({
