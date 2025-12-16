@@ -5,7 +5,7 @@ import * as fs from 'fs/promises';
 import { createCanvas, loadImage } from 'canvas';
 import { BaseBot } from "@bot";
 import { logger } from "@utils";
-import guild_profile from '../guild_profile.json';
+// import guild_profile from '../guild_profile.json';
 
 export interface CanvasOptions {
     itemsPerRow: number;
@@ -149,37 +149,57 @@ export const listInOneImage = async (content: CanvasContent[], options?: Partial
     return attachment;
 }
 
+export const parseDuration = (duration: string): number | null => {
+    const match = duration.match(/^(\d+)([smhdw])$/);
+    if (!match) return null;
+
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+
+    if (isNaN(value)) return null;
+    switch (unit) {
+        case "s": return value * 1000;
+        case "m": return value * 60 * 1000;
+        case "h": return value * 60 * 60 * 1000;
+        case "d": return value * 24 * 60 * 60 * 1000;
+        case "w": return value * 7 * 24 * 60 * 60 * 1000;
+        default: return null;
+    }
+}
+
 //========================================//
 //======== Change Server Profile =========//
 //========================================//
-const getRandomImage = () => {
-    if (!guild_profile || guild_profile.length === 0) {
-        throw new Error("No guild profile configuration found, please check guild_profile.json");
-    }
-    const index = Math.floor(Math.random() * guild_profile.length);
-    return guild_profile[index];
-}
+// Uncomment the following code to enable automatic server icon changes
+// remember to create and configure guild_profile.json accordingly
+// const getRandomImage = () => {
+//     if (!guild_profile || guild_profile.length === 0) {
+//         throw new Error("No guild profile configuration found, please check guild_profile.json");
+//     }
+//     const index = Math.floor(Math.random() * guild_profile.length);
+//     return guild_profile[index];
+// }
 
-async function updateServerIcon(bot: BaseBot, guildId: string) {
-    const guild = bot.client.guilds.cache.get(guildId);
-    if (!guild) {
-        console.error("cannot find guild");
-        return;
-    }
-    const profile = getRandomImage();
-    try {
-        await guild.setIcon(profile.url);
-        await guild.setName(profile.name);
-    } catch (error) {
-        logger.errorLogger(bot.clientId, guildId, error);
-    }
-}
+// async function updateServerIcon(bot: BaseBot, guildId: string) {
+//     const guild = bot.client.guilds.cache.get(guildId);
+//     if (!guild) {
+//         console.error("cannot find guild");
+//         return;
+//     }
+//     const profile = getRandomImage();
+//     try {
+//         await guild.setIcon(profile.url);
+//         await guild.setName(profile.name);
+//     } catch (error) {
+//         logger.errorLogger(bot.clientId, guildId, error);
+//     }
+// }
 
-export const scheduleIconChange = (bot: BaseBot, guildId: string) => {
-    const interval = getRandomInterval(60, 10*60);
-    console.log(`Next icon change in ${interval / 60 / 1000} minutes`);
-    setTimeout(async () => {
-        await updateServerIcon(bot, guildId);
-        scheduleIconChange(bot, guildId);
-    }, interval);
-}
+// export const scheduleIconChange = (bot: BaseBot, guildId: string) => {
+//     const interval = getRandomInterval(60, 10*60);
+//     console.log(`Next icon change in ${interval / 60 / 1000} minutes`);
+//     setTimeout(async () => {
+//         await updateServerIcon(bot, guildId);
+//         scheduleIconChange(bot, guildId);
+//     }, interval);
+// }
