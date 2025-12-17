@@ -52,9 +52,9 @@ export default class bubble_wrap extends SlashCommand {
         
             let displayChar = char;
             if (this.getVisualWidth(char) === 1) {
-                displayChar = ` ${char}  `; 
+                displayChar = `  ${char}  `; 
             }else{
-                displayChar = `${char} `;
+                displayChar = ` ${char} `;
             }
             
             board[places[i]] = "||" + displayChar + "||";
