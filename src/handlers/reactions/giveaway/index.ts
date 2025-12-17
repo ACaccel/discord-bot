@@ -1,5 +1,5 @@
 import { MessageReaction, User } from "discord.js";
-import { ReactionHandler } from "..";
+import { ReactionHandler } from "@reaction";
 import { BaseBot } from "@bot";
 import { isGiveawayBot } from "utils/giveaway";
 
