@@ -8,11 +8,11 @@ import { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { logger } from '@utils';
 
-export default class get_sticker extends Command {
+export default class menu_get_sticker extends Command {
     constructor() {
         super();
         this.setConfig({
-            name: "get_sticker",
+            name: "取得貼圖連結",
             description: "取得訊息中的貼圖 URL",
             type: ApplicationCommandType.Message as ContextMenuCommandType,
         });

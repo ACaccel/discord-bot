@@ -9,7 +9,7 @@ import { logger, bot_cmd } from "@utils";
 import { HandlerFactory } from "handlers";
 
 export interface CommandConfig {
-    name: string;
+    name: string;   // command name for handler lookup and display
     description: string;
     type?: ContextMenuCommandType;   // for context menu commands, default is Chat Input
     options?: {
@@ -73,18 +73,25 @@ export const registerCommands = async (bot: BaseBot) => {
         bot.config.commands.forEach((name) => {
             const newCommand = createCommand(name);
             if (newCommand) {
-                bot.commandHandlers.set(name, newCommand);
+                bot.commandHandlers.set(newCommand.config.name, newCommand);    // use config name rather than class name as the key
             }
         });
 
         // register commands to Discord API
-        await bot.client.application?.commands.set([]);
+        await bot.client.application?.commands.set([]); // global command registration takes up to 1 hour to propagate
+        await Promise.all(
+            Object.entries(bot.guildInfo).map(async ([guildId]) => {
+                await bot.client.application?.commands.set([], guildId);    // guild command registration is instant
+            })
+        );
         const rest_commands = getCommandJsonBody(bot.commandHandlers, bot);
+        // await bot.client.application?.commands.set(rest_commands);
         await Promise.all(
             Object.entries(bot.guildInfo).map(async ([guildId]) => {
                 await bot.client.application?.commands.set(rest_commands, guildId);
             })
         );
+        
 
         logger.systemLogger(bot.clientId, `Successfully register ${bot.commandHandlers.size} application (/) commands.`)
     } catch (err) {
@@ -102,12 +109,9 @@ export const executeCommand = async (interaction: ChatInputCommandInteraction | 
         return;
     }
 
-    const command = bot.config.commands.find((cmd) => cmd === interaction.commandName);
-    if (command) {
-        const handler = bot.commandHandlers.get(interaction.commandName)
-        if (handler) {
-            await handler.execute(interaction, bot);
-        }
+    const handler = bot.commandHandlers.get(interaction.commandName);
+    if (handler) {
+        await handler.execute(interaction, bot);
     } else {
         interaction.reply({ content: "Command not found.", ephemeral: true });
     }
