@@ -3,7 +3,7 @@ import { ReactionHandler } from "@reaction";
 import { BaseBot } from "@bot";
 import { isGiveawayBot } from "utils/giveaway";
 
-export default class roll_call extends ReactionHandler {
+export default class giveaway extends ReactionHandler {
     public override async executeAdded(reaction: MessageReaction, user: User, bot: BaseBot): Promise<void> {
         if (!isGiveawayBot(bot)) return;
 
