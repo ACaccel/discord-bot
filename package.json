@@ -6,6 +6,7 @@
   "scripts": {
     "install-lock": "yarn install --frozen-lockfile",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "ts-node src/deploy.ts",
     "tomori": "ts-node src/bot/tomori/index.ts",
     "nijika": "ts-node src/bot/nijika/index.ts",
     "msg_archive": "ts-node src/bot/msg_archive/index.ts"

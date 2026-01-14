@@ -3,6 +3,9 @@ import {
     ChatInputCommandInteraction,
     ContextMenuCommandInteraction,
     ContextMenuCommandType,
+    REST,
+    Routes,
+    RateLimitData,
 } from "discord.js";
 import { BaseBot } from "@bot";
 import { logger, bot_cmd } from "@utils";
@@ -63,6 +66,14 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
 export const registerCommands = async (bot: BaseBot) => {
     logger.systemLogger(bot.clientId, "Registering commands...");
 
+    // const rest = new REST({ version: "10" }).setToken(bot.getToken());
+    // rest.on('rateLimited', (info: RateLimitData) => {
+    //     console.log(info);
+    // });
+    // rest.on('restDebug', (message: string) => {
+    //     console.log(message);
+    // });
+
     try {
         if (!bot.config.commands) {
             logger.systemLogger(bot.clientId, "No commands to register.");
@@ -76,22 +87,22 @@ export const registerCommands = async (bot: BaseBot) => {
                 bot.commandHandlers.set(newCommand.config.name, newCommand);    // use config name rather than class name as the key
             }
         });
-
-        // register commands to Discord API
-        await bot.client.application?.commands.set([]); // global command registration takes up to 1 hour to propagate
-        await Promise.all(
-            Object.entries(bot.guildInfo).map(async ([guildId]) => {
-                await bot.client.application?.commands.set([], guildId);    // guild command registration is instant
-            })
-        );
-        const rest_commands = getCommandJsonBody(bot.commandHandlers, bot);
-        // await bot.client.application?.commands.set(rest_commands);
-        await Promise.all(
-            Object.entries(bot.guildInfo).map(async ([guildId]) => {
-                await bot.client.application?.commands.set(rest_commands, guildId);
-            })
-        );
         
+        // deprecated: use deploy.ts instead
+        // register commands to Discord API via REST (guild registration is instant)
+        // const rest_commands = getCommandJsonBody(bot.commandHandlers, bot);
+        // for (const [guildId] of Object.entries(bot.guildInfo)) {
+        //     await rest.put(
+        //         Routes.applicationGuildCommands(bot.clientId, guildId),
+        //         { body: rest_commands },
+        //     ).then(() => {
+        //         logger.systemLogger(bot.clientId, `Registered ${rest_commands.length} commands for guild ${guildId}`);
+        //     }).catch((err) => {
+        //         console.error(err);
+        //         logger.errorLogger(bot.clientId, guildId, `Failed to register commands for guild ${guildId}: ${err}`);
+        //     });
+        //     await new Promise(resolve => setTimeout(resolve, 60000)); // to avoid rate limit
+        // }
 
         logger.systemLogger(bot.clientId, `Successfully register ${bot.commandHandlers.size} application (/) commands.`)
     } catch (err) {
