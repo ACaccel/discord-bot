@@ -26,7 +26,7 @@ import db from '@db';
 import { logger } from "@utils";
 import { auto_reply, detectGuildCreate, detectGuildMemberUpdate, detectMessageDelete, detectMessageUpdate } from "@event";
 import { ReactionHandler, executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
-import { giveaway } from "@features";
+import { giveaway, activity } from "@features";
 
 export interface Config {
     admin?: string;
@@ -126,6 +126,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 await registerModals(this);
                 await registerReactions(this);
                 await giveaway.rebootGiveawayJobs(this);
+                await activity.rebootActivityJobs(this);
 
                 await this.rebootMessage();
                 if (callback) {
