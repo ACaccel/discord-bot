@@ -23,11 +23,10 @@ import { ButtonHandler, registerButtons, executeButton } from '@button';
 import { ModalHandler, registerModals, executeModal } from '@modal';
 import { registerSSMs, SSMHandler, executeSSM } from '@ssm';
 import db from '@db';
-import { giveaway, logger } from "@utils";
+import { logger } from "@utils";
 import { auto_reply, detectGuildCreate, detectGuildMemberUpdate, detectMessageDelete, detectMessageUpdate } from "@event";
-import { executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
-import slash_command_config from '../slash_command.json';
-import { ReactionHandler } from "handlers/reactions";
+import { ReactionHandler, executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
+import { giveaway } from "@features";
 
 export interface Config {
     admin?: string;
@@ -73,7 +72,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public voice?: Voice;
 
     public help_msg: string;
-    public giveaway_jobs: Map<string, Job>
+    public jobs: Map<string, Job>;
 
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: TConfig) {
         this.token = token;
@@ -90,7 +89,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         this.reactionHandler = new Map<string, ReactionHandler>();
 
         this.help_msg = '';
-        this.giveaway_jobs = new Map<string, Job>();
+        this.jobs = new Map<string, Job>();
     }
 
     public run = async (callback?: () => Promise<void>) => {
@@ -111,12 +110,6 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         }
         logger.systemLogger(this.clientId, `Logged in as ${this.client.user.username}!`);
 
-        // check configuration files
-        if (!slash_command_config) {
-            logger.systemLogger(this.clientId, "Please setup your slash_command.json file.");
-            return;
-        }
-
         if (this.config.admin) {
             this.adminId = this.config.admin;
         }
@@ -132,6 +125,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 await registerSSMs(this);
                 await registerModals(this);
                 await registerReactions(this);
+                await giveaway.rebootGiveawayJobs(this);
 
                 await this.rebootMessage();
                 if (callback) {
@@ -188,6 +182,10 @@ export abstract class BaseBot<TConfig extends Config = Config> {
 
     public getMongoURI = () => {
         return this.mongoURI;
+    }
+
+    public getToken = () => {
+        return this.token;
     }
 
     /********** Registration Methods **********/

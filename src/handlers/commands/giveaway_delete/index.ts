@@ -1,9 +1,9 @@
-import { 
+import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger, giveaway } from '@utils';
+import { giveaway } from '@features';
 
 export default class giveaway_delete extends Command {
     constructor() {
@@ -24,19 +24,6 @@ export default class giveaway_delete extends Command {
     }
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
-        await interaction.deferReply();
-        try {
-            const message_id = interaction.options.get("message_id")?.value as string;
-            const guild = interaction.guild;
-            if (!guild) {
-                await interaction.editReply({ content: "找不到伺服器" });
-                return;
-            }
-            await giveaway.deleteGiveaway(bot, guild.id, message_id);
-            await interaction.editReply({ content: "抽獎已刪除" });
-        } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法刪除抽獎" });
-        }
+        await giveaway.handleGiveawayDelete(interaction, bot as BaseBot & giveaway.IGiveawayBot);
     }
 }

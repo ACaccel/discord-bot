@@ -1,15 +1,20 @@
-import { GuildMember, EmbedBuilder, MessageReaction, User, Channel } from 'discord.js';
+import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
 import { BaseBot } from '@bot';
 import { bot_cmd, misc } from '@utils';
 
-interface IGiveawayBot {
-    giveaway_jobs: Map<string, Job>
+export interface IGiveawayBot {
+    jobs: Map<string, Job>
 }
 
 export const isGiveawayBot = (bot: BaseBot) => {
-    return (bot as BaseBot & IGiveawayBot).giveaway_jobs !== undefined;
+    return (bot as BaseBot & IGiveawayBot).jobs !== undefined;
 }
+
+export const giveawayJobKey = (message_id: string) => `giveaway:${message_id}`;
+
+export const isGiveawayJobKey = (key: string, messageId: string) =>
+    key.startsWith('giveaway:') && key.split(':')[1] === messageId;
 
 export const giveawayAnnouncement = async (channel: Channel, prize: string, prize_owner_id: string, winner_num: number, end_time_date: Date, description: string) => {
     if (!channel.isSendable()) return null;
@@ -65,8 +70,24 @@ export const scheduleGiveaway = async (bot: BaseBot, guild_id: string, message_i
     if (!giveaway) return "Giveaway not found";
     const giveawayChannel = guild.channels.cache.get(giveaway.channel_id);
     if (!giveawayChannel?.isSendable()) return "Giveaway channel not found";
-    const participants = giveaway.participants.map((id: string) => guild.members.cache.get(id)).filter((member: GuildMember | undefined) => member);
-    const participantsArray = Array.isArray(participants) ? participants : Array.from(participants.values());
+
+    const message = await giveawayChannel.messages.fetch(message_id).catch(() => null);
+    if (!message) return "Giveaway message not found";
+
+    const reaction = message.reactions.cache.get("🎉");
+    const users = await reaction?.users.fetch().catch(() => null);
+
+    const participantsMembers: GuildMember[] = [];
+    if (users) {
+        for (const [, user] of users) {
+            if (user.bot) continue;
+            const member = guild.members.cache.get(user.id);
+            if (member) {
+                participantsMembers.push(member);
+            }
+        }
+    }
+    const participantsArray = participantsMembers;
 
     // Select winners
     let winners: GuildMember[] = [];
@@ -103,10 +124,10 @@ export const deleteGiveaway = async (bot: BaseBot & IGiveawayBot, guild_id: stri
         return "Database not found";
     }
 
-    const job = bot.giveaway_jobs.get(message_id)
+    const job = bot.jobs.get(giveawayJobKey(message_id));
     if (job) {
         job.cancel();
-        bot.giveaway_jobs.delete(message_id);
+        bot.jobs.delete(giveawayJobKey(message_id));
     }
     await db.models["Giveaway"].deleteOne({ message_id });
 
@@ -126,28 +147,10 @@ export const rebootGiveawayJobs = async (bot: BaseBot) => {
                             await scheduleGiveaway(bot, guild_info.guild.id, g.message_id);
                         }
                     });
-                    bot.giveaway_jobs.set(g.message_id, job);
+                    bot.jobs.set(giveawayJobKey(g.message_id), job);
                 } else {
                     deleteGiveaway(bot, guild_info.guild.id, g.message_id);
                 }
-
-                // recover participants
-                const guild = bot.client.guilds.cache.get(guild_info.guild.id);
-                if (!guild) return "Guild not found";
-                const channel = guild.channels.cache.get(g.channel_id);
-                if (!channel?.isSendable()) return "Channel not found";
-                channel.messages.fetch(g.message_id).then(async (message) => {
-                    if (!message) return "Message not found";
-                    const participants = await message.reactions.cache.get("🎉")?.users.fetch();
-                    if (!participants) return "Participants not found";
-                    participants.forEach(async (user) => {
-                        if (user.bot) return;
-                        if (!g.participants.includes(user.id)) {
-                            g.participants.push(user.id);
-                        }
-                    });
-                    await g.save();
-                });
             });
         });
     });
