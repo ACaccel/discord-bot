@@ -62,17 +62,9 @@ const activitySchema = new Schema({
     participants: [{ type: String, required: true }]
 });
 
-// const holidaySchema = new Schema({
-//     date: { type: String, required: true },
-//     name: { type: String, required: true },
-//     holiday: { type: Boolean, required: true },
-//     username: { type: String, required: false }
-// })
-
 export const Fetch = mongoose.model('Fetch', fetchSchema);
 export const Message = mongoose.model('Message', messageSchema);
 export const Reply = mongoose.model('Reply', replySchema);
 export const Todo = mongoose.model('Todo', todoSchema);
 export const Giveaway = mongoose.model('Giveaway', giveawaySchema);
 export const Activity = mongoose.model('Activity', activitySchema);
-// export const Holiday = mongoose.model('Holiday', holidaySchema);
