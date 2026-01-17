@@ -7,6 +7,7 @@ import {
     activityAnnouncement,
     findActivity,
     scheduleActivity,
+    deleteActivity,
     IActivityBot,
     activityJobKey,
 } from './activity';
@@ -93,5 +94,36 @@ export const handleActivityCreate = async (
     } catch (error) {
         logger.errorLogger(bot.clientId, interaction.guild?.id ?? null, error);
         await interaction.editReply({ content: "無法建立活動" });
+    }
+};
+
+export const handleActivityDelete = async (
+    interaction: ChatInputCommandInteraction,
+    bot: BaseBot & IActivityBot,
+): Promise<void> => {
+    await interaction.deferReply();
+    try {
+        const activity_id = interaction.options.get("activity_id")?.value as string | null;
+        if (!activity_id) {
+            await interaction.editReply({ content: "請提供活動ID" });
+            return;
+        }
+
+        const guild = interaction.guild;
+        if (!guild) {
+            await interaction.editReply({ content: "找不到伺服器" });
+            return;
+        }
+
+        const result = await deleteActivity(bot, guild.id, activity_id);
+        if (typeof result === 'string' && result !== null) {
+            await interaction.editReply({ content: `無法刪除活動: ${result}` });
+            return;
+        }
+
+        await interaction.editReply({ content: "活動已刪除" });
+    } catch (error) {
+        logger.errorLogger(bot.clientId, interaction.guild?.id ?? null, error);
+        await interaction.editReply({ content: "無法刪除活動" });
     }
 };
