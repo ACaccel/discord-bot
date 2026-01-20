@@ -1,7 +1,7 @@
 import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
 import { BaseBot } from '@bot';
-import { bot_cmd, misc } from '@utils';
+import { bot_cmd, JobManager } from '@utils';
 
 export interface IActivityBot {
     jobs: Map<string, Job>
@@ -104,12 +104,7 @@ export const scheduleActivity = async (bot: BaseBot, guild_id: string, activity_
         }`
     });
 
-    // Remove job
-    const job = bot.jobs.get(activityJobKey(activity_id));
-    if (job) {
-        job.cancel();
-        bot.jobs.delete(activityJobKey(activity_id));
-    }
+    new JobManager(bot.jobs).cancel(activityJobKey(activity_id));
 
     return null;
 }
@@ -126,30 +121,25 @@ export const deleteActivity = async (bot: BaseBot & IActivityBot, guild_id: stri
         return "Database not found";
     }
 
-    const job = bot.jobs.get(activityJobKey(activity_id));
-    if (job) {
-        job.cancel();
-        bot.jobs.delete(activityJobKey(activity_id));
-    }
+    new JobManager(bot.jobs).cancel(activityJobKey(activity_id));
     await db.models["Activity"].deleteOne({ activity_id });
 
     return null;
 }
 
 export const rebootActivityJobs = async (bot: BaseBot) => {
+    const jobManager = new JobManager(bot.jobs);
     Object.values(bot.guildInfo).forEach(guild_info => { 
         if (!guild_info.db) return "Database not found";
         guild_info.db.models["Activity"].find({}).then((activities: any) => {
             activities.forEach((a: any) => {
-                // re-schedule all active activities
                 const expired_at = new Date(a.expired_at);
                 if (expired_at > new Date()) {
-                    const job = misc.scheduleJob(expired_at, async () => {
+                    jobManager.schedule(activityJobKey(a.activity_id), expired_at, async () => {
                         if (await findActivity(bot, guild_info.guild.id, a.activity_id)) {
                             await scheduleActivity(bot, guild_info.guild.id, a.activity_id);
                         }
                     });
-                    bot.jobs.set(activityJobKey(a.activity_id), job);
                 } else {
                     deleteActivity(bot as BaseBot & IActivityBot, guild_info.guild.id, a.activity_id);
                 }

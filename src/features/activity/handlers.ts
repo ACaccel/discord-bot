@@ -2,7 +2,7 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { logger, misc } from '@utils';
+import { logger, misc, JobManager } from '@utils';
 import {
     activityAnnouncement,
     findActivity,
@@ -84,8 +84,7 @@ export const handleActivityCreate = async (
 
         // schedule job to close activity
         if (await findActivity(bot, guild.id, activity_id)) {
-            const job = misc.scheduleJob(end_time_date, () => scheduleActivity(bot, guild.id, activity_id));
-            bot.jobs.set(activityJobKey(activity_id), job);
+            new JobManager(bot.jobs).schedule(activityJobKey(activity_id), end_time_date, () => scheduleActivity(bot, guild.id, activity_id));
         }
 
         await interaction.editReply({ 

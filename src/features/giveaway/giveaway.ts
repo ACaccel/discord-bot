@@ -1,7 +1,7 @@
 import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
 import { BaseBot } from '@bot';
-import { bot_cmd, misc } from '@utils';
+import { bot_cmd, JobManager } from '@utils';
 
 export interface IGiveawayBot {
     jobs: Map<string, Job>
@@ -106,14 +106,14 @@ export const scheduleGiveaway = async (bot: BaseBot, guild_id: string, message_i
         }`
     });
 
-    // Delete giveaway from database
     await db.models["Giveaway"].deleteOne({ message_id });
+    new JobManager(bot.jobs).cancel(giveawayJobKey(message_id));
 
     return null;
 }
 
 export const deleteGiveaway = async (bot: BaseBot & IGiveawayBot, guild_id: string, message_id: string) => {
-    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveawayBotBot";
+    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveawayBot";
 
     const guild = bot.client.guilds.cache.get(guild_id);
     if (!guild) {
@@ -124,30 +124,25 @@ export const deleteGiveaway = async (bot: BaseBot & IGiveawayBot, guild_id: stri
         return "Database not found";
     }
 
-    const job = bot.jobs.get(giveawayJobKey(message_id));
-    if (job) {
-        job.cancel();
-        bot.jobs.delete(giveawayJobKey(message_id));
-    }
+    new JobManager(bot.jobs).cancel(giveawayJobKey(message_id));
     await db.models["Giveaway"].deleteOne({ message_id });
 
     return null;
 }
 
 export const rebootGiveawayJobs = async (bot: BaseBot) => {
+    const jobManager = new JobManager(bot.jobs);
     Object.values(bot.guildInfo).forEach(guild_info => { 
         if (!guild_info.db) return "Database not found";
         guild_info.db.models["Giveaway"].find({}).then((giveaways: any) => {
             giveaways.forEach((g: any) => {
-                // re-schedule all active giveaways
                 const end_time = new Date(g.end_time);
                 if (end_time > new Date()) {
-                    const job = misc.scheduleJob(end_time, async () => {
+                    jobManager.schedule(giveawayJobKey(g.message_id), end_time, async () => {
                         if (await findGiveaway(bot, guild_info.guild.id, g.message_id)) {
                             await scheduleGiveaway(bot, guild_info.guild.id, g.message_id);
                         }
                     });
-                    bot.jobs.set(giveawayJobKey(g.message_id), job);
                 } else {
                     deleteGiveaway(bot, guild_info.guild.id, g.message_id);
                 }

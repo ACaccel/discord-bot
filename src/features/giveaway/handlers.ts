@@ -2,7 +2,7 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { logger, misc } from '@utils';
+import { logger, misc, JobManager } from '@utils';
 import {
     giveawayAnnouncement,
     findGiveaway,
@@ -90,8 +90,7 @@ export const handleGiveawayCreate = async (
 
         // schedule job to find winner
         if (await findGiveaway(bot, guild.id, message_id)) {
-            const job = misc.scheduleJob(end_time_date, () => scheduleGiveaway(bot, guild.id, message_id));
-            bot.jobs.set(giveawayJobKey(message_id), job);
+            new JobManager(bot.jobs).schedule(giveawayJobKey(message_id), end_time_date, () => scheduleGiveaway(bot, guild.id, message_id));
         }
 
         await interaction.editReply({ content: `抽獎已建立！將於 ${end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })} 結束` });
