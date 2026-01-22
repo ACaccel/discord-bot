@@ -12,8 +12,8 @@ export default class menu_get_sticker extends Command {
     constructor() {
         super();
         this.setConfig({
-            name: "取得貼圖連結",
-            description: "取得訊息中的貼圖 URL",
+            name: "取得表符/貼圖連結",
+            description: "取得訊息中的表符/貼圖連結 (單一表符或貼圖)",
             type: ApplicationCommandType.Message as ContextMenuCommandType,
         });
     }
@@ -23,27 +23,54 @@ export default class menu_get_sticker extends Command {
         try {
             const message = interaction.targetMessage;
             const stickers = message.stickers;
+            const content = message.content?.trim() || "";
 
-            if (stickers.size === 0) {
-                await interaction.editReply({ content: "此訊息沒有貼圖" });
+            // Check for stickers first
+            if (stickers.size > 0) {
+                const embed = new EmbedBuilder()
+                    .setTitle("Sticker URL")
+                    .setColor(0x5865F2);
+
+                stickers.forEach(sticker => {
+                    embed.addFields({
+                        name: sticker.name,
+                        value: sticker.url
+                    });
+                });
+
+                await interaction.editReply({ embeds: [embed] });
                 return;
             }
 
-            const embed = new EmbedBuilder()
-                .setTitle("Sticker URL")
-                .setColor(0x5865F2);
+            // Check for single emoji in message content
+            const emojiPattern = /^<a?:(\w+):(\d+)>$/;
+            const emojiMatch = content.match(emojiPattern);
 
-            stickers.forEach(sticker => {
-                embed.addFields({
-                    name: sticker.name,
-                    value: sticker.url
-                });
-            });
+            if (emojiMatch) {
+                const isAnimated = content.startsWith("<a:");
+                const emojiName = emojiMatch[1];
+                const emojiId = emojiMatch[2];
+                const emojiUrl = isAnimated 
+                    ? `https://cdn.discordapp.com/emojis/${emojiId}.gif`
+                    : `https://cdn.discordapp.com/emojis/${emojiId}.png`;
 
-            await interaction.editReply({ embeds: [embed] });
+                const embed = new EmbedBuilder()
+                    .setTitle("Emoji URL")
+                    .setColor(0x5865F2)
+                    .addFields({
+                        name: emojiName,
+                        value: emojiUrl
+                    });
+
+                await interaction.editReply({ embeds: [embed] });
+                return;
+            }
+
+            // No stickers or emoji found
+            await interaction.editReply({ content: "此訊息沒有貼圖或單一 emoji" });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得貼圖" });
+            await interaction.editReply({ content: "無法取得貼圖或 emoji" });
         }
     }
 }
