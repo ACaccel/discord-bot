@@ -52,7 +52,11 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
     const channelTypes = [
         ChannelType.GuildText,
         ChannelType.GuildVoice,
+        ChannelType.GuildAnnouncement,
+        ChannelType.AnnouncementThread,
         ChannelType.PublicThread,
+        ChannelType.PrivateThread,
+        ChannelType.GuildStageVoice,
         ChannelType.GuildForum,
     ] as const;    
 
