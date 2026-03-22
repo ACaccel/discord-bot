@@ -70,6 +70,7 @@ TOKEN = YOUR_DISCORD_BOT_TOKEN
 MONGO_URI = YOUR_MONGODB_URI
 CLIENT_ID = YOUR_DISCORD_BOT_CLIENT_ID
 PORT = LISTENING_PORT (if you want to run the bot as a web server)
+ACCUWEATHER_KEY = YOUR_ACCUWEATHER_API_KEY (if you want to use the weather command)
 ```
 
 ## License

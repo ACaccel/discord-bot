@@ -18,7 +18,7 @@ export default class weather_forecast extends Command {
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply();
         try {
-            var api_route = "https://dataservice.accuweather.com/forecasts/v1/hourly/1hour/315078?apikey=rVlGI9UbF0ALnbcerU3qKGQeHYjPyTDj&language=zh-tw&details=true";
+            var api_route = `https://dataservice.accuweather.com/forecasts/v1/hourly/1hour/315078?apikey=${process.env.ACCUWEATHER_KEY}&language=zh-tw&details=true`;
             const response = await axios.get(api_route);
             const weatherForecast = response.data[0];
             const temperatureCelsius = (weatherForecast.Temperature.Value - 32) * 5 / 9; // Convert Fahrenheit to Celsius
