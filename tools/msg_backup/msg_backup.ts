@@ -1,4 +1,4 @@
-import { ChannelType, Client, Collection, DMChannel, GatewayIntentBits, Message, TextBasedChannel } from "discord.js";
+import { ChannelType, Client, Collection, GatewayIntentBits, Message, TextBasedChannel } from "discord.js";
 import dotenv from "dotenv";
 import db from "@db";
 import fs from "fs";
@@ -45,7 +45,8 @@ const MONGO_URI = process.env.MONGO_URI;
 const LOG_FILE = path.join(
     process.cwd(),
     'tools',
-    `msg_archive_reconcile_${new Date().toISOString().replace(/[:.]/g, "-")}.log`
+    'msg_backup',
+    `msg_backup_${new Date().toISOString().replace(/[:.]/g, "-")}.log`
 );
 
 const log = (message: string) => {
@@ -64,7 +65,7 @@ if (!TOKEN || !MONGO_URI) {
 
 const parseStartTimestamp = (): number => {
     if (!START_DATE) {
-        console.error("START_DATE is empty. Please set START_DATE in tools/msg_archive_reconcile.ts (format: YYYY-MM-DD).");
+        console.error("START_DATE is empty. Set start_date in tools/msg_backup/config.json (format: YYYY-MM-DD).");
         process.exit(1);
     }
 
@@ -272,23 +273,41 @@ const reconcileChannel = async (
                 insertedMissing += pendingInserts.length;
                 monthInserted += pendingInserts.length;
             } catch (err: any) {
-                // Handle duplicate key errors: insert remaining one by one
-                if (err.code === 11000 || err.name === 'BulkWriteError') {
-                    const inserted = err.insertedCount || 0;
-                    insertedMissing += inserted;
-                    monthInserted += inserted;
-                    // Try inserting remaining individually (skip duplicates)
-                    for (const doc of pendingInserts.slice(inserted)) {
-                        try {
-                            await database.models["Message"].create(doc);
-                            insertedMissing++;
-                            monthInserted++;
-                        } catch {
-                            // Skip duplicates
-                        }
-                    }
-                } else {
+                // Mongoose validation-only failure (not duplicate / driver bulk errors)
+                if (err.name === "MongooseBulkWriteError") {
                     throw err;
+                }
+                const writeErrors = err.writeErrors ?? err.result?.result?.writeErrors ?? [];
+                const partialInsert =
+                    err.name === "MongoBulkWriteError" ||
+                    err.code === 11000 ||
+                    writeErrors.length > 0;
+                if (!partialInsert) {
+                    throw err;
+                }
+                // insertMany(ordered:false) does not insert "the first N" docs — slice(N) was wrong.
+                // Use mongoose's insertedDocs / driver insertedCount, then retry only failed indices.
+                const nInserted =
+                    (Array.isArray(err.insertedDocs) ? err.insertedDocs.length : undefined) ??
+                    (typeof err.insertedCount === "number" ? err.insertedCount : undefined) ??
+                    err.result?.insertedCount ??
+                    0;
+                insertedMissing += nInserted;
+                monthInserted += nInserted;
+
+                const failedIndices = new Set<number>(
+                    writeErrors.map((e: { index: number }) => Number(e.index))
+                );
+                for (const idx of failedIndices) {
+                    const doc = pendingInserts[idx];
+                    if (!doc) continue;
+                    try {
+                        await database.models["Message"].create(doc);
+                        insertedMissing++;
+                        monthInserted++;
+                    } catch (ce: any) {
+                        if (ce.code !== 11000) throw ce;
+                    }
                 }
             }
             pendingInserts = [];
@@ -451,11 +470,18 @@ const reconcileChannel = async (
 
     // sync Fetch.lastMessageID for this channel to the latest message we've seen
     if (latestMessageId) {
-        await database.models["Fetch"].findOneAndUpdate(
-            { channel: (channel as any).name || "", channelID: channel.id },
-            { lastMessageID: latestMessageId },
-            { upsert: true }
+        const channelName = (channel as any).name || "";
+        const kept = await database.models["Fetch"].findOneAndUpdate(
+            { channelID: channel.id },
+            { $set: { channel: channelName, lastMessageID: latestMessageId } },
+            { upsert: true, new: true }
         );
+        if (kept?._id) {
+            await database.models["Fetch"].deleteMany({
+                channelID: channel.id,
+                _id: { $ne: kept._id }
+            });
+        }
     }
 
     log(

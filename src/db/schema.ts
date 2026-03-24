@@ -2,8 +2,8 @@ import mongoose, { Schema } from "mongoose";
 
 const fetchSchema = new Schema({
     channel: { type: String, required: true },
-    channelID: { type: String, required: true },
-    lastMessageID: { type: String, required: true }
+    channelID: { type: String, required: true, index: true },
+    lastMessageID: { type: String, required: false, default: "" },
 });
 
 const messageSchema = new Schema({
