@@ -195,11 +195,11 @@ export const parseDuration = (duration: string): number | null => {
 //     }
 // }
 
-// export const scheduleIconChange = (bot: BaseBot, guildId: string) => {
-//     const interval = getRandomInterval(60, 10*60);
+// export const scheduleIconChange = async (bot: BaseBot, guildId: string) => {
+//     await updateServerIcon(bot, guildId);
+//     const interval = getRandomInterval(2*60, 10*60);
 //     console.log(`Next icon change in ${interval / 60 / 1000} minutes`);
 //     setTimeout(async () => {
-//         await updateServerIcon(bot, guildId);
-//         scheduleIconChange(bot, guildId);
+//         await scheduleIconChange(bot, guildId);
 //     }, interval);
 // }
