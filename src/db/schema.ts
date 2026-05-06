@@ -10,7 +10,7 @@ const messageSchema = new Schema({
     channelId: { type: String, required: true },    // channel & thread
     channelName: { type: String, required: true },
     content: String,
-    messageId: { type: String, required: true },
+    messageId: { type: String, required: true, unique: true },
     userId: { type: String, required: true },
     userName: { type: String, required: true },
     attachments: [{

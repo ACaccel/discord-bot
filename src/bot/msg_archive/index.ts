@@ -40,4 +40,4 @@ const msgArchive = new MsgArchive(
     config
 );
 let backup_server = msgArchive.config.backup_server;
-msgArchive.run(() => msgArchive.messageBackup(backup_server, 60));
+msgArchive.run(() => msgArchive.messageBackup(backup_server));
