@@ -1,0 +1,7 @@
+{
+    "admin": "YOUR_ADMIN_USER_ID",
+    "commands": [
+        "help",
+        "COMMAND_NAME"
+    ]
+}

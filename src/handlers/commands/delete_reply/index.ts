@@ -116,11 +116,11 @@ export default class delete_reply extends Command {
                 await interaction.followUp({
                     content: '圖片回覆預覽（前10筆）：',
                     files: [attachment],
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
                 } catch (err) {
                     // console.log(err)
-                    await interaction.followUp({ content: '無法產生圖片預覽', ephemeral: true });
+                    await interaction.followUp({ content: '無法產生圖片預覽', flags: MessageFlags.Ephemeral });
                 }
             }
             */

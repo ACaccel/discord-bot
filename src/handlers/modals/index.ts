@@ -1,6 +1,7 @@
 import { 
     ModalSubmitInteraction,
-} from "discord.js";
+    MessageFlags,
+} from 'discord.js';
 import { BaseBot } from "@bot";
 import { logger } from "@utils";
 import { HandlerFactory } from "handlers";
@@ -25,7 +26,7 @@ export const registerModals = async (bot: BaseBot) => {
 
 export const executeModal = async (interaction: ModalSubmitInteraction, bot: BaseBot) => {
     if (!bot.modalHandler) {
-        interaction.reply({ content: "Modal handler not found.", ephemeral: true });
+        interaction.reply({ content: "Modal handler not found.", flags: MessageFlags.Ephemeral });
         return;
     }
 

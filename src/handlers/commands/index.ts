@@ -6,7 +6,8 @@ import {
     REST,
     Routes,
     RateLimitData,
-} from "discord.js";
+    MessageFlags,
+} from 'discord.js';
 import { BaseBot } from "@bot";
 import { logger, bot_cmd } from "@utils";
 import { HandlerFactory } from "handlers";
@@ -18,6 +19,7 @@ export interface CommandConfig {
     options?: {
         string?: CommandOption[];
         number?: CommandOption[];
+        float?: CommandOption[];
         user?: CommandOption[];
         channel?: CommandOption[];
         attachment?: CommandOption[];
@@ -29,6 +31,10 @@ interface CommandOption {
     description: string;
     required: boolean;
     choices?: CommandChoice[];
+    /** Minimum numeric value (only applies to `number` and `float` options). */
+    min?: number;
+    /** Maximum numeric value (only applies to `number` and `float` options). */
+    max?: number;
 }
 
 interface CommandChoice {
@@ -112,11 +118,11 @@ export const registerCommands = async (bot: BaseBot) => {
 
 export const executeCommand = async (interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot, blocked_channels?: string[]) => {
     if (!bot.config.commands) {
-        interaction.reply({ content: "Config of commands not found.", ephemeral: true });
+        interaction.reply({ content: "Config of commands not found.", flags: MessageFlags.Ephemeral });
         return;
     }
     if (!bot.commandHandlers) {
-        interaction.reply({ content: "Command handler not found.", ephemeral: true });
+        interaction.reply({ content: "Command handler not found.", flags: MessageFlags.Ephemeral });
         return;
     }
 
@@ -124,7 +130,7 @@ export const executeCommand = async (interaction: ChatInputCommandInteraction | 
     if (handler) {
         await handler.execute(interaction, bot);
     } else {
-        interaction.reply({ content: "Command not found.", ephemeral: true });
+        interaction.reply({ content: "Command not found.", flags: MessageFlags.Ephemeral });
     }
     
     const parentId = interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null;

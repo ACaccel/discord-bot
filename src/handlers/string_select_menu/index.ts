@@ -1,6 +1,7 @@
 import { 
     StringSelectMenuInteraction,
-} from "discord.js";
+    MessageFlags,
+} from 'discord.js';
 import { BaseBot } from "@bot";
 import { logger } from "@utils";
 import { HandlerFactory } from "handlers";
@@ -29,7 +30,7 @@ export const registerSSMs = async (bot: BaseBot) => {
 
 export const executeSSM = async (interaction: StringSelectMenuInteraction, bot: BaseBot) => {
     if (!bot.ssmHandler) {
-        interaction.reply({ content: "String select menu handler not found.", ephemeral: true });
+        interaction.reply({ content: "String select menu handler not found.", flags: MessageFlags.Ephemeral });
         return;
     }
 

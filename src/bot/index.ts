@@ -13,7 +13,8 @@ import {
     Interaction,
     User,
     PartialUser,
-} from "discord.js";
+    MessageFlags,
+} from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
 import { Connection, Model } from "mongoose";
@@ -292,7 +293,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 break;
             default:
                 if (!interaction.isAutocomplete()) {
-                    await interaction.reply({ content: '目前尚不支援此類型的指令', ephemeral: true });
+                    await interaction.reply({ content: '目前尚不支援此類型的指令', flags: MessageFlags.Ephemeral });
                 }
                 break;
         }

@@ -1,6 +1,7 @@
 import {
     ChatInputCommandInteraction,
     Guild,
+    MessageFlags,
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
@@ -28,7 +29,7 @@ export default class talk_signed extends Command {
         try {
             let content = interaction.options.get("content")?.value as string;
             if (!content) {
-                await interaction.reply({ content: "請輸入內容", ephemeral: true });
+                await interaction.reply({ content: "請輸入內容", flags: MessageFlags.Ephemeral });
                 return;
             }
             
@@ -36,12 +37,12 @@ export default class talk_signed extends Command {
             let guild = interaction.guild as Guild;
             let channel = interaction.channel;
             if (!channel?.isSendable()) {
-                await interaction.reply({ content: "頻道不存在或無法傳送訊息", ephemeral: true });
+                await interaction.reply({ content: "頻道不存在或無法傳送訊息", flags: MessageFlags.Ephemeral });
                 return;
             }
             let guild_member = interaction.member && 'displayName' in interaction.member ? interaction.member : null;
             if (!guild_member) {
-                await interaction.reply({ content: "無法取得成員資訊", ephemeral: true });
+                await interaction.reply({ content: "無法取得成員資訊", flags: MessageFlags.Ephemeral });
                 return;
             }
             
@@ -56,7 +57,7 @@ export default class talk_signed extends Command {
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: "無法傳送訊息", ephemeral: true });
+            await interaction.reply({ content: "無法傳送訊息", flags: MessageFlags.Ephemeral });
         }
     }
 }

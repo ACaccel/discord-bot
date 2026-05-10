@@ -2,6 +2,7 @@ import {
     ButtonInteraction,
     Guild,
     GuildMember,
+    MessageFlags,
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { ButtonHandler } from '@button';
@@ -15,7 +16,7 @@ export default class toggle_role extends ButtonHandler {
         if (!role) {
             await interaction.reply({
                 content: `Role not found.`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
             return;
         }
@@ -25,13 +26,13 @@ export default class toggle_role extends ButtonHandler {
             await member.roles.remove(roleId);
             await interaction.reply({
                 content: `Removed role ${role.name}.`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         } else {
             await member.roles.add(roleId);
             await interaction.reply({
                 content: `Added role ${role.name}.`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
     }

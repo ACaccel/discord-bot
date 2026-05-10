@@ -2,7 +2,8 @@ import {
     Client,
     Message,
     PartialMessage,
-    Interaction
+    Interaction,
+    MessageFlags,
 } from 'discord.js';
 import { BaseBot, Config } from '@bot';
 import { 
@@ -46,7 +47,7 @@ export class Nijika extends BaseBot<NijikaConfig> {
                 break;
             default:
                 if (!interaction.isAutocomplete()) {
-                    await interaction.reply({ content: '目前尚不支援此類型的指令', ephemeral: true });
+                    await interaction.reply({ content: '目前尚不支援此類型的指令', flags: MessageFlags.Ephemeral });
                 }
                 break;
         }

@@ -62,9 +62,20 @@ const activitySchema = new Schema({
     participants: [{ type: String, required: true }]
 });
 
+// Per-user AI API settings; a document's existence also acts as a whitelist entry.
+const userApiSettingSchema = new Schema({
+    userId: { type: String, required: true, unique: true, index: true },
+    provider: { type: String, required: true, default: 'openai' },
+    model: { type: String, required: true, default: 'gpt-4o' },
+    temperature: { type: Number, required: true, default: 1.0 },
+    system_prompt: { type: String, default: '' },
+    web_search: { type: Boolean, required: true, default: false },
+});
+
 export const Fetch = mongoose.model('Fetch', fetchSchema);
 export const Message = mongoose.model('Message', messageSchema);
 export const Reply = mongoose.model('Reply', replySchema);
 export const Todo = mongoose.model('Todo', todoSchema);
 export const Giveaway = mongoose.model('Giveaway', giveawaySchema);
 export const Activity = mongoose.model('Activity', activitySchema);
+export const UserApiSetting = mongoose.model('UserApiSetting', userApiSettingSchema);

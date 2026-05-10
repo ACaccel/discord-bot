@@ -1,5 +1,6 @@
 import {
-    StringSelectMenuInteraction
+    StringSelectMenuInteraction,
+    MessageFlags,
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { SSMHandler } from '@ssm';
@@ -11,14 +12,14 @@ export default class delete_reply extends SSMHandler {
 
         const db = bot.guildInfo[interaction.guild?.id as string].db;
         if (!db) {
-            await interaction.reply({ content: "找不到資料庫", ephemeral: true }); 
+            await interaction.reply({ content: "找不到資料庫", flags: MessageFlags.Ephemeral });
             return;
         }
 
         const pair = await db.models["Reply"].findById(value);
         const replymsg = pair.reply;
         await db.models["Reply"].findByIdAndDelete(value);
-        
+
         await interaction.reply({ content: `已刪除回覆：${key} => ${replymsg}` });
     }
 }

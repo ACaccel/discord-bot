@@ -49,17 +49,45 @@ class BackupLog {
 
 const BACKUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
-// Retries `fn` up to `maxAttempts` times on ConnectTimeoutError with exponential backoff.
-// All other errors are re-thrown immediately.
-async function retryFetch<T>(fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
+// Classifies whether an error is worth retrying. Covers HTTP 5xx / 429 from
+// discord.js (HTTPError / DiscordAPIError both expose `status`) and the
+// undici/node connection-layer errors that surface during transient network
+// blips. Anything else (4xx perms, Unknown Channel, validation) is permanent
+// and must propagate immediately so the caller can log it.
+function isRetryableError(err: any): boolean {
+    if (!err) return false;
+
+    const status: number | undefined = err.status ?? err.httpStatus;
+    if (typeof status === 'number' && (status >= 500 || status === 429)) return true;
+
+    const name = err.name;
+    if (name === 'ConnectTimeoutError' || name === 'AbortError' || name === 'FetchError') return true;
+
+    const code = err.code;
+    if (code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'EAI_AGAIN' ||
+        code === 'ENOTFOUND' || code === 'UND_ERR_SOCKET' || code === 'UND_ERR_CONNECT_TIMEOUT') {
+        return true;
+    }
+
+    // Fallback for errors whose typing is lost through discord.js wrapping.
+    const msg = String(err);
+    if (msg.includes('ConnectTimeoutError') || msg.includes('Service Unavailable')) return true;
+
+    return false;
+}
+
+// Retries `fn` up to `maxAttempts` times on transient errors with jittered
+// exponential backoff. Non-retryable errors are re-thrown immediately.
+async function retryFetch<T>(fn: () => Promise<T>, maxAttempts = 5): Promise<T> {
     let delay = 2000;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             return await fn();
-        } catch (err: any) {
-            const isTimeout = err?.name === 'ConnectTimeoutError' || String(err).includes('ConnectTimeoutError');
-            if (!isTimeout || attempt === maxAttempts) throw err;
-            await new Promise(res => setTimeout(res, delay));
+        } catch (err) {
+            if (!isRetryableError(err) || attempt === maxAttempts) throw err;
+            // Jitter prevents many parallel channel backups from retrying in lockstep.
+            const jittered = delay * (0.5 + Math.random());
+            await new Promise(res => setTimeout(res, jittered));
             delay *= 2;
         }
     }

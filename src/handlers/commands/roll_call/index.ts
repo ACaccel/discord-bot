@@ -1,6 +1,7 @@
 import { 
     ChatInputCommandInteraction,
     GuildMember,
+    MessageFlags,
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
@@ -35,7 +36,7 @@ export default class roll_call extends Command {
             const activity_id = interaction.options.get("activity_id")?.value as string | undefined;
 
             if (!users && !activity_id) {
-                await interaction.reply({ content: "請提供被點名者 (users) 或活動ID (activity_id)", ephemeral: true });
+                await interaction.reply({ content: "請提供被點名者 (users) 或活動ID (activity_id)", flags: MessageFlags.Ephemeral });
                 return;
             }
 
@@ -44,19 +45,19 @@ export default class roll_call extends Command {
             if (activity_id) {
                 const guild = interaction.guild;
                 if (!guild) {
-                    await interaction.reply({ content: "找不到伺服器", ephemeral: true });
+                    await interaction.reply({ content: "找不到伺服器", flags: MessageFlags.Ephemeral });
                     return;
                 }
 
                 const db = bot.guildInfo[guild.id].db;
                 if (!db) {
-                    await interaction.reply({ content: "找不到資料庫", ephemeral: true });
+                    await interaction.reply({ content: "找不到資料庫", flags: MessageFlags.Ephemeral });
                     return;
                 }
 
                 const activity = await db.models["Activity"].findOne({ activity_id });
                 if (!activity) {
-                    await interaction.reply({ content: `找不到活動ID為 ${activity_id} 的活動`, ephemeral: true });
+                    await interaction.reply({ content: `找不到活動ID為 ${activity_id} 的活動`, flags: MessageFlags.Ephemeral });
                     return;
                 }
 
@@ -69,14 +70,14 @@ export default class roll_call extends Command {
                 }
 
                 if (validUsers.length === 0) {
-                    await interaction.reply({ content: "該活動目前沒有參與者", ephemeral: true });
+                    await interaction.reply({ content: "該活動目前沒有參與者", flags: MessageFlags.Ephemeral });
                     return;
                 }
 
                 await db.models["Activity"].deleteOne({ activity_id });
             } else if (users) {
                 if (!users.match(/^<@\d+>(\s*<@\d+>)*$/)) {
-                    await interaction.reply({ content: "格式錯誤！regex: match(/^<@\d+>(\s*<@\d+>)*$/)", ephemeral: true });
+                    await interaction.reply({ content: "格式錯誤！regex: match(/^<@\d+>(\s*<@\d+>)*$/)", flags: MessageFlags.Ephemeral });
                     return;
                 }
         
@@ -84,13 +85,13 @@ export default class roll_call extends Command {
                 for (const userId of userIds) {
                     const user = interaction.guild?.members.cache.get(userId);
                     if (!user) {
-                        await interaction.reply({ content: `找不到ID為 ${userId} 的使用者, 請確認ID是否正確`, ephemeral: true });
+                        await interaction.reply({ content: `找不到ID為 ${userId} 的使用者, 請確認ID是否正確`, flags: MessageFlags.Ephemeral });
                         return;
                     }
                     validUsers.push(user);
                 }
                 if (validUsers.length === 0) {
-                    await interaction.reply({ content: "請至少提供一個有效的使用者ID", ephemeral: true });
+                    await interaction.reply({ content: "請至少提供一個有效的使用者ID", flags: MessageFlags.Ephemeral });
                     return;
                 }
             }
@@ -109,10 +110,10 @@ export default class roll_call extends Command {
             if (!ch?.isSendable()) return;
             const msg = await ch.send({ content: announcement });
             bot_cmd.msgReact(msg, ["<:slowpoke_wave_lr:1178718404102848573>"])
-            await interaction.reply({ content: "點名已發送！", ephemeral: true })
+            await interaction.reply({ content: "點名已發送！", flags: MessageFlags.Ephemeral })
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: "無法進行點名", ephemeral: true });
+            await interaction.reply({ content: "無法進行點名", flags: MessageFlags.Ephemeral });
         }
     }
 }

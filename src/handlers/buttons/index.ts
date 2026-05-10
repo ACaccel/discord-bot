@@ -1,6 +1,7 @@
 import { 
     ButtonInteraction,
-} from "discord.js";
+    MessageFlags,
+} from 'discord.js';
 import { BaseBot } from "@bot";
 import { logger } from "@utils";
 import { HandlerFactory } from "handlers";
@@ -29,7 +30,7 @@ export const registerButtons = async (bot: BaseBot) => {
 
 export const executeButton = async (interaction: ButtonInteraction, bot: BaseBot) => {
     if (!bot.buttonHandler) {
-        interaction.reply({ content: "Button handler not found.", ephemeral: true });
+        interaction.reply({ content: "Button handler not found.", flags: MessageFlags.Ephemeral });
         return;
     }
 

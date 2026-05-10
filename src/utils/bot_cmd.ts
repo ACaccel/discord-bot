@@ -89,11 +89,24 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
             }),
 
         number: (e: any) =>
-            slashCommand.addIntegerOption(o =>
+            slashCommand.addIntegerOption(o => {
                 o.setName(e.name)
                  .setDescription(e.description)
-                 .setRequired(e.required)
-            ),
+                 .setRequired(e.required);
+                if (typeof e.min === 'number') o.setMinValue(e.min);
+                if (typeof e.max === 'number') o.setMaxValue(e.max);
+                return o;
+            }),
+
+        float: (e: any) =>
+            slashCommand.addNumberOption(o => {
+                o.setName(e.name)
+                 .setDescription(e.description)
+                 .setRequired(e.required);
+                if (typeof e.min === 'number') o.setMinValue(e.min);
+                if (typeof e.max === 'number') o.setMaxValue(e.max);
+                return o;
+            }),
 
         attachment: (e: any) =>
             slashCommand.addAttachmentOption(o =>
