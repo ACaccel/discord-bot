@@ -42,9 +42,10 @@ export const executeButton = async (interaction: ButtonInteraction, bot: BaseBot
     }
 }
 
+import { BUTTON_REGISTRY } from './registry.generated';
+
 const buttonHandlerFactory = new HandlerFactory<ButtonHandler>();
-const buttonDir = __dirname;
-buttonHandlerFactory.register(buttonDir);
+buttonHandlerFactory.registerFromRegistry(BUTTON_REGISTRY);
 
 export const getButtonHandlerClass = (name: string) => buttonHandlerFactory.getConstructor(name);
 export const createButtonHandler = (name: string) => buttonHandlerFactory.create(name);

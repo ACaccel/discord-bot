@@ -38,9 +38,10 @@ export const executeModal = async (interaction: ModalSubmitInteraction, bot: Bas
     }
 }
 
+import { MODAL_REGISTRY } from './registry.generated';
+
 const modalHandlerFactory = new HandlerFactory<ModalHandler>();
-const modalDir = __dirname;
-modalHandlerFactory.register(modalDir);
+modalHandlerFactory.registerFromRegistry(MODAL_REGISTRY);
 
 export const getModalHandlerClass = (name: string) => modalHandlerFactory.getConstructor(name);
 export const createModalHandler = (name: string) => modalHandlerFactory.create(name);

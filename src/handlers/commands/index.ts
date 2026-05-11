@@ -144,9 +144,10 @@ export const executeCommand = async (interaction: ChatInputCommandInteraction | 
     }
 }
 
+import { COMMAND_REGISTRY } from './registry.generated';
+
 const commandHandlerFactory = new HandlerFactory<Command>();
-const commandsDir = __dirname;
-commandHandlerFactory.register(commandsDir);
+commandHandlerFactory.registerFromRegistry(COMMAND_REGISTRY);
 
 export const getSlashCommandClass = (name: string) => commandHandlerFactory.getConstructor(name);
 export const createCommand = (name: string) => commandHandlerFactory.create(name);
