@@ -4,6 +4,11 @@
 /data
 *.log
 
+# Personal Claude Code settings (machine-specific allowlists, paths).
+# `.claude/agents/` IS tracked — those are shared dev tooling.
+.claude/settings.json
+.claude/settings.local.json
+
 .env
 config.json
 guild_profile.json
