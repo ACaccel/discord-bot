@@ -1,0 +1,25 @@
+name: CodeQL
+
+# Runs on PR + push + weekly schedule. PR trigger is required so this job
+# can be promoted to a required check on protected branches.
+on:
+  pull_request:
+    branches: [main, 'refactor/**']
+  push:
+    branches: [main, 'refactor/**']
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3

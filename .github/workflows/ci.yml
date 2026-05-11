@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'refactor/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - run: yarn lint
+      - run: yarn format:check
+      - run: yarn handlers:gen:check
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - run: yarn typecheck
+
+  test-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - run: yarn test:unit
+      - run: yarn test:i18n
+
+  test-int:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      # Run integration tests with JSON reporter so we can verify the
+      # project actually loaded files (no silent green).
+      # `|| true` is used to keep the step exit clean when vitest exits 0
+      # under --passWithNoTests but does NOT write the JSON file; the
+      # subsequent guard step is the real gate and checks file presence.
+      - name: Run integration tests
+        run: yarn test:int --reporter=json --outputFile=.vitest-int.json
+      # Empty-project guard: while .github/PHASE < 2 a zero-file integration
+      # set is intentional. From phase 2 onward, zero files means the
+      # vitest project glob is broken — fail the build.
+      - name: Empty-project guard
+        run: |
+          set -euo pipefail
+          phase="$(tr -d '[:space:]' < .github/PHASE)"
+          if [ -f .vitest-int.json ]; then
+            suites="$(jq '.numTotalTestSuites // 0' .vitest-int.json)"
+          else
+            # Vitest exits 0 under --passWithNoTests without writing the
+            # report file when zero suites match — that is the very state
+            # this guard exists to catch.
+            suites=0
+          fi
+          echo "::notice::Phase=$phase  numTotalTestSuites=$suites"
+          if [ "$suites" -gt 0 ]; then
+            echo "Integration test suites present; guard satisfied."
+            exit 0
+          fi
+          if [ "$phase" -le 1 ]; then
+            echo "Phase $phase: empty integration set is intentional; guard PASSES."
+            exit 0
+          fi
+          echo "::error::Phase $phase requires at least one integration test suite, but vitest reported 0."
+          exit 1
+
+  test-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - name: Run contract tests
+        run: yarn test:contract --reporter=json --outputFile=.vitest-contract.json
+      # Contract test layer arrives in Phase 5 (LLM provider adapters).
+      # Until then, zero contract suites are intentional.
+      - name: Empty-project guard
+        run: |
+          set -euo pipefail
+          phase="$(tr -d '[:space:]' < .github/PHASE)"
+          if [ -f .vitest-contract.json ]; then
+            suites="$(jq '.numTotalTestSuites // 0' .vitest-contract.json)"
+          else
+            suites=0
+          fi
+          echo "::notice::Phase=$phase  numTotalTestSuites=$suites (contract)"
+          if [ "$suites" -gt 0 ]; then exit 0; fi
+          if [ "$phase" -le 4 ]; then exit 0; fi
+          echo "::error::Phase $phase requires at least one contract test suite, but vitest reported 0."
+          exit 1
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks needs full history
+      - uses: ./.github/actions/yarn-install
+      - name: audit-ci (HIGH+ with documented allowlist)
+        run: yarn security --output-format=json | tee audit-ci-report.json
+      - name: Archive audit report + allowlist
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-ci-report-${{ github.run_id }}
+          path: |
+            audit-ci-report.json
+            audit-ci.jsonc
+          retention-days: 90
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
