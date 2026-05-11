@@ -42,9 +42,10 @@ export const executeSSM = async (interaction: StringSelectMenuInteraction, bot: 
     }
 }
 
+import { SSM_REGISTRY } from './registry.generated';
+
 const ssmHandlerFactory = new HandlerFactory<SSMHandler>();
-const ssmDir = __dirname;
-ssmHandlerFactory.register(ssmDir);
+ssmHandlerFactory.registerFromRegistry(SSM_REGISTRY);
 
 export const getSSMHandlerClass = (name: string) => ssmHandlerFactory.getConstructor(name);
 export const createSSMHandler = (name: string) => ssmHandlerFactory.create(name);

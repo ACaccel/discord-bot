@@ -48,9 +48,10 @@ export const executeReactionRemoved = async (reaction: MessageReaction, user: Us
     }
 };
 
+import { REACTION_REGISTRY } from './registry.generated';
+
 const reactionHandlerFactory = new HandlerFactory<ReactionHandler>();
-const reactionDir = __dirname;
-reactionHandlerFactory.register(reactionDir);
+reactionHandlerFactory.registerFromRegistry(REACTION_REGISTRY);
 
 export const getReactionHandlerClass = (name: string) => reactionHandlerFactory.getConstructor(name);
 export const createReactionHandler = (name: string) => reactionHandlerFactory.create(name);

@@ -24,6 +24,9 @@
   },
   // Phase 0: strict typechecking applies only to newly-added code paths.
   // Each later phase that converts a legacy directory adds its path here.
-  "include": ["src/core/**/*", "scripts/**/*", "test/**/*"],
+  // Phase 1 expansion: `src/db/**` — schemas now have typed doc interfaces
+  // (no more `Record<string, Model<any>>`) and the connection factory
+  // returns a strongly-typed `Models` map.
+  "include": ["src/core/**/*", "src/db/**/*", "scripts/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]
 }

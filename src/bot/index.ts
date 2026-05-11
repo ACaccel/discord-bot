@@ -17,13 +17,12 @@ import {
 } from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
-import { Connection, Model } from "mongoose";
+import db, { type GuildDb } from '@db';
 import { Job } from 'node-schedule';
 import { Command, registerCommands, executeCommand } from "@cmd";
 import { ButtonHandler, registerButtons, executeButton } from '@button';
 import { ModalHandler, registerModals, executeModal } from '@modal';
 import { registerSSMs, SSMHandler, executeSSM } from '@ssm';
-import db from '@db';
 import { logger } from "@utils";
 import { auto_reply, detectGuildCreate, detectGuildMemberUpdate, detectMessageDelete, detectMessageUpdate } from "@event";
 import { ReactionHandler, executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
@@ -40,10 +39,7 @@ export interface GuildInfo {
     guild: Guild;
     channels?: Record<string, Channel>;
     roles?: Record<string, Role>;
-    db?: {
-        connection: Connection;
-        models: Record<string, Model<any>>;
-    }
+    db?: GuildDb;
 }
 
 interface GuildConfig {
