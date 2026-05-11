@@ -1,0 +1,18 @@
+{
+  "command": {
+    "not_found": "找不到指令 /{{name}},請使用 /help 查看可用指令清單。"
+  },
+  "validation": {
+    "field_required": "參數「{{field}}」不可為空,請重新輸入。"
+  },
+  "permission": {
+    "denied": "你沒有使用此指令的權限(需要角色:{{requiredRole}})。"
+  },
+  "db": {
+    "unavailable": "資料庫暫時無法連線,本指令稍後可重試。錯誤編號:{{traceId}}"
+  },
+  "llm": {
+    "rate_limited": "AI 服務目前忙線中(限流),請於 {{retryAfter}} 秒後再試。"
+  },
+  "unexpected": "指令執行時發生未預期的錯誤,管理員已收到通知(錯誤編號:{{traceId}})。"
+}

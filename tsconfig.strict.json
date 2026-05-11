@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "useUnknownInCatchVariables": true,
+
+    "skipDefaultLibCheck": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  // Phase 0: strict typechecking applies only to newly-added code paths.
+  // Each later phase that converts a legacy directory adds its path here.
+  "include": ["src/core/**/*", "scripts/**/*", "test/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
