@@ -122,15 +122,31 @@ export class MongoConnectionManager implements ConnectionManager {
   private async open(guildId: GuildId): Promise<GuildConnection> {
     const uri = buildGuildMongoUri(this.baseUri, guildId);
     const connection = await mongoose.createConnection(uri).asPromise();
-    const models = buildModels(connection);
-    // Block until declared indexes (e.g. unique `Message.messageId`)
-    // are present. Otherwise the very first `insertManyIgnoringDuplicates`
-    // after a cold-start `getConnection` can race the auto-index build
-    // and silently store duplicate rows.
-    await Promise.all(Object.values(models).map((m) => m.init()));
-    const entry: GuildConnection = { guildId, connection, models };
-    this.cache.set(guildId, entry);
-    return entry;
+    try {
+      const models = buildModels(connection);
+      // Block until declared indexes (e.g. unique `Message.messageId`)
+      // are present. Otherwise the very first
+      // `insertManyIgnoringDuplicates` after a cold-start
+      // `getConnection` can race the auto-index build and silently
+      // store duplicate rows.
+      await Promise.all(Object.values(models).map((m) => m.init()));
+      const entry: GuildConnection = { guildId, connection, models };
+      this.cache.set(guildId, entry);
+      return entry;
+    } catch (err: unknown) {
+      // Init failed (auth, network, index conflict, ...) but the
+      // mongoose connection is already open. Close it before
+      // rethrowing so a failed cold-start does not leak a TCP
+      // socket — getConnection() would otherwise retry-and-leak on
+      // every subsequent attempt.
+      try {
+        await connection.close();
+      } catch {
+        // Suppress: the original init error is what callers need to
+        // see; close failures during cleanup must not mask it.
+      }
+      throw err;
+    }
   }
 }
 
