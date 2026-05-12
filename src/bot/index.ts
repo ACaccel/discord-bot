@@ -27,6 +27,12 @@ import {
 import { asGuildId } from '../core/ids';
 import { buildRepos, type Repos } from '../persistence/repositories';
 import type { ConnectionManager } from '../infra/mongo/connection-manager';
+import {
+  createLoggerFromProcessEnv,
+  installProcessHandlers,
+  type Logger,
+} from '../core/logger';
+import { initLegacyLogger } from '../utils/logger';
 import { Job } from 'node-schedule';
 import { Command, registerCommands, executeCommand } from "@cmd";
 import { ButtonHandler, registerButtons, executeButton } from '@button';
@@ -110,6 +116,13 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         this.jobs = new Map<string, Job>();
 
         this.container = createContainer();
+        // Logger is the first registration so downstream factories may
+        // resolve it for their own structured logs. The instance is
+        // bound with `{ bot: clientId }` so every line carries the bot
+        // identity without callers passing it explicitly.
+        this.container.registerSingleton(TOKENS.Logger, () =>
+            createLoggerFromProcessEnv({ bot: this.clientId }),
+        );
         // ConnectionManager is keyed by URI through `getMongoConnectionManagerForUri`,
         // shared with the legacy `db.dbConnect()` shim — one pool per process per URI.
         const uri = this.mongoURI;
@@ -158,9 +171,51 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     }
 
     public run = async (callback?: () => Promise<void>) => {
+        // Wire the structured logger before any handler runs so legacy
+        // `logger.systemLogger(...)` callsites route through the same
+        // bot-scoped pino instance the IoC container holds.
+        const rootLogger = this.container.resolve<Logger>(TOKENS.Logger);
+        initLegacyLogger(rootLogger);
+        // Process-level safety net. `installProcessHandlers` is
+        // idempotent so multi-bot processes (one node process running
+        // >1 BaseBot) install exactly once.
+        installProcessHandlers({
+            logger: rootLogger,
+            gracefulShutdown: () => this.shutdown(),
+        });
         await this.login();
         await this.init(callback);
         await this.listen();
+    }
+
+    /**
+     * Best-effort graceful shutdown invoked by the
+     * `uncaughtException` handler. Override in subclasses to add
+     * bot-specific teardown. The default closes the Discord client +
+     * mongo connections via the shared {@link ConnectionManager}.
+     */
+    public shutdown = async (): Promise<void> => {
+        const log = this.container.tryResolve<Logger>(TOKENS.Logger);
+        try {
+            this.client.destroy();
+        } catch (e: unknown) {
+            // Best-effort: log so ops sees why teardown couldn't reach a
+            // clean state, but the process is already on the fatal path
+            // and will exit shortly regardless.
+            log?.warn(
+                { err: e instanceof Error ? e : new Error(String(e)) },
+                'shutdown: client.destroy threw',
+            );
+        }
+        try {
+            const cm = this.container.tryResolve<ConnectionManager>(TOKENS.ConnectionManager);
+            await cm?.closeAll();
+        } catch (e: unknown) {
+            log?.warn(
+                { err: e instanceof Error ? e : new Error(String(e)) },
+                'shutdown: connection manager closeAll threw',
+            );
+        }
     }
 
     public login = async () => {
