@@ -1,18 +1,32 @@
 {
   "command": {
-    "not_found": "找不到指令 /{{name}},請使用 /help 查看可用指令清單。"
+    "not_found": "找不到指令 /{{name}},請使用 /help 查看可用指令清單。",
+    "guild_only": "此指令只能在伺服器中使用。",
+    "unsupported_interaction_type": "目前尚不支援此類型的指令"
   },
   "validation": {
-    "field_required": "參數「{{field}}」不可為空,請重新輸入。"
+    "field_required": "參數「{{field}}」不可為空,請重新輸入。",
+    "field_invalid": "參數「{{field}}」格式不正確,請重新輸入。"
   },
   "permission": {
-    "denied": "你沒有使用此指令的權限(需要角色:{{requiredRole}})。"
+    "denied": "你沒有使用此指令的權限(需要角色:{{requiredRole}})。",
+    "admin_only": "此指令僅限管理員使用。"
   },
   "db": {
-    "unavailable": "資料庫暫時無法連線,本指令稍後可重試。錯誤編號:{{traceId}}"
+    "unavailable": "資料庫暫時無法連線,本指令稍後可重試。錯誤編號:{{traceId}}",
+    "connection_failed": "資料庫連線異常,請稍後再試。",
+    "operation_failed": "資料庫操作失敗,請稍後再試。"
   },
   "llm": {
-    "rate_limited": "AI 服務目前忙線中(限流),請於 {{retryAfter}} 秒後再試。"
+    "rate_limited": "AI 服務目前忙線中(限流),請於 {{retryAfter}} 秒後再試。",
+    "invalid_api_key": "Provider `{{provider}}` 的 API 金鑰未設定或無效,請於 .env 設定後重試。",
+    "context_too_long": "對話內容超過 `{{provider}}` 模型的上下文長度限制,請縮短輸入或重新開始對話。",
+    "upstream_failure": "AI 服務 `{{provider}}` 暫時無法存取(狀態 {{status}}),請稍後再試。",
+    "timeout": "AI 服務 `{{provider}}` 回應逾時,請稍後再試。",
+    "unknown": "AI 服務發生未預期的錯誤,請稍後再試。"
+  },
+  "configuration": {
+    "missing_env": "環境變數 `{{envVar}}` 未設定,請聯絡管理員。"
   },
   "unexpected": "指令執行時發生未預期的錯誤,管理員已收到通知(錯誤編號:{{traceId}})。"
 }

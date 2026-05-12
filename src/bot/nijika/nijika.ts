@@ -56,7 +56,11 @@ export class Nijika extends BaseBot<NijikaConfig> {
                 break;
             default:
                 if (!interaction.isAutocomplete()) {
-                    await interaction.reply({ content: '目前尚不支援此類型的指令', flags: MessageFlags.Ephemeral });
+                    await interaction.reply({
+                        content:
+                            this.translator?.t('errors:command.unsupported_interaction_type') ?? '',
+                        flags: MessageFlags.Ephemeral,
+                    });
                 }
                 break;
         }
