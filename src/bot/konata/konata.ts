@@ -5,10 +5,17 @@ import { createLlmChatPlugin } from '@plugins';
 /**
  * Konata composition root. Phase 4b-3 relocated the entire LLM chat
  * lifecycle (session management, provider dispatch, chunked reply,
- * pre-warm) into {@link createLlmChatPlugin}; this class is left as a
- * thin BaseBot subclass that registers the plugin and a Discord
- * presence. No event listener overrides are needed — BaseBot's
- * defaults are no-op for every event Konata used to suppress.
+ * pre-warm) into {@link createLlmChatPlugin}; this class registers
+ * that plugin and a Discord presence.
+ *
+ * Listener override policy: Konata is a pure LLM-chat bot. It must
+ * NOT log reactions or run guild-create initialisation — both are
+ * non-chat sinks. After Phase 4b-2 the message-event listeners
+ * (messageCreate / messageUpdate / messageDelete / guildMemberUpdate)
+ * default to no-op on BaseBot, so those overrides were dropped; the
+ * three remaining overrides below mirror listeners BaseBot still
+ * wires to legacy handlers (reactionAdd/Remove → executeReaction*,
+ * guildCreate → detectGuildCreate) and must stay silent for Konata.
  */
 export class Konata extends BaseBot<Config> {
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: Config) {
@@ -16,6 +23,12 @@ export class Konata extends BaseBot<Config> {
         this.use(createLlmChatPlugin({ clientId: this.clientId }));
         this.registerPresence();
     }
+
+    // Suppress non-chat listeners BaseBot still routes to legacy
+    // handlers. See class docstring for the rationale.
+    public override messageReactionAddListener = async (): Promise<void> => {};
+    public override messageReactionRemoveListener = async (): Promise<void> => {};
+    public override guildCreateListener = async (): Promise<void> => {};
 
     /**
      * Without an explicit presence, Discord clients tend to render an idle bot
