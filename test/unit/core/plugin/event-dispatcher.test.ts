@@ -86,4 +86,19 @@ describe('EventDispatcher', () => {
     const dispatcher = new EventDispatcher(silent);
     await expect(dispatcher.emit('messageCreate', {} as never)).resolves.toBeUndefined();
   });
+
+  it('subscribedEvents() snapshots every event that currently has a subscriber', () => {
+    const dispatcher = new EventDispatcher(silent);
+    expect(dispatcher.subscribedEvents()).toEqual([]);
+    dispatcher.subscribe('p1', services(), {
+      messageCreate: async () => undefined,
+      ready: async () => undefined,
+    });
+    dispatcher.subscribe('p2', services(), { messageCreate: async () => undefined });
+    const events = [...dispatcher.subscribedEvents()].sort();
+    expect(events).toEqual(['messageCreate', 'ready']);
+    dispatcher.unsubscribeAll('p1');
+    // p2 still owns messageCreate; ready has no subscribers and drops out.
+    expect([...dispatcher.subscribedEvents()].sort()).toEqual(['messageCreate']);
+  });
 });
