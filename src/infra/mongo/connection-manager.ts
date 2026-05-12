@@ -142,27 +142,28 @@ export class MongoConnectionManager implements ConnectionManager {
       // but rejections drop a stderr line and the connection stays
       // serving. Duplicate-row risk under a missing unique index is
       // the operator's to fix; an unusable bot is ours.
-      const initResults = await Promise.allSettled(
+      // Each init runs in its own task so the per-model `name` stays
+      // in scope on rejection — `Promise.allSettled`'s `result.reason`
+      // carries only the inner error, not the closure binding. Log
+      // inside the task, then rethrow so `allSettled` still records
+      // the rejection for any future caller that wants it.
+      // Stderr keeps this layer free of cross-imports into core/logger;
+      // the bot's structured logger separately reports
+      // "MongoDB for guild ... connected" / "Failed".
+      await Promise.allSettled(
         Object.entries(models).map(async ([name, model]) => {
-          await model.init();
-          return name;
+          try {
+            await model.init();
+          } catch (err: unknown) {
+            const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+            process.stderr.write(
+              `[mongo] model.init() failed for ${name} on guild ${guildId}: ${reason}. ` +
+                `Connection kept open; indexes may be missing.\n`,
+            );
+            throw err;
+          }
         }),
       );
-      for (const result of initResults) {
-        if (result.status === 'rejected') {
-          const reason =
-            result.reason instanceof Error
-              ? `${result.reason.name}: ${result.reason.message}`
-              : String(result.reason);
-          // Stderr keeps this layer free of cross-imports into core/logger.
-          // The line is intended for operators; the bot's structured logger
-          // separately reports "MongoDB for guild ... connected" / "Failed".
-          process.stderr.write(
-            `[mongo] model.init() failed on guild ${guildId}: ${reason}. ` +
-              `Connection kept open; indexes may be missing.\n`,
-          );
-        }
-      }
       const entry: GuildConnection = { guildId, connection, models };
       this.cache.set(guildId, entry);
       return entry;

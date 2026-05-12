@@ -110,8 +110,13 @@ describe('MongoConnectionManager (integration)', () => {
       const reuse = await mgr.getConnection(tolerateGuildId);
       expect(reuse).toBe(guildConn);
 
-      // Operator MUST see something about the init failure on stderr.
-      expect(captured.some((line) => line.includes('model.init() failed'))).toBe(true);
+      // Operator MUST see WHICH model failed: a bare "model.init() failed"
+      // line would force them to grep the codebase to learn whether it
+      // was Message, UserApiSetting, or something else. The phase-7
+      // hotfix bakes the model name into the line.
+      const failureLine = captured.find((line) => line.includes('model.init() failed'));
+      expect(failureLine).toBeDefined();
+      expect(failureLine).toMatch(/model\.init\(\) failed for Message on guild /);
     } finally {
       process.stderr.write = stderrWrite;
       await mgr.closeAll();
