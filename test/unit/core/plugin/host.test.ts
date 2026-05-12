@@ -5,6 +5,7 @@ import { systemClock } from '../../../../src/core/time';
 import { createContainer, type ServiceContainer } from '../../../../src/core/ioc';
 import {
   CriticalPluginFailureError,
+  DependencyDisabledError,
   DuplicateContributionError,
   PluginHost,
   PluginRegistrationError,
@@ -246,6 +247,91 @@ describe('PluginHost lifecycle', () => {
     await expect(host.initAll()).rejects.toBeInstanceOf(CriticalPluginFailureError);
     // Still marked disabled for the diagnostic surface.
     expect(host.getDisabledPlugins().map((d) => d.id)).toEqual(['fatal']);
+  });
+
+  it('cascade-disables transitive dependents when a dependency fails in init', async () => {
+    const initSpy = {
+      logger: vi.fn(async () => {
+        throw new Error('logger init failed');
+      }),
+      repos: vi.fn(async () => undefined),
+      app: vi.fn(async () => undefined),
+      unrelated: vi.fn(async () => undefined),
+    };
+    const startSpy = {
+      app: vi.fn(async () => undefined),
+      repos: vi.fn(async () => undefined),
+    };
+    const { host } = buildHost();
+    host.register(plugin({ id: 'logger', init: initSpy.logger }));
+    host.register(
+      plugin({
+        id: 'repos',
+        dependencies: [{ id: 'logger', versionRange: '*' }],
+        init: initSpy.repos,
+        start: startSpy.repos,
+      }),
+    );
+    host.register(
+      plugin({
+        id: 'app',
+        dependencies: [{ id: 'repos', versionRange: '*' }],
+        init: initSpy.app,
+        start: startSpy.app,
+      }),
+    );
+    host.register(plugin({ id: 'unrelated', init: initSpy.unrelated }));
+    host.finalizeRegistration();
+    await host.initAll();
+    await host.startAll();
+
+    // Logger failed; repos + app must have been cascade-disabled and
+    // their hooks must never have run. `unrelated` (no dependency on
+    // logger) keeps running normally.
+    const disabled = host
+      .getDisabledPlugins()
+      .map((d) => d.id)
+      .sort();
+    expect(disabled).toEqual(['app', 'logger', 'repos']);
+    expect(initSpy.logger).toHaveBeenCalledTimes(1);
+    expect(initSpy.repos).not.toHaveBeenCalled();
+    expect(initSpy.app).not.toHaveBeenCalled();
+    expect(startSpy.repos).not.toHaveBeenCalled();
+    expect(startSpy.app).not.toHaveBeenCalled();
+    expect(initSpy.unrelated).toHaveBeenCalledTimes(1);
+
+    // The cascade victims carry a DependencyDisabledError whose
+    // root cause is the original failure.
+    const reposDisabled = host.getDisabledPlugins().find((d) => d.id === 'repos');
+    expect(reposDisabled?.error).toBeInstanceOf(DependencyDisabledError);
+    expect((reposDisabled?.error as DependencyDisabledError).rootPluginId).toBe('logger');
+  });
+
+  it('cascade-disable propagates critical-ness — a critical dependent of a failed dep aborts the phase', async () => {
+    const { host } = buildHost();
+    host.register(
+      plugin({
+        id: 'logger',
+        init: async () => {
+          throw new Error('logger init failed');
+        },
+      }),
+    );
+    host.register(
+      plugin({
+        id: 'critical-app',
+        critical: true,
+        dependencies: [{ id: 'logger', versionRange: '*' }],
+        init: async () => undefined,
+      }),
+    );
+    host.finalizeRegistration();
+    await expect(host.initAll()).rejects.toBeInstanceOf(CriticalPluginFailureError);
+    const disabled = host
+      .getDisabledPlugins()
+      .map((d) => d.id)
+      .sort();
+    expect(disabled).toEqual(['critical-app', 'logger']);
   });
 
   it('runs onShutdown in reverse topological order; failures are non-fatal', async () => {

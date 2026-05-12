@@ -33,6 +33,7 @@ export {
   PluginHost,
   PluginRegistrationError,
   CriticalPluginFailureError,
+  DependencyDisabledError,
   DuplicateContributionError,
   type EffectiveRegistries,
   type PluginHostOptions,

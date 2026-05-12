@@ -126,10 +126,39 @@ export interface EffectiveRegistries {
   readonly reactions: Readonly<Record<string, HandlerConstructor>>;
 }
 
+/**
+ * Thrown by the host (not by the failing plugin) when a plugin is
+ * disabled as a transitive consequence of one of its dependencies
+ * failing. `rootPluginId` names the original failure; the cascade
+ * victim's own hook never ran.
+ */
+export class DependencyDisabledError extends Error {
+  public override readonly name = 'DependencyDisabledError';
+  public readonly pluginId: PluginId;
+  public readonly rootPluginId: PluginId;
+  public override readonly cause: unknown;
+  constructor(pluginId: PluginId, rootPluginId: PluginId, rootCause: unknown) {
+    super(
+      `DependencyDisabledError: plugin "${pluginId}" was disabled because its dependency "${rootPluginId}" failed; ${pluginId}'s lifecycle hooks did not run.`,
+      { cause: rootCause },
+    );
+    this.pluginId = pluginId;
+    this.rootPluginId = rootPluginId;
+    this.cause = rootCause;
+  }
+}
+
 export class PluginHost {
   private readonly registered = new Map<PluginId, RegisteredPlugin>();
   private readonly disabled = new Map<PluginId, DisabledPlugin>();
   private order: readonly PluginId[] = [];
+  /**
+   * Forward dependency edges: `dependents.get(X)` is the set of
+   * plugins that name X in their `dependencies`. Populated at
+   * {@link finalizeRegistration} time so cascade-disable can run in
+   * O(|edges|) when a plugin fails.
+   */
+  private dependents: Map<PluginId, Set<PluginId>> = new Map();
   private effectiveRegistries: EffectiveRegistries | undefined;
   private readonly dispatcher: EventDispatcher;
 
@@ -178,6 +207,7 @@ export class PluginHost {
   public finalizeRegistration(): void {
     this.checkDependencies();
     this.order = this.topologicalOrder();
+    this.dependents = this.buildDependentsIndex();
   }
 
   /** Merge codegen registries with plugin contributions; cached. */
@@ -410,6 +440,70 @@ export class PluginHost {
     return Object.freeze(out);
   }
 
+  /**
+   * Forward-edge index: for each plugin id, the set of plugins that
+   * named it as a dependency. Built once at finalize time and walked
+   * by {@link cascadeDisable} when a dependency fails.
+   */
+  private buildDependentsIndex(): Map<PluginId, Set<PluginId>> {
+    const out = new Map<PluginId, Set<PluginId>>();
+    for (const id of this.registered.keys()) {
+      out.set(id, new Set());
+    }
+    for (const [id, entry] of this.registered) {
+      for (const dep of entry.plugin.dependencies ?? []) {
+        out.get(dep.id)?.add(id);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Disable every plugin that depends (transitively) on `failedId`.
+   * Each cascade victim is marked with a {@link DependencyDisabledError}
+   * whose `cause` is the original failure, so the disabled set is
+   * self-explanatory for operators.
+   *
+   * Returns the list of victims that were marked `critical` — caller
+   * folds them into the critical-failure rethrow.
+   */
+  private cascadeDisable(
+    failedId: PluginId,
+    phase: DisabledPlugin['phase'],
+    rootCause: Error,
+  ): readonly CriticalPluginFailureError[] {
+    const criticals: CriticalPluginFailureError[] = [];
+    const queue: PluginId[] = [failedId];
+    const seen = new Set<PluginId>([failedId]);
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (current === undefined) break;
+      for (const dependent of this.dependents.get(current) ?? []) {
+        if (seen.has(dependent)) continue;
+        seen.add(dependent);
+        if (this.disabled.has(dependent)) continue;
+        const entry = this.registered.get(dependent);
+        if (entry === undefined) continue;
+        const cascadeErr = new DependencyDisabledError(dependent, failedId, rootCause);
+        this.disabled.set(dependent, { id: dependent, phase, error: cascadeErr });
+        this.options.logger.warn(
+          {
+            plugin: dependent,
+            phase,
+            dependency: failedId,
+            cause: rootCause instanceof Error ? { message: rootCause.message } : undefined,
+          },
+          'plugin disabled because its dependency failed; lifecycle hook will not run',
+        );
+        if (entry.plugin.critical === true) {
+          criticals.push(new CriticalPluginFailureError(dependent, phase, cascadeErr));
+        }
+        queue.push(dependent);
+      }
+    }
+    return criticals;
+  }
+
   private buildResolver(): TypedResolver {
     const container = this.options.container;
     return <T>(token: ServiceToken<T>): T => container.resolve<T>(token);
@@ -466,6 +560,12 @@ export class PluginHost {
         if (entry.plugin.critical === true) {
           criticalFailures.push(new CriticalPluginFailureError(id, phase, error));
         }
+        // Cascade-disable every plugin that (transitively) depended
+        // on this one — their lifecycle hooks would observe a partly-
+        // initialised world otherwise. Cascade victims marked
+        // `critical: true` also fold into the rethrow list.
+        const cascaded = this.cascadeDisable(id, phase, error);
+        criticalFailures.push(...cascaded);
       }
     }
     if (criticalFailures.length > 0) {
@@ -490,3 +590,4 @@ export class PluginHost {
 
 // Re-export the merge-time error so consumers can `instanceof`-narrow.
 export { DuplicateContributionError };
+// DependencyDisabledError already exported above (class declaration).
