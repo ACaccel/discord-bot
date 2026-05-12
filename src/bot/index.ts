@@ -103,6 +103,18 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public readonly container: ServiceContainer;
 
     /**
+     * Bot-scoped {@link Translator}. Set inside {@link run} once the
+     * async i18next catalog load resolves. Handlers reach localised
+     * strings via `bot.translator.t('key', { params })` without
+     * needing to import the IoC container (which the
+     * `no-restricted-imports` rule blocks for handler code).
+     *
+     * Optional only to model the pre-`run()` window; in any handler
+     * context the field is guaranteed defined.
+     */
+    public translator: Translator | undefined;
+
+    /**
      * PluginHost: lazily constructed in {@link run} once async Translator
      * initialisation has resolved. Subclasses stage plugins via
      * {@link use} between `new XBot(...)` and `bot.run()`; staged plugins
@@ -261,6 +273,13 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // can call `resolve(TOKENS.Translator)` synchronously.
         const translator = await createDefaultTranslator();
         this.container.registerSingleton(TOKENS.Translator, () => translator);
+        // Surface the resolved Translator on the bot itself so legacy
+        // handlers (which still receive `bot: BaseBot` rather than a
+        // per-interaction context) can call `bot.translator.t(...)`.
+        // PR 6-2/6-3 migrates handlers; the field stays as the
+        // canonical access point until the per-interaction ctx shape
+        // lands.
+        this.translator = translator;
         // Build the host now that Translator + Clock + Logger are all
         // bound. Phase 4b-1 passes empty core registries because the
         // legacy registerCommands/registerButtons/... paths still feed
@@ -570,7 +589,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 break;
             default:
                 if (!interaction.isAutocomplete()) {
-                    await interaction.reply({ content: '目前尚不支援此類型的指令', flags: MessageFlags.Ephemeral });
+                    await interaction.reply({
+                        content:
+                            this.translator?.t('errors:command.unsupported_interaction_type') ?? '',
+                        flags: MessageFlags.Ephemeral,
+                    });
                 }
                 break;
         }

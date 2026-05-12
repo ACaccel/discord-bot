@@ -1,1 +1,14 @@
-{}
+{
+  "gay": {
+    "is_gay": "{{name}} 是 gay",
+    "is_not_gay": "{{name}} 不是 gay"
+  },
+  "pin_message": {
+    "not_in_thread": "這個指令只能在討論串使用喔",
+    "not_thread_owner": "你不是串主喔",
+    "unpinned": "已取消釘選訊息",
+    "pinned": "已釘選訊息",
+    "invalid_action": "無效的指令",
+    "operation_failed": "無法釘選訊息"
+  }
+}
