@@ -59,6 +59,24 @@ describe('loadEnv', () => {
       });
       expect((env as Record<string, unknown>)['RANDOM_THING']).toBeUndefined();
     });
+
+    it('treats empty LLM API keys as absent (operators leave unused providers blank)', () => {
+      // Konata-style .env: declares every provider key but only fills xAI.
+      const env = loadEnv({
+        exitOnFailure: false,
+        source: {
+          ...validBase,
+          OPENAI_API_KEY: '',
+          ANTHROPIC_API_KEY: '   ',
+          GEMINI_API_KEY: '',
+          XAI_API_KEY: 'real-xai-key',
+        },
+      });
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
+      expect(env.XAI_API_KEY).toBe('real-xai-key');
+    });
   });
 
   describe('failure paths', () => {
