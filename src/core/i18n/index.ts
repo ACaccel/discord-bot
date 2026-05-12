@@ -12,3 +12,8 @@ export {
   normalizeDiscordLocale,
   type LocaleResolutionInputs,
 } from './locale-resolver';
+export {
+  loadCatalogResources,
+  createDefaultTranslator,
+  type LoadCatalogOptions,
+} from './catalog-loader';

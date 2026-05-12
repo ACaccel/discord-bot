@@ -1,5 +1,6 @@
-import { 
+import {
     Client,
+    type ClientEvents,
     Events,
     Guild,
     Channel,
@@ -33,6 +34,9 @@ import {
   type Logger,
 } from '../core/logger';
 import { initLegacyLogger } from '../utils/logger';
+import { createDefaultTranslator, type Translator } from '../core/i18n';
+import { systemClock, type Clock } from '../core/time';
+import { PluginHost, type Plugin } from '../core/plugin';
 import { Job } from 'node-schedule';
 import { Command, registerCommands, executeCommand } from "@cmd";
 import { ButtonHandler, registerButtons, executeButton } from '@button';
@@ -98,6 +102,15 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      */
     public readonly container: ServiceContainer;
 
+    /**
+     * PluginHost: lazily constructed in {@link run} once async Translator
+     * initialisation has resolved. Subclasses stage plugins via
+     * {@link use} between `new XBot(...)` and `bot.run()`; staged plugins
+     * are flushed into the host as part of `run()`'s startup sequence.
+     */
+    private pluginHost: PluginHost | undefined;
+    private readonly pendingPlugins: Array<{ plugin: Plugin<unknown>; config: unknown }> = [];
+
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: TConfig) {
         this.token = token;
         this.mongoURI = mongoURI;
@@ -140,7 +153,39 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             return buildRepos(guildConn);
         };
         this.container.registerSingleton(TOKENS.ReposFactory, () => reposFactory);
+        // Clock is stateless and side-effect-free; the singleton is
+        // bound at construction so plugins resolving via the typed
+        // resolver get the production wall clock by default. Tests that
+        // need a FakeClock build their own container.
+        this.container.registerSingleton(TOKENS.Clock, () => systemClock);
     }
+
+    /**
+     * Stage a plugin for registration. Idempotent across distinct ids;
+     * duplicate ids are rejected later by {@link PluginHost.register}
+     * during {@link run}'s flush step, so the failure carries the host's
+     * structured `PluginRegistrationError` rather than an ad-hoc throw
+     * here.
+     *
+     * Returns `this` for fluent composition in subclass constructors:
+     * ```ts
+     * super(...);
+     * this.use(AutoReplyPlugin).use(GiveawayPlugin, giveawayConfig);
+     * ```
+     */
+    public use = <Config>(plugin: Plugin<Config>, config?: Config): this => {
+        this.pendingPlugins.push({
+            plugin: plugin as Plugin<unknown>,
+            config: config as unknown,
+        });
+        return this;
+    }
+
+    /**
+     * Expose the host for tests and for subclasses that need to inspect
+     * disabled-plugin state. Undefined before {@link run} has built it.
+     */
+    public getPluginHost = (): PluginHost | undefined => this.pluginHost;
 
     /**
      * Open (or reuse) the per-guild MongoDB connection and populate
@@ -183,9 +228,72 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             logger: rootLogger,
             gracefulShutdown: () => this.shutdown(),
         });
+        // Translator load is async (i18next.init); we register it as a
+        // singleton holding the resolved instance so plugin init contexts
+        // can call `resolve(TOKENS.Translator)` synchronously.
+        const translator = await createDefaultTranslator();
+        this.container.registerSingleton(TOKENS.Translator, () => translator);
+        // Build the host now that Translator + Clock + Logger are all
+        // bound. Phase 4b-1 passes empty core registries because the
+        // legacy registerCommands/registerButtons/... paths still feed
+        // the BaseBot's Map<>s directly; Phase 4b-3 fold codegen output
+        // into PluginHostOptions.coreRegistries.
+        const host = new PluginHost({
+            container: this.container,
+            logger: rootLogger,
+            translator,
+            clock: this.container.resolve<Clock>(TOKENS.Clock),
+            coreRegistries: {},
+        });
+        for (const { plugin, config } of this.pendingPlugins) {
+            host.register(plugin, config);
+        }
+        host.finalizeRegistration();
+        // Building registries is a no-op when no plugin contributes
+        // handlers; calling it here keeps the contract surface symmetric
+        // for tests and ensures the merge fail-fast (duplicate handler
+        // name) fires at startup rather than at first interaction.
+        host.buildEffectiveRegistries();
+        this.pluginHost = host;
+        // init runs before client.login so plugins can resolve DI graph
+        // (logger, repos factory) without observing a half-connected
+        // Discord client; any critical failure surfaces before the bot
+        // appears online.
+        await host.initAll();
         await this.login();
+        // start runs after login but BEFORE the EventDispatcher is
+        // attached to client.on(...) — the dispatcher subscriptions are
+        // collected by attachEventSubscriptions() inside startAll() and
+        // the host doc requires we defer client.on() wiring until the
+        // method returns.
+        await host.startAll();
+        this.attachDispatcherToClient(host);
         await this.init(callback);
         await this.listen();
+    }
+
+    /**
+     * Forward every event a plugin currently subscribes to from the
+     * Discord client into the host's EventDispatcher. One `client.on`
+     * listener per subscribed event keeps the discord.js listener-count
+     * cap predictable and avoids fanning unsubscribed events into the
+     * dispatcher (cheap no-ops, but visible in profiling).
+     *
+     * MUST be invoked only after `host.startAll()` returns. Calling
+     * earlier means plugins whose `start` hook hasn't completed could
+     * still observe events. Enforced by ordering in {@link run}.
+     */
+    private attachDispatcherToClient = (host: PluginHost): void => {
+        const dispatcher = host.getEventDispatcher();
+        for (const event of dispatcher.subscribedEvents()) {
+            // Type-narrow each event individually so the forwarded
+            // `args` keeps the precise ClientEvents[event] tuple shape.
+            // discord.js's `client.on` signature accepts the same tuple
+            // so no further cast is needed at the call site.
+            this.client.on(event, (...args: ClientEvents[typeof event]) => {
+                void dispatcher.emit(event, ...args);
+            });
+        }
     }
 
     /**
@@ -196,6 +304,20 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      */
     public shutdown = async (): Promise<void> => {
         const log = this.container.tryResolve<Logger>(TOKENS.Logger);
+        // Run plugin onShutdown hooks (reverse topo order) BEFORE
+        // tearing down the Discord client / Mongo pool, so a plugin that
+        // wants to flush via either dependency still has access. Errors
+        // inside onShutdown are already caught by PluginHost.
+        if (this.pluginHost !== undefined) {
+            try {
+                await this.pluginHost.shutdownAll();
+            } catch (e: unknown) {
+                log?.warn(
+                    { err: e instanceof Error ? e : new Error(String(e)) },
+                    'shutdown: pluginHost.shutdownAll threw; continuing teardown',
+                );
+            }
+        }
         try {
             this.client.destroy();
         } catch (e: unknown) {
@@ -251,6 +373,17 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 await this.rebootMessage();
                 if (callback) {
                     await callback();
+                }
+                // readyAll runs *inside* ClientReady so plugins observe
+                // a fully-online client when their onReady hook fires.
+                // Failures here are logged but never fatal — the bot is
+                // already serving, mirroring host docstring policy.
+                if (this.pluginHost !== undefined) {
+                    try {
+                        await this.pluginHost.readyAll();
+                    } catch (readyErr: unknown) {
+                        logger.errorLogger(this.clientId, null, readyErr);
+                    }
                 }
             } catch (err) {
                 logger.errorLogger(this.clientId, null, err);

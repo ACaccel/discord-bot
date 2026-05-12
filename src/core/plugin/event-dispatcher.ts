@@ -119,4 +119,15 @@ export class EventDispatcher {
   public listenerCount(event: keyof ClientEvents): number {
     return this.subscriptions.get(event)?.length ?? 0;
   }
+
+  /**
+   * Snapshot of every event name that currently has at least one
+   * subscriber. Phase 4b's BaseBot uses this after `startAll()` to
+   * attach a single `client.on(event, ...)` per subscribed event,
+   * forwarding into {@link emit}. Returning a fresh array keeps the
+   * caller from mutating the dispatcher's internal map.
+   */
+  public subscribedEvents(): readonly (keyof ClientEvents)[] {
+    return [...this.subscriptions.keys()] as (keyof ClientEvents)[];
+  }
 }

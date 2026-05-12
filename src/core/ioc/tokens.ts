@@ -25,6 +25,8 @@ import type { GuildId } from '../ids';
 import { token, type ServiceToken } from './container';
 
 import type { ConnectionManager } from '../../infra/mongo/connection-manager';
+import type { Clock } from '../time';
+import type { Translator } from '../i18n';
 import type { Logger } from '../logger';
 import type { Repos } from '../../persistence/repositories';
 
@@ -44,10 +46,17 @@ export interface Tokens {
    * `.child({ traceId })` for narrower scope.
    */
   readonly Logger: ServiceToken<Logger>;
+  /** Bot-scoped Translator. Phase 4b-1 registers the i18next-backed
+   *  default; the plugin host receives it via PluginHostOptions. */
+  readonly Translator: ServiceToken<Translator>;
+  /** Wall-clock abstraction; tests substitute a FakeClock. */
+  readonly Clock: ServiceToken<Clock>;
 }
 
 export const TOKENS: Tokens = {
   ConnectionManager: token<ConnectionManager>('ConnectionManager'),
   ReposFactory: token<ReposFactory>('ReposFactory'),
   Logger: token<Logger>('Logger'),
+  Translator: token<Translator>('Translator'),
+  Clock: token<Clock>('Clock'),
 };
