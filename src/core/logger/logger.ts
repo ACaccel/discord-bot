@@ -27,6 +27,7 @@
  */
 import pino, { type Logger as PinoLogger, type LoggerOptions } from 'pino';
 import { buildPinoRedactPaths } from '../config/redact';
+import { scrubForLog } from './scrub-for-log';
 
 /**
  * Application-facing logger surface. A subset of pino's API — keeping
@@ -98,13 +99,37 @@ export const createLogger = (input: CreateLoggerInput): Logger => {
 /**
  * Adapt a pino logger to our {@link Logger} interface. Keeps the rest
  * of the codebase from importing pino types directly.
+ *
+ * Every object argument is passed through {@link scrubForLog} before
+ * reaching pino. This is **redundant** with pino's `redact.paths`
+ * (configured in {@link createLogger}) — it exists to give CodeQL's
+ * taint analysis an explicit sanitisation step it can recognise on
+ * `js/clear-text-logging`, AND as defense-in-depth against a future
+ * redact-path misconfiguration. See `scrub-for-log.ts` header.
  */
-const wrap = (p: PinoLogger): Logger => ({
-  trace: (a: object | string, b?: string) => (typeof a === 'string' ? p.trace(a) : p.trace(a, b)),
-  debug: (a: object | string, b?: string) => (typeof a === 'string' ? p.debug(a) : p.debug(a, b)),
-  info: (a: object | string, b?: string) => (typeof a === 'string' ? p.info(a) : p.info(a, b)),
-  warn: (a: object | string, b?: string) => (typeof a === 'string' ? p.warn(a) : p.warn(a, b)),
-  error: (a: object | string, b?: string) => (typeof a === 'string' ? p.error(a) : p.error(a, b)),
-  fatal: (a: object | string, b?: string) => (typeof a === 'string' ? p.fatal(a) : p.fatal(a, b)),
-  child: (bindings) => wrap(p.child(bindings)),
-});
+const wrap = (p: PinoLogger): Logger => {
+  type LogFn = (obj: object, msg?: string) => void;
+  type StringLogFn = (msg: string) => void;
+  const call =
+    (objFn: LogFn, strFn: StringLogFn) =>
+    (a: object | string, b?: string): void => {
+      if (typeof a === 'string') {
+        strFn(a);
+        return;
+      }
+      // scrubForLog deep-clones with sensitive top-level + nested keys
+      // replaced by '[Redacted]'. Pino's runtime redact still runs on
+      // top of this; the scrub is the static-analysis-visible step.
+      const scrubbed = scrubForLog(a) as object;
+      objFn(scrubbed, b);
+    };
+  return {
+    trace: call(p.trace.bind(p), p.trace.bind(p)),
+    debug: call(p.debug.bind(p), p.debug.bind(p)),
+    info: call(p.info.bind(p), p.info.bind(p)),
+    warn: call(p.warn.bind(p), p.warn.bind(p)),
+    error: call(p.error.bind(p), p.error.bind(p)),
+    fatal: call(p.fatal.bind(p), p.fatal.bind(p)),
+    child: (bindings) => wrap(p.child(bindings)),
+  };
+};
