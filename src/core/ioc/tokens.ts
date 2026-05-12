@@ -26,6 +26,7 @@ import { token, type ServiceToken } from './container';
 
 import type { ConnectionManager } from '../../infra/mongo/connection-manager';
 import type { Clock } from '../time';
+import type { GuildRegistry } from '../guild-registry';
 import type { Translator } from '../i18n';
 import type { Logger } from '../logger';
 import type { Repos } from '../../persistence/repositories';
@@ -51,6 +52,8 @@ export interface Tokens {
   readonly Translator: ServiceToken<Translator>;
   /** Wall-clock abstraction; tests substitute a FakeClock. */
   readonly Clock: ServiceToken<Clock>;
+  /** Per-guild registry: repos / channel / role lookup by guild id. */
+  readonly GuildRegistry: ServiceToken<GuildRegistry>;
 }
 
 export const TOKENS: Tokens = {
@@ -59,4 +62,5 @@ export const TOKENS: Tokens = {
   Logger: token<Logger>('Logger'),
   Translator: token<Translator>('Translator'),
   Clock: token<Clock>('Clock'),
+  GuildRegistry: token<GuildRegistry>('GuildRegistry'),
 };

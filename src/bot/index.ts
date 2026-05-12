@@ -37,13 +37,14 @@ import { initLegacyLogger } from '../utils/logger';
 import { createDefaultTranslator, type Translator } from '../core/i18n';
 import { systemClock, type Clock } from '../core/time';
 import { PluginHost, type Plugin } from '../core/plugin';
+import type { GuildRegistry } from '../core/guild-registry';
 import { Job } from 'node-schedule';
 import { Command, registerCommands, executeCommand } from "@cmd";
 import { ButtonHandler, registerButtons, executeButton } from '@button';
 import { ModalHandler, registerModals, executeModal } from '@modal';
 import { registerSSMs, SSMHandler, executeSSM } from '@ssm';
 import { logger } from "@utils";
-import { auto_reply, detectGuildCreate, detectGuildMemberUpdate, detectMessageDelete, detectMessageUpdate } from "@event";
+import { detectGuildCreate } from "@event";
 import { ReactionHandler, executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
 import { giveaway, activity } from "@features";
 
@@ -158,6 +159,18 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // resolver get the production wall clock by default. Tests that
         // need a FakeClock build their own container.
         this.container.registerSingleton(TOKENS.Clock, () => systemClock);
+        // GuildRegistry is a read-only view over `this.guildInfo`.
+        // Plugins resolve it once during init and call lookup methods
+        // inside event handlers instead of holding a BaseBot reference.
+        // Implemented as an inline closure-bound impl so the bot's
+        // composition root stays small; tests provide their own fake.
+        const guildRegistry: GuildRegistry = {
+            getRepos: (guildId) => this.guildInfo[guildId]?.repos,
+            getChannel: (guildId, name) => this.guildInfo[guildId]?.channels?.[name],
+            getRole: (guildId, name) => this.guildInfo[guildId]?.roles?.[name],
+            listGuildIds: () => Object.keys(this.guildInfo),
+        };
+        this.container.registerSingleton(TOKENS.GuildRegistry, () => guildRegistry);
     }
 
     /**
@@ -547,18 +560,29 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         }
     }
 
-    public messageCreateListener = async (message: Message): Promise<void> => {
-        if (message.guildId)
-            await auto_reply(message, this, message.guildId);
-    }
+    /**
+     * Default no-op for `messageCreate`. Phase 4b-2 moved `auto_reply`
+     * and `tts_reply` into {@link AutoReplyPlugin} / {@link TtsReplyPlugin};
+     * bots opt in via `bot.use(AutoReplyPlugin)`. Subclasses (e.g.
+     * Konata) still override this when they own a non-plugin chat flow;
+     * Phase 4b-3 migrates those too.
+     */
+    public messageCreateListener = async (_message: Message): Promise<void> => {}
 
-    public messageUpdateListener = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage): Promise<void> => {
-        await detectMessageUpdate(oldMessage, newMessage, this);
-    }
+    /**
+     * Default no-op for `messageUpdate`. Phase 4b-2 moved
+     * `detectMessageUpdate` into {@link GuildEventsPlugin}.
+     */
+    public messageUpdateListener = async (
+        _oldMessage: Message | PartialMessage,
+        _newMessage: Message | PartialMessage,
+    ): Promise<void> => {}
 
-    public messageDeleteListener = async (message: Message | PartialMessage): Promise<void> => {
-        await detectMessageDelete(message, this);
-    }
+    /**
+     * Default no-op for `messageDelete`. Phase 4b-2 moved
+     * `detectMessageDelete` into {@link GuildEventsPlugin}.
+     */
+    public messageDeleteListener = async (_message: Message | PartialMessage): Promise<void> => {}
 
     public messageReactionAddListener = async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser): Promise<void> => {
         const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
@@ -578,9 +602,14 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         }
     }
 
-    public guildMemberUpdateListener = async (oldMember: GuildMember | PartialGuildMember, newMember: GuildMember | PartialGuildMember): Promise<void> => {
-        detectGuildMemberUpdate(oldMember, newMember, this);
-    }
+    /**
+     * Default no-op for `guildMemberUpdate`. Phase 4b-2 moved
+     * `detectGuildMemberUpdate` into {@link GuildEventsPlugin}.
+     */
+    public guildMemberUpdateListener = async (
+        _oldMember: GuildMember | PartialGuildMember,
+        _newMember: GuildMember | PartialGuildMember,
+    ): Promise<void> => {}
 
     public guildCreateListener = async (guild: any): Promise<void> => {
         detectGuildCreate(guild, this);

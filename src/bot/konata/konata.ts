@@ -67,15 +67,16 @@ export class Konata extends BaseBot<Config> {
 
     // ─── Event Listeners ──────────────────────────────────────────────────────
 
-    // ─── Suppress all non-chat events ──────────────────────────────────────────
-    // Konata is a pure LLM-chat bot; it must not log message edits/deletes,
-    // reactions, member updates, or guild joins. Override BaseBot's detect*
-    // hooks with no-ops so those events are silently ignored.
-    public override messageUpdateListener = async (): Promise<void> => {};
-    public override messageDeleteListener = async (): Promise<void> => {};
+    // ─── Suppress non-chat events Konata never wants ──────────────────────────
+    // Konata is a pure LLM-chat bot. Phase 4b-2 made BaseBot's
+    // messageUpdate / messageDelete / guildMemberUpdate listeners
+    // default to no-op (logic moved to GuildEventsPlugin which Konata
+    // does not register), so those overrides are no longer needed.
+    // The remaining overrides below cover listeners still wired in
+    // BaseBot (reactions, guildCreate); Phase 4b-3 migrates them too
+    // and drops these overrides.
     public override messageReactionAddListener = async (): Promise<void> => {};
     public override messageReactionRemoveListener = async (): Promise<void> => {};
-    public override guildMemberUpdateListener = async (): Promise<void> => {};
     public override guildCreateListener = async (): Promise<void> => {};
 
     public override messageCreateListener = async (message: Message): Promise<void> => {

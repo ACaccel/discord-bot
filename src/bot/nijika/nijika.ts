@@ -1,21 +1,10 @@
-import { 
-    Client,
-    Message,
-    PartialMessage,
-    Interaction,
-    MessageFlags,
-} from 'discord.js';
+import { Client, Interaction, MessageFlags } from 'discord.js';
 import { BaseBot, Config } from '@bot';
-import { 
-    auto_reply,
-    detectMessageDelete, 
-    detectMessageUpdate, 
-    tts_reply,
-} from '@event';
 import { executeCommand } from '@cmd';
 import { executeButton } from '@button';
 import { executeModal } from '@modal';
 import { executeSSM } from '@ssm';
+import { AutoReplyPlugin, TtsReplyPlugin, createGuildEventsPlugin } from '@plugins';
 
 interface NijikaConfig extends Config {
     blocked_channels: string[];
@@ -27,8 +16,22 @@ export class Nijika extends BaseBot<NijikaConfig> {
         super(client, token, mongoURI, clientId, config);
         this.help_msg = '### 目前支援的功能：\n' +
                         '1. tts: 回覆一則訊息並輸入tts，bot會產生該訊息的語音檔\n' +
-                        '2. auto reply: bot會根據資料庫的message pair回覆訊息\n' + 
+                        '2. auto reply: bot會根據資料庫的message pair回覆訊息\n' +
                         '3. roll dice: 輸入範例-> `2d5`, 在1~5隨機選擇兩個數字\n';
+
+        // Phase 4b-2: legacy message listeners migrated to plugins.
+        // `blocked_channels` continues to suppress event-channel
+        // mirroring for the configured forum/thread parents; the
+        // command path still consults the same list through
+        // `executeCommand` below.
+        this.use(AutoReplyPlugin);
+        this.use(TtsReplyPlugin);
+        this.use(
+            createGuildEventsPlugin({
+                blockedChannels: this.config.blocked_channels,
+                clientId: this.clientId,
+            }),
+        );
     }
 
     public override interactionEventListener = async (interaction: Interaction): Promise<void> => {
@@ -51,19 +54,5 @@ export class Nijika extends BaseBot<NijikaConfig> {
                 }
                 break;
         }
-    }
-
-    public override messageCreateListener = async (message: Message): Promise<void> => {
-        await tts_reply(message);
-        if (message.guildId)
-            await auto_reply(message, this, message.guildId);
-    }
-
-    public override messageUpdateListener = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage): Promise<void> => {
-        await detectMessageUpdate(oldMessage, newMessage, this, this.config.blocked_channels);
-    }
-
-    public override messageDeleteListener = async (message: Message | PartialMessage): Promise<void> => {
-        await detectMessageDelete(message, this, this.config.blocked_channels);
     }
 }

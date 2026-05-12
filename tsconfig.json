@@ -20,7 +20,8 @@
       "@event": ["events/index"],
       "@features": ["features/index"],
       "@llm_chat": ["features/llm_chat/index"],
-      "@core/*": ["core/*"]
+      "@core/*": ["core/*"],
+      "@plugins": ["plugins/index"]
     },
     "resolveJsonModule": true,
     "esModuleInterop": true,
