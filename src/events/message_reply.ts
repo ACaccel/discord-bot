@@ -33,17 +33,16 @@ export const tts_reply = async (msg: Message) => {
 
 const search_reply = async (msg: string, bot: BaseBot, guild_id: string) => {
     // search reply from database
-    let success = false;
-    const db = bot.guildInfo[guild_id].db;
-    if (!db) {
+    const repos = bot.guildInfo[guild_id]?.repos;
+    if (!repos) {
         throw new Error("Cannot connect to MongoDB.");
     }
-    let res = await db.models["Reply"].find({input: msg});
-    success = (res.length !== 0);
-    
+    const res = await repos.reply.findByInput(msg);
+    const success = res.length !== 0;
+
     // if number of reply > 1, randomly select one
     let reply = "";
-    if(res.length !== 0) {
+    if (success) {
         reply = res[Math.floor(Math.random() * res.length)].reply;
     }
     return { reply, success };

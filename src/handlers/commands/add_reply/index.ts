@@ -30,19 +30,18 @@ export default class add_reply extends Command {
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply();
         try {
-            const input = interaction.options.get("keyword")?.value;
-            const reply = interaction.options.get("reply")?.value;
-    
-            const db = bot.guildInfo[interaction.guild?.id as string].db;
-            if (!db) {
+            const input = interaction.options.get("keyword")?.value as string;
+            const reply = interaction.options.get("reply")?.value as string;
+
+            const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
+            if (!repos) {
                 await interaction.editReply({ content: "找不到資料庫" });
                 return;
             }
-            const existPair = await db.models["Reply"].find({ input, reply });
-    
-            if (existPair && existPair.length === 0) {
-                const newReply = new db.models["Reply"]({ input, reply });
-                await newReply.save();
+            const existPair = await repos.reply.findExactPair(input, reply);
+
+            if (existPair.length === 0) {
+                await repos.reply.create(input, reply);
                 await interaction.editReply({ content: `已新增 輸入：${input} 回覆：${reply}！` });
             } else {
                 await interaction.editReply({ content: `此配對 輸入：${input} 回覆：${reply} 已經存在！` });

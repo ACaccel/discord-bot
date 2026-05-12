@@ -56,15 +56,15 @@ export default class ai_settings extends Command {
             return;
         }
 
-        const UserApiSetting = bot.guildInfo[guildId]?.db?.models['UserApiSetting'];
-        if (!UserApiSetting) {
+        const repos = bot.guildInfo[guildId]?.repos;
+        if (!repos) {
             await interaction.reply({ content: '資料庫連線異常，請稍後再試。', flags: MessageFlags.Ephemeral });
             return;
         }
 
-        let doc: UserApiDoc | null;
+        let doc: UserApiDoc | undefined;
         try {
-            doc = await UserApiSetting.findOne({ userId }).lean() as UserApiDoc | null;
+            doc = (await repos.userApiSetting.findByUserId(userId)) as UserApiDoc | undefined;
         } catch (err) {
             logger.errorLogger(bot.clientId, guildId, err);
             await interaction.reply({ content: '資料庫操作失敗，請稍後再試。', flags: MessageFlags.Ephemeral });

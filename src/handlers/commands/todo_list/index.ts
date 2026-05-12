@@ -43,24 +43,24 @@ export default class todo_list extends Command {
                 return;
             }
     
-            const db = bot.guildInfo[interaction.guild?.id as string].db;
-            if (!db) {
+            const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
+            if (!repos) {
                 await interaction.editReply({ content: "找不到資料庫" });
                 return;
             }
-    
+            const todos = repos.todo;
+
             if (action == "add") {
-                const existPair = await db.models["Todo"].find({ content });
+                const existPair = await todos.findByContent(content);
                 if (existPair.length === 0) {
-                    const newTodo = new db.models["Todo"]({ content });
-                    await newTodo.save();
+                    await todos.create(content);
                     await interaction.editReply({ content: `已新增待辦事項：${content}` });
                 } else {
                     await interaction.editReply({ content: `此待辦事項：${content} 已經存在！` });
                 }
             } else if (action == "delete") {
                 // content is index
-                const todoList = await db.models["Todo"].find({});
+                const todoList = await todos.listAll();
                 if (!parseInt(content)) {
                     await interaction.editReply({ content: "請輸入數字" });
                     return;
@@ -69,11 +69,11 @@ export default class todo_list extends Command {
                     await interaction.editReply({ content: `找不到待辦事項：${content}` });
                 } else {
                     const deleted_content = todoList[parseInt(content) - 1].content;
-                    await db.models["Todo"].deleteOne({ content: deleted_content });
+                    await todos.deleteByContent(deleted_content);
                     await interaction.editReply({ content: `已刪除待辦事項：${deleted_content}` });
                 }
             } else if (action == "list") {
-                const todoList = await db.models["Todo"].find({});
+                const todoList = await todos.listAll();
                 let content = "待辦事項：\n";
                 todoList.map((e, i) => {
                     content += `> ${i + 1}. ${e.content}\n`;

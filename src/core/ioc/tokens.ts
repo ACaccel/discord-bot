@@ -8,12 +8,13 @@
  *   - Future cross-phase additions (LlmProvider in Phase 5, plugin
  *     contributions in Phase 4a) land here, not scattered.
  *
- * Phase 2 ships a subset; tokens for not-yet-implemented services are
- * declared but unbound. `tryResolve` returns `undefined` for unbound
- * tokens, so this is safe.
+ * Phase 2 PR B ships repository factories for all 7 schemas plus a
+ * `Repos` factory that bundles them. Tokens for not-yet-implemented
+ * services are declared but unbound — `tryResolve` returns undefined
+ * for unbound tokens, so this is safe.
  *
  * Repository tokens are deliberately **factory tokens** of shape
- * `(g: GuildId) => Repo` rather than scoped registrations. Per
+ * `(g: GuildId) => Repo` rather than scoped registrations. Per the
  * Phase-2 design (architecture-reviewer consult): scoped registration
  * requires a real per-request scope object threaded through, which
  * we do not have until Phase 4a. A factory token is one explicit line
@@ -23,22 +24,22 @@
 import type { GuildId } from '../ids';
 import { token, type ServiceToken } from './container';
 
-import type { MessageRepo } from '../../persistence/repositories/message.repo';
-import type { ReplyRepo } from '../../persistence/repositories/reply.repo';
 import type { ConnectionManager } from '../../infra/mongo/connection-manager';
+import type { Repos } from '../../persistence/repositories';
 
-/** Per-guild repository factory shape. */
-export type RepoFactory<R> = (guildId: GuildId) => R;
+/** Per-guild repository factory shape. Reserved for Phase 4a when the
+ *  plugin/interaction scope makes per-repo registration meaningful. */
+export type RepoFactory<R> = (guildId: GuildId) => Promise<R>;
+
+/** Per-guild full-bag factory — current preferred entry point. */
+export type ReposFactory = (guildId: GuildId) => Promise<Repos>;
 
 export interface Tokens {
-  // ----- Phase 2 (this PR) -----
   readonly ConnectionManager: ServiceToken<ConnectionManager>;
-  readonly MessageRepoFactory: ServiceToken<RepoFactory<MessageRepo>>;
-  readonly ReplyRepoFactory: ServiceToken<RepoFactory<ReplyRepo>>;
+  readonly ReposFactory: ServiceToken<ReposFactory>;
 }
 
 export const TOKENS: Tokens = {
   ConnectionManager: token<ConnectionManager>('ConnectionManager'),
-  MessageRepoFactory: token<RepoFactory<MessageRepo>>('MessageRepoFactory'),
-  ReplyRepoFactory: token<RepoFactory<ReplyRepo>>('ReplyRepoFactory'),
+  ReposFactory: token<ReposFactory>('ReposFactory'),
 };

@@ -30,13 +30,13 @@ export default class delete_reply extends Command {
         await interaction.deferReply();
         try {
             const key = interaction.options.get("keyword")?.value as string;
-            const db = bot.guildInfo[interaction.guild?.id as string].db;
-            if (!db) {
+            const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
+            if (!repos) {
                 await interaction.editReply({ content: "找不到資料庫" });
                 return;
             }
-            const existPair = await db.models["Reply"].find({ input: key });
-    
+            const existPair = await repos.reply.findByInput(key);
+
             // select menu
             let selectRows = []
             for (let i = 0; i < existPair.length; i += 25) {
@@ -44,20 +44,21 @@ export default class delete_reply extends Command {
                     .setCustomId(`delete_reply|${key}|${i/25}`)
                     .setPlaceholder('選擇要刪除的回覆')
                     .addOptions(
-                        existPair.slice(i, i + 25).map((reply: any, idx: number) =>
+                        existPair.slice(i, i + 25).map((reply, idx) =>
                             new StringSelectMenuOptionBuilder()
                             .setLabel(reply.reply.length > 60 ? `${i + idx + 1}. ` + reply.reply.slice(0, 60) + "..." : `${i + idx + 1}. ` + reply.reply)
-                            .setValue(reply.id)
+                            // `lean()` strips the `id` virtual; use the raw _id.
+                            .setValue(reply._id.toString())
                         )
                     );
                 const row = new ActionRowBuilder<StringSelectMenuBuilder>()
                     .addComponents(select);
                 selectRows.push(row);
             }
-    
+
             // image preview
             let previewContent = "圖片預覽：\n";
-            existPair.forEach((reply: any, idx: number) => {
+            existPair.forEach((reply, idx) => {
                 if (typeof reply.reply === "string" && reply.reply.startsWith("http")) {
                     previewContent += `${idx+1} - ${reply.reply}\n`;
                 }

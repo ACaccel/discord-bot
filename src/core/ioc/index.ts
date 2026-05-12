@@ -21,4 +21,4 @@ export {
   type ServiceFactory,
 } from './container';
 
-export { TOKENS, type Tokens, type RepoFactory } from './tokens';
+export { TOKENS, type Tokens, type RepoFactory, type ReposFactory } from './tokens';

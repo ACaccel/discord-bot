@@ -26,13 +26,13 @@ export default class list_reply extends Command {
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply();
         try {
-            const keyword = interaction.options.get("keyword")?.value;
-            const db = bot.guildInfo[interaction.guild?.id as string].db;
-            if (!db) {
+            const keyword = interaction.options.get("keyword")?.value as string;
+            const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
+            if (!repos) {
                 await interaction.editReply({ content: "找不到資料庫" });
                 return;
             }
-            const replyList = await db.models["Reply"].find({ input: keyword });
+            const replyList = await repos.reply.findByInput(keyword);
             if (replyList.length === 0) {
                 await interaction.editReply({ content: `找不到 輸入：${keyword} 的回覆！` });
             } else {

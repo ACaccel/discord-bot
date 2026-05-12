@@ -10,15 +10,19 @@ export default class delete_reply extends SSMHandler {
         const key = interaction.customId.split('|')[1];
         const value = interaction.values[0];
 
-        const db = bot.guildInfo[interaction.guild?.id as string].db;
-        if (!db) {
+        const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
+        if (!repos) {
             await interaction.reply({ content: "找不到資料庫", flags: MessageFlags.Ephemeral });
             return;
         }
 
-        const pair = await db.models["Reply"].findById(value);
+        const pair = await repos.reply.findById(value);
+        if (!pair) {
+            await interaction.reply({ content: '找不到該回覆紀錄', flags: MessageFlags.Ephemeral });
+            return;
+        }
         const replymsg = pair.reply;
-        await db.models["Reply"].findByIdAndDelete(value);
+        await repos.reply.deleteById(value);
 
         await interaction.reply({ content: `已刪除回覆：${key} => ${replymsg}` });
     }
