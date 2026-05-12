@@ -43,18 +43,19 @@ yarn deploy -t nijika  # register slash commands with Discord
 
 All gates run in CI; please run them locally before opening a PR.
 
-| Command                   | What it checks                                                                                 |
-| ------------------------- | ---------------------------------------------------------------------------------------------- |
-| `yarn typecheck`          | Strict TypeScript (`tsconfig.strict.json`) — `any`, `as any`, un-narrowed `unknown`, etc. fail |
-| `yarn lint`               | ESLint on every strict-mode directory                                                          |
-| `yarn format:check`       | Prettier (use `yarn format` to fix)                                                            |
-| `yarn handlers:gen:check` | Codegen registries match the on-disk handler layout                                            |
-| `yarn test:unit`          | Unit tests (Vitest project `unit`)                                                             |
-| `yarn test:int`           | Integration tests with mongodb-memory-server                                                   |
-| `yarn test:contract`      | LLM provider contract tests via nock                                                           |
-| `yarn test:i18n`          | Catalog parity + CJK-literal scanner                                                           |
-| `yarn test`               | All four test projects                                                                         |
-| `yarn security`           | `yarn npm audit` + `gitleaks detect`                                                           |
+| Command                   | What it checks                                                                                                         |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `yarn typecheck`          | Strict TypeScript (`tsconfig.strict.json`) — `any`, `as any`, un-narrowed `unknown`, etc. fail                         |
+| `yarn lint`               | ESLint on every strict-mode directory                                                                                  |
+| `yarn format:check`       | Prettier (use `yarn format` to fix)                                                                                    |
+| `yarn handlers:gen:check` | Codegen registries match the on-disk handler layout                                                                    |
+| `yarn test:unit`          | Unit tests (Vitest project `unit`)                                                                                     |
+| `yarn test:int`           | Integration tests with mongodb-memory-server                                                                           |
+| `yarn test:contract`      | LLM provider contract tests via nock                                                                                   |
+| `yarn test:i18n`          | Catalog parity + CJK-literal scanner                                                                                   |
+| `yarn test`               | All four test projects                                                                                                 |
+| `yarn security`           | `yarn npm audit` + `gitleaks detect`                                                                                   |
+| `yarn smoke`              | Pre-deploy boundary probe: `.env` load + Mongo admin.ping + Discord login until `ready`. Manual; not in the CI matrix. |
 
 A handful of legacy directories (`src/handlers/`, `src/plugins/`,
 `src/bot/`) are not yet on the strict tsconfig — they still pass
@@ -295,6 +296,38 @@ listeners, etc.
    test that constructs a fake `PluginEventContext` /
    `PluginRuntimeContext`. See `test/unit/plugins/` for the established
    shape — `auto-reply.test.ts` is the most representative example.
+
+## Pre-deploy smoke
+
+`yarn smoke` is a boundary-only sanity check intended to run against a
+staging or production deployment **before** promoting a release. It
+needs a real bot `.env` (TOKEN + CLIENT_ID, plus MONGO_URI for bots
+that talk to Mongo) and live network access to Discord.
+
+```bash
+yarn smoke                 # defaults to --bot nijika
+yarn smoke --bot konata
+yarn smoke -b msg-archive
+SMOKE_TIMEOUT_MS=60000 yarn smoke --bot tomori
+```
+
+What the script verifies, in order:
+
+1. **Env load** — runs the same zod-parsed `loadEnv()` the bot uses at
+   boot, so a missing or malformed value fails fast.
+2. **Mongo `admin.ping`** — only if `MONGO_URI` is present in the
+   loaded env. Confirms authentication and reachability without
+   touching any guild database.
+3. **Discord login + `clientReady`** — logs the bot in with TOKEN,
+   waits for the ready event, and asserts the bot's user id matches
+   `CLIENT_ID`. Catches token/id mismatches a deploy might otherwise
+   only surface mid-traffic.
+
+Each step is timeboxed (default 30 s, override via `SMOKE_TIMEOUT_MS`).
+The script does NOT register slash commands, start plugins, or open
+HTTP routes — keep it cheap so it can sit in front of every deploy.
+Exit status: `0` on full success, `1` on any failure (the failed step
+is printed to stderr).
 
 ## Commit conventions
 
