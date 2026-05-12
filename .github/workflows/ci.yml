@@ -37,11 +37,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/yarn-install
-      # Run integration tests with JSON reporter so we can verify the
-      # project actually loaded files (no silent green).
-      # `|| true` is used to keep the step exit clean when vitest exits 0
-      # under --passWithNoTests but does NOT write the JSON file; the
-      # subsequent guard step is the real gate and checks file presence.
+      # Run integration tests with JSON reporter so the next step can
+      # verify the project actually loaded files (no silent green). As
+      # of Phase 2, `test:int` no longer passes `--passWithNoTests`, so
+      # vitest itself exits nonzero on a glob-mismatch; the JSON guard
+      # below is defense-in-depth for the case where vitest discovers
+      # suites but every test inside them is skipped.
       - name: Run integration tests
         run: yarn test:int --reporter=json --outputFile=.vitest-int.json
       # Empty-project guard: while .github/PHASE < 2 a zero-file integration

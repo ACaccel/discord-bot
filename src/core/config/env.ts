@@ -15,6 +15,12 @@
  * logger (which honours REDACT_FIELD_NAMES in `./redact.ts`) for any
  * downstream observation. The parsed return value is frozen so callers
  * cannot mutate it into something a redactor would not catch.
+ *
+ * Reserved env-var prefixes:
+ *   - `INTEGRATION_*` is owned by `test/integration/setup.ts` (e.g.
+ *     `INTEGRATION_MONGO_URI` published by the mongodb-memory-server
+ *     globalSetup). Do not promote any `INTEGRATION_*` key into this
+ *     schema; tests own that namespace.
  */
 import { z } from 'zod';
 import * as dotenv from 'dotenv';

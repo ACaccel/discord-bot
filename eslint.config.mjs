@@ -7,11 +7,12 @@ import globals from 'globals';
 /**
  * Flat config (ESLint v9).
  *
- * Phase 0 scope: lints only new code paths (`src/core/**`, `scripts/**`,
- * `test/**`). Legacy directories will join as each later phase migrates
- * them. Most rules start as `warn` to avoid blocking the refactor; the
- * critical ones (no-restricted-syntax for raw process.env, import cycles)
- * are `error` from day one.
+ * Phase 0 scope: lints `src/core/**`, `scripts/**`, `test/**`.
+ * Phase 2 expansion: also lints `src/persistence/**`, `src/infra/**`.
+ * Legacy directories join as each later phase migrates them. Most rules
+ * start as `warn` to avoid blocking the refactor; the critical ones
+ * (no-restricted-syntax for raw process.env, import cycles, IoC
+ * service-locator guard) are `error` from day one.
  */
 export default tseslint.config(
   {
@@ -77,6 +78,39 @@ export default tseslint.config(
       ],
     },
   },
+  // Service-locator guard (Phase 2): the IoC container is a composition
+  // tool, not an ambient lookup. Only composition roots (`src/bots/**`,
+  // and the legacy `src/bot/**` until Phase 4b retires it) and tests
+  // may import it. Application / domain / interface / persistence /
+  // infra layers receive dependencies via constructor parameters from
+  // their composition root.
+  {
+    files: [
+      'src/application/**/*.ts',
+      'src/domain/**/*.ts',
+      'src/interface/**/*.ts',
+      'src/persistence/**/*.ts',
+      'src/infra/**/*.ts',
+      'src/handlers/**/*.ts',
+      'src/events/**/*.ts',
+      'src/features/**/*.ts',
+      'src/utils/**/*.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/core/ioc', '**/core/ioc/*', '@core/ioc', '@core/ioc/*'],
+              message:
+                'IoC container imports are restricted to composition roots (src/bots/**) and tests. Receive dependencies via constructor parameters instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Test files: relax some rules.
   {
     files: ['test/**/*.ts', 'scripts/**/*.ts'],
@@ -84,6 +118,7 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       'no-console': 'off',
       'no-restricted-syntax': 'off',
+      'no-restricted-imports': 'off',
     },
   },
   prettier,
