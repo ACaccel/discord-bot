@@ -124,26 +124,59 @@ export class MongoConnectionManager implements ConnectionManager {
     const connection = await mongoose.createConnection(uri).asPromise();
     try {
       const models = buildModels(connection);
-      // Block until declared indexes (e.g. unique `Message.messageId`)
-      // are present. Otherwise the very first
-      // `insertManyIgnoringDuplicates` after a cold-start
-      // `getConnection` can race the auto-index build and silently
-      // store duplicate rows.
-      await Promise.all(Object.values(models).map((m) => m.init()));
+      // Best-effort index initialization.
+      //
+      // Pre-Phase-2 the bot relied on mongoose's lazy `autoIndex` and
+      // tolerated index-build failures silently (a Mongo user without
+      // `createIndex` permission, pre-existing duplicate rows on a
+      // `unique` field, etc.). Phase 2 added `await m.init()` to close
+      // a startup race between `insertManyIgnoringDuplicates` and the
+      // auto-built unique index — necessary for the backup loop.
+      //
+      // But treating every init failure as fatal is strictly worse for
+      // the operator: a single permission gap or one collection with
+      // legacy duplicates blocks ALL DB commands across EVERY guild,
+      // because `connectOneGuild` rethrows and the caller leaves
+      // `slot.repos` unset. Switch to `allSettled`: we still await the
+      // build (race window stays closed when permissions/data are OK),
+      // but rejections drop a stderr line and the connection stays
+      // serving. Duplicate-row risk under a missing unique index is
+      // the operator's to fix; an unusable bot is ours.
+      // Each init runs in its own task so the per-model `name` stays
+      // in scope on rejection — `Promise.allSettled`'s `result.reason`
+      // carries only the inner error, not the closure binding. Log
+      // inside the task, then rethrow so `allSettled` still records
+      // the rejection for any future caller that wants it.
+      // Stderr keeps this layer free of cross-imports into core/logger;
+      // the bot's structured logger separately reports
+      // "MongoDB for guild ... connected" / "Failed".
+      await Promise.allSettled(
+        Object.entries(models).map(async ([name, model]) => {
+          try {
+            await model.init();
+          } catch (err: unknown) {
+            const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+            process.stderr.write(
+              `[mongo] model.init() failed for ${name} on guild ${guildId}: ${reason}. ` +
+                `Connection kept open; indexes may be missing.\n`,
+            );
+            throw err;
+          }
+        }),
+      );
       const entry: GuildConnection = { guildId, connection, models };
       this.cache.set(guildId, entry);
       return entry;
     } catch (err: unknown) {
-      // Init failed (auth, network, index conflict, ...) but the
-      // mongoose connection is already open. Close it before
-      // rethrowing so a failed cold-start does not leak a TCP
-      // socket — getConnection() would otherwise retry-and-leak on
-      // every subsequent attempt.
+      // Reached only when something OTHER than `m.init()` throws
+      // (e.g. `buildModels` itself). The mongoose connection is open
+      // at this point — close it so a failed cold-start does not leak
+      // a TCP socket and the next `getConnection` retries cleanly.
       try {
         await connection.close();
       } catch {
-        // Suppress: the original init error is what callers need to
-        // see; close failures during cleanup must not mask it.
+        // Suppress: the original error is what callers need to see;
+        // close failures during cleanup must not mask it.
       }
       throw err;
     }

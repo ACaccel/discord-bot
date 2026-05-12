@@ -1,15 +1,17 @@
 /**
  * Integration smoke for `MongoConnectionManager`.
  *
- * Covers two production-side paths the message-repo suite does not
+ * Covers production-side paths the message-repo suite does not
  * exercise (it uses `StaticConnectionManager`):
  *   - In-flight dedupe via the `pending` map (two simultaneous
  *     `getConnection(g)` calls share one open).
- *   - Cleanup on init failure: when `model.init()` rejects after the
- *     mongoose connection is already open, the connection must be
- *     closed before the rejection bubbles. Regression for a codex
- *     stop-hook finding ("Mongo connection setup leaks open
- *     connections on init failure").
+ *   - Tolerance for `model.init()` failures: when an index build
+ *     rejects (legacy duplicate data, missing `createIndex`
+ *     permission, etc.) the manager logs the rejection but still
+ *     returns a usable cached connection. Regression for the
+ *     phase-7 hotfix that converted `Promise.all` -> `allSettled`
+ *     after every DB command failed with "找不到資料庫" once a single
+ *     model's init rejected.
  */
 import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
@@ -61,17 +63,19 @@ describe('MongoConnectionManager (integration)', () => {
     }
   });
 
-  it('closes the underlying mongoose connection when model.init() rejects', async () => {
+  it('tolerates model.init() rejection and still returns a usable connection', async () => {
     // Trigger a real `model.init()` failure by pre-seeding two docs
     // that violate `Message.messageId`'s unique index. When the
     // manager later opens this guild's database, its `m.init()` call
-    // will fail building the unique index — the regression target is
-    // that the already-open mongoose connection must be closed
-    // before the rejection bubbles, otherwise every retry leaks
-    // another socket.
+    // for the `Message` model will fail building the unique index.
+    //
+    // The phase-7 contract: the manager logs the rejection to stderr
+    // but still returns the (cached) `GuildConnection` so DB commands
+    // for that guild keep working — operators fix the data / index
+    // issue out-of-band; the bot does not block on it.
     const baseUri = requireMongoUri().replace(/[^/]*$/, '');
-    const leakGuildId = asGuildId('333333333333333333');
-    const seedUri = buildGuildMongoUri(baseUri, leakGuildId);
+    const tolerateGuildId = asGuildId('333333333333333333');
+    const seedUri = buildGuildMongoUri(baseUri, tolerateGuildId);
 
     const seed = await mongoose.createConnection(seedUri).asPromise();
     try {
@@ -83,16 +87,40 @@ describe('MongoConnectionManager (integration)', () => {
       await seed.close();
     }
 
-    const baselineOpen = mongoose.connections.filter((c) => c.readyState === 1).length;
+    // Silence the operator-facing stderr line during the test run; it
+    // is intentional in production but noisy in vitest output.
+    const stderrWrite = process.stderr.write.bind(process.stderr);
+    const captured: string[] = [];
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      captured.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
+      return true;
+    }) as typeof process.stderr.write;
 
     const mgr = new MongoConnectionManager(baseUri);
-    await expect(mgr.getConnection(leakGuildId)).rejects.toThrow();
+    try {
+      const guildConn = await mgr.getConnection(tolerateGuildId);
+      expect(guildConn.connection.readyState).toBe(1);
+      // Models map is still wired even though the index for Message
+      // is missing — repository code can still query/insert non-unique
+      // workflows.
+      expect(guildConn.models.Reply).toBeDefined();
 
-    // Manager owns no leaked connection: the post-failure count of
-    // *connected* mongoose connections must match the pre-attempt
-    // baseline. Pre-fix, this number would be baseline + 1.
-    const afterOpen = mongoose.connections.filter((c) => c.readyState === 1).length;
-    expect(afterOpen).toBe(baselineOpen);
+      // Subsequent `getConnection` hits the cache and returns the same
+      // entry (no re-attempt, no second stderr line).
+      const reuse = await mgr.getConnection(tolerateGuildId);
+      expect(reuse).toBe(guildConn);
+
+      // Operator MUST see WHICH model failed: a bare "model.init() failed"
+      // line would force them to grep the codebase to learn whether it
+      // was Message, UserApiSetting, or something else. The phase-7
+      // hotfix bakes the model name into the line.
+      const failureLine = captured.find((line) => line.includes('model.init() failed'));
+      expect(failureLine).toBeDefined();
+      expect(failureLine).toMatch(/model\.init\(\) failed for Message on guild /);
+    } finally {
+      process.stderr.write = stderrWrite;
+      await mgr.closeAll();
+    }
 
     // Cleanup the seed data so a re-run of this suite stays clean.
     const cleanup = await mongoose.createConnection(seedUri).asPromise();
