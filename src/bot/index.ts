@@ -46,7 +46,6 @@ import { registerSSMs, SSMHandler, executeSSM } from '@ssm';
 import { logger } from "@utils";
 import { detectGuildCreate } from "@event";
 import { ReactionHandler, executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
-import { giveaway, activity } from "@features";
 
 export interface Config {
     admin?: string;
@@ -166,11 +165,27 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // composition root stays small; tests provide their own fake.
         const guildRegistry: GuildRegistry = {
             getRepos: (guildId) => this.guildInfo[guildId]?.repos,
+            getDb: (guildId) => {
+                const db = this.guildInfo[guildId]?.db;
+                if (db === undefined) return undefined;
+                // Cast the model bag's value type to the plugin-facing
+                // `Model<unknown>` — the legacy `GuildDb` shape stores
+                // `Model<any>` which would otherwise leak `any` into
+                // strict-mode consumers.
+                return {
+                    connection: db.connection,
+                    models: db.models as unknown as Record<string, import('mongoose').Model<unknown>>,
+                };
+            },
             getChannel: (guildId, name) => this.guildInfo[guildId]?.channels?.[name],
             getRole: (guildId, name) => this.guildInfo[guildId]?.roles?.[name],
             listGuildIds: () => Object.keys(this.guildInfo),
         };
         this.container.registerSingleton(TOKENS.GuildRegistry, () => guildRegistry);
+        // Discord client singleton — plugins that need raw client
+        // primitives (channel fetch, message archive) resolve through
+        // here rather than holding a BaseBot reference.
+        this.container.registerSingleton(TOKENS.DiscordClient, () => this.client);
     }
 
     /**
@@ -380,9 +395,10 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 await registerSSMs(this);
                 await registerModals(this);
                 await registerReactions(this);
-                await giveaway.rebootGiveawayJobs(this);
-                await activity.rebootActivityJobs(this);
-
+                // Giveaway / activity reboot logic moved to
+                // {@link createGiveawayPlugin} / {@link createActivityPlugin}
+                // in Phase 4b-3. Bots that need them call `.use()`
+                // with a `rebootJobs` closure in their composition root.
                 await this.rebootMessage();
                 if (callback) {
                     await callback();
