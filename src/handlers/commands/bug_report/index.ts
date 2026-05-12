@@ -42,7 +42,7 @@ export default class bug_report extends Command {
             const admin = await bot.client.users.fetch(bot.adminId);
             if (admin) {
                 await admin.send(`Bug Report from ${interaction.user.username}：${content}`);
-                await interaction.reply({ content: `問題已回報! 內容: ${content}`, flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('replies:bug_report.reported', { content }) ?? '', flags: MessageFlags.Ephemeral });
             } else {
                 throw new Error("Admin not found");
             }

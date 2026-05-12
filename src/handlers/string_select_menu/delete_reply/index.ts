@@ -24,6 +24,6 @@ export default class delete_reply extends SSMHandler {
         const replymsg = pair.reply;
         await repos.reply.deleteById(value);
 
-        await interaction.reply({ content: `已刪除回覆：${key} => ${replymsg}` });
+        await interaction.reply({ content: bot.translator?.t('replies:delete_reply.deleted', { key, reply: replymsg }) ?? '' });
     }
 }

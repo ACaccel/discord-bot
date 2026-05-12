@@ -60,9 +60,9 @@ export default class todo_list extends Command {
                 const existPair = await todos.findByContent(content);
                 if (existPair.length === 0) {
                     await todos.create(content);
-                    await interaction.editReply({ content: `已新增待辦事項：${content}` });
+                    await interaction.editReply({ content: bot.translator?.t('replies:todo_list.added', { content }) ?? '' });
                 } else {
-                    await interaction.editReply({ content: `此待辦事項：${content} 已經存在！` });
+                    await interaction.editReply({ content: bot.translator?.t('replies:todo_list.already_exists', { content }) ?? '' });
                 }
             } else if (action == "delete") {
                 // content is index
@@ -72,15 +72,15 @@ export default class todo_list extends Command {
                     return;
                 }
                 if (parseInt(content) > todoList.length) {
-                    await interaction.editReply({ content: `找不到待辦事項：${content}` });
+                    await interaction.editReply({ content: bot.translator?.t('replies:todo_list.not_found', { content }) ?? '' });
                 } else {
                     const deleted_content = todoList[parseInt(content) - 1].content;
                     await todos.deleteByContent(deleted_content);
-                    await interaction.editReply({ content: `已刪除待辦事項：${deleted_content}` });
+                    await interaction.editReply({ content: bot.translator?.t('replies:todo_list.deleted', { content: deleted_content }) ?? '' });
                 }
             } else if (action == "list") {
                 const todoList = await todos.listAll();
-                let content = "待辦事項：\n";
+                let content = bot.translator?.t('replies:todo_list.header') ?? '';
                 todoList.map((e, i) => {
                     content += `> ${i + 1}. ${e.content}\n`;
                 });

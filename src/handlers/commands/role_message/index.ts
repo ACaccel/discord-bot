@@ -53,7 +53,7 @@ export default class role_message extends Command {
             for (const roleId of roleIds) {
                 const role = guild.roles.cache.get(roleId);
                 if (!role) {
-                    await interaction.editReply({ content: `找不到ID為 ${roleId} 的身份組, 請確認ID是否正確` });
+                    await interaction.editReply({ content: bot.translator?.t('replies:role_message.role_not_found', { id: roleId }) ?? '' });
                     return;
                 }
                 validRoles.push(role);

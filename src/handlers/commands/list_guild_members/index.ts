@@ -80,14 +80,20 @@ export default class list_guild_members extends Command {
             const lines = members.map(buildMemberLine);
             const chunks = chunkLines(lines, MAX_DESCRIPTION_LENGTH);
 
-            const title = `${guild.name} 成員清單`;
-            const totalText = `總數：${members.length}（使用者：${members.filter((m) => !m.user.bot).length}、機器人：${members.filter((m) => m.user.bot).length}）`;
+            const t = (key: string, params?: Record<string, string | number>): string =>
+                bot.translator?.t(key, params) ?? '';
+            const title = t('replies:list_guild_members.title', { name: guild.name });
+            const totalText = t('replies:list_guild_members.total', {
+                total: members.length,
+                users: members.filter((m) => !m.user.bot).length,
+                bots: members.filter((m) => m.user.bot).length,
+            });
 
             const firstEmbed = new EmbedBuilder()
                 .setTitle(title)
                 .setDescription(chunks[0])
                 .setColor(0x5865F2)
-                .setFooter({ text: `${totalText}｜第 1/${chunks.length} 頁` });
+                .setFooter({ text: t('replies:list_guild_members.footer', { totalText, current: 1, total: chunks.length }) });
 
             await interaction.editReply({ embeds: [firstEmbed] });
 
@@ -96,7 +102,7 @@ export default class list_guild_members extends Command {
                     .setTitle(title)
                     .setDescription(chunks[i])
                     .setColor(0x5865F2)
-                    .setFooter({ text: `${totalText}｜第 ${i + 1}/${chunks.length} 頁` });
+                    .setFooter({ text: t('replies:list_guild_members.footer', { totalText, current: i + 1, total: chunks.length }) });
 
                 await interaction.followUp({ embeds: [pageEmbed] });
             }

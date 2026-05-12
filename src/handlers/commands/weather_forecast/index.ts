@@ -24,14 +24,16 @@ export default class weather_forecast extends Command {
             const weatherForecast = response.data[0];
             const temperatureCelsius = (weatherForecast.Temperature.Value - 32) * 5 / 9; // Convert Fahrenheit to Celsius
             const realFeelCelsius = (weatherForecast.RealFeelTemperature.Value - 32) * 5 / 9; // Convert Fahrenheit to Celsius
-            let formattedContent = "每小時天氣預報：\n";
-            formattedContent += `- 預測時間：${weatherForecast.DateTime}\n`;
-            formattedContent += `- 天氣狀況：${weatherForecast.IconPhrase}\n`;
-            formattedContent += `- 降雨機率：${weatherForecast.PrecipitationProbability}%\n`;
-            formattedContent += `- 雷暴機率：${weatherForecast.ThunderstormProbability}%\n`;
-            formattedContent += `- 室外氣溫：${temperatureCelsius}°C\n`;
-            formattedContent += `- 體感溫度：${realFeelCelsius}°C\n`;
-            formattedContent += `- 相對濕度：${weatherForecast.RelativeHumidity}%\n`;
+            const t = (key: string, params?: Record<string, string | number>): string =>
+                bot.translator?.t(key, params) ?? '';
+            let formattedContent = t('replies:weather_forecast.header');
+            formattedContent += t('replies:weather_forecast.forecast_time', { value: weatherForecast.DateTime });
+            formattedContent += t('replies:weather_forecast.weather_status', { value: weatherForecast.IconPhrase });
+            formattedContent += t('replies:weather_forecast.precipitation', { value: weatherForecast.PrecipitationProbability });
+            formattedContent += t('replies:weather_forecast.thunderstorm', { value: weatherForecast.ThunderstormProbability });
+            formattedContent += t('replies:weather_forecast.temperature', { value: temperatureCelsius });
+            formattedContent += t('replies:weather_forecast.real_feel', { value: realFeelCelsius });
+            formattedContent += t('replies:weather_forecast.humidity', { value: weatherForecast.RelativeHumidity });
             
             const formattedContentWithBackticks = formattedContent;
             await interaction.editReply({ content: formattedContentWithBackticks });

@@ -76,12 +76,17 @@ export default class search_anime_scene extends Command {
                         const embedMsg = new EmbedBuilder()
                             .setTitle(filename)
                             .setURL(video)
-                            .setDescription(`第 ${episode} 集, 
-                                相似度：${similarity.toFixed(2)}%
-                                時間：${(from/60).toFixed(0)}:${(from%60).toFixed(2)} - ${(to/60).toFixed(0)}:${(to%60).toFixed(2)}`)
+                            .setDescription(bot.translator?.t('replies:search_anime_scene.description', {
+                                episode,
+                                similarity: similarity.toFixed(2),
+                                fromMin: (from / 60).toFixed(0),
+                                fromSec: (from % 60).toFixed(2),
+                                toMin: (to / 60).toFixed(0),
+                                toSec: (to % 60).toFixed(2),
+                            }) ?? '')
                             .setImage(image)
                             .setTimestamp()
-                            .setFooter({ text: `第 ${i + 1} 筆結果` });
+                            .setFooter({ text: bot.translator?.t('replies:search_anime_scene.footer', { index: i + 1 }) ?? '' });
                         embedarr.push(embedMsg);
                     });
 

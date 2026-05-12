@@ -52,7 +52,7 @@ export default class talk_signed extends Command {
             await interaction.deferReply();
             await interaction.deleteReply();
             if (content.includes("@everyone") || content.includes("@here")) {
-                const tagMessage = `${guild_member.displayName}(${interaction.user.username})好壞喔被我抓到你在 tag 所有人`;
+                const tagMessage = bot.translator?.t('replies:talk_signed.tag_warning', { displayName: guild_member.displayName, username: interaction.user.username }) ?? '';
                 await channel.send(tagMessage);
             } else {
                 await channel.send(`${guild_member.displayName}(${interaction.user.username}): ${content}`);

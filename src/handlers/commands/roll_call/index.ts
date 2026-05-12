@@ -60,7 +60,7 @@ export default class roll_call extends Command {
 
                 const activity = await db.models["Activity"].findOne({ activity_id });
                 if (!activity) {
-                    await interaction.reply({ content: `找不到活動ID為 ${activity_id} 的活動`, flags: MessageFlags.Ephemeral });
+                    await interaction.reply({ content: bot.translator?.t('replies:roll_call.activity_not_found', { id: activity_id }) ?? '', flags: MessageFlags.Ephemeral });
                     return;
                 }
 
@@ -88,7 +88,7 @@ export default class roll_call extends Command {
                 for (const userId of userIds) {
                     const user = interaction.guild?.members.cache.get(userId);
                     if (!user) {
-                        await interaction.reply({ content: `找不到ID為 ${userId} 的使用者, 請確認ID是否正確`, flags: MessageFlags.Ephemeral });
+                        await interaction.reply({ content: bot.translator?.t('replies:roll_call.user_not_found', { id: userId }) ?? '', flags: MessageFlags.Ephemeral });
                         return;
                     }
                     validUsers.push(user);
@@ -99,9 +99,9 @@ export default class roll_call extends Command {
                 }
             }
     
-            let announcement = `初華大人的點名簿：<@${interaction.user.id}> 發起了點名！\n`;
+            let announcement = bot.translator?.t('replies:roll_call.announcement_header', { userId: interaction.user.id }) ?? '';
             if (activity_id) {
-                announcement += `(活動ID: ${activity_id})\n`;
+                announcement += bot.translator?.t('replies:roll_call.activity_id_line', { id: activity_id }) ?? '';
             }
             let id = 1;
             validUsers.forEach(user => {

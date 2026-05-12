@@ -206,9 +206,9 @@ export default class db_list_message extends Command {
 
             if (messages.length === 0) {
                 const scopeText = hour === null || hour === undefined
-                    ? `${date} 整天`
-                    : `${date} ${hour} 點`;
-                await interaction.editReply({ content: `找不到 <#${channel.id}> 在 ${scopeText} 的訊息紀錄` });
+                    ? bot.translator?.t('replies:db_list_message.scope_full_day', { date }) ?? ''
+                    : bot.translator?.t('replies:db_list_message.scope_hour', { date, hour }) ?? '';
+                await interaction.editReply({ content: bot.translator?.t('replies:db_list_message.no_messages', { channelId: channel.id, scopeText }) ?? '' });
                 return;
             }
 
@@ -276,7 +276,7 @@ export default class db_list_message extends Command {
             }
 
             const rangeText = hour === null || hour === undefined
-                ? `${date} 00:00 - 次日 00:00`
+                ? bot.translator?.t('replies:db_list_message.range_full_day', { date }) ?? ''
                 : `${date} ${hour.toString().padStart(2, "0")}:00 - ${(hour + 1).toString().padStart(2, "0")}:00`;
 
             if (print === "yes") {
@@ -284,7 +284,7 @@ export default class db_list_message extends Command {
                 const outChannel = interaction.channel;
                 if (!outChannel || typeof (outChannel as any).send !== "function") {
                     await interaction.editReply({
-                        content: `找不到可用的輸出頻道（slash 指令頻道）。`,
+                        content: bot.translator?.t('replies:db_list_message.no_output_channel') ?? '',
                     });
                     return;
                 }
@@ -308,7 +308,7 @@ export default class db_list_message extends Command {
                 if (current) chunks.push(current);
 
                 await interaction.editReply({
-                    content: `共找到 ${messages.length} 則訊息（${rangeText}，<#${channel.id}>），將分成 ${chunks.length} 則訊息發送。`,
+                    content: bot.translator?.t('replies:db_list_message.found_split', { count: messages.length, rangeText, channelId: channel.id, chunks: chunks.length }) ?? '',
                 });
 
                 for (const chunk of chunks) {
@@ -327,7 +327,7 @@ export default class db_list_message extends Command {
                 });
 
                 await interaction.editReply({
-                    content: `共找到 ${messages.length} 則訊息（${rangeText}，<#${channel.id}>）。`,
+                    content: bot.translator?.t('replies:db_list_message.found', { count: messages.length, rangeText, channelId: channel.id }) ?? '',
                     files: [attachment],
                 });
             }

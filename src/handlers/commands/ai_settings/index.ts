@@ -85,13 +85,13 @@ export default class ai_settings extends Command {
         const modelOptions = listProviderModels(provider);
         if (modelOptions.length === 0) {
             await interaction.reply({
-                content: `目前無法取得 \`${provider}\` 的可用模型清單。可能原因：API 金鑰未設定、網路暫時失敗，或服務剛啟動仍在載入。請稍候片刻後重試。`,
+                content: bot.translator?.t('replies:ai_settings.model_list_unavailable', { provider }) ?? '',
                 flags: MessageFlags.Ephemeral,
             });
             return;
         }
 
-        const modal = buildSettingsModal(provider, doc, modelOptions);
+        const modal = buildSettingsModal(provider, doc, modelOptions, bot.translator);
         await interaction.showModal(modal);
     }
 }
@@ -100,10 +100,14 @@ function buildSettingsModal(
     provider: LLMProviderName,
     current: UserApiDoc,
     modelOptions: string[],
+    translator: BaseBot['translator'],
 ): ModalBuilder {
+    const t = (key: string, params?: Record<string, string | number>): string =>
+        translator?.t(key, params) ?? '';
+
     const modelSelect = new StringSelectMenuBuilder()
         .setCustomId('model')
-        .setPlaceholder('選擇模型')
+        .setPlaceholder(t('replies:ai_settings.select_model_placeholder'))
         .addOptions(
             modelOptions.map((m) =>
                 new StringSelectMenuOptionBuilder()
@@ -115,14 +119,14 @@ function buildSettingsModal(
 
     const webSearchSelect = new StringSelectMenuBuilder()
         .setCustomId('web_search')
-        .setPlaceholder('網頁搜尋')
+        .setPlaceholder(t('replies:ai_settings.web_search_placeholder'))
         .addOptions(
             new StringSelectMenuOptionBuilder()
-                .setLabel('開啟')
+                .setLabel(t('replies:ai_settings.toggle_on'))
                 .setValue('on')
                 .setDefault(current.web_search),
             new StringSelectMenuOptionBuilder()
-                .setLabel('關閉')
+                .setLabel(t('replies:ai_settings.toggle_off'))
                 .setValue('off')
                 .setDefault(!current.web_search),
         );
@@ -140,11 +144,11 @@ function buildSettingsModal(
         .setRequired(false)
         .setMaxLength(4000)
         .setValue(current.system_prompt ?? '')
-        .setPlaceholder('（選填）為 AI 設定角色或規則');
+        .setPlaceholder(t('replies:ai_settings.system_prompt_placeholder'));
 
     return new ModalBuilder()
         .setCustomId(`ai_settings|${provider}`)
-        .setTitle(`AI 設定 — ${provider}`)
+        .setTitle(t('replies:ai_settings.modal_title', { provider }))
         .setLabelComponents(
             new LabelBuilder()
                 .setLabel('Model')

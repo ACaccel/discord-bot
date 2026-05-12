@@ -124,7 +124,7 @@ export default class emoji_frequency extends Command {
                 });
                 
                 // Update progress
-                await interaction.editReply({ content: `正在處理第 ${monthOffset + 1} / ${last_n_months} 個月的資料...` });
+                await interaction.editReply({ content: bot.translator?.t('replies:emoji_frequency.progress', { current: monthOffset + 1, total: last_n_months }) ?? '' });
             }
     
             allEmoji.forEach((_, emojiText) => {
@@ -135,10 +135,24 @@ export default class emoji_frequency extends Command {
                 .sort((a, b) => frequency === "asc" ? a[1] - b[1] : b[1] - a[1])
                 .slice(0, top_n);
     
-            let content = `最近${last_n_months}個月內使用頻率${frequency === "asc" ? "最低" : "最高"}的 ${top_n} 個${type === "animated" ? "動態" : "靜態"}表情符號：\n`;
+            const t = (key: string, params?: Record<string, string | number>): string =>
+                bot.translator?.t(key, params) ?? '';
+            const direction = frequency === "asc"
+                ? t('replies:emoji_frequency.direction_lowest')
+                : t('replies:emoji_frequency.direction_highest');
+            const kind = type === "animated"
+                ? t('replies:emoji_frequency.kind_animated')
+                : t('replies:emoji_frequency.kind_static');
+            let content = t('replies:emoji_frequency.header', { months: last_n_months, direction, top: top_n, kind });
             for (let i = 0; i < sortedEmojis.length; i++) {
                 const [emoji, _] = sortedEmojis[i];
-                content += `${i + 1}. ${emoji} - 總共: ${allEmoji.get(emoji)} 次, 文字內: ${textEmoji.get(emoji)} 次, 訊息反應: ${reactionEmoji.get(emoji)} 次\n`;
+                content += t('replies:emoji_frequency.line', {
+                    rank: i + 1,
+                    emoji,
+                    total: allEmoji.get(emoji) ?? 0,
+                    text: textEmoji.get(emoji) ?? 0,
+                    reaction: reactionEmoji.get(emoji) ?? 0,
+                });
                 
                 // Send every 10 emojis or at the end
                 if ((i + 1) % 10 === 0 || i === sortedEmojis.length - 1) {

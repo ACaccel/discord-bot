@@ -74,18 +74,26 @@ export default class ai_settings_modal extends ModalHandler {
         // limit so the surrounding bullet lines still fit; truncate with an
         // explicit marker rather than silently dropping the tail.
         const PROMPT_DISPLAY_MAX = 1700;
+        const t = (key: string, params?: Record<string, string | number>): string =>
+            bot.translator?.t(key, params) ?? '';
         const promptDisplay = systemPrompt
             ? systemPrompt.length > PROMPT_DISPLAY_MAX
-                ? `\n\`\`\`\n${systemPrompt.slice(0, PROMPT_DISPLAY_MAX)}\n…（共 ${systemPrompt.length} 字，已截斷）\n\`\`\``
+                ? t('replies:ai_settings.modal_system_prompt_preview', {
+                    preview: systemPrompt.slice(0, PROMPT_DISPLAY_MAX),
+                    length: systemPrompt.length,
+                })
                 : `\n\`\`\`\n${systemPrompt}\n\`\`\``
-            : '（未設定）';
+            : t('replies:ai_settings.system_prompt_not_set');
+        const webSearchLabel = t(
+            webSearchValue === 'on' ? 'replies:ai_settings.toggle_on' : 'replies:ai_settings.toggle_off',
+        );
         await interaction.reply({
             content: [
-                '✅ AI 設定已更新：',
+                t('replies:ai_settings.updated_header'),
                 `• Provider: \`${provider}\``,
                 `• Model: \`${model}\``,
                 `• Temperature: \`${temperature}\``,
-                `• Web Search: ${webSearchValue === 'on' ? '開啟' : '關閉'}`,
+                t('replies:ai_settings.web_search_status', { value: webSearchLabel }),
                 `• System Prompt: ${promptDisplay}`,
             ].join('\n'),
             flags: MessageFlags.Ephemeral,

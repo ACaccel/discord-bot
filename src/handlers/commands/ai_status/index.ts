@@ -38,16 +38,23 @@ export default class ai_status extends Command {
 
             // Truncate system prompt to keep total reply well under Discord's 2000-char limit.
             const PROMPT_PREVIEW_MAX = 1500;
+            const t = (key: string, params?: Record<string, string | number>): string =>
+                bot.translator?.t(key, params) ?? '';
             const promptDisplay = doc.system_prompt
                 ? doc.system_prompt.length > PROMPT_PREVIEW_MAX
-                    ? `\`${doc.system_prompt.slice(0, PROMPT_PREVIEW_MAX)}…\`（共 ${doc.system_prompt.length} 字，已截斷）`
+                    ? t('replies:ai_status.system_prompt_preview', {
+                        preview: doc.system_prompt.slice(0, PROMPT_PREVIEW_MAX),
+                        length: doc.system_prompt.length,
+                    })
                     : `\`${doc.system_prompt}\``
-                : '（未設定）';
+                : t('replies:ai_status.system_prompt_not_set');
             const lines = [
                 `**Provider:** \`${doc.provider}\``,
                 `**Model:** \`${doc.model}\``,
                 `**Temperature:** \`${doc.temperature}\``,
-                `**Web Search:** ${doc.web_search ? '開啟' : '關閉'}`,
+                t('replies:ai_status.web_search_status', {
+                    value: t(doc.web_search ? 'replies:ai_settings.toggle_on' : 'replies:ai_settings.toggle_off'),
+                }),
                 `**System Prompt:** ${promptDisplay}`,
             ];
             await interaction.editReply({ content: lines.join('\n') });

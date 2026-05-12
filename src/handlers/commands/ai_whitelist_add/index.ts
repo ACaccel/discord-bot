@@ -47,7 +47,7 @@ export default class ai_whitelist_add extends Command {
         try {
             const existing = await repos.userApiSetting.findByUserId(target.id);
             if (existing) {
-                await interaction.editReply({ content: `${target.displayName} 已在白名單中。` });
+                await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.already_in', { user: target.displayName }) ?? '' });
                 return;
             }
             await repos.userApiSetting.create(target.id, {
@@ -57,7 +57,7 @@ export default class ai_whitelist_add extends Command {
                 system_prompt: '',
                 web_search: false,
             });
-            await interaction.editReply({ content: `已將 ${target.displayName} 加入白名單（預設 provider: openai）。` });
+            await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.added', { user: target.displayName }) ?? '' });
         } catch (err) {
             logger.errorLogger(bot.clientId, guildId, err);
             await interaction.editReply({ content: bot.translator?.t('errors:db.operation_failed') ?? '' });

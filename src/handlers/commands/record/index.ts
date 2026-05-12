@@ -112,7 +112,7 @@ export default class record extends Command {
                     await interaction.editReply({ content: bot.translator?.t('replies:record.no_audio') ?? '' });
                 } else {
                     const attachment = new AttachmentBuilder(buffer, { name: `${timestamp}.zip` })
-                    await interaction.editReply({ content: `已儲存倒數 ${duration} 分鐘的錄音`, files: [attachment] });
+                    await interaction.editReply({ content: bot.translator?.t('replies:record.saved', { duration }) ?? '', files: [attachment] });
                 }
             } else {
                 await interaction.editReply({ content: bot.translator?.t('replies:record.invalid_action') ?? '' });

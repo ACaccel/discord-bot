@@ -1,7 +1,12 @@
 import { Channel } from "discord.js";
+import type { Translator } from "../core/i18n";
 
-export const earthquake_warning = async(channel: Channel, eq_role: string) => {
+export const earthquake_warning = async (
+    channel: Channel,
+    eq_role: string,
+    translator: Translator | undefined,
+): Promise<void> => {
     if (!channel.isSendable()) return;
-    await channel.send(`# <@&${eq_role}> 台北強震警報!!! (4級以上)` +
-        "\n> 為什麼要地震！？");
-}
+    const message = translator?.t('replies:earthquake.alert', { role: eq_role }) ?? '';
+    await channel.send(message);
+};

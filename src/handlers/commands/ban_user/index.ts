@@ -56,9 +56,14 @@ export default class ban_user extends Command {
     
             // ban message
             const initiator = interaction.member as GuildMember || interaction.user;
-            const ban_msg = `**${initiator.displayName}** 發起了審判！\n` +
-                            `是否禁言 **${member.displayName}** ${duration} 分鐘？\n` +
-                            `**${JUDGE_TIME}** 分鐘後累積 **${BAN_THRESHOLD}** 票則禁言，<@&${ban_user_role}> 讓他看看豐川家的黑暗！`
+            const ban_msg = bot.translator?.t('replies:ban_user.vote_call', {
+                initiator: initiator.displayName,
+                target: member.displayName,
+                duration,
+                judgeTime: JUDGE_TIME,
+                threshold: BAN_THRESHOLD,
+                role: ban_user_role,
+            }) ?? '';
             await interaction.deleteReply();
             const ch = interaction.channel;
             if (!ch?.isSendable()) return;
@@ -91,25 +96,25 @@ export default class ban_user extends Command {
             const ban_judgement = async () => {
                 const emoji = judge_msg.reactions.resolve("👍");
                 if (!emoji) {
-                    await judge_msg.reply("無法取得投票數");
+                    await judge_msg.reply(bot.translator?.t('replies:ban_user.cannot_get_votes') ?? '');
                     return;
                 }
                 if (member.user.bot) {
-                    await judge_msg.reply("還想ban機器人阿");
+                    await judge_msg.reply(bot.translator?.t('replies:ban_user.cannot_ban_bot') ?? '');
                     return;
                 }
-    
+
                 const judge_count = emoji.count - 1;
                 if (judge_count >= BAN_THRESHOLD) {
                     try {
-                        await member.timeout(duration * 60 * 1000, "初華大人的禁言裁決！");
-                        await judge_msg.reply(`${member.user.tag} 已被初華大人禁言 ${duration} 分鐘`);
+                        await member.timeout(duration * 60 * 1000, bot.translator?.t('replies:ban_user.timeout_reason') ?? '');
+                        await judge_msg.reply(bot.translator?.t('replies:ban_user.timed_out', { user: member.user.tag, duration }) ?? '');
                     } catch (error) {
-                        await judge_msg.reply("雖然初華大人無法禁言他，但將予以無限刪除之審判，即刻裁決！");
+                        await judge_msg.reply(bot.translator?.t('replies:ban_user.cannot_timeout') ?? '');
                         await delete_on_msg_create();
                     }
                 } else {
-                    await judge_msg.reply(`投票數 ${judge_count} 票，未達到禁言門檻 ${BAN_THRESHOLD} 票`);
+                    await judge_msg.reply(bot.translator?.t('replies:ban_user.vote_failed', { count: judge_count, threshold: BAN_THRESHOLD }) ?? '');
                 }
             }
             misc.scheduleJob(end_time_date, () => ban_judgement());

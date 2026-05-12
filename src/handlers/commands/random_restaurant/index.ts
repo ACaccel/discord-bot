@@ -136,12 +136,16 @@ export default class random_restaurant extends Command {
             const phone = response.data.restaurant.phone;
             const price = response.data.restaurant.price;
             const google_map = response.data.restaurant.google_maps_link;
+            const t = (key: string, params?: Record<string, string | number>): string =>
+                bot.translator?.t(key, params) ?? '';
             await interaction.editReply({
-                content: `「${message ?? "沒有描述"}」\n\n` +
-                        `${price ? `價位：${price}\n` : ""}` +
-                        `${address ? `地址：${address}\n` : ""}` +
-                        `${phone ? `電話：${phone}\n` : ""}` +
-                        `${google_map ? `地圖：${google_map}` : ""}`
+                content: t('replies:random_restaurant.description', {
+                    message: message ?? t('replies:random_restaurant.no_description'),
+                    priceLine: price ? t('replies:random_restaurant.price_line', { price }) : '',
+                    addressLine: address ? t('replies:random_restaurant.address_line', { address }) : '',
+                    phoneLine: phone ? t('replies:random_restaurant.phone_line', { phone }) : '',
+                    mapLine: google_map ? t('replies:random_restaurant.map_line', { map: google_map }) : '',
+                }),
             });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
