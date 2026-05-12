@@ -13,7 +13,7 @@ interface MsgArchiveConfig extends Config {
  * {@link createMessageBackupPlugin}. This class now only registers
  * the plugin and suppresses the listener categories BaseBot still
  * wires (interactions / reactions / guildCreate) — Konata is a chat
- * bot, msg_archive is a worker; it must not respond to either.
+ * bot, msg-archive is a worker; it must not respond to either.
  */
 export class MsgArchive extends BaseBot<MsgArchiveConfig> {
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: MsgArchiveConfig) {

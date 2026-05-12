@@ -11,7 +11,7 @@
     "deploy": "ts-node src/deploy.ts",
     "tomori": "ts-node src/bot/tomori/index.ts",
     "nijika": "ts-node src/bot/nijika/index.ts",
-    "msg_archive": "ts-node src/bot/msg_archive/index.ts",
+    "msg-archive": "ts-node src/bot/msg-archive/index.ts",
     "konata": "ts-node src/bot/konata/index.ts",
     "typecheck": "tsc -p tsconfig.strict.json",
     "typecheck:legacy": "tsc --noEmit",

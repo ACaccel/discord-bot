@@ -3,7 +3,7 @@ import { BaseBot, Config } from '@bot';
 import { executeCommand } from '@cmd';
 import { executeButton } from '@button';
 import { executeModal } from '@modal';
-import { executeSSM } from '@ssm';
+import { executeSSM } from '@select-menu';
 import { activity, giveaway } from '@features';
 import {
     AutoReplyPlugin,

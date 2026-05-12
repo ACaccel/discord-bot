@@ -3,7 +3,7 @@ import {
     MessageFlags,
 } from 'discord.js';
 import { BaseBot } from '@bot';
-import { SSMHandler } from '@ssm';
+import { SSMHandler } from '@select-menu';
 
 export default class delete_reply extends SSMHandler {
     public override async execute(interaction: StringSelectMenuInteraction, bot: BaseBot): Promise<void> {

@@ -3,10 +3,10 @@ import {
     GatewayIntentBits
 } from 'discord.js';
 import dotenv from "dotenv";
-import { MsgArchive } from './msgArchive';
+import { MsgArchive } from './msg-archive';
 import config from './config.json';
 
-dotenv.config({ path: './src/bot/msg_archive/.env' });
+dotenv.config({ path: './src/bot/msg-archive/.env' });
 
 // discord client
 const client: Client = new Client({ 

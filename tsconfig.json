@@ -12,7 +12,7 @@
       "@bot": ["bot/index"],
       "@cmd": ["handlers/commands/index"],
       "@button": ["handlers/buttons/index"],
-      "@ssm": ["handlers/string_select_menu/index"],
+      "@select-menu": ["handlers/select-menus/index"],
       "@modal": ["handlers/modals/index"],
       "@reaction": ["handlers/reactions/index"],
       "@utils": ["utils/index"],
