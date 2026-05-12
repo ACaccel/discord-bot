@@ -21,7 +21,7 @@ const REGISTRY_FILES = [
   'src/handlers/commands/registry.generated.ts',
   'src/handlers/buttons/registry.generated.ts',
   'src/handlers/modals/registry.generated.ts',
-  'src/handlers/string_select_menu/registry.generated.ts',
+  'src/handlers/select-menus/registry.generated.ts',
   'src/handlers/reactions/registry.generated.ts',
 ] as const;
 

@@ -1,6 +1,6 @@
 /**
  * MessageBackupPlugin — periodic per-guild message backup, ported
- * from `src/bot/msg_archive/msgArchive.ts`.
+ * from `src/bot/msg-archive/msg-archive.ts`.
  *
  * The plugin owns the full backup logic that used to live on the
  * `MsgArchive` BaseBot subclass. `MsgArchive` shrinks to a composition
@@ -482,7 +482,7 @@ const performBackup = async (
     return;
   }
 
-  const logPath = path.join(process.cwd(), 'logs', `msg_archive_${guildId}.log`);
+  const logPath = path.join(process.cwd(), 'logs', `msg-archive-${guildId}.log`);
   const log = new BackupLog(logPath);
 
   try {

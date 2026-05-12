@@ -5,7 +5,7 @@ import fs from "fs";
 import path from "path";
 import config from "./config.json";
 
-dotenv.config({ path: "./src/bot/msg_archive/.env" });
+dotenv.config({ path: "./src/bot/msg-archive/.env" });
 
 // ================================================
 // ================ CONFIGURATION =================

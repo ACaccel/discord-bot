@@ -60,7 +60,7 @@ const TARGETS: readonly RegistryTarget[] = [
     exportName: 'MODAL_REGISTRY',
   },
   {
-    dir: 'src/handlers/string_select_menu',
+    dir: 'src/handlers/select-menus',
     typeImportPath: '.',
     typeName: 'SSMHandler',
     exportName: 'SSM_REGISTRY',

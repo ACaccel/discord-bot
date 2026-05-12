@@ -43,7 +43,7 @@ import { Job } from 'node-schedule';
 import { Command, registerCommands, executeCommand } from "@cmd";
 import { ButtonHandler, registerButtons, executeButton } from '@button';
 import { ModalHandler, registerModals, executeModal } from '@modal';
-import { registerSSMs, SSMHandler, executeSSM } from '@ssm';
+import { registerSSMs, SSMHandler, executeSSM } from '@select-menu';
 import { logger } from "@utils";
 import { detectGuildCreate } from "@event";
 import { ReactionHandler, executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
