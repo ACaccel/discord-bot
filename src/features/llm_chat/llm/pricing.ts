@@ -1,4 +1,4 @@
-import { LLMUsage } from './types';
+import { LLMUsage } from '../../../infra/llm';
 
 /**
  * Per-million-token USD pricing as `[input, output]`.
