@@ -10,15 +10,18 @@ export default class add_reply extends Command {
         super();
         this.setConfig({
             name: "add_reply",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "新增自動回覆",
             options: {
                 string: [
                     {
                         name: "keyword",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "關鍵字",
                         required: true
                     },{
                         name: "reply",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "回覆",
                         required: true
                     }
@@ -35,7 +38,7 @@ export default class add_reply extends Command {
 
             const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
             if (!repos) {
-                await interaction.editReply({ content: "找不到資料庫" });
+                await interaction.editReply({ content: bot.translator?.t('errors:db.not_found') ?? '' });
                 return;
             }
             const existPair = await repos.reply.findExactPair(input, reply);

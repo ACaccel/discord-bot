@@ -11,11 +11,13 @@ export default class bug_report extends Command {
         super();
         this.setConfig({
             name: "bug_report",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "回報問題",
             options: {
                 string: [
                     {
                         name: "content",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "問題描述",
                         required: true
                     }

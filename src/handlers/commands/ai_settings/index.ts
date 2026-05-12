@@ -33,11 +33,13 @@ export default class ai_settings extends Command {
         super();
         this.setConfig({
             name: 'ai_settings',
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: '一次性編輯你的 AI 設定（model / temperature / web search / system prompt）',
             options: {
                 string: [
                     {
                         name: 'provider',
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: '選擇 AI provider，後續 model 候選將依此 provider 動態載入',
                         required: true,
                         choices: PROVIDER_CHOICES,
@@ -52,13 +54,13 @@ export default class ai_settings extends Command {
         const userId = interaction.user.id;
         const guildId = interaction.guildId;
         if (!guildId) {
-            await interaction.reply({ content: '此指令只能在伺服器中使用。', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('errors:command.guild_only') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
 
         const repos = bot.guildInfo[guildId]?.repos;
         if (!repos) {
-            await interaction.reply({ content: '資料庫連線異常，請稍後再試。', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('errors:db.connection_failed') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
 
@@ -67,11 +69,11 @@ export default class ai_settings extends Command {
             doc = (await repos.userApiSetting.findByUserId(userId)) as UserApiDoc | undefined;
         } catch (err) {
             logger.errorLogger(bot.clientId, guildId, err);
-            await interaction.reply({ content: '資料庫操作失敗，請稍後再試。', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('errors:db.operation_failed') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
         if (!doc) {
-            await interaction.reply({ content: '你不在白名單中，請聯絡管理員。', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('errors:ai.not_whitelisted') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
 

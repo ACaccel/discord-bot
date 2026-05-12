@@ -4,6 +4,9 @@
     "api_error": "呼叫 AI API 時發生錯誤,請稍後再試。",
     "missing_api_key": "Provider `{{provider}}` 的 API 金鑰未設定(請於 .env 設定 `{{envVar}}`)。"
   },
+  "menu_get_avatar": {
+    "avatar_url_field": "頭像連結"
+  },
   "auto_reply": {
     "goodnight_reply": "健康に良くない！<:ave_mortis_bad_for_health:1333052644368846878>",
     "fatcat_line": "肥貓好gay",

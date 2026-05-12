@@ -11,15 +11,18 @@ export default class level_detail extends Command {
         super();
         this.setConfig({
             name: "level_detail",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "查看等級詳細資訊",
             options: {
                 number: [
                     {
                         name: "left",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "左邊界",
                         required: true
                     },{
                         name: "right",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "右邊界",
                         required: true
                     }

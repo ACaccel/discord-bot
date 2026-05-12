@@ -10,11 +10,13 @@ export default class list_reply extends Command {
         super();
         this.setConfig({
             name: "list_reply",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "列出自動回覆",
             options: {
                 string: [
                     {
                         name: "keyword",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "關鍵字",
                         required: true
                     }
@@ -29,7 +31,7 @@ export default class list_reply extends Command {
             const keyword = interaction.options.get("keyword")?.value as string;
             const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
             if (!repos) {
-                await interaction.editReply({ content: "找不到資料庫" });
+                await interaction.editReply({ content: bot.translator?.t('errors:db.not_found') ?? '' });
                 return;
             }
             const replyList = await repos.reply.findByInput(keyword);

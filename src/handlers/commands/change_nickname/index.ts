@@ -10,11 +10,13 @@ export default class change_nickname extends Command {
         super();
         this.setConfig({
             name: "change_nickname",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "更改bot暱稱",
             options: {
                 string: [
                     {
                         name: "nickname",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "新暱稱",
                         required: true
                     }
@@ -28,14 +30,14 @@ export default class change_nickname extends Command {
         try {
             const guild = interaction.guild;
             if (!guild) {
-                await interaction.editReply({ content: "找不到伺服器"});
+                await interaction.editReply({ content: bot.translator?.t('errors:command.guild_not_found') ?? ''});
                 return;
             }
     
             const newName = interaction.options.get("nickname")?.value as string;
             const userBot = guild.members.cache.get(bot.client.user?.id as string);
             if (!userBot) {
-                await interaction.editReply({ content: "找不到機器人"});
+                await interaction.editReply({ content: bot.translator?.t('errors:command.bot_not_found') ?? ''});
                 return;
             }
             await userBot.setNickname(newName);

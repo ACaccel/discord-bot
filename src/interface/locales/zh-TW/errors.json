@@ -2,6 +2,12 @@
   "command": {
     "not_found": "找不到指令 /{{name}},請使用 /help 查看可用指令清單。",
     "guild_only": "此指令只能在伺服器中使用。",
+    "guild_not_found": "找不到伺服器",
+    "guild_info_not_found": "找不到伺服器資訊",
+    "channel_not_found": "找不到頻道",
+    "channel_not_sendable": "頻道不存在或無法傳送訊息",
+    "user_not_found": "找不到使用者",
+    "bot_not_found": "找不到機器人",
     "unsupported_interaction_type": "目前尚不支援此類型的指令"
   },
   "validation": {
@@ -10,12 +16,18 @@
   },
   "permission": {
     "denied": "你沒有使用此指令的權限(需要角色:{{requiredRole}})。",
-    "admin_only": "此指令僅限管理員使用。"
+    "admin_only": "此指令僅限管理員使用。",
+    "admin_only_short": "只有管理員可以執行此指令。"
+  },
+  "ai": {
+    "not_whitelisted": "你不在白名單中,請聯絡管理員。"
   },
   "db": {
     "unavailable": "資料庫暫時無法連線,本指令稍後可重試。錯誤編號:{{traceId}}",
     "connection_failed": "資料庫連線異常,請稍後再試。",
-    "operation_failed": "資料庫操作失敗,請稍後再試。"
+    "operation_failed": "資料庫操作失敗,請稍後再試。",
+    "not_found": "找不到資料庫",
+    "not_configured": "請先設定資料庫"
   },
   "llm": {
     "rate_limited": "AI 服務目前忙線中(限流),請於 {{retryAfter}} 秒後再試。",

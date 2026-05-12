@@ -13,11 +13,13 @@ export default class ban_user extends Command {
         super();
         this.setConfig({
             name: "ban_user",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "暫時禁言使用者(ban_threshold: 5 votes, judge_time: 1 min)",
             options: {
                 user: [
                     {
                         name: "user",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "被禁言的使用者",
                         required: true
                     }
@@ -25,6 +27,7 @@ export default class ban_user extends Command {
                 number: [
                     {
                         name: "duration",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "禁言時限 (單位: 分鐘, max: 5)",
                         required: false
                     }
@@ -42,7 +45,7 @@ export default class ban_user extends Command {
             const member = interaction.guild?.members.cache.get(user);
             const ban_user_role = bot.guildInfo[interaction.guild?.id as string]?.roles?.ban_user?.id || "role not set";
             if (!member) {
-                await interaction.editReply({ content: "找不到使用者" });
+                await interaction.editReply({ content: bot.translator?.t('errors:command.user_not_found') ?? '' });
                 return;
             }
             

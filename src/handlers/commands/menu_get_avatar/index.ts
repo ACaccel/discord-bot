@@ -12,7 +12,9 @@ export default class menu_get_avatar extends Command {
     constructor() {
         super();
         this.setConfig({
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             name: "取得用戶頭像連結",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "取得用戶的頭像 URL",
             type: ApplicationCommandType.User as ContextMenuCommandType,
         });
@@ -29,8 +31,8 @@ export default class menu_get_avatar extends Command {
                 .setColor(0x5865F2)
                 .setImage(avatarUrl)
                 .addFields({
-                    name: "頭像連結",
-                    value: avatarUrl
+                    name: bot.translator?.t('replies:menu_get_avatar.avatar_url_field') ?? '',
+                    value: avatarUrl,
                 });
 
             await interaction.editReply({ embeds: [embed] });
