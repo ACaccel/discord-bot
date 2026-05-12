@@ -1,11 +1,14 @@
 name: CI
 
 on:
+  # PR branches are exercised by `pull_request`; the `push` trigger
+  # stays scoped to `main` so a push to a PR branch does not fire
+  # both events back-to-back (the duplicate doubled CI cost without
+  # adding any signal — the PR run already covers the same commit).
   pull_request:
   push:
     branches:
       - main
-      - 'refactor/**'
 
 jobs:
   lint:

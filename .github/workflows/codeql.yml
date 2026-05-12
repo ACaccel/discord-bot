@@ -1,12 +1,15 @@
 name: CodeQL
 
-# Runs on PR + push + weekly schedule. PR trigger is required so this job
-# can be promoted to a required check on protected branches.
+# PR branches are exercised by `pull_request`; the `push` trigger
+# stays scoped to `main` (and the weekly schedule) so a push to a PR
+# branch does not fire two parallel CodeQL analyses on the same
+# commit — CodeQL TS analysis is the slowest workflow in the repo and
+# the duplicate was the dominant queue cost.
 on:
   pull_request:
     branches: [main, 'refactor/**']
   push:
-    branches: [main, 'refactor/**']
+    branches: [main]
   schedule:
     - cron: '0 6 * * 1'
 
