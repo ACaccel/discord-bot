@@ -34,7 +34,7 @@ export default class ai_whitelist_list extends Command {
                 return;
             }
 
-            const header = `**AI 白名單（${docs.length} 位用戶）：**`;
+            const header = bot.translator?.t('replies:ai_whitelist.header', { count: docs.length }) ?? '';
             const lines = docs.map((d) => `<@${d.userId}> — \`${d.provider}\` / \`${d.model}\``);
 
             // Build pages that stay within Discord's 2000-character limit.

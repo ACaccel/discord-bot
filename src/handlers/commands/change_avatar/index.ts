@@ -94,7 +94,7 @@ export default class change_avatar extends Command {
             if (newColorRole)
                 await userBot.roles.add(newColorRole);
 
-            await interaction.editReply({ content: `${oldName}已死，現在正是${newName}復權的時刻` });
+            await interaction.editReply({ content: bot.translator?.t('replies:change_avatar.changed', { oldName, newName }) ?? '' });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:change_avatar.failed') ?? ''});

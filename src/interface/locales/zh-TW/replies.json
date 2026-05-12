@@ -6,7 +6,8 @@
   },
   "menu_get_avatar": {
     "avatar_url_field": "頭像連結",
-    "failed": "無法取得用戶頭像"
+    "failed": "無法取得用戶頭像",
+    "title": "{{user}} 的頭像 URL"
   },
   "menu_get_sticker": {
     "not_found": "此訊息沒有貼圖或單一 emoji",
@@ -31,10 +32,17 @@
     "operation_failed": "無法釘選訊息"
   },
   "add_reply": {
+    "added": "已新增 輸入:{{input}} 回覆:{{reply}}!",
+    "already_exists": "此配對 輸入:{{input}} 回覆:{{reply}} 已經存在!",
     "failed": "無法新增訊息回覆配對"
   },
   "ai_whitelist": {
-    "empty": "白名單目前為空。"
+    "empty": "白名單目前為空。",
+    "header": "**AI 白名單({{count}} 位用戶):**",
+    "already_in": "{{user}} 已在白名單中。",
+    "added": "已將 {{user}} 加入白名單(預設 provider: openai)。",
+    "not_in": "{{user}} 不在白名單中。",
+    "removed": "已將 {{user}} 從白名單移除。"
   },
   "ai_settings": {
     "modal_id_error": "Modal 識別錯誤,請重新執行 /ai_settings。",
@@ -44,69 +52,143 @@
     "web_search_placeholder": "網頁搜尋",
     "toggle_on": "開啟",
     "toggle_off": "關閉",
-    "system_prompt_placeholder": "(選填)為 AI 設定角色或規則"
+    "system_prompt_placeholder": "(選填)為 AI 設定角色或規則",
+    "model_list_unavailable": "目前無法取得 `{{provider}}` 的可用模型清單。可能原因:API 金鑰未設定、網路暫時失敗,或服務剛啟動仍在載入。請稍候片刻後重試。",
+    "modal_title": "AI 設定 — {{provider}}",
+    "system_prompt_preview": "`{{preview}}…`(共 {{length}} 字,已截斷)",
+    "system_prompt_not_set": "(未設定)",
+    "updated_header": "✅ AI 設定已更新:",
+    "modal_system_prompt_preview": "\n```\n{{preview}}\n…(共 {{length}} 字,已截斷)\n```",
+    "web_search_status": "• Web Search: {{value}}"
+  },
+  "ai_status": {
+    "system_prompt_preview": "`{{preview}}…`(共 {{length}} 字,已截斷)",
+    "system_prompt_not_set": "(未設定)",
+    "web_search_status": "**Web Search:** {{value}}"
   },
   "ban_user": {
     "cannot_get_votes": "無法取得投票數",
     "cannot_ban_bot": "還想ban機器人阿",
     "cannot_timeout": "雖然初華大人無法禁言他,但將予以無限刪除之審判,即刻裁決!",
-    "failed": "無法禁言使用者"
+    "failed": "無法禁言使用者",
+    "vote_call": "**{{initiator}}** 發起了審判!\n是否禁言 **{{target}}** {{duration}} 分鐘?\n**{{judgeTime}}** 分鐘後累積 **{{threshold}}** 票則禁言,<@&{{role}}> 讓他看看豐川家的黑暗!",
+    "timed_out": "{{user}} 已被初華大人禁言 {{duration}} 分鐘",
+    "vote_failed": "投票數 {{count}} 票,未達到禁言門檻 {{threshold}} 票",
+    "timeout_reason": "初華大人的禁言裁決!"
   },
   "bubble_wrap": {
     "too_long": "字串太長了,請縮短到 64 字元以內"
   },
   "bug_report": {
     "empty_content": "請輸入內容",
-    "failed": "無法回報問題"
+    "failed": "無法回報問題",
+    "reported": "問題已回報! 內容: {{content}}"
   },
   "change_avatar": {
     "no_role_config": "沒有身份組設定",
     "new_role_not_found": "找不到新身份",
-    "failed": "更改失敗"
+    "failed": "更改失敗",
+    "changed": "{{oldName}}已死,現在正是{{newName}}復權的時刻"
   },
   "change_nickname": {
-    "failed": "更改失敗"
+    "failed": "更改失敗",
+    "changed": "已更改暱稱為:{{newName}}"
   },
   "db_list_message": {
     "not_text_channel": "此 channel 不是文字頻道/討論串,無法查詢",
     "invalid_args": "參數格式錯誤:date 請用 YYYY-MM-DD,hour(若有填)請用 0-23",
-    "failed": "無法列出訊息紀錄"
+    "failed": "無法列出訊息紀錄",
+    "no_messages": "找不到 <#{{channelId}}> 在 {{scopeText}} 的訊息紀錄",
+    "scope_full_day": "{{date}} 整天",
+    "scope_hour": "{{date}} {{hour}} 點",
+    "range_full_day": "{{date}} 00:00 - 次日 00:00",
+    "no_output_channel": "找不到可用的輸出頻道(slash 指令頻道)。",
+    "found_split": "共找到 {{count}} 則訊息({{rangeText}},<#{{channelId}}>),將分成 {{chunks}} 則訊息發送。",
+    "found": "共找到 {{count}} 則訊息({{rangeText}},<#{{channelId}}>)。"
   },
   "delete_reply": {
     "failed": "無法刪除訊息回覆配對",
     "record_not_found": "找不到該回覆紀錄",
-    "select_placeholder": "選擇要刪除的回覆"
+    "select_placeholder": "選擇要刪除的回覆",
+    "image_preview_header": "圖片預覽:\n",
+    "deleted": "已刪除回覆:{{key}} => {{reply}}"
   },
   "emoji_frequency": {
     "done": "處理完成!",
-    "failed": "無法取得表情符號使用頻率"
+    "failed": "無法取得表情符號使用頻率",
+    "progress": "正在處理第 {{current}} / {{total}} 個月的資料...",
+    "header": "最近{{months}}個月內使用頻率{{direction}}的 {{top}} 個{{kind}}表情符號:\n",
+    "line": "{{rank}}. {{emoji}} - 總共: {{total}} 次, 文字內: {{text}} 次, 訊息反應: {{reaction}} 次\n",
+    "direction_lowest": "最低",
+    "direction_highest": "最高",
+    "kind_animated": "動態",
+    "kind_static": "靜態"
   },
   "get_avatar": {
     "failed": "無法取得頭像"
   },
   "help": {
     "no_commands": "沒有指令清單",
-    "failed": "無法取得指令清單"
+    "failed": "無法取得指令清單",
+    "commands_header": "### 目前支援的slash command:\n"
   },
   "inspect_member_ids": {
     "no_valid_id": "找不到有效 ID,請輸入 17~20 位數字的 Discord ID",
     "embed_failed": "無法建立檢查結果",
-    "failed": "檢查可疑 ID 失敗"
+    "failed": "檢查可疑 ID 失敗",
+    "not_in_guild_line": "**是否在本伺服器**: 否",
+    "user_not_found_line": "**使用者資訊**: 查無資料(可能不存在、未快取或無法存取)",
+    "parse_failed_line": "**狀態**: 無法解析使用者資料",
+    "profile_link_line": "**可點擊個人頁**: [Open Profile](https://discord.com/users/{{id}})",
+    "in_guild_line": "**是否在本伺服器**: {{value}}",
+    "account_type_line": "**帳號類型**: {{value}}",
+    "created_at_line": "**帳號建立時間**: {{value}}",
+    "system_user_line": "**System User**: {{value}}",
+    "joined_at_line": "**加入伺服器時間**: {{value}}",
+    "display_name_line": "**暱稱(Display Name)**: {{value}}",
+    "timed_out_line": "**已逾時(Timed Out)**: {{value}}",
+    "timeout_until_line": "**逾時到期**: {{value}}",
+    "pending_line": "**Pending 成員驗證**: {{value}}",
+    "highest_role_line": "**最高身分組**: {{value}}",
+    "role_count_line": "**身分組數量**: {{value}}",
+    "top_roles_line": "**前 10 個身分組**: {{value}}",
+    "boost_since_line": "**Boost 開始時間**: {{value}}",
+    "kickable_line": "**可被踢出**: {{value}}",
+    "bannable_line": "**可被封鎖**: {{value}}",
+    "yes": "是",
+    "no": "否",
+    "title": "可疑 ID 檢查 {{current}}/{{total}}",
+    "exceeds_max": "一次最多檢查 {{max}} 筆,已忽略 {{dropped}} 筆。"
   },
   "level_detail": {
     "too_long": "太長了...請選短一點的範圍",
-    "failed": "無法取得等級詳情"
+    "failed": "無法取得等級詳情",
+    "message_count": "**訊息總數:** {{count}} ",
+    "current_xp": "**當前經驗值:** {{userXp}} / {{levelXp}} ",
+    "total_xp": "**總經驗值:** {{totalXp}} ",
+    "average_xp": "**平均經驗值:** {{averageXp}} \n\n"
   },
   "list_guild_members": {
     "empty": "目前沒有可列出的成員",
-    "failed": "取得成員清單失敗"
+    "failed": "取得成員清單失敗",
+    "title": "{{name}} 成員清單",
+    "total": "總數:{{total}}(使用者:{{users}}、機器人:{{bots}})",
+    "footer": "{{totalText}}|第 {{current}}/{{total}} 頁"
   },
   "list_reply": {
-    "failed": "無法列出訊息回覆配對"
+    "failed": "無法列出訊息回覆配對",
+    "not_found": "找不到 輸入:{{keyword}} 的回覆!",
+    "header": "輸入:{{keyword}} 的回覆:\n"
   },
   "random_restaurant": {
     "midnight": "現在半夜 餐廳都關門了啦🈹",
-    "no_match": "找不到符合您條件的餐廳呢"
+    "no_match": "找不到符合您條件的餐廳呢",
+    "no_description": "沒有描述",
+    "description": "「{{message}}」\n\n{{priceLine}}{{addressLine}}{{phoneLine}}{{mapLine}}",
+    "price_line": "價位:{{price}}\n",
+    "address_line": "地址:{{address}}\n",
+    "phone_line": "電話:{{phone}}\n",
+    "map_line": "地圖:{{map}}"
   },
   "record": {
     "join_voice_first": "請先加入語音頻道",
@@ -116,14 +198,16 @@
     "stopped": "停止錄音",
     "no_audio": "未收到音訊,不儲存音檔",
     "invalid_action": "無效的指令",
-    "failed": "無法錄音"
+    "failed": "無法錄音",
+    "saved": "已儲存倒數 {{duration}} 分鐘的錄音"
   },
   "role_message": {
     "no_permission": "你沒有權限發送身份組領取訊息",
     "format_error": "格式錯誤!regex: match(/^<@&\\d+>(\\s*<@&\\d+>)*$/)",
     "no_valid_id": "請至少提供一個有效的身份組ID",
     "prompt": "請選擇你要領取的身份組:",
-    "failed": "無法發送身份組領取訊息"
+    "failed": "無法發送身份組領取訊息",
+    "role_not_found": "找不到ID為 {{id}} 的身份組, 請確認ID是否正確"
   },
   "roll_call": {
     "missing_target": "請提供被點名者 (users) 或活動ID (activity_id)",
@@ -131,35 +215,68 @@
     "format_error": "格式錯誤!regex: match(/^<@\\d+>(\\s*<@\\d+>)*$/)",
     "no_valid_id": "請至少提供一個有效的使用者ID",
     "sent": "點名已發送!",
-    "failed": "無法進行點名"
+    "failed": "無法進行點名",
+    "activity_not_found": "找不到活動ID為 {{id}} 的活動",
+    "user_not_found": "找不到ID為 {{id}} 的使用者, 請確認ID是否正確",
+    "announcement_header": "初華大人的點名簿:<@{{userId}}> 發起了點名!\n",
+    "activity_id_line": "(活動ID: {{id}})\n",
+    "trigger_prefix": "初華大人的點名簿"
   },
   "search_anime_scene": {
     "upload_image": "請上傳圖片",
-    "failed": "無法搜尋動畫截圖"
+    "failed": "無法搜尋動畫截圖",
+    "description": "第 {{episode}} 集,\n相似度:{{similarity}}%\n時間:{{fromMin}}:{{fromSec}} - {{toMin}}:{{toSec}}",
+    "footer": "第 {{index}} 筆結果"
   },
   "sticker_frequency": {
-    "failed": "無法取得貼圖使用頻率"
+    "failed": "無法取得貼圖使用頻率",
+    "progress": "正在處理第 {{current}} / {{total}} 個月的資料...",
+    "header": "最近{{months}}個月內使用頻率{{direction}}的 {{top}} 個貼圖:\n",
+    "line": "{{rank}}. {{sticker}} - {{count}} 次\n",
+    "chart_label": "{{rank}}: {{count}}次",
+    "direction_lowest": "最低",
+    "direction_highest": "最高"
   },
   "talk": {
     "missing_args": "請輸入頻道和內容",
-    "send_failed": "無法傳送訊息"
+    "send_failed": "無法傳送訊息",
+    "tag_warning": "{{user}}好壞喔被我抓到你在 tag 所有人"
   },
   "talk_signed": {
     "missing_args": "請輸入內容",
     "member_not_found": "無法取得成員資訊",
-    "send_failed": "無法傳送訊息"
+    "send_failed": "無法傳送訊息",
+    "tag_warning": "{{displayName}}({{username}})好壞喔被我抓到你在 tag 所有人"
   },
   "todo_list": {
     "missing_content": "請輸入待辦事項內容",
     "expect_number": "請輸入數字",
-    "failed": "無法變更待辦事項"
+    "failed": "無法變更待辦事項",
+    "added": "已新增待辦事項:{{content}}",
+    "already_exists": "此待辦事項:{{content}} 已經存在!",
+    "not_found": "找不到待辦事項:{{content}}",
+    "deleted": "已刪除待辦事項:{{content}}",
+    "header": "待辦事項:\n"
   },
   "update_role": {
     "no_config": "設定檔中未找到等級身分組配置",
     "done": "更新完成",
-    "failed": "無法更新身份組"
+    "failed": "無法更新身份組",
+    "removed": "[ SYSTEM ] {{name}}, 移除: {{role}}",
+    "granted": "[ SYSTEM ] {{name}}, 獲得: {{role}}"
   },
   "weather_forecast": {
-    "failed": "無法取得天氣預報"
+    "failed": "無法取得天氣預報",
+    "header": "每小時天氣預報:\n",
+    "forecast_time": "- 預測時間:{{value}}\n",
+    "weather_status": "- 天氣狀況:{{value}}\n",
+    "precipitation": "- 降雨機率:{{value}}%\n",
+    "thunderstorm": "- 雷暴機率:{{value}}%\n",
+    "temperature": "- 室外氣溫:{{value}}°C\n",
+    "real_feel": "- 體感溫度:{{value}}°C\n",
+    "humidity": "- 相對濕度:{{value}}%\n"
+  },
+  "earthquake": {
+    "alert": "# <@&{{role}}> 台北強震警報!!! (4級以上)\n> 為什麼要地震!?"
   }
 }

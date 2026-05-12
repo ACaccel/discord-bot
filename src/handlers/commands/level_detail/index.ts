@@ -45,10 +45,10 @@ export default class level_detail extends Command {
                 leaderboard.slice(left - 1, right).forEach((e, i) => {
                     const averageXp = (e.xp.totalXp / e.messageCount).toPrecision(6);
                     content += `> **${e.rank} - ${e.username}﹝Level ${e.level}﹞**\n`;
-                    content += `**訊息總數：** ${e.messageCount} `;
-                    content += `**當前經驗值：** ${e.xp.userXp} / ${e.xp.levelXp} `;
-                    content += `**總經驗值：** ${e.xp.totalXp} `;
-                    content += `**平均經驗值：** ${averageXp} \n\n`;
+                    content += bot.translator?.t('replies:level_detail.message_count', { count: e.messageCount }) ?? '';
+                    content += bot.translator?.t('replies:level_detail.current_xp', { userXp: e.xp.userXp, levelXp: e.xp.levelXp }) ?? '';
+                    content += bot.translator?.t('replies:level_detail.total_xp', { totalXp: e.xp.totalXp }) ?? '';
+                    content += bot.translator?.t('replies:level_detail.average_xp', { averageXp }) ?? '';
                 });
     
                 if (content.length < 2000) {

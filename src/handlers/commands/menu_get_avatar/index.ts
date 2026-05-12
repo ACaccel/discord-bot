@@ -27,7 +27,7 @@ export default class menu_get_avatar extends Command {
             const avatarUrl = user.displayAvatarURL({ extension: 'png', size: 1024 });
 
             const embed = new EmbedBuilder()
-                .setTitle(`${user.username} 的頭像 URL`)
+                .setTitle(bot.translator?.t('replies:menu_get_avatar.title', { user: user.username }) ?? '')
                 .setColor(0x5865F2)
                 .setImage(avatarUrl)
                 .addFields({

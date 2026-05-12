@@ -13,6 +13,7 @@ export default class roll_call extends ReactionHandler {
 }
 
 const rollCallReact = async (reaction: MessageReaction, user: User) => {
+    // i18n-ignore: trigger prefix matched against the announcement broadcast by /roll_call.
     if (reaction.message.content?.startsWith("初華大人的點名簿")) {
         // parse all users
         const userIds = reaction.message.content.match(/<@!?(\d+)>/g);

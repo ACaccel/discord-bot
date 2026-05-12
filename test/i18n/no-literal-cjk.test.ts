@@ -32,7 +32,7 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const STRICT_MODE_PHASE = 7; // PR 6-3 bumps PHASE to 6 → flips this to 6.
+const STRICT_MODE_PHASE = 6; // PR 6-3b: scanner now strict at PHASE >= 6.
 
 /**
  * Directories the scanner walks. Each entry is a path relative to

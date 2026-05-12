@@ -25,7 +25,7 @@ export default class help extends Command {
 
             let  helpContent = '## Help Message\n';
             helpContent += bot.help_msg;
-            helpContent += '### 目前支援的slash command：\n';
+            helpContent += bot.translator?.t('replies:help.commands_header') ?? '';
             bot.commandHandlers.forEach((cmd) => {
                 if (cmd.config) {
                     helpContent += `* \`/${cmd.config.name}\` : ${cmd.config.description}\n`;

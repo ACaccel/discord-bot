@@ -99,18 +99,23 @@ export default class sticker_frequency extends Command {
                 });
                 
                 // update progress
-                await interaction.editReply({ content: `正在處理第 ${monthOffset + 1} / ${last_n_months} 個月的資料...` });
+                await interaction.editReply({ content: bot.translator?.t('replies:sticker_frequency.progress', { current: monthOffset + 1, total: last_n_months }) ?? '' });
             }
-    
+
             const sortedStickers = Array.from(stickerMap.entries())
                 .sort((a, b) => frequency === "asc" ? a[1] - b[1] : b[1] - a[1])
                 .slice(0, top_n);
-    
-            let content = `最近${last_n_months}個月內使用頻率${frequency === "asc" ? "最低" : "最高"}的 ${top_n} 個貼圖：\n`;
+
+            const t = (key: string, params?: Record<string, string | number>): string =>
+                bot.translator?.t(key, params) ?? '';
+            const direction = frequency === "asc"
+                ? t('replies:sticker_frequency.direction_lowest')
+                : t('replies:sticker_frequency.direction_highest');
+            let content = t('replies:sticker_frequency.header', { months: last_n_months, direction, top: top_n });
             sortedStickers.forEach(([sticker, count], index) => {
-                content += `${index + 1}. ${sticker} - ${count} 次\n`;
+                content += t('replies:sticker_frequency.line', { rank: index + 1, sticker, count });
             });
-    
+
             // create a preview image
             let canvasContent: misc.CanvasContent[] = [];
             for (let i = 0; i < sortedStickers.length; i++) {
@@ -119,7 +124,7 @@ export default class sticker_frequency extends Command {
                 if (sticker) {
                     canvasContent.push({
                         url: sticker.url,
-                        text: `${i + 1}: ${count}次`
+                        text: t('replies:sticker_frequency.chart_label', { rank: i + 1, count }),
                     });
                 }
             }

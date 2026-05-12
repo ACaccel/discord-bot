@@ -77,12 +77,12 @@ export default class update_role extends Command {
                     
                     if (guildMember.roles.cache.has(removedRole.id) && removedRole.name !== roleToAssign) {
                         await guildMember.roles.remove(removedRole);
-                        await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 移除: ${botConfig.level_roles[roleLevel]}`);
+                        await channel.send(bot.translator?.t('replies:update_role.removed', { name: guildMember.user.displayName, role: botConfig.level_roles[roleLevel] }) ?? '');
                     }
                 }
                 if (addedRole && !hasRoleToAssign) {
                     await guildMember.roles.add(addedRole);
-                    await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 獲得: ${roleToAssign}`);
+                    await channel.send(bot.translator?.t('replies:update_role.granted', { name: guildMember.user.displayName, role: roleToAssign }) ?? '');
                 }
             }));
             await interaction.editReply({ content: bot.translator?.t('replies:update_role.done') ?? '' });

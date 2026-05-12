@@ -36,9 +36,9 @@ export default class list_reply extends Command {
             }
             const replyList = await repos.reply.findByInput(keyword);
             if (replyList.length === 0) {
-                await interaction.editReply({ content: `找不到 輸入：${keyword} 的回覆！` });
+                await interaction.editReply({ content: bot.translator?.t('replies:list_reply.not_found', { keyword }) ?? '' });
             } else {
-                let content = `輸入：${keyword} 的回覆：\n`;
+                let content = bot.translator?.t('replies:list_reply.header', { keyword }) ?? '';
                 replyList.map((e, i) => {
                     content += `> ${i + 1}. ${e.reply}\n`;
                 });

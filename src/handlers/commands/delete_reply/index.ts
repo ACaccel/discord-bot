@@ -44,7 +44,7 @@ export default class delete_reply extends Command {
             for (let i = 0; i < existPair.length; i += 25) {
                 const select = new StringSelectMenuBuilder()
                     .setCustomId(`delete_reply|${key}|${i/25}`)
-                    .setPlaceholder('選擇要刪除的回覆')
+                    .setPlaceholder(bot.translator?.t('replies:delete_reply.select_placeholder') ?? '')
                     .addOptions(
                         existPair.slice(i, i + 25).map((reply, idx) =>
                             new StringSelectMenuOptionBuilder()
@@ -59,7 +59,7 @@ export default class delete_reply extends Command {
             }
 
             // image preview
-            let previewContent = "圖片預覽：\n";
+            let previewContent = bot.translator?.t('replies:delete_reply.image_preview_header') ?? '';
             existPair.forEach((reply, idx) => {
                 if (typeof reply.reply === "string" && reply.reply.startsWith("http")) {
                     previewContent += `${idx+1} - ${reply.reply}\n`;

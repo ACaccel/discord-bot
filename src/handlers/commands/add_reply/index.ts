@@ -45,9 +45,9 @@ export default class add_reply extends Command {
 
             if (existPair.length === 0) {
                 await repos.reply.create(input, reply);
-                await interaction.editReply({ content: `已新增 輸入：${input} 回覆：${reply}！` });
+                await interaction.editReply({ content: bot.translator?.t('replies:add_reply.added', { input, reply }) ?? '' });
             } else {
-                await interaction.editReply({ content: `此配對 輸入：${input} 回覆：${reply} 已經存在！` });
+                await interaction.editReply({ content: bot.translator?.t('replies:add_reply.already_exists', { input, reply }) ?? '' });
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);

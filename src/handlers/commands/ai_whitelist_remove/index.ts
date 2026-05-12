@@ -46,10 +46,10 @@ export default class ai_whitelist_remove extends Command {
         try {
             const removed = await repos.userApiSetting.deleteByUserId(target.id);
             if (!removed) {
-                await interaction.editReply({ content: `${target.displayName} 不在白名單中。` });
+                await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.not_in', { user: target.displayName }) ?? '' });
                 return;
             }
-            await interaction.editReply({ content: `已將 ${target.displayName} 從白名單移除。` });
+            await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.removed', { user: target.displayName }) ?? '' });
         } catch (err) {
             logger.errorLogger(bot.clientId, guildId, err);
             await interaction.editReply({ content: bot.translator?.t('errors:db.operation_failed') ?? '' });

@@ -61,7 +61,8 @@ r.post('/earthquake', (_, res) => {
         if (!guild_info.channels?.earthquake || !guild_info.roles?.earthquake) return;
         earthquake_warning(
             guild_info.channels.earthquake,
-            guild_info.roles.earthquake.id
+            guild_info.roles.earthquake.id,
+            nijika.translator,
         );
     });
     res.status(200).send('OK');
