@@ -69,7 +69,17 @@ const mongoUriSchema = z
 // missing-key gate at `resolve(name)` time emits a
 // `MissingApiKeyError` which surfaces only when something actually
 // asks for that provider.
-const llmKeySchema = z.string().min(1).optional();
+//
+// Treat empty / whitespace-only values as absent. Operators frequently
+// keep one .env template per repo with every provider key listed and
+// fill in only the ones they use (e.g. Konata uses xAI, leaves
+// OPENAI_API_KEY=, ANTHROPIC_API_KEY=, GEMINI_API_KEY= blank). Without
+// this preprocess the empty string survives into `.min(1)` and
+// `loadEnv` rejects an otherwise-valid deployment.
+const llmKeySchema = z.preprocess(
+  (v) => (typeof v === 'string' && v.trim().length === 0 ? undefined : v),
+  z.string().min(1).optional(),
+);
 
 const envSchema = z
   .object({
