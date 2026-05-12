@@ -8,15 +8,21 @@
  *
  * Inputs use branded ID types from `@core/ids` so a `UserId` cannot be
  * passed where a `ChannelId` is expected. Returned `MessageDoc` carries
- * the raw stored shape; rebranding the embedded id fields is a Phase 3
- * concern when domain-doc types land alongside the error taxonomy.
+ * the raw stored shape; rebranding the embedded id fields is a Phase 4
+ * concern when domain-doc types land alongside the plugin layer.
  *
- * Repos do **not** wrap mongoose errors in this PR. The Phase 3 error
- * taxonomy (DatabaseError + sub-codes) will own that. For Phase 2,
- * mongoose errors bubble unchanged.
+ * **Error wrapping (Phase 3)**: mongoose errors are translated into
+ * typed `DatabaseError` instances by the shared `databaseErrorFrom`
+ * translator in `infra/mongo/error-translator.ts`. Callers see typed
+ * errors with stable sub-codes (`DATABASE_DUPLICATE_KEY`,
+ * `DATABASE_TIMEOUT`, ...), the original mongoose error preserved on
+ * `cause`, and a `context.operation` field naming the failing repo
+ * method. Programmer errors (TypeError from input validation) still
+ * bubble unwrapped — they are not a domain failure mode.
  */
 import type { ChannelId } from '../../core/ids';
 import type { GuildConnection } from '../../infra/mongo/connection-manager';
+import { databaseErrorFrom } from '../../infra/mongo/error-translator';
 import type { MessageDoc } from '../schemas/message.schema';
 
 export interface InsertResult {
@@ -57,7 +63,11 @@ export class MongoMessageRepo implements MessageRepo {
   constructor(private readonly conn: GuildConnection) {}
 
   public async countAll(): Promise<number> {
-    return this.conn.models.Message.countDocuments({}).exec();
+    try {
+      return await this.conn.models.Message.countDocuments({}).exec();
+    } catch (err: unknown) {
+      throw databaseErrorFrom(err, { operation: 'MongoMessageRepo.countAll' });
+    }
   }
 
   public async findRecentByChannel(
@@ -65,23 +75,38 @@ export class MongoMessageRepo implements MessageRepo {
     limit: number,
   ): Promise<readonly MessageDoc[]> {
     if (!Number.isInteger(limit) || limit <= 0) {
+      // Programmer error — not a domain failure mode. Bubble unwrapped.
       throw new TypeError(
         `MongoMessageRepo.findRecentByChannel: limit must be a positive integer, got ${limit}`,
       );
     }
-    // Branded `ChannelId` is structurally a `string` at runtime — no
-    // explicit unbrand needed at the mongoose call site.
-    const docs = await this.conn.models.Message.find({ channelId })
-      .sort({ timestamp: -1 })
-      .limit(limit)
-      .lean<MessageDoc[]>()
-      .exec();
-    return docs;
+    try {
+      // Branded `ChannelId` is structurally a `string` at runtime — no
+      // explicit unbrand needed at the mongoose call site.
+      const docs = await this.conn.models.Message.find({ channelId })
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .lean<MessageDoc[]>()
+        .exec();
+      return docs;
+    } catch (err: unknown) {
+      throw databaseErrorFrom(err, {
+        operation: 'MongoMessageRepo.findRecentByChannel',
+        input: { channelId: String(channelId), limit },
+      });
+    }
   }
 
   public async findByMessageId(messageId: string): Promise<MessageDoc | undefined> {
-    const doc = await this.conn.models.Message.findOne({ messageId }).lean<MessageDoc>().exec();
-    return doc ?? undefined;
+    try {
+      const doc = await this.conn.models.Message.findOne({ messageId }).lean<MessageDoc>().exec();
+      return doc ?? undefined;
+    } catch (err: unknown) {
+      throw databaseErrorFrom(err, {
+        operation: 'MongoMessageRepo.findByMessageId',
+        input: { messageId },
+      });
+    }
   }
 
   public async insertManyIgnoringDuplicates(docs: readonly MessageDoc[]): Promise<InsertResult> {
@@ -94,10 +119,11 @@ export class MongoMessageRepo implements MessageRepo {
       });
       return { inserted: inserted.length, duplicates: docs.length - inserted.length };
     } catch (err: unknown) {
-      // TODO(phase-3): replace duck-typed BulkWriteError handling with
-      // a typed DatabaseError translation (sub-code DUPLICATE_KEY).
-      // Mongoose throws BulkWriteError when any doc collides; the
-      // partial insert count is on `err.insertedDocs`.
+      // Mongoose throws BulkWriteError on duplicate-key conflicts; the
+      // partial-success count is on `err.insertedDocs`. That is the
+      // *expected* path for this method's contract — return success
+      // with the partial count rather than translating to DatabaseError.
+      // Any other error shape is genuinely abnormal and is wrapped.
       if (
         typeof err === 'object' &&
         err !== null &&
@@ -110,7 +136,10 @@ export class MongoMessageRepo implements MessageRepo {
           duplicates: docs.length - insertedDocs.length,
         };
       }
-      throw err;
+      throw databaseErrorFrom(err, {
+        operation: 'MongoMessageRepo.insertManyIgnoringDuplicates',
+        input: { batchSize: docs.length },
+      });
     }
   }
 }

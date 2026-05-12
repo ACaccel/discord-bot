@@ -1,0 +1,62 @@
+import { describe, expect, it } from 'vitest';
+import { DatabaseError } from '../../../../src/core/errors';
+import {
+  databaseErrorFrom,
+  __classifyMongoErrorForTests as classify,
+} from '../../../../src/infra/mongo/error-translator';
+
+describe('classifyMongoError', () => {
+  it('maps the well-known duplicate-key code 11000', () => {
+    expect(classify({ code: 11000, message: 'E11000 duplicate key' })).toBe(
+      'DATABASE_DUPLICATE_KEY',
+    );
+    expect(classify({ code: '11000' })).toBe('DATABASE_DUPLICATE_KEY');
+  });
+
+  it('maps mongoose ValidationError / CastError', () => {
+    expect(classify({ name: 'ValidationError', message: 'bad' })).toBe('DATABASE_VALIDATION');
+    expect(classify({ name: 'CastError', message: 'bad' })).toBe('DATABASE_VALIDATION');
+  });
+
+  it('maps server-selection / timeout shapes', () => {
+    expect(classify({ name: 'MongooseServerSelectionError' })).toBe('DATABASE_TIMEOUT');
+    expect(classify({ name: 'MongoServerSelectionError' })).toBe('DATABASE_TIMEOUT');
+    expect(classify({ name: 'MongoNetworkTimeoutError' })).toBe('DATABASE_TIMEOUT');
+    expect(classify({ message: 'operation timed out after 5s' })).toBe('DATABASE_TIMEOUT');
+  });
+
+  it('maps non-timeout network failures', () => {
+    expect(classify({ name: 'MongoNetworkError' })).toBe('DATABASE_NETWORK');
+    expect(classify({ message: 'connect ECONNREFUSED 127.0.0.1:27017' })).toBe('DATABASE_NETWORK');
+    expect(classify({ message: 'getaddrinfo ENOTFOUND host' })).toBe('DATABASE_NETWORK');
+  });
+
+  it('falls back to UNKNOWN for anything unrecognised, including non-object input', () => {
+    expect(classify(null)).toBe('DATABASE_UNKNOWN');
+    expect(classify(undefined)).toBe('DATABASE_UNKNOWN');
+    expect(classify('plain string')).toBe('DATABASE_UNKNOWN');
+    expect(classify({ name: 'SomethingWeird', message: 'meh' })).toBe('DATABASE_UNKNOWN');
+  });
+});
+
+describe('databaseErrorFrom', () => {
+  it('returns a DatabaseError with the classified sub-code', () => {
+    const raw = new Error('E11000 duplicate key');
+    (raw as Error & { code: number }).code = 11000;
+    const out = databaseErrorFrom(raw, { operation: 'MongoMessageRepo.insertOne' });
+    expect(out).toBeInstanceOf(DatabaseError);
+    expect(out.code).toBe('DATABASE_DUPLICATE_KEY');
+    expect(out.messageKey).toBe('errors.db.duplicate_key');
+    expect(out.context.operation).toBe('MongoMessageRepo.insertOne');
+    expect(out.cause).toBe(raw);
+  });
+
+  it('threads context.input through unchanged', () => {
+    const out = databaseErrorFrom(new Error('timed out'), {
+      operation: 'MongoMessageRepo.findOne',
+      input: { messageId: 'm1' },
+    });
+    expect(out.code).toBe('DATABASE_TIMEOUT');
+    expect(out.context.input).toEqual({ messageId: 'm1' });
+  });
+});

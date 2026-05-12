@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2021",
+    "target": "ES2022",
     "module": "CommonJS",
     "moduleResolution": "Node",
     "rootDir": ".",
@@ -29,11 +29,16 @@
   // Phase 2: `src/persistence/**` (schemas + repositories now live here;
   //   src/db/** is a thin re-export shim) and `src/infra/mongo/**`
   //   (ConnectionManager owns the SDK lifecycle).
+  // Phase 3: `src/utils/logger.ts` (rewritten as a strict shim over
+  //   `core/logger`). Other `src/utils/**` files are NOT included yet —
+  //   they retain legacy patterns that Phase 6/7 will clean up. The
+  //   include path uses a file-level pattern to scope precisely.
   "include": [
     "src/core/**/*",
     "src/db/**/*",
     "src/persistence/**/*",
     "src/infra/mongo/**/*",
+    "src/utils/logger.ts",
     "scripts/**/*",
     "test/**/*"
   ],

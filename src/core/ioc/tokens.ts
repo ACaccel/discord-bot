@@ -25,6 +25,7 @@ import type { GuildId } from '../ids';
 import { token, type ServiceToken } from './container';
 
 import type { ConnectionManager } from '../../infra/mongo/connection-manager';
+import type { Logger } from '../logger';
 import type { Repos } from '../../persistence/repositories';
 
 /** Per-guild repository factory shape. Reserved for Phase 4a when the
@@ -37,9 +38,16 @@ export type ReposFactory = (guildId: GuildId) => Promise<Repos>;
 export interface Tokens {
   readonly ConnectionManager: ServiceToken<ConnectionManager>;
   readonly ReposFactory: ServiceToken<ReposFactory>;
+  /**
+   * Bot-scoped root logger. Resolved instance carries `{ bot: clientId }`
+   * already bound; downstream code should `.child({ guildId })` /
+   * `.child({ traceId })` for narrower scope.
+   */
+  readonly Logger: ServiceToken<Logger>;
 }
 
 export const TOKENS: Tokens = {
   ConnectionManager: token<ConnectionManager>('ConnectionManager'),
   ReposFactory: token<ReposFactory>('ReposFactory'),
+  Logger: token<Logger>('Logger'),
 };
