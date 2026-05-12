@@ -1,4 +1,7 @@
 {
+  "base_bot": {
+    "reboot_notice": "{{botName}}重開機囉!"
+  },
   "llm_chat": {
     "thinking": "🤔 思考中…",
     "api_error": "呼叫 AI API 時發生錯誤,請稍後再試。",
