@@ -34,6 +34,7 @@ import {
   type Logger,
 } from '../core/logger';
 import { initLegacyLogger } from '../utils/logger';
+import { loadEnv, type Env } from '../core/config';
 import { createDefaultTranslator, type Translator } from '../core/i18n';
 import { systemClock, type Clock } from '../core/time';
 import { PluginHost, type Plugin } from '../core/plugin';
@@ -271,6 +272,26 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // Translator load is async (i18next.init); we register it as a
         // singleton holding the resolved instance so plugin init contexts
         // can call `resolve(TOKENS.Translator)` synchronously.
+        // Load the typed Env once at run() so plugins resolve LLM API
+        // keys and other configuration through `TOKENS.Env` instead of
+        // touching `process.env` directly. Failures here are
+        // non-fatal: legacy bots still pass TOKEN / MONGO_URI / CLIENT_ID
+        // through the constructor, so a deployment with a partially
+        // valid env still boots. The structured warning lets ops see
+        // when typed Env is unavailable so the no-restricted-syntax
+        // rule is the only failure mode left for misconfigured keys.
+        try {
+            const env = loadEnv({
+                exitOnFailure: false,
+                requireDb: this.mongoURI !== undefined,
+            });
+            this.container.registerSingleton(TOKENS.Env, () => env);
+        } catch (envErr: unknown) {
+            rootLogger.warn(
+                { err: envErr instanceof Error ? envErr : new Error(String(envErr)) },
+                'BaseBot.run: typed Env load failed; TOKENS.Env will be unbound. Plugins requiring it (e.g. LlmChatPlugin) will fail at init.',
+            );
+        }
         const translator = await createDefaultTranslator();
         this.container.registerSingleton(TOKENS.Translator, () => translator);
         // Surface the resolved Translator on the bot itself so legacy

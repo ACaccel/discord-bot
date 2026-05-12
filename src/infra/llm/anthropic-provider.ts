@@ -19,14 +19,8 @@ export class AnthropicProvider implements LLMProvider {
 
   private readonly client: Anthropic;
 
-  public constructor(client?: Anthropic) {
-    this.client =
-      client ??
-      new Anthropic({
-        // TODO(phase-6): move LLM keys into typed Env (`src/core/config`).
-        // eslint-disable-next-line no-restricted-syntax
-        apiKey: process.env['ANTHROPIC_API_KEY'],
-      });
+  public constructor(apiKey?: string, client?: Anthropic) {
+    this.client = client ?? new Anthropic({ apiKey });
   }
 
   public async chat(messages: readonly LLMMessage[], settings: LLMSettings): Promise<LLMResult> {

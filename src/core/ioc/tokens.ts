@@ -28,6 +28,7 @@ import { token, type ServiceToken } from './container';
 
 import type { ConnectionManager } from '../../infra/mongo/connection-manager';
 import type { Clock } from '../time';
+import type { Env } from '../config';
 import type { GuildRegistry } from '../guild-registry';
 import type { Translator } from '../i18n';
 import type { Logger } from '../logger';
@@ -63,6 +64,13 @@ export interface Tokens {
    * a singleton holding the live `Client` instance.
    */
   readonly DiscordClient: ServiceToken<Client>;
+  /**
+   * Validated, frozen environment. The `infra/llm` registry pulls
+   * LLM provider API keys from this rather than reading
+   * `process.env` directly, so the strict no-restricted-syntax rule
+   * is honoured everywhere outside `core/config`.
+   */
+  readonly Env: ServiceToken<Env>;
 }
 
 export const TOKENS: Tokens = {
@@ -73,4 +81,5 @@ export const TOKENS: Tokens = {
   Clock: token<Clock>('Clock'),
   GuildRegistry: token<GuildRegistry>('GuildRegistry'),
   DiscordClient: token<Client>('DiscordClient'),
+  Env: token<Env>('Env'),
 };

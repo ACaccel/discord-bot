@@ -9,7 +9,10 @@ const BASE = 'https://api.openai.com';
 const CHAT_PATH = '/v1/chat/completions';
 
 const buildProvider = (): OpenAIProvider =>
-  new OpenAIProvider(new OpenAI({ apiKey: 'sk-test', baseURL: `${BASE}/v1`, maxRetries: 0 }));
+  new OpenAIProvider(
+    'sk-test',
+    new OpenAI({ apiKey: 'sk-test', baseURL: `${BASE}/v1`, maxRetries: 0 }),
+  );
 
 describe('OpenAIProvider contract', () => {
   setupNock();

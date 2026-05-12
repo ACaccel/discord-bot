@@ -9,7 +9,10 @@ const BASE = 'https://api.x.ai';
 const CHAT_PATH = '/v1/chat/completions';
 
 const buildProvider = (): XAIProvider =>
-  new XAIProvider(new OpenAI({ apiKey: 'sk-test', baseURL: `${BASE}/v1`, maxRetries: 0 }));
+  new XAIProvider(
+    'sk-test',
+    new OpenAI({ apiKey: 'sk-test', baseURL: `${BASE}/v1`, maxRetries: 0 }),
+  );
 
 const callerSettings = settings({ provider: 'xai', model: 'grok-3' });
 const callerMessages = [{ role: 'user', content: 'hi' } as const];

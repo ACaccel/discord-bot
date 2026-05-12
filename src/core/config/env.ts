@@ -61,6 +61,16 @@ const mongoUriSchema = z
     }
   }, 'MONGO_URI must include a non-empty host');
 
+// Optional LLM-provider API keys. Phase 6 PR 2 lifts these into the
+// typed Env so the `infra/llm` providers can resolve them through DI
+// rather than reading `process.env` directly (the `TODO(phase-6)`
+// markers in src/infra/llm/* are retired by this change). A bot that
+// does not use a given provider simply omits the key — the registry's
+// missing-key gate at `resolve(name)` time emits a
+// `MissingApiKeyError` which surfaces only when something actually
+// asks for that provider.
+const llmKeySchema = z.string().min(1).optional();
+
 const envSchema = z
   .object({
     TOKEN: nonPlaceholder('TOKEN'),
@@ -69,6 +79,10 @@ const envSchema = z
     PORT: z.coerce.number().int().positive().optional(),
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
+    OPENAI_API_KEY: llmKeySchema,
+    ANTHROPIC_API_KEY: llmKeySchema,
+    GEMINI_API_KEY: llmKeySchema,
+    XAI_API_KEY: llmKeySchema,
   })
   // Allow unknown env vars (Node, OS, shell tooling all add their own) but
   // only the typed keys above are returned to callers.
@@ -81,6 +95,11 @@ export type Env = Readonly<{
   PORT?: number;
   NODE_ENV: 'development' | 'test' | 'production';
   LOG_LEVEL: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+  /** Optional per-provider LLM API keys. Empty when the deployment does not use that provider. */
+  OPENAI_API_KEY?: string;
+  ANTHROPIC_API_KEY?: string;
+  GEMINI_API_KEY?: string;
+  XAI_API_KEY?: string;
 }>;
 
 /**
@@ -170,7 +189,18 @@ export const loadEnv = (options: LoadEnvOptions = {}): Env => {
   // .passthrough() let into parseResult.data and keeps the returned object
   // narrow. (Do not "simplify" by spreading parseResult.data; that would
   // defeat the strip-unknown-keys guarantee asserted in env.test.ts.)
-  const { TOKEN, CLIENT_ID, MONGO_URI, PORT, NODE_ENV, LOG_LEVEL } = parseResult.data;
+  const {
+    TOKEN,
+    CLIENT_ID,
+    MONGO_URI,
+    PORT,
+    NODE_ENV,
+    LOG_LEVEL,
+    OPENAI_API_KEY,
+    ANTHROPIC_API_KEY,
+    GEMINI_API_KEY,
+    XAI_API_KEY,
+  } = parseResult.data;
   const env: Env = Object.freeze({
     TOKEN,
     CLIENT_ID,
@@ -178,6 +208,10 @@ export const loadEnv = (options: LoadEnvOptions = {}): Env => {
     ...(PORT !== undefined && { PORT }),
     NODE_ENV,
     LOG_LEVEL,
+    ...(OPENAI_API_KEY !== undefined && { OPENAI_API_KEY }),
+    ...(ANTHROPIC_API_KEY !== undefined && { ANTHROPIC_API_KEY }),
+    ...(GEMINI_API_KEY !== undefined && { GEMINI_API_KEY }),
+    ...(XAI_API_KEY !== undefined && { XAI_API_KEY }),
   });
 
   if (env.NODE_ENV === 'production' && env.LOG_LEVEL === 'debug') {

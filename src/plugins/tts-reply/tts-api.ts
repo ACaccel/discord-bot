@@ -68,6 +68,7 @@ export const ttsApi = async (input: string): Promise<TtsResult> => {
   try {
     const response = await axios.post<unknown>(TTS_ENDPOINT, {
       fn_index: 0,
+      // i18n-ignore: TTS API request payload literal (language code expected by upstream).
       data: [translated, 'setsuna_short1-3_wav', '日本語', 1],
       session_hash: 's5r78fhbum',
     });
