@@ -17,7 +17,16 @@ import {
 } from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
-import db, { type GuildDb } from '@db';
+import db, { type GuildDb, getMongoConnectionManagerForUri } from '@db';
+import {
+  createContainer,
+  TOKENS,
+  type ServiceContainer,
+  type ReposFactory,
+} from '../core/ioc';
+import { asGuildId } from '../core/ids';
+import { buildRepos, type Repos } from '../persistence/repositories';
+import type { ConnectionManager } from '../infra/mongo/connection-manager';
 import { Job } from 'node-schedule';
 import { Command, registerCommands, executeCommand } from "@cmd";
 import { ButtonHandler, registerButtons, executeButton } from '@button';
@@ -39,7 +48,10 @@ export interface GuildInfo {
     guild: Guild;
     channels?: Record<string, Channel>;
     roles?: Record<string, Role>;
+    /** @deprecated Use `repos` for typed access. Kept for unmigrated callsites; removed in Phase 4b. */
     db?: GuildDb;
+    /** Per-guild repository bag built from the IoC container at connect time. */
+    repos?: Repos;
 }
 
 interface GuildConfig {
@@ -71,6 +83,15 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public help_msg: string;
     public jobs: Map<string, Job>;
 
+    /**
+     * Composition-root IoC container. Owned by BaseBot, populated in
+     * the constructor with `ConnectionManager` + `ReposFactory`. Other
+     * layers must NOT import this container — handlers reach repos via
+     * `bot.guildInfo[guildId].repos`. The eslint `no-restricted-imports`
+     * rule enforces the constraint.
+     */
+    public readonly container: ServiceContainer;
+
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: TConfig) {
         this.token = token;
         this.mongoURI = mongoURI;
@@ -87,6 +108,53 @@ export abstract class BaseBot<TConfig extends Config = Config> {
 
         this.help_msg = '';
         this.jobs = new Map<string, Job>();
+
+        this.container = createContainer();
+        // ConnectionManager is keyed by URI through `getMongoConnectionManagerForUri`,
+        // shared with the legacy `db.dbConnect()` shim — one pool per process per URI.
+        const uri = this.mongoURI;
+        this.container.registerSingleton(TOKENS.ConnectionManager, () => {
+            if (uri === undefined || uri.length === 0) {
+                throw new Error(
+                    'BaseBot: ConnectionManager resolved but no MONGO_URI was supplied to the bot constructor.',
+                );
+            }
+            return getMongoConnectionManagerForUri(uri);
+        });
+        const reposFactory: ReposFactory = async (guildId: ReturnType<typeof asGuildId>) => {
+            const cm = this.container.resolve<ConnectionManager>(TOKENS.ConnectionManager);
+            const guildConn = await cm.getConnection(guildId);
+            return buildRepos(guildConn);
+        };
+        this.container.registerSingleton(TOKENS.ReposFactory, () => reposFactory);
+    }
+
+    /**
+     * Open (or reuse) the per-guild MongoDB connection and populate
+     * BOTH `guildInfo[g].db` (legacy shape, for unmigrated callsites)
+     * and `guildInfo[g].repos` (typed bag, for new code).
+     *
+     * Reused by the startup loop in {@link connectGuildDB} and by the
+     * new-guild-join path in `src/events/guild_event.ts`.
+     */
+    public connectOneGuild = async (guildId: string): Promise<void> => {
+        const slot = this.guildInfo[guildId];
+        if (slot === undefined) {
+            logger.systemLogger(this.clientId, `connectOneGuild: no guildInfo slot for ${guildId}`);
+            return;
+        }
+        const branded = asGuildId(guildId);
+        // Resolve through the registered ReposFactory so the registration
+        // is exercised by the only consumer (single code path; future
+        // composition roots get the same builder).
+        const reposFactory = this.container.resolve<ReposFactory>(TOKENS.ReposFactory);
+        const repos = await reposFactory(branded);
+        const cm = this.container.resolve<ConnectionManager>(TOKENS.ConnectionManager);
+        // The connection is cached inside ConnectionManager so this is the
+        // same instance the factory just built repos against.
+        const guildConn = await cm.getConnection(branded);
+        slot.db = { connection: guildConn.connection, models: guildConn.models };
+        slot.repos = repos;
     }
 
     public run = async (callback?: () => Promise<void>) => {
@@ -243,15 +311,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
 
         try {
             await Promise.all(Object.entries(this.guildInfo).map(async ([guild_id, guild]) => {
-                const database = await db.dbConnect(this.mongoURI!, guild_id)
-                .catch((err) => {
-                    logger.systemLogger(this.clientId, `Failed to connect to MongoDB for guild ${guild_id}: ${err}`);
-                });
-                if (database && this.guildInfo[guild_id]) {
-                    this.guildInfo[guild_id].db = database;
+                try {
+                    await this.connectOneGuild(guild_id);
                     logger.systemLogger(this.clientId, `MongoDB for guild: ${guild_id} - ${guild.guild.name} connected.`);
-                } else {
-                    logger.systemLogger(this.clientId, `Failed to connect to MongoDB for guild ${guild_id}.: database is null or guildInfo is null`);
+                } catch (err) {
+                    logger.systemLogger(this.clientId, `Failed to connect to MongoDB for guild ${guild_id}: ${err}`);
                 }
             }));
         } catch (err) {

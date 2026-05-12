@@ -275,9 +275,10 @@ export class Konata extends BaseBot<Config> {
 
     /** Returns the user's ApiSetting doc if they are whitelisted, null otherwise. */
     private async fetchUserApiSetting(guildId: string, userId: string): Promise<UserApiDoc | null> {
-        const model = this.guildInfo[guildId]?.db?.models['UserApiSetting'];
-        if (!model) return null;
-        return model.findOne({ userId }).lean() as Promise<UserApiDoc | null>;
+        const repos = this.guildInfo[guildId]?.repos;
+        if (!repos) return null;
+        const doc = await repos.userApiSetting.findByUserId(userId);
+        return (doc ?? null) as UserApiDoc | null;
     }
 
     /** Remove only this bot's mention tag from the message content, preserving other user mentions. */

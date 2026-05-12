@@ -35,15 +35,15 @@ export default class ai_whitelist_remove extends Command {
             return;
         }
 
-        const UserApiSetting = bot.guildInfo[guildId]?.db?.models['UserApiSetting'];
-        if (!UserApiSetting) {
+        const repos = bot.guildInfo[guildId]?.repos;
+        if (!repos) {
             await interaction.editReply({ content: '資料庫連線異常，請稍後再試。' });
             return;
         }
 
         try {
-            const result = await UserApiSetting.deleteOne({ userId: target.id });
-            if (result.deletedCount === 0) {
+            const removed = await repos.userApiSetting.deleteByUserId(target.id);
+            if (!removed) {
                 await interaction.editReply({ content: `${target.displayName} 不在白名單中。` });
                 return;
             }

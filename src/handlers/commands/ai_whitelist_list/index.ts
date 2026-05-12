@@ -20,16 +20,14 @@ export default class ai_whitelist_list extends Command {
             return;
         }
 
-        const UserApiSetting = bot.guildInfo[guildId]?.db?.models['UserApiSetting'];
-        if (!UserApiSetting) {
+        const repos = bot.guildInfo[guildId]?.repos;
+        if (!repos) {
             await interaction.editReply({ content: '資料庫連線異常，請稍後再試。' });
             return;
         }
 
         try {
-            const docs = await UserApiSetting.find({}, 'userId provider model').lean() as unknown as Array<{
-                userId: string; provider: string; model: string;
-            }>;
+            const docs = await repos.userApiSetting.listAll();
             if (docs.length === 0) {
                 await interaction.editReply({ content: '白名單目前為空。' });
                 return;

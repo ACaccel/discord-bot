@@ -36,20 +36,19 @@ export default class ai_whitelist_add extends Command {
             return;
         }
 
-        const UserApiSetting = bot.guildInfo[guildId]?.db?.models['UserApiSetting'];
-        if (!UserApiSetting) {
+        const repos = bot.guildInfo[guildId]?.repos;
+        if (!repos) {
             await interaction.editReply({ content: '資料庫連線異常，請稍後再試。' });
             return;
         }
 
         try {
-            const existing = await UserApiSetting.findOne({ userId: target.id });
+            const existing = await repos.userApiSetting.findByUserId(target.id);
             if (existing) {
                 await interaction.editReply({ content: `${target.displayName} 已在白名單中。` });
                 return;
             }
-            await UserApiSetting.create({
-                userId: target.id,
+            await repos.userApiSetting.create(target.id, {
                 provider: 'openai',
                 model: DEFAULT_MODELS['openai'],
                 temperature: 1.0,

@@ -21,17 +21,14 @@ export default class ai_status extends Command {
             return;
         }
 
-        const UserApiSetting = bot.guildInfo[guildId]?.db?.models['UserApiSetting'];
-        if (!UserApiSetting) {
+        const repos = bot.guildInfo[guildId]?.repos;
+        if (!repos) {
             await interaction.editReply({ content: '資料庫連線異常，請稍後再試。' });
             return;
         }
 
         try {
-            const doc = await UserApiSetting.findOne({ userId }).lean() as {
-                provider: string; model: string; temperature: number;
-                system_prompt: string; web_search: boolean;
-            } | null;
+            const doc = await repos.userApiSetting.findByUserId(userId);
 
             if (!doc) {
                 await interaction.editReply({ content: '你不在白名單中，請聯絡管理員。' });

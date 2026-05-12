@@ -23,8 +23,8 @@ export default class ai_settings_modal extends ModalHandler {
         }
 
         const userId = interaction.user.id;
-        const UserApiSetting = bot.guildInfo[guildId]?.db?.models['UserApiSetting'];
-        if (!UserApiSetting) {
+        const repos = bot.guildInfo[guildId]?.repos;
+        if (!repos) {
             await interaction.reply({ content: '資料庫連線異常，請稍後再試。', flags: MessageFlags.Ephemeral });
             return;
         }
@@ -52,21 +52,18 @@ export default class ai_settings_modal extends ModalHandler {
         }
 
         try {
-            const doc = await UserApiSetting.findOne({ userId });
+            const doc = await repos.userApiSetting.findByUserId(userId);
             if (!doc) {
                 await interaction.reply({ content: '你不在白名單中，請聯絡管理員。', flags: MessageFlags.Ephemeral });
                 return;
             }
-            await UserApiSetting.updateOne(
-                { userId },
-                {
-                    provider,
-                    model,
-                    temperature,
-                    web_search: webSearchValue === 'on',
-                    system_prompt: systemPrompt,
-                },
-            );
+            await repos.userApiSetting.update(userId, {
+                provider,
+                model,
+                temperature,
+                web_search: webSearchValue === 'on',
+                system_prompt: systemPrompt,
+            });
         } catch (err) {
             logger.errorLogger(bot.clientId, guildId, err);
             await interaction.reply({ content: '資料庫操作失敗，請稍後再試。', flags: MessageFlags.Ephemeral });

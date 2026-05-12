@@ -10,7 +10,6 @@ import {
 import { BaseBot, GuildInfo } from '@bot';
 import { getCommandJsonBody } from '@cmd';
 import { logger } from '@utils';
-import db from '@db';
 
 export const detectMessageUpdate = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage, bot: BaseBot, blocked_channels?: string[]) => {
     const parentId = (oldMessage.channel as TextChannel).parentId as string;
@@ -151,13 +150,12 @@ export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
         throw new Error('No MongoDB URI.');
     }
 
-    const database = await db.dbConnect(bot.getMongoURI()!, guild.id)
-    .catch((err) => {
+    // Populate both legacy `db` (for unmigrated callsites) and the
+    // typed `repos` bag in one call. Phase 4b removes the legacy half.
+    await bot.connectOneGuild(guild.id).catch((err) => {
         throw new Error(`Failed to connect to MongoDB: ${err}`);
     });
-    if (database && bot.guildInfo[guild.id]) {
-        bot.guildInfo[guild.id].db = database;
-    } else {
+    if (!bot.guildInfo[guild.id]?.repos) {
         throw new Error(`Cannot connect to MongoDB for guild ${guild.id}.`);
     }
 

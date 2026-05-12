@@ -26,12 +26,19 @@ export interface GuildDb {
  *   - importing `@db` does not require `MONGO_URI` at module-evaluation time;
  *   - tests or hypothetical multi-cluster setups that pass two different
  *     URIs get two managers (and thus two connection pools), instead of
- *     silently reusing the first one — an honest, testable contract for
- *     the deprecated shim while it lives through Phase 4b.
+ *     silently reusing the first one;
+ *   - BaseBot's IoC container and the legacy `dbConnect()` callers share
+ *     the same manager instance per URI — no double pool.
  */
 const managers = new Map<string, MongoConnectionManager>();
 
-const getManager = (mongoURI: string): MongoConnectionManager => {
+/**
+ * Return the process-wide {@link MongoConnectionManager} for `mongoURI`,
+ * creating one on first request. Both `dbConnect()` (legacy callers) and
+ * `BaseBot`'s IoC container go through this so a guild's connection is
+ * cached exactly once regardless of which path opens it first.
+ */
+export const getMongoConnectionManagerForUri = (mongoURI: string): MongoConnectionManager => {
   const existing = managers.get(mongoURI);
   if (existing !== undefined) return existing;
   const created = new MongoConnectionManager(mongoURI);
@@ -45,7 +52,7 @@ const getManager = (mongoURI: string): MongoConnectionManager => {
  */
 export const dbConnect = async (mongoURI: string, guild_id: string): Promise<GuildDb> => {
   const guildId: GuildId = asGuildId(guild_id);
-  const m = getManager(mongoURI);
+  const m = getMongoConnectionManagerForUri(mongoURI);
   const guildConn = await m.getConnection(guildId);
   return { connection: guildConn.connection, models: guildConn.models };
 };
