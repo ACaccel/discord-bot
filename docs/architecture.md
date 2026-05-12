@@ -94,10 +94,15 @@ interface Plugin<Config = void> {
   onReady?(ctx: PluginRuntimeContext): Promise<void>;
   onShutdown?(ctx: PluginRuntimeContext): Promise<void>;
 
-  events?: PluginEventSubscriptions;
-  contributes?: PluginContributions;
+  readonly events?: PluginEventSubscriptions;
+  readonly contributes?: PluginContributions;
 }
 ```
+
+Each `Plugin*Context` extends `PluginRuntimeServices`, which exposes a
+typed `resolve<T>(token: ServiceToken<T>) => T` along with the
+pre-bound `logger`, `translator`, and `clock`. Plugins never receive
+the raw IoC container.
 
 `PluginHost` (`src/core/plugin/host.ts`) topologically sorts plugins by
 dependencies, runs lifecycle hooks, isolates errors (a plugin that
@@ -132,8 +137,9 @@ TOKENS = {
 }
 ```
 
-Plugins resolve dependencies inside `init(ctx)` only — runtime hooks
-must not call `container.resolve` (Service Locator anti-pattern).
+Plugins call `ctx.resolve(TOKENS.X)` to fetch dependencies; the host
+forbids reaching the raw container directly so the Service-Locator
+anti-pattern stays unreachable.
 
 ### Repository pattern
 
@@ -144,9 +150,10 @@ Each domain entity has:
 - `src/persistence/repositories/<name>.repo.ts` — typed interface +
   `Mongo<Name>Repo` implementation
 
-`createRepositories(connection)` in `src/persistence/index.ts` is the
-factory that produces the bundle used by `GuildRegistry`. Tests inject
-in-memory fakes that satisfy the same interface.
+`buildRepos(connection)` in `src/persistence/repositories/index.ts`
+is the factory that produces the `Repos` bundle used by
+`GuildRegistry`. Tests inject in-memory fakes that satisfy the same
+interfaces.
 
 ### Error taxonomy
 
@@ -250,7 +257,7 @@ And the bot class itself selects plugins:
 export class MyBot extends BaseBot<MyConfig> {
   public constructor(/* … */) {
     super(/* … */);
-    this.use(createAutoReplyPlugin({ blockedChannels: [] }));
+    this.use(AutoReplyPlugin);
     this.use(createLlmChatPlugin());
     // …
   }

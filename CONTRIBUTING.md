@@ -25,8 +25,12 @@ yarn install --frozen-lockfile
 ```
 
 Each bot under `src/bot/<name>/` needs its own `config.json` (copy
-`config.example.json`) and `.env` file containing `TOKEN`, `CLIENT_ID`,
-`MONGO_URI`, and `PORT` (Nijika only).
+`config.example.json`) and `.env` file. Required keys: `TOKEN`,
+`CLIENT_ID`. Optional keys: `MONGO_URI` (omit for bots that do not
+talk to MongoDB), `PORT` (Nijika's earthquake webhook), and any
+LLM provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+`GEMINI_API_KEY`, `XAI_API_KEY`) for LLM-chat-enabled bots. The full
+schema lives in [`src/core/config/env.ts`](src/core/config/env.ts).
 
 Run a bot in development:
 
@@ -157,7 +161,9 @@ Discord.
 
 5. **Add a test.** The minimum is a unit test asserting one happy and
    one failure path; if the command touches MongoDB, add an integration
-   test that uses `createMongoTestHarness` from `test/fixtures/`.
+   test under `test/integration/` that uses the `withFreshConnection`
+   helper from `test/integration/helpers/mongo.ts` (it reuses the
+   shared `mongodb-memory-server` started in `test/integration/setup.ts`).
 
 6. **Register with Discord.** `yarn deploy -t <bot-name>` after the bot
    has been started at least once (so the slash command registration
@@ -185,40 +191,55 @@ listeners, etc.
    // src/plugins/<plugin-name>/plugin.ts
    import type { Plugin } from '../../core/plugin';
    import { TOKENS } from '../../core/ioc';
-   import { configSchema, type PluginConfig } from './config.schema';
+   import { ConfigSchema, type XxxConfig } from './config.schema';
 
-   export const createXxxPlugin = (config?: Partial<PluginConfig>): Plugin<PluginConfig> => {
-     let logger; // captured during init
-     let translator; // captured during init
+   const PLUGIN_ID = 'xxx';
+   const PLUGIN_VERSION = '1.0.0';
+
+   /**
+    * The factory parses `rawConfig` up front so the returned plugin
+    * object can close over a fully-typed `config`. The host does NOT
+    * re-run the schema at register time when the plugin omits
+    * `configSchema` from its declaration — match how existing plugins
+    * (giveaway, guild-events, message-backup, llm-chat) work.
+    */
+   export const createXxxPlugin = (rawConfig: unknown): Plugin => {
+     const config: XxxConfig = ConfigSchema.parse(rawConfig);
 
      return {
-       id: 'xxx',
-       version: '1.0.0',
-       scope: 'bot', // or 'guild'
-       critical: false, // soft-disable on init failure
-       configSchema,
+       id: PLUGIN_ID,
+       version: PLUGIN_VERSION,
+       scope: 'bot', // 'guild' scope is reserved for Phase 4b
+       critical: false, // soft-disable on init/start failure
 
-       async init(ctx) {
-         logger = ctx.logger;
-         translator = ctx.translator;
-         // resolve other deps here, NOT inside event handlers:
-         // const conn = ctx.container.resolve(TOKENS.ConnectionManager);
+       async init(ctx): Promise<void> {
+         // Resolve dependencies via the typed accessor. Do NOT cache
+         // anything you can fetch in O(1) per event — `ctx.resolve` is
+         // a map lookup. Cache only if construction is heavy.
+         //
+         // Example: const env = ctx.resolve(TOKENS.Env);
        },
 
        events: {
-         messageCreate: async (msg) => {
-           // host wraps this call with try/catch — one failure does not
-           // kill the listener for the next message.
+         // First arg is always the plugin runtime context, then the
+         // discord.js event args. The host wraps every call in
+         // try/catch so one failure does not break later dispatches.
+         messageCreate: async (ctx, message): Promise<void> => {
+           const registry = ctx.resolve(TOKENS.GuildRegistry);
+           // ... use ctx.logger, ctx.translator, config, registry ...
+           void registry;
+           void message;
          },
-       },
-
-       contributes: {
-         // Optional: the plugin owns its own slash commands.
-         // commands: [MyCommand],
        },
      };
    };
    ```
+
+   Tip: if your plugin needs to contribute slash commands or other
+   handlers, `Plugin.contributes` is a `Record<string, HandlerConstructor>`
+   (not an array) keyed by the handler name. Most current plugins do
+   not use this field — handlers live under `src/handlers/` and are
+   picked up by the codegen registry instead.
 
 3. **Add the zod config schema.**
 
