@@ -56,15 +56,51 @@ const walk = (dir: string): string[] => {
   return out;
 };
 
+/**
+ * Annotate `name:` / `description:` lines INSIDE a `this.setConfig({...})`
+ * block.
+ *
+ * The setConfig-only gate is mandatory: an earlier, looser version of
+ * this script (PR 6-2b first commit) over-matched and tagged an embed
+ * `addFields({ name: '頭像連結', ... })` line as command-builder
+ * metadata. The line is runtime UI and needs a translator call, not
+ * an i18n-ignore. Codex stop-time review caught the regression; this
+ * gate is the structural fix.
+ *
+ * Depth tracking is a simple brace counter starting from
+ * `this.setConfig(` and closing when the parenthesis depth returns
+ * to zero. Brace-in-string false-positives (a `{` inside a CJK
+ * literal) are theoretically possible but the setConfig body never
+ * contains such literals in this codebase.
+ */
 const annotateFile = (filePath: string): number => {
   const source = fs.readFileSync(filePath, 'utf8');
   const lines = source.split('\n');
   const out: string[] = [];
   let annotations = 0;
+  let parenDepth = 0;
+  let inSetConfig = false;
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i] as string;
+    // Detect `this.setConfig(` opener on this line; consume the
+    // opening paren in the depth counter below so the closing `)`
+    // on a later line balances out.
+    if (!inSetConfig && /this\.setConfig\s*\(/.test(line)) {
+      inSetConfig = true;
+      parenDepth = 0;
+    }
+    if (inSetConfig) {
+      // Track paren depth across the whole line. The setConfig body
+      // closes when depth returns to zero AFTER the opener line.
+      for (let j = 0; j < line.length; j += 1) {
+        const c = line.charAt(j);
+        if (c === '(') parenDepth += 1;
+        if (c === ')') parenDepth -= 1;
+      }
+    }
+
     const match = BUILDER_FIELD_PATTERN.exec(line);
-    if (match !== null && CJK_REGEX.test(line)) {
+    if (inSetConfig && match !== null && CJK_REGEX.test(line)) {
       const prev = out[out.length - 1] ?? '';
       if (!IGNORE_LINE_PATTERN.test(prev)) {
         const indent = match[1] ?? '';
@@ -73,6 +109,10 @@ const annotateFile = (filePath: string): number => {
       }
     }
     out.push(line);
+
+    if (inSetConfig && parenDepth <= 0) {
+      inSetConfig = false;
+    }
   }
   if (annotations > 0) {
     fs.writeFileSync(filePath, out.join('\n'));
