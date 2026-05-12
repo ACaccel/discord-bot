@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { TOKENS } from '../../core/ioc';
 import type { GuildRegistry } from '../../core/guild-registry';
 import type { Plugin } from '../../core/plugin';
+import { logger as legacyLogger } from '../../utils';
 
 const PLUGIN_ID = 'guild-events';
 const PLUGIN_VERSION = '1.0.0';
@@ -40,6 +41,15 @@ const ConfigSchema = z
      * silenced too. Empty = mirror everything.
      */
     blockedChannels: z.array(z.string()).default([]),
+    /**
+     * The host bot's Discord client id. Required because the legacy
+     * audit-log path (`logger.guildLogger`) tags every line with the
+     * emitting bot; preserving that side-effect verbatim is part of
+     * the Phase 4b behaviour contract. Passed in by the composition
+     * root rather than resolved at runtime so the plugin stays
+     * decoupled from BaseBot.
+     */
+    clientId: z.string().min(1),
   })
   .strict();
 
@@ -94,6 +104,7 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
         await handleMessageUpdate(
           ctx.resolve(TOKENS.GuildRegistry),
           config.blockedChannels,
+          config.clientId,
           oldMessage,
           newMessage,
         );
@@ -102,13 +113,13 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
         await handleMessageDelete(
           ctx.resolve(TOKENS.GuildRegistry),
           config.blockedChannels,
+          config.clientId,
           message,
         );
       },
       guildMemberUpdate: async (ctx, oldMember, newMember) => {
         const guildId = newMember.guild.id;
         const eventChannel = resolveEventChannel(ctx.resolve(TOKENS.GuildRegistry), guildId);
-        if (eventChannel === undefined) return;
         const oldRoles = oldMember.roles.cache;
         const newRoles = newMember.roles.cache;
         const addedRoles = newRoles.filter((role) => !oldRoles.has(role.id));
@@ -118,28 +129,41 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
         if (newMember.partial) await newMember.fetch();
         const addedRolesList = addedRoles.map((role) => `<@&${role.id}>`).join(', ');
         const removedRolesList = removedRoles.map((role) => `<@&${role.id}>`).join(', ');
-        const embed = new EmbedBuilder()
-          .setColor(0x0000ff)
-          .setTitle('Role Update')
-          .setAuthor({
-            name: newMember.user.username,
-            iconURL: newMember.user.displayAvatarURL(),
-          })
-          .addFields(
-            { name: 'user', value: `<@${newMember.user.id}>`, inline: true },
-            {
-              name: 'added roles',
-              value: addedRolesList.length > 0 ? addedRolesList : 'No roles added',
-              inline: true,
-            },
-            {
-              name: 'removed roles',
-              value: removedRolesList.length > 0 ? removedRolesList : 'No roles removed',
-              inline: true,
-            },
-          )
-          .setTimestamp();
-        await eventChannel.send({ embeds: [embed] });
+        if (eventChannel !== undefined) {
+          const embed = new EmbedBuilder()
+            .setColor(0x0000ff)
+            .setTitle('Role Update')
+            .setAuthor({
+              name: newMember.user.username,
+              iconURL: newMember.user.displayAvatarURL(),
+            })
+            .addFields(
+              { name: 'user', value: `<@${newMember.user.id}>`, inline: true },
+              {
+                name: 'added roles',
+                value: addedRolesList.length > 0 ? addedRolesList : 'No roles added',
+                inline: true,
+              },
+              {
+                name: 'removed roles',
+                value: removedRolesList.length > 0 ? removedRolesList : 'No roles removed',
+                inline: true,
+              },
+            )
+            .setTimestamp();
+          await eventChannel.send({ embeds: [embed] });
+        }
+        // Audit-log line preserved verbatim from legacy
+        // `detectGuildMemberUpdate`. Decoupled from the embed write so
+        // a missing `event` channel does not suppress the audit trail.
+        const log = `User: ${newMember.user.username}, Added: ${addedRolesList}, Removed: ${removedRolesList}`;
+        legacyLogger.guildLogger(
+          config.clientId,
+          guildId,
+          'guild_member_update',
+          log,
+          newMember.guild.name,
+        );
       },
     },
   };
@@ -148,6 +172,7 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
 const handleMessageUpdate = async (
   registry: GuildRegistry,
   blockedChannels: readonly string[],
+  clientId: string,
   oldMessage: Message | PartialMessage,
   newMessage: Message | PartialMessage,
 ): Promise<void> => {
@@ -167,28 +192,45 @@ const handleMessageUpdate = async (
   if (newMessage.partial) await newMessage.fetch();
 
   const eventChannel = resolveEventChannel(registry, newMessage.guildId);
-  if (eventChannel === undefined) return;
+  if (eventChannel !== undefined) {
+    const embed = new EmbedBuilder()
+      .setColor(0x00ff00)
+      .setTitle('Message Updated')
+      .setAuthor({
+        name: newMessage.author.displayName,
+        iconURL: newMessage.author.displayAvatarURL(),
+      })
+      .addFields(
+        { name: 'author', value: `<@${newMessage.author.id}>`, inline: true },
+        { name: 'channel', value: `<#${newMessage.channel.id}>`, inline: true },
+        { name: 'old message', value: truncate(oldMessage.content), inline: false },
+        { name: 'new message', value: truncate(newMessage.content), inline: false },
+      )
+      .setTimestamp();
+    await eventChannel.send({ embeds: [embed] });
+  }
 
-  const embed = new EmbedBuilder()
-    .setColor(0x00ff00)
-    .setTitle('Message Updated')
-    .setAuthor({
-      name: newMessage.author.displayName,
-      iconURL: newMessage.author.displayAvatarURL(),
-    })
-    .addFields(
-      { name: 'author', value: `<@${newMessage.author.id}>`, inline: true },
-      { name: 'channel', value: `<#${newMessage.channel.id}>`, inline: true },
-      { name: 'old message', value: truncate(oldMessage.content), inline: false },
-      { name: 'new message', value: truncate(newMessage.content), inline: false },
-    )
-    .setTimestamp();
-  await eventChannel.send({ embeds: [embed] });
+  // Audit-log side effect from legacy `detectMessageUpdate` — emitted
+  // independently of the embed so a missing `event` channel does not
+  // suppress the audit trail. `?.name` mirrors the legacy nullable
+  // chain on the channel cache.
+  const channelName = newMessage.guild.channels.cache.get(newMessage.channel.id)?.name;
+  const log =
+    `User: ${newMessage.author.username}, Channel: ${channelName ?? '<unknown>'}, ` +
+    `Old: ${oldMessage.content}, New: ${newMessage.content}`;
+  legacyLogger.guildLogger(
+    clientId,
+    newMessage.guildId,
+    'message_update',
+    log,
+    newMessage.guild.name,
+  );
 };
 
 const handleMessageDelete = async (
   registry: GuildRegistry,
   blockedChannels: readonly string[],
+  clientId: string,
   message: Message | PartialMessage,
 ): Promise<void> => {
   const parentId = (message.channel as TextChannel).parentId;
@@ -199,35 +241,54 @@ const handleMessageDelete = async (
   if (message.partial) await message.fetch();
 
   const eventChannel = resolveEventChannel(registry, message.guildId);
-  if (eventChannel === undefined) return;
-
   const content =
     message.content === null || message.content === undefined || message.content.length === 0
       ? 'No content'
       : truncate(message.content);
 
-  const embed = new EmbedBuilder()
-    .setColor(0xff0000)
-    .setTitle('Message Deleted')
-    .setAuthor({
-      name: message.author.displayName,
-      iconURL: message.author.displayAvatarURL(),
-    })
-    .addFields(
-      { name: 'author', value: `<@${message.author.id}>`, inline: true },
-      { name: 'channel', value: `<#${message.channel.id}>`, inline: true },
-      { name: 'message', value: content, inline: false },
-    )
-    .setTimestamp();
+  if (eventChannel !== undefined) {
+    const embed = new EmbedBuilder()
+      .setColor(0xff0000)
+      .setTitle('Message Deleted')
+      .setAuthor({
+        name: message.author.displayName,
+        iconURL: message.author.displayAvatarURL(),
+      })
+      .addFields(
+        { name: 'author', value: `<@${message.author.id}>`, inline: true },
+        { name: 'channel', value: `<#${message.channel.id}>`, inline: true },
+        { name: 'message', value: content, inline: false },
+      )
+      .setTimestamp();
+    if (message.attachments.size > 0) {
+      message.attachments.forEach((attachment) => {
+        if (attachment.contentType === null) return;
+        if (attachment.contentType.includes('image')) {
+          embed.setImage(attachment.url);
+        } else {
+          embed.addFields({ name: 'attachment', value: attachment.url, inline: false });
+        }
+      });
+    }
+    await eventChannel.send({ embeds: [embed] });
+  }
+
+  // Forensic attachment download (legacy `detectMessageDelete` ran
+  // this for EVERY attachment, including images that the embed
+  // separately previews). Fire-and-forget; the helper has its own
+  // internal try/catch so a failed save does not break the audit
+  // log below.
   if (message.attachments.size > 0) {
     message.attachments.forEach((attachment) => {
-      if (attachment.contentType === null) return;
-      if (attachment.contentType.includes('image')) {
-        embed.setImage(attachment.url);
-      } else {
-        embed.addFields({ name: 'attachment', value: attachment.url, inline: false });
-      }
+      void legacyLogger.attachmentLogger(message.guildId as string, attachment);
     });
   }
-  await eventChannel.send({ embeds: [embed] });
+
+  // Audit-log side effect — emitted regardless of event-channel
+  // presence so deletions are traceable when the mirror is offline.
+  const channelName = message.guild.channels.cache.get(message.channel.id)?.name;
+  const log =
+    `User: ${message.author.username}, Channel: ${channelName ?? '<unknown>'}, ` +
+    `Message: ${message.content ?? ''}`;
+  legacyLogger.guildLogger(clientId, message.guildId, 'message_delete', log, message.guild.name);
 };

@@ -26,7 +26,12 @@ export class Nijika extends BaseBot<NijikaConfig> {
         // `executeCommand` below.
         this.use(AutoReplyPlugin);
         this.use(TtsReplyPlugin);
-        this.use(createGuildEventsPlugin({ blockedChannels: this.config.blocked_channels }));
+        this.use(
+            createGuildEventsPlugin({
+                blockedChannels: this.config.blocked_channels,
+                clientId: this.clientId,
+            }),
+        );
     }
 
     public override interactionEventListener = async (interaction: Interaction): Promise<void> => {

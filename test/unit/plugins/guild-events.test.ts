@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createGuildEventsPlugin } from '../../../src/plugins/guild-events';
 
 describe('createGuildEventsPlugin', () => {
-  it('accepts an empty config and defaults blockedChannels to []', () => {
-    const plugin = createGuildEventsPlugin({});
+  it('accepts a minimal config (clientId only) and defaults blockedChannels to []', () => {
+    const plugin = createGuildEventsPlugin({ clientId: 'bot-1' });
     expect(plugin.id).toBe('guild-events');
     expect(plugin.scope).toBe('bot');
     expect(plugin.events?.messageUpdate).toBeTypeOf('function');
@@ -12,17 +12,25 @@ describe('createGuildEventsPlugin', () => {
   });
 
   it('accepts a blockedChannels list', () => {
-    const plugin = createGuildEventsPlugin({ blockedChannels: ['1', '2'] });
+    const plugin = createGuildEventsPlugin({ clientId: 'bot-1', blockedChannels: ['1', '2'] });
     expect(plugin.id).toBe('guild-events');
+  });
+
+  it('requires a non-empty clientId so audit logs carry bot identity', () => {
+    expect(() => createGuildEventsPlugin({})).toThrow();
+    expect(() => createGuildEventsPlugin({ clientId: '' })).toThrow();
   });
 
   it('rejects configs whose fields have the wrong shape', () => {
     expect(() =>
-      createGuildEventsPlugin({ blockedChannels: 'not-an-array' as unknown as string[] }),
+      createGuildEventsPlugin({
+        clientId: 'bot-1',
+        blockedChannels: 'not-an-array' as unknown as string[],
+      }),
     ).toThrow();
   });
 
   it('rejects unknown keys (.strict() prevents config drift)', () => {
-    expect(() => createGuildEventsPlugin({ blocked: ['1'] })).toThrow();
+    expect(() => createGuildEventsPlugin({ clientId: 'bot-1', blocked: ['1'] })).toThrow();
   });
 });
