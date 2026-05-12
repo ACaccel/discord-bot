@@ -37,7 +37,7 @@ export default class weather_forecast extends Command {
             await interaction.editReply({ content: formattedContentWithBackticks });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得天氣預報" });
+            await interaction.editReply({ content: bot.translator?.t('replies:weather_forecast.failed') ?? '' });
         }
     }
 }

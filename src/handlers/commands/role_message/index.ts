@@ -37,14 +37,14 @@ export default class role_message extends Command {
             }
             const member = interaction.member as GuildMember;
             if (!member.permissions.has("ManageRoles")) {
-                await interaction.editReply({ content: "你沒有權限發送身份組領取訊息" });
+                await interaction.editReply({ content: bot.translator?.t('replies:role_message.no_permission') ?? '' });
                 return;
             }
     
             // Verify IDs format and existence
             const roles = interaction.options.get("roles")?.value as string;
             if (!roles || !roles.match(/^<@&\d+>(\s*<@&\d+>)*$/)) {
-                await interaction.editReply({ content: "格式錯誤！regex: match(/^<@&\d+>(\s*<@&\d+>)*$/)" });
+                await interaction.editReply({ content: bot.translator?.t('replies:role_message.format_error') ?? '' });
                 return;
             }
             // Extract role IDs from mentions
@@ -59,7 +59,7 @@ export default class role_message extends Command {
                 validRoles.push(role);
             }
             if (validRoles.length === 0) {
-                await interaction.editReply({ content: "請至少提供一個有效的身份組ID" });
+                await interaction.editReply({ content: bot.translator?.t('replies:role_message.no_valid_id') ?? '' });
                 return;
             }
     
@@ -71,12 +71,12 @@ export default class role_message extends Command {
             const rows = bot_cmd.buildButtonRows(button_config);
     
             await interaction.editReply({
-                content: "請選擇你要領取的身份組：",
+                content: bot.translator?.t('replies:role_message.prompt') ?? '',
                 components: rows
             });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法發送身份組領取訊息" });
+            await interaction.editReply({ content: bot.translator?.t('replies:role_message.failed') ?? '' });
         }
     }
 }

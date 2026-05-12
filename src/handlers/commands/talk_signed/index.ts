@@ -31,7 +31,7 @@ export default class talk_signed extends Command {
         try {
             let content = interaction.options.get("content")?.value as string;
             if (!content) {
-                await interaction.reply({ content: "請輸入內容", flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('replies:talk_signed.missing_args') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
             
@@ -44,7 +44,7 @@ export default class talk_signed extends Command {
             }
             let guild_member = interaction.member && 'displayName' in interaction.member ? interaction.member : null;
             if (!guild_member) {
-                await interaction.reply({ content: "無法取得成員資訊", flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('replies:talk_signed.member_not_found') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
             
@@ -59,7 +59,7 @@ export default class talk_signed extends Command {
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: "無法傳送訊息", flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('replies:talk_signed.send_failed') ?? '', flags: MessageFlags.Ephemeral });
         }
     }
 }

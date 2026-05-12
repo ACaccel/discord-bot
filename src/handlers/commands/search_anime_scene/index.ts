@@ -40,7 +40,7 @@ export default class search_anime_scene extends Command {
         try {
             const image = interaction.options.get("image")?.attachment;
             if (!image) {
-                await interaction.editReply({ content: "請上傳圖片" });
+                await interaction.editReply({ content: bot.translator?.t('replies:search_anime_scene.upload_image') ?? '' });
                 return;
             }
 
@@ -90,7 +90,7 @@ export default class search_anime_scene extends Command {
             })
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法搜尋動畫截圖" });
+            await interaction.editReply({ content: bot.translator?.t('replies:search_anime_scene.failed') ?? '' });
         }
     }
 }

@@ -40,7 +40,7 @@ export default class talk extends Command {
             let ch = interaction.options.get("channel")?.value as string;
             let content = interaction.options.get("content")?.value as string;
             if (!ch || !content) {
-                await interaction.reply({ content: "請輸入頻道和內容", flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('replies:talk.missing_args') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
             
@@ -63,7 +63,7 @@ export default class talk extends Command {
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: "無法傳送訊息", flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('replies:talk.send_failed') ?? '', flags: MessageFlags.Ephemeral });
         }
     }
 }

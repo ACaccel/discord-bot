@@ -128,7 +128,7 @@ export default class sticker_frequency extends Command {
             await interaction.editReply({ content: content, files: attachment ? [attachment] : [] });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得貼圖使用頻率" });
+            await interaction.editReply({ content: bot.translator?.t('replies:sticker_frequency.failed') ?? '' });
         }
     }
 }

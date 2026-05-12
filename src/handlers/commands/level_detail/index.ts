@@ -54,14 +54,14 @@ export default class level_detail extends Command {
                 if (content.length < 2000) {
                     await interaction.editReply({ content });
                 } else {
-                    await interaction.editReply({ content: "太長了...請選短一點的範圍" });
+                    await interaction.editReply({ content: bot.translator?.t('replies:level_detail.too_long') ?? '' });
                 }
             } else {
-                await interaction.editReply({ content: "太長了...請選短一點的範圍" });
+                await interaction.editReply({ content: bot.translator?.t('replies:level_detail.too_long') ?? '' });
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得等級詳情" });
+            await interaction.editReply({ content: bot.translator?.t('replies:level_detail.failed') ?? '' });
         }
     }
 }

@@ -59,7 +59,7 @@ export default class record extends Command {
             if (action === "start") {
                 const member = interaction.member as GuildMember;
                 if (!member.voice.channelId) {
-                    await interaction.editReply({ content: "請先加入語音頻道" });
+                    await interaction.editReply({ content: bot.translator?.t('replies:record.join_voice_first') ?? '' });
                     return;
                 }
 
@@ -70,7 +70,7 @@ export default class record extends Command {
                     }
                 }
                 if (!interaction.guild?.voiceAdapterCreator) {
-                    await interaction.editReply({ content: "無法加入語音頻道" });
+                    await interaction.editReply({ content: bot.translator?.t('replies:record.cannot_join_voice') ?? '' });
                     return;
                 }
                 bot.voice.connection = joinVoiceChannel({
@@ -81,23 +81,23 @@ export default class record extends Command {
                 });
                 bot.voice.recorder.startRecording(bot.voice.connection);
 
-                await interaction.editReply({ content: "開始錄音" });
+                await interaction.editReply({ content: bot.translator?.t('replies:record.started') ?? '' });
             } else if (action === "stop") {
                 if (!bot.voice || !bot.voice.recorder.isRecording() || !bot.voice.connection) {
-                    await interaction.editReply({ content: "目前沒有錄音" });
+                    await interaction.editReply({ content: bot.translator?.t('replies:record.no_recording') ?? '' });
                     return;
                 }
 
                 bot.voice.recorder.stopRecording(bot.voice.connection);
                 bot.voice.connection.destroy();
                 bot.voice.connection = null;
-                await interaction.editReply({ content: "停止錄音" });
+                await interaction.editReply({ content: bot.translator?.t('replies:record.stopped') ?? '' });
             } else if (action === "save") {
                 if (!duration) {
                     duration = 5;
                 }
                 if (!bot.voice || !bot.voice.recorder.isRecording() || !bot.voice.connection) {
-                    await interaction.editReply({ content: "目前沒有錄音" });
+                    await interaction.editReply({ content: bot.translator?.t('replies:record.no_recording') ?? '' });
                     return;
                 }
                 
@@ -109,17 +109,17 @@ export default class record extends Command {
                 const buffer = await bot.voice.recorder.getRecordedVoiceAsBuffer(interaction.guild?.id as string, 'separate', duration);;
 
                 if (buffer.length === 0) {
-                    await interaction.editReply({ content: "未收到音訊，不儲存音檔" });
+                    await interaction.editReply({ content: bot.translator?.t('replies:record.no_audio') ?? '' });
                 } else {
                     const attachment = new AttachmentBuilder(buffer, { name: `${timestamp}.zip` })
                     await interaction.editReply({ content: `已儲存倒數 ${duration} 分鐘的錄音`, files: [attachment] });
                 }
             } else {
-                await interaction.editReply({ content: "無效的指令" });
+                await interaction.editReply({ content: bot.translator?.t('replies:record.invalid_action') ?? '' });
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法錄音" });
+            await interaction.editReply({ content: bot.translator?.t('replies:record.failed') ?? '' });
         }
     }
 }

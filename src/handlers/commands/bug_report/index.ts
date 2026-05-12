@@ -30,7 +30,7 @@ export default class bug_report extends Command {
         try {
             let content = interaction.options.get("content")?.value as string;
             if (!content) {
-                await interaction.reply({ content: "請輸入內容", flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('replies:bug_report.empty_content') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
     
@@ -48,7 +48,7 @@ export default class bug_report extends Command {
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: "無法回報問題", flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('replies:bug_report.failed') ?? '', flags: MessageFlags.Ephemeral });
         }
     }
 }

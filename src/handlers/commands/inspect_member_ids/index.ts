@@ -124,7 +124,7 @@ export default class inspect_member_ids extends Command {
             const allIds = parseIds(rawIds);
 
             if (allIds.length === 0) {
-                await interaction.editReply({ content: "找不到有效 ID，請輸入 17~20 位數字的 Discord ID" });
+                await interaction.editReply({ content: bot.translator?.t('replies:inspect_member_ids.no_valid_id') ?? '' });
                 return;
             }
 
@@ -149,7 +149,7 @@ export default class inspect_member_ids extends Command {
 
             const first = embeds.shift();
             if (!first) {
-                await interaction.editReply({ content: "無法建立檢查結果" });
+                await interaction.editReply({ content: bot.translator?.t('replies:inspect_member_ids.embed_failed') ?? '' });
                 return;
             }
 
@@ -163,7 +163,7 @@ export default class inspect_member_ids extends Command {
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "檢查可疑 ID 失敗" });
+            await interaction.editReply({ content: bot.translator?.t('replies:inspect_member_ids.failed') ?? '' });
         }
     }
 }

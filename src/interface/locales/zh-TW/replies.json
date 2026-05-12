@@ -5,7 +5,12 @@
     "missing_api_key": "Provider `{{provider}}` 的 API 金鑰未設定(請於 .env 設定 `{{envVar}}`)。"
   },
   "menu_get_avatar": {
-    "avatar_url_field": "頭像連結"
+    "avatar_url_field": "頭像連結",
+    "failed": "無法取得用戶頭像"
+  },
+  "menu_get_sticker": {
+    "not_found": "此訊息沒有貼圖或單一 emoji",
+    "failed": "無法取得貼圖或 emoji"
   },
   "auto_reply": {
     "goodnight_reply": "健康に良くない！<:ave_mortis_bad_for_health:1333052644368846878>",
@@ -24,5 +29,137 @@
     "pinned": "已釘選訊息",
     "invalid_action": "無效的指令",
     "operation_failed": "無法釘選訊息"
+  },
+  "add_reply": {
+    "failed": "無法新增訊息回覆配對"
+  },
+  "ai_whitelist": {
+    "empty": "白名單目前為空。"
+  },
+  "ai_settings": {
+    "modal_id_error": "Modal 識別錯誤,請重新執行 /ai_settings。",
+    "missing_model_or_web_search": "請選擇 Model 與 Web Search 兩個欄位。",
+    "invalid_temperature": "Temperature 必須為 0.0 – 2.0 的數字。",
+    "select_model_placeholder": "選擇模型",
+    "web_search_placeholder": "網頁搜尋",
+    "toggle_on": "開啟",
+    "toggle_off": "關閉",
+    "system_prompt_placeholder": "(選填)為 AI 設定角色或規則"
+  },
+  "ban_user": {
+    "cannot_get_votes": "無法取得投票數",
+    "cannot_ban_bot": "還想ban機器人阿",
+    "cannot_timeout": "雖然初華大人無法禁言他,但將予以無限刪除之審判,即刻裁決!",
+    "failed": "無法禁言使用者"
+  },
+  "bubble_wrap": {
+    "too_long": "字串太長了,請縮短到 64 字元以內"
+  },
+  "bug_report": {
+    "empty_content": "請輸入內容",
+    "failed": "無法回報問題"
+  },
+  "change_avatar": {
+    "no_role_config": "沒有身份組設定",
+    "new_role_not_found": "找不到新身份",
+    "failed": "更改失敗"
+  },
+  "change_nickname": {
+    "failed": "更改失敗"
+  },
+  "db_list_message": {
+    "not_text_channel": "此 channel 不是文字頻道/討論串,無法查詢",
+    "invalid_args": "參數格式錯誤:date 請用 YYYY-MM-DD,hour(若有填)請用 0-23",
+    "failed": "無法列出訊息紀錄"
+  },
+  "delete_reply": {
+    "failed": "無法刪除訊息回覆配對",
+    "record_not_found": "找不到該回覆紀錄",
+    "select_placeholder": "選擇要刪除的回覆"
+  },
+  "emoji_frequency": {
+    "done": "處理完成!",
+    "failed": "無法取得表情符號使用頻率"
+  },
+  "get_avatar": {
+    "failed": "無法取得頭像"
+  },
+  "help": {
+    "no_commands": "沒有指令清單",
+    "failed": "無法取得指令清單"
+  },
+  "inspect_member_ids": {
+    "no_valid_id": "找不到有效 ID,請輸入 17~20 位數字的 Discord ID",
+    "embed_failed": "無法建立檢查結果",
+    "failed": "檢查可疑 ID 失敗"
+  },
+  "level_detail": {
+    "too_long": "太長了...請選短一點的範圍",
+    "failed": "無法取得等級詳情"
+  },
+  "list_guild_members": {
+    "empty": "目前沒有可列出的成員",
+    "failed": "取得成員清單失敗"
+  },
+  "list_reply": {
+    "failed": "無法列出訊息回覆配對"
+  },
+  "random_restaurant": {
+    "midnight": "現在半夜 餐廳都關門了啦🈹",
+    "no_match": "找不到符合您條件的餐廳呢"
+  },
+  "record": {
+    "join_voice_first": "請先加入語音頻道",
+    "cannot_join_voice": "無法加入語音頻道",
+    "started": "開始錄音",
+    "no_recording": "目前沒有錄音",
+    "stopped": "停止錄音",
+    "no_audio": "未收到音訊,不儲存音檔",
+    "invalid_action": "無效的指令",
+    "failed": "無法錄音"
+  },
+  "role_message": {
+    "no_permission": "你沒有權限發送身份組領取訊息",
+    "format_error": "格式錯誤!regex: match(/^<@&\\d+>(\\s*<@&\\d+>)*$/)",
+    "no_valid_id": "請至少提供一個有效的身份組ID",
+    "prompt": "請選擇你要領取的身份組:",
+    "failed": "無法發送身份組領取訊息"
+  },
+  "roll_call": {
+    "missing_target": "請提供被點名者 (users) 或活動ID (activity_id)",
+    "no_participants": "該活動目前沒有參與者",
+    "format_error": "格式錯誤!regex: match(/^<@\\d+>(\\s*<@\\d+>)*$/)",
+    "no_valid_id": "請至少提供一個有效的使用者ID",
+    "sent": "點名已發送!",
+    "failed": "無法進行點名"
+  },
+  "search_anime_scene": {
+    "upload_image": "請上傳圖片",
+    "failed": "無法搜尋動畫截圖"
+  },
+  "sticker_frequency": {
+    "failed": "無法取得貼圖使用頻率"
+  },
+  "talk": {
+    "missing_args": "請輸入頻道和內容",
+    "send_failed": "無法傳送訊息"
+  },
+  "talk_signed": {
+    "missing_args": "請輸入內容",
+    "member_not_found": "無法取得成員資訊",
+    "send_failed": "無法傳送訊息"
+  },
+  "todo_list": {
+    "missing_content": "請輸入待辦事項內容",
+    "expect_number": "請輸入數字",
+    "failed": "無法變更待辦事項"
+  },
+  "update_role": {
+    "no_config": "設定檔中未找到等級身分組配置",
+    "done": "更新完成",
+    "failed": "無法更新身份組"
+  },
+  "weather_forecast": {
+    "failed": "無法取得天氣預報"
   }
 }

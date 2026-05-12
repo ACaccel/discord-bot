@@ -30,7 +30,7 @@ export default class ai_whitelist_list extends Command {
         try {
             const docs = await repos.userApiSetting.listAll();
             if (docs.length === 0) {
-                await interaction.editReply({ content: '白名單目前為空。' });
+                await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.empty') ?? '' });
                 return;
             }
 

@@ -19,7 +19,7 @@ export default class help extends Command {
         await interaction.deferReply();
         try {
             if (!bot.config.commands) {
-                await interaction.editReply({ content: "沒有指令清單"});
+                await interaction.editReply({ content: bot.translator?.t('replies:help.no_commands') ?? ''});
                 return;
             }
 
@@ -35,7 +35,7 @@ export default class help extends Command {
             await interaction.editReply({ content: helpContent });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得指令清單"});
+            await interaction.editReply({ content: bot.translator?.t('replies:help.failed') ?? ''});
         }
     }
 }

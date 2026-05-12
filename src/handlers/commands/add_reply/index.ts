@@ -51,7 +51,7 @@ export default class add_reply extends Command {
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法新增訊息回覆配對" });
+            await interaction.editReply({ content: bot.translator?.t('replies:add_reply.failed') ?? '' });
         }
     }
 }

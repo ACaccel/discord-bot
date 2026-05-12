@@ -18,7 +18,7 @@ export default class delete_reply extends SSMHandler {
 
         const pair = await repos.reply.findById(value);
         if (!pair) {
-            await interaction.reply({ content: '找不到該回覆紀錄', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('replies:delete_reply.record_not_found') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
         const replymsg = pair.reply;

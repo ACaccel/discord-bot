@@ -39,7 +39,7 @@ export default class roll_call extends Command {
             const activity_id = interaction.options.get("activity_id")?.value as string | undefined;
 
             if (!users && !activity_id) {
-                await interaction.reply({ content: "請提供被點名者 (users) 或活動ID (activity_id)", flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('replies:roll_call.missing_target') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
 
@@ -73,14 +73,14 @@ export default class roll_call extends Command {
                 }
 
                 if (validUsers.length === 0) {
-                    await interaction.reply({ content: "該活動目前沒有參與者", flags: MessageFlags.Ephemeral });
+                    await interaction.reply({ content: bot.translator?.t('replies:roll_call.no_participants') ?? '', flags: MessageFlags.Ephemeral });
                     return;
                 }
 
                 await db.models["Activity"].deleteOne({ activity_id });
             } else if (users) {
                 if (!users.match(/^<@\d+>(\s*<@\d+>)*$/)) {
-                    await interaction.reply({ content: "格式錯誤！regex: match(/^<@\d+>(\s*<@\d+>)*$/)", flags: MessageFlags.Ephemeral });
+                    await interaction.reply({ content: bot.translator?.t('replies:roll_call.format_error') ?? '', flags: MessageFlags.Ephemeral });
                     return;
                 }
         
@@ -94,7 +94,7 @@ export default class roll_call extends Command {
                     validUsers.push(user);
                 }
                 if (validUsers.length === 0) {
-                    await interaction.reply({ content: "請至少提供一個有效的使用者ID", flags: MessageFlags.Ephemeral });
+                    await interaction.reply({ content: bot.translator?.t('replies:roll_call.no_valid_id') ?? '', flags: MessageFlags.Ephemeral });
                     return;
                 }
             }
@@ -113,10 +113,10 @@ export default class roll_call extends Command {
             if (!ch?.isSendable()) return;
             const msg = await ch.send({ content: announcement });
             bot_cmd.msgReact(msg, ["<:slowpoke_wave_lr:1178718404102848573>"])
-            await interaction.reply({ content: "點名已發送！", flags: MessageFlags.Ephemeral })
+            await interaction.reply({ content: bot.translator?.t('replies:roll_call.sent') ?? '', flags: MessageFlags.Ephemeral })
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: "無法進行點名", flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('replies:roll_call.failed') ?? '', flags: MessageFlags.Ephemeral });
         }
     }
 }

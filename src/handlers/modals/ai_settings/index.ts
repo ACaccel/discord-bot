@@ -11,14 +11,14 @@ export default class ai_settings_modal extends ModalHandler {
         // customId format: ai_settings|<provider>
         const [modalType, providerRaw] = interaction.customId.split('|');
         if (modalType !== 'ai_settings' || !providerRaw || !VALID_PROVIDERS.has(providerRaw as LLMProviderName)) {
-            await interaction.reply({ content: 'Modal 識別錯誤，請重新執行 /ai_settings。', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('replies:ai_settings.modal_id_error') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
         const provider = providerRaw as LLMProviderName;
 
         const guildId = interaction.guildId;
         if (!guildId) {
-            await interaction.reply({ content: '此互動只能在伺服器中使用。', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('errors:command.guild_only') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
 
@@ -38,14 +38,14 @@ export default class ai_settings_modal extends ModalHandler {
         const model = modelValues[0];
         const webSearchValue = webSearchValues[0];
         if (!model || !webSearchValue) {
-            await interaction.reply({ content: '請選擇 Model 與 Web Search 兩個欄位。', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('replies:ai_settings.missing_model_or_web_search') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
 
         const temperature = Number.parseFloat(tempStr);
         if (Number.isNaN(temperature) || temperature < 0 || temperature > 2) {
             await interaction.reply({
-                content: 'Temperature 必須為 0.0 – 2.0 的數字。',
+                content: bot.translator?.t('replies:ai_settings.invalid_temperature') ?? '',
                 flags: MessageFlags.Ephemeral,
             });
             return;

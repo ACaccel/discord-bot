@@ -134,7 +134,7 @@ export default class delete_reply extends Command {
             });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法刪除訊息回覆配對" });
+            await interaction.editReply({ content: bot.translator?.t('replies:delete_reply.failed') ?? '' });
         }
     }
 }

@@ -33,7 +33,7 @@ export default class bubble_wrap extends Command {
         const side_len = 7;
         const total_cells = side_len * side_len;
         if (inner_str.length > side_len * side_len) {
-            await interaction.reply({ content: "字串太長了，請縮短到 64 字元以內" });
+            await interaction.reply({ content: bot.translator?.t('replies:bubble_wrap.too_long') ?? '' });
             return;
         }
 

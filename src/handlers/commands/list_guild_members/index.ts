@@ -73,7 +73,7 @@ export default class list_guild_members extends Command {
                 });
 
             if (members.length === 0) {
-                await interaction.editReply({ content: "目前沒有可列出的成員" });
+                await interaction.editReply({ content: bot.translator?.t('replies:list_guild_members.empty') ?? '' });
                 return;
             }
 
@@ -102,7 +102,7 @@ export default class list_guild_members extends Command {
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "取得成員清單失敗" });
+            await interaction.editReply({ content: bot.translator?.t('replies:list_guild_members.failed') ?? '' });
         }
     }
 }

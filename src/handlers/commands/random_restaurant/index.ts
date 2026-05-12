@@ -151,9 +151,9 @@ export default class random_restaurant extends Command {
             const hourTPE = (now.getUTCHours() + 8) % 24;
             console.log(hourTPE)
             if (hourTPE >= 0 && hourTPE < 6) {
-                await interaction.editReply({ content: "現在半夜 餐廳都關門了啦🈹" });
+                await interaction.editReply({ content: bot.translator?.t('replies:random_restaurant.midnight') ?? '' });
             } else {
-                await interaction.editReply({ content: "找不到符合您條件的餐廳呢" });
+                await interaction.editReply({ content: bot.translator?.t('replies:random_restaurant.no_match') ?? '' });
             }
         }
     }
