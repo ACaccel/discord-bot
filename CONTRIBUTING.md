@@ -98,7 +98,7 @@ Discord.
    import { Command } from '@cmd';
    import { logger } from '@utils';
 
-   export default classmy_command extends Command {
+   export default class MyCommand extends Command {
      constructor() {
        super();
        this.setConfig({
@@ -175,84 +175,100 @@ Plugins are the right home for behaviours that are bot-scoped, not
 interaction-scoped: scheduled jobs, event subscriptions, message
 listeners, etc.
 
-1. **Create the plugin folder.**
+1. **Create the plugin folder.** Mirror the layout existing plugins
+   use:
 
    ```
    src/plugins/<plugin-name>/
-     plugin.ts          # createXxxPlugin(config?) factory
-     config.schema.ts   # zod schema for the plugin's config
-     index.ts           # re-exports the factory
+     plugin.ts   # ConfigSchema (private const) + factory
+     index.ts    # re-exports the factory + the inferred config type
    ```
 
-2. **Implement the contract** (`Plugin<Config>` from
-   `src/core/plugin/types.ts`):
+   None of the existing plugins (`auto-reply`, `tts-reply`, `llm-chat`,
+   `giveaway`, `activity`, `guild-events`, `message-backup`) split the
+   schema into its own file — keep it inside `plugin.ts` so the
+   factory, the schema, and the inferred config type stay co-located.
+
+2. **Implement the contract** (see `src/core/plugin/types.ts` for
+   `Plugin`, `PluginRuntimeContext`, and friends):
 
    ```ts
    // src/plugins/<plugin-name>/plugin.ts
+   import { z } from 'zod';
    import type { Plugin } from '../../core/plugin';
    import { TOKENS } from '../../core/ioc';
-   import { ConfigSchema, type XxxConfig } from './config.schema';
 
    const PLUGIN_ID = 'xxx';
    const PLUGIN_VERSION = '1.0.0';
 
+   const ConfigSchema = z
+     .object({
+       blockedChannels: z.array(z.string()).default([]),
+     })
+     .strict();
+
+   export type XxxConfig = z.infer<typeof ConfigSchema>;
+
    /**
-    * The factory parses `rawConfig` up front so the returned plugin
+    * The factory parses `rawConfig` up front so the returned Plugin
     * object can close over a fully-typed `config`. The host does NOT
-    * re-run the schema at register time when the plugin omits
-    * `configSchema` from its declaration — match how existing plugins
-    * (giveaway, guild-events, message-backup, llm-chat) work.
+    * re-validate at register time when the plugin omits the
+    * `configSchema` field — this is how every existing plugin works
+    * (see `guild-events/plugin.ts`).
     */
    export const createXxxPlugin = (rawConfig: unknown): Plugin => {
      const config: XxxConfig = ConfigSchema.parse(rawConfig);
+     const isBlocked = (channelId: string): boolean => config.blockedChannels.includes(channelId);
 
      return {
        id: PLUGIN_ID,
        version: PLUGIN_VERSION,
-       scope: 'bot', // 'guild' scope is reserved for Phase 4b
-       critical: false, // soft-disable on init/start failure
-
-       async init(ctx): Promise<void> {
-         // Resolve dependencies via the typed accessor. Do NOT cache
-         // anything you can fetch in O(1) per event — `ctx.resolve` is
-         // a map lookup. Cache only if construction is heavy.
-         //
-         // Example: const env = ctx.resolve(TOKENS.Env);
-       },
+       scope: 'bot', // 'guild' is reserved for Phase 4b
+       critical: false, // false = soft-disable on init/start failure
 
        events: {
-         // First arg is always the plugin runtime context, then the
-         // discord.js event args. The host wraps every call in
-         // try/catch so one failure does not break later dispatches.
+         // The host always passes the runtime context as the first
+         // argument, then the discord.js event arguments verbatim.
+         // Every call is wrapped in try/catch so one failure does not
+         // break later dispatches.
          messageCreate: async (ctx, message): Promise<void> => {
+           if (message.guildId === null) return;
+           if (isBlocked(message.channelId)) return;
+
+           // Resolve dependencies via the typed accessor — never reach
+           // into the raw container. `ctx.resolve` is an O(1) map
+           // lookup; calling it per event is the established pattern.
            const registry = ctx.resolve(TOKENS.GuildRegistry);
-           // ... use ctx.logger, ctx.translator, config, registry ...
+           ctx.logger.debug(
+             { guildId: message.guildId, channelId: message.channelId },
+             'xxx: handling message',
+           );
            void registry;
-           void message;
          },
        },
      };
    };
    ```
 
-   Tip: if your plugin needs to contribute slash commands or other
-   handlers, `Plugin.contributes` is a `Record<string, HandlerConstructor>`
-   (not an array) keyed by the handler name. Most current plugins do
-   not use this field — handlers live under `src/handlers/` and are
-   picked up by the codegen registry instead.
+   `init` / `start` / `onReady` / `onShutdown` are all optional. Add
+   them only when the plugin has actual setup work — `auto-reply`,
+   `tts-reply`, and `guild-events` ship without any lifecycle hook,
+   while `giveaway` and `activity` use `onReady` to re-schedule jobs.
 
-3. **Add the zod config schema.**
+   Tip: if your plugin needs to contribute slash commands or other
+   handlers, `Plugin.contributes.<type>` is a
+   `Record<string, HandlerConstructor>` keyed by the handler name (not
+   an array). Most plugins do not use this field — handlers live under
+   `src/handlers/` and are picked up by the codegen registry.
+
+3. **Export the factory.**
 
    ```ts
-   // src/plugins/<plugin-name>/config.schema.ts
-   import { z } from 'zod';
-
-   export const configSchema = z.object({
-     enabled: z.boolean().default(true),
-     // …
-   });
-   export type PluginConfig = z.infer<typeof configSchema>;
+   // src/plugins/<plugin-name>/index.ts
+   export { createXxxPlugin, type XxxConfig } from './plugin';
    ```
+
+   Then add the matching line to [`src/plugins/index.ts`](src/plugins/index.ts).
 
 4. **Add i18n keys** for any user-facing strings (see the slash-command
    recipe above).
@@ -266,18 +282,19 @@ listeners, etc.
    export class Nijika extends BaseBot<NijikaConfig> {
      public constructor(/* … */) {
        super(/* … */);
-       this.use(
-         createXxxPlugin({
-           /* config */
-         }),
-       );
+       this.use(createXxxPlugin({ blockedChannels: [] }));
      }
    }
    ```
 
+   `this.use(...)` is fluent (returns `this`), so multiple registrations
+   can chain if you prefer.
+
 6. **Add tests.** The plugin's pure logic gets unit tests; the wiring
-   (init lifecycle, event subscriptions) gets a plugin-level test that
-   uses a fake `Plugin*Context`. See `test/unit/plugins/` for examples.
+   (event subscriptions, lifecycle hooks if any) gets a plugin-level
+   test that constructs a fake `PluginEventContext` /
+   `PluginRuntimeContext`. See `test/unit/plugins/` for the established
+   shape — `auto-reply.test.ts` is the most representative example.
 
 ## Commit conventions
 
