@@ -21,6 +21,8 @@
  * in the composition root and revisits naturally when the plugin
  * lifecycle introduces an interaction scope.
  */
+import type { Client } from 'discord.js';
+
 import type { GuildId } from '../ids';
 import { token, type ServiceToken } from './container';
 
@@ -54,6 +56,13 @@ export interface Tokens {
   readonly Clock: ServiceToken<Clock>;
   /** Per-guild registry: repos / channel / role lookup by guild id. */
   readonly GuildRegistry: ServiceToken<GuildRegistry>;
+  /**
+   * Discord client. Plugins that need fetch / channel / message
+   * primitives (notably the message-archive backup loop) resolve this
+   * rather than reaching back to a BaseBot reference. Registered as
+   * a singleton holding the live `Client` instance.
+   */
+  readonly DiscordClient: ServiceToken<Client>;
 }
 
 export const TOKENS: Tokens = {
@@ -63,4 +72,5 @@ export const TOKENS: Tokens = {
   Translator: token<Translator>('Translator'),
   Clock: token<Clock>('Clock'),
   GuildRegistry: token<GuildRegistry>('GuildRegistry'),
+  DiscordClient: token<Client>('DiscordClient'),
 };

@@ -39,5 +39,7 @@ const msgArchive = new MsgArchive(
     process.env.CLIENT_ID as string,
     config
 );
-let backup_server = msgArchive.config.backup_server;
-msgArchive.run(() => msgArchive.messageBackup(backup_server));
+// Phase 4b-3: the backup loop now lives in `MessageBackupPlugin`,
+// scheduled by the host's `onReady` hook. The composition root no
+// longer needs a callback into `messageBackup(...)`.
+msgArchive.run();
