@@ -27,6 +27,7 @@
     "test:i18n": "vitest run --project i18n",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "smoke": "ts-node scripts/smoke.ts",
     "handlers:gen": "ts-node scripts/gen-registry.ts",
     "handlers:gen:check": "ts-node scripts/gen-registry.ts --check",
     "security": "audit-ci --config audit-ci.jsonc"
