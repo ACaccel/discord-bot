@@ -82,6 +82,36 @@ const resolveEventChannel = (
 };
 
 /**
+ * Mirror an embed to the event channel, swallowing send failures so a
+ * misconfigured channel (perms revoked, channel deleted between cache
+ * read and send) never suppresses the audit-log side effects that
+ * follow. Replicates the legacy `logger.channelLogger` swallowing
+ * behaviour; without it a Discord-side rejection here would abort the
+ * surrounding handler before `guildLogger` / `attachmentLogger` ran.
+ *
+ * `clientId` is threaded in so the structured error line is tagged
+ * with the originating bot, matching the rest of this plugin's audit
+ * surface.
+ */
+const safeSendEmbed = async (
+  channel: TextChannel,
+  embed: EmbedBuilder,
+  clientId: string,
+  guildId: string,
+  context: string,
+): Promise<void> => {
+  try {
+    await channel.send({ embeds: [embed] });
+  } catch (err: unknown) {
+    legacyLogger.errorLogger(
+      clientId,
+      guildId,
+      new Error(`guild-events: failed to mirror ${context} embed: ${String(err)}`),
+    );
+  }
+};
+
+/**
  * Build a plugin instance with `blockedChannels` baked into closures.
  *
  * The factory validates `rawConfig` here (rather than letting the host
@@ -151,7 +181,7 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
               },
             )
             .setTimestamp();
-          await eventChannel.send({ embeds: [embed] });
+          await safeSendEmbed(eventChannel, embed, config.clientId, guildId, 'guild_member_update');
         }
         // Audit-log line preserved verbatim from legacy
         // `detectGuildMemberUpdate`. Decoupled from the embed write so
@@ -168,6 +198,9 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
     },
   };
 };
+
+/** Test-only access. Not part of the plugin's public API. */
+export const __test = { safeSendEmbed };
 
 const handleMessageUpdate = async (
   registry: GuildRegistry,
@@ -207,7 +240,7 @@ const handleMessageUpdate = async (
         { name: 'new message', value: truncate(newMessage.content), inline: false },
       )
       .setTimestamp();
-    await eventChannel.send({ embeds: [embed] });
+    await safeSendEmbed(eventChannel, embed, clientId, newMessage.guildId, 'message_update');
   }
 
   // Audit-log side effect from legacy `detectMessageUpdate` — emitted
@@ -270,7 +303,7 @@ const handleMessageDelete = async (
         }
       });
     }
-    await eventChannel.send({ embeds: [embed] });
+    await safeSendEmbed(eventChannel, embed, clientId, message.guildId, 'message_delete');
   }
 
   // Forensic attachment download (legacy `detectMessageDelete` ran
