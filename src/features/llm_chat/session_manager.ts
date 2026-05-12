@@ -1,4 +1,4 @@
-import { LLMMessage } from './llm/types';
+import { LLMMessage } from '../../infra/llm';
 
 interface Session {
     userId: string;

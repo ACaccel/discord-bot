@@ -38,6 +38,7 @@
     "src/db/**/*",
     "src/persistence/**/*",
     "src/infra/mongo/**/*",
+    "src/infra/llm/**/*",
     "src/utils/logger.ts",
     "scripts/**/*",
     "test/**/*"

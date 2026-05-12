@@ -25,6 +25,7 @@ import {
   LLMService,
   MissingApiKeyError,
   SessionManager,
+  createDefaultRegistry,
   formatUsageFooter,
   listProviderModels,
   type LLMMessage,
@@ -131,7 +132,7 @@ const handleChatError = async (
 
 export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
   const sessions = new SessionManager();
-  const llmService = new LLMService();
+  const llmService = new LLMService(createDefaultRegistry());
 
   return {
     id: PLUGIN_ID,
