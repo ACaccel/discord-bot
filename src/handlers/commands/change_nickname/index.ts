@@ -45,7 +45,7 @@ export default class change_nickname extends Command {
             await interaction.editReply({ content: `已更改暱稱為：${newName}` });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "更改失敗"});
+            await interaction.editReply({ content: bot.translator?.t('replies:change_nickname.failed') ?? ''});
         }
     }
 }

@@ -27,14 +27,14 @@ export default class update_role extends Command {
         try {
             // if (!(bot instanceof Nijika)) return;
             // if (!bot.config.level_roles) {
-            //     await interaction.editReply({ content: "設定檔中未找到等級身分組配置" });
+            //     await interaction.editReply({ content: bot.translator?.t('replies:update_role.no_config') ?? '' });
             //     return;
             // }
             let botConfig: UpdateRoleConfig;
             if ('level_roles' in bot.config) {
                 botConfig = bot.config as UpdateRoleConfig;
             } else {
-                await interaction.editReply({ content: "設定檔中未找到等級身分組配置" });
+                await interaction.editReply({ content: bot.translator?.t('replies:update_role.no_config') ?? '' });
                 return;
             }
 
@@ -85,10 +85,10 @@ export default class update_role extends Command {
                     await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 獲得: ${roleToAssign}`);
                 }
             }));
-            await interaction.editReply({ content: "更新完成" });
+            await interaction.editReply({ content: bot.translator?.t('replies:update_role.done') ?? '' });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法更新身份組" });
+            await interaction.editReply({ content: bot.translator?.t('replies:update_role.failed') ?? '' });
         }
     }
 }

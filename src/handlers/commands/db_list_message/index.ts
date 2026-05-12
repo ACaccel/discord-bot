@@ -176,7 +176,7 @@ export default class db_list_message extends Command {
             ] as const;
             const allowedTypes = new Set<ChannelType>(channelTypes);
             if (!allowedTypes.has(channel.type)) {
-                await interaction.editReply({ content: "此 channel 不是文字頻道/討論串，無法查詢" });
+                await interaction.editReply({ content: bot.translator?.t('replies:db_list_message.not_text_channel') ?? '' });
                 return;
             }
 
@@ -185,7 +185,7 @@ export default class db_list_message extends Command {
             const hour = interaction.options.getInteger("hour", false);
             const range = parseStartEnd(date, hour);
             if (!range) {
-                await interaction.editReply({ content: "參數格式錯誤：date 請用 YYYY-MM-DD，hour（若有填）請用 0-23" });
+                await interaction.editReply({ content: bot.translator?.t('replies:db_list_message.invalid_args') ?? '' });
                 return;
             }
 
@@ -333,7 +333,7 @@ export default class db_list_message extends Command {
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法列出訊息紀錄" });
+            await interaction.editReply({ content: bot.translator?.t('replies:db_list_message.failed') ?? '' });
         }
     }
 }

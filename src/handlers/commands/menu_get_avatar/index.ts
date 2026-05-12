@@ -38,7 +38,7 @@ export default class menu_get_avatar extends Command {
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得用戶頭像" });
+            await interaction.editReply({ content: bot.translator?.t('replies:menu_get_avatar.failed') ?? '' });
         }
     }
 }

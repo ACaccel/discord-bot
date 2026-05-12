@@ -46,7 +46,7 @@ export default class list_reply extends Command {
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: "無法列出訊息回覆配對" });
+            await interaction.reply({ content: bot.translator?.t('replies:list_reply.failed') ?? '' });
         }
     }
 }

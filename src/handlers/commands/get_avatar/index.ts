@@ -47,7 +47,7 @@ export default class get_avatar extends Command {
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得頭像" });
+            await interaction.editReply({ content: bot.translator?.t('replies:get_avatar.failed') ?? '' });
         }
     }
 }

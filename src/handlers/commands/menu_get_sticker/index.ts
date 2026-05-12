@@ -69,10 +69,10 @@ export default class menu_get_sticker extends Command {
             }
 
             // No stickers or emoji found
-            await interaction.editReply({ content: "此訊息沒有貼圖或單一 emoji" });
+            await interaction.editReply({ content: bot.translator?.t('replies:menu_get_sticker.not_found') ?? '' });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得貼圖或 emoji" });
+            await interaction.editReply({ content: bot.translator?.t('replies:menu_get_sticker.failed') ?? '' });
         }
     }
 }

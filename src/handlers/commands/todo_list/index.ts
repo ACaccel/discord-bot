@@ -45,7 +45,7 @@ export default class todo_list extends Command {
             const content = interaction.options.get("content")?.value as string;
     
             if (!content && action !== "list") {
-                await interaction.editReply({ content: "請輸入待辦事項內容" });
+                await interaction.editReply({ content: bot.translator?.t('replies:todo_list.missing_content') ?? '' });
                 return;
             }
     
@@ -68,7 +68,7 @@ export default class todo_list extends Command {
                 // content is index
                 const todoList = await todos.listAll();
                 if (!parseInt(content)) {
-                    await interaction.editReply({ content: "請輸入數字" });
+                    await interaction.editReply({ content: bot.translator?.t('replies:todo_list.expect_number') ?? '' });
                     return;
                 }
                 if (parseInt(content) > todoList.length) {
@@ -88,7 +88,7 @@ export default class todo_list extends Command {
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法變更待辦事項" });
+            await interaction.editReply({ content: bot.translator?.t('replies:todo_list.failed') ?? '' });
         }
     }
 }

@@ -60,7 +60,7 @@ export default class change_avatar extends Command {
                 return;
             }
             if (!identity_config) {
-                await interaction.editReply({ content: "沒有身份組設定"});
+                await interaction.editReply({ content: bot.translator?.t('replies:change_avatar.no_role_config') ?? ''});
                 return;
             }
 
@@ -74,7 +74,7 @@ export default class change_avatar extends Command {
             }
             const new_identity = identity_config.find((e) => e.name === newName)
             if (!new_identity) {
-                await interaction.editReply({ content: "找不到新身份"});
+                await interaction.editReply({ content: bot.translator?.t('replies:change_avatar.new_role_not_found') ?? ''});
                 return;
             }
 
@@ -97,7 +97,7 @@ export default class change_avatar extends Command {
             await interaction.editReply({ content: `${oldName}已死，現在正是${newName}復權的時刻` });
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "更改失敗"});
+            await interaction.editReply({ content: bot.translator?.t('replies:change_avatar.failed') ?? ''});
         }
     }
 }

@@ -115,7 +115,7 @@ export default class ban_user extends Command {
             misc.scheduleJob(end_time_date, () => ban_judgement());
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法禁言使用者" });
+            await interaction.editReply({ content: bot.translator?.t('replies:ban_user.failed') ?? '' });
         }
     }
 }

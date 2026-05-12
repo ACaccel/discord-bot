@@ -148,11 +148,11 @@ export default class emoji_frequency extends Command {
             }
             
             if (content === "") {
-                await interaction.editReply({ content: "處理完成！" });
+                await interaction.editReply({ content: bot.translator?.t('replies:emoji_frequency.done') ?? '' });
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得表情符號使用頻率" });
+            await interaction.editReply({ content: bot.translator?.t('replies:emoji_frequency.failed') ?? '' });
         }
     }
 }
