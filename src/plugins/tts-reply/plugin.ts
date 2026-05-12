@@ -13,7 +13,7 @@
 import type { TextChannel } from 'discord.js';
 
 import type { Plugin } from '../../core/plugin';
-import { misc } from '../../utils';
+import { ttsApi } from './tts-api';
 
 const PLUGIN_ID = 'tts-reply';
 const PLUGIN_VERSION = '1.0.0';
@@ -47,8 +47,8 @@ export const TtsReplyPlugin: Plugin = {
         return;
       }
 
-      const { attachment, error } = await misc.tts_api(refContent);
-      if (error !== null && error !== undefined) {
+      const { attachment, error } = await ttsApi(refContent);
+      if (error.length > 0) {
         await message.reply(error);
         return;
       }

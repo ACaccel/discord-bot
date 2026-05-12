@@ -25,7 +25,12 @@ import { z } from 'zod';
 import { TOKENS } from '../../core/ioc';
 import type { GuildRegistry } from '../../core/guild-registry';
 import type { Plugin } from '../../core/plugin';
-import { logger as legacyLogger } from '../../utils';
+// Import directly from the leaf module (not the barrel) so the strict
+// typecheck does not transitively pull the legacy `utils/misc.ts` and
+// `utils/bot_cmd.ts` files, which still use `@bot` / `@cmd` path
+// aliases not present in `tsconfig.strict.json`. `utils/logger.ts`
+// itself was rewritten as a strict-clean shim in Phase 3.
+import * as legacyLogger from '../../utils/logger';
 
 const PLUGIN_ID = 'guild-events';
 const PLUGIN_VERSION = '1.0.0';
