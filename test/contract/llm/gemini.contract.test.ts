@@ -12,7 +12,8 @@ const MODEL = 'gemini-2.0-flash';
 // is matched separately via `.query(true)`.
 const GEN_PATH = new RegExp(`^/v1beta/models/${MODEL}:generateContent$`);
 
-const buildProvider = (): GeminiProvider => new GeminiProvider(new GoogleGenerativeAI('fake-key'));
+const buildProvider = (): GeminiProvider =>
+  new GeminiProvider('fake-key', new GoogleGenerativeAI('fake-key'));
 
 const callerSettings = settings({ provider: 'gemini', model: MODEL });
 const callerMessages = [{ role: 'user', content: 'hi' } as const];

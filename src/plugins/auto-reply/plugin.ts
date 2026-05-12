@@ -31,16 +31,14 @@ const FATCAT_PROBABILITY = 0.01;
 const MUBAIMU_PROBABILITY = 0.005;
 const LUCKY_GLOBAL_PROBABILITY = 0.005;
 
+// i18n-ignore: trigger-matching keyword/regex, not user-facing prose.
 const LONG_HAIR_REGEX = /長髮男(?=\s|$)/;
 const DICE_REGEX = /^(\d+)d(\d+)$/;
 const DICE_MAX_COUNT = 100;
 const DICE_MAX_SIDES = 2 ** 30;
 
+// i18n-ignore: trigger-matching keyword, not a user-facing reply.
 const GOODNIGHT_LINE = '該睡覺了，肥貓跟你說晚安';
-const GOODNIGHT_REPLY = '健康に良くない！<:ave_mortis_bad_for_health:1333052644368846878>';
-const FATCAT_LINE = '肥貓好gay';
-const MUBAIMU_LINE = '晴人杰';
-const LONG_HAIR_LINE = '去spa';
 
 /** Roll dice; `null` when the input is not a dice expression. */
 export const rollDice = (msg: string): string | null => {
@@ -105,13 +103,14 @@ export const AutoReplyPlugin: Plugin = {
       // bound to `{ plugin: 'auto-reply' }` by the host.
       const registry = ctx.resolve(TOKENS.GuildRegistry);
       const logger = ctx.logger;
+      const t = ctx.translator;
 
       if (!message.channel.isSendable()) return;
       if (message.guildId === null) return;
       const guildId = message.guildId;
 
       if (message.content.includes(GOODNIGHT_LINE)) {
-        await message.reply(GOODNIGHT_REPLY);
+        await message.reply(t.t('replies:auto_reply.goodnight_reply'));
       }
 
       // The remaining behaviours all skip bot authors so two bots
@@ -124,10 +123,10 @@ export const AutoReplyPlugin: Plugin = {
       }
 
       if (message.author.id === FATCAT_USER_ID && Math.random() < FATCAT_PROBABILITY) {
-        await message.channel.send(FATCAT_LINE);
+        await message.channel.send(t.t('replies:auto_reply.fatcat_line'));
       }
       if (message.author.id === MUBAIMU_USER_ID && Math.random() < MUBAIMU_PROBABILITY) {
-        await message.channel.send(MUBAIMU_LINE);
+        await message.channel.send(t.t('replies:auto_reply.mubaimu_line'));
       }
       if (Math.random() < LUCKY_GLOBAL_PROBABILITY) {
         const lucky = await safeLookup(registry, guildId, '[*]', logger, 'lucky');
@@ -137,7 +136,7 @@ export const AutoReplyPlugin: Plugin = {
       }
 
       if (LONG_HAIR_REGEX.test(message.content)) {
-        await message.channel.send(LONG_HAIR_LINE);
+        await message.channel.send(t.t('replies:auto_reply.long_hair_line'));
       }
 
       const diceResult = rollDice(message.content);

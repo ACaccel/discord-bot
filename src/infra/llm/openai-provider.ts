@@ -24,19 +24,14 @@ export class OpenAIProvider implements LLMProvider {
 
   private readonly client: OpenAI;
 
-  public constructor(client?: OpenAI) {
-    // `client` injection point exists so contract tests can pass a
+  public constructor(apiKey?: string, client?: OpenAI) {
+    // `client` injection exists so contract tests can pass a
     // pre-configured instance with a custom `baseURL` (the nock
-    // interceptor binds to whatever host the test sets).
-    this.client =
-      client ??
-      new OpenAI({
-        // TODO(phase-6): move LLM keys into typed Env (`src/core/config`).
-        // The registry's missing-key gate at `resolve()` already validates
-        // the value before this constructor runs.
-        // eslint-disable-next-line no-restricted-syntax
-        apiKey: process.env['OPENAI_API_KEY'],
-      });
+    // interceptor binds to whatever host the test sets). `apiKey`
+    // arrives from the typed `Env` via the composition root; the
+    // registry's missing-key gate at `resolve()` runs first so a
+    // missing value never reaches this constructor in production.
+    this.client = client ?? new OpenAI({ apiKey });
   }
 
   public async chat(messages: readonly LLMMessage[], settings: LLMSettings): Promise<LLMResult> {

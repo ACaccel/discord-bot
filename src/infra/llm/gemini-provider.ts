@@ -17,10 +17,8 @@ export class GeminiProvider implements LLMProvider {
 
   private readonly client: GoogleGenerativeAI;
 
-  public constructor(client?: GoogleGenerativeAI) {
-    // TODO(phase-6): move LLM keys into typed Env (`src/core/config`).
-    // eslint-disable-next-line no-restricted-syntax
-    this.client = client ?? new GoogleGenerativeAI(process.env['GEMINI_API_KEY'] ?? '');
+  public constructor(apiKey?: string, client?: GoogleGenerativeAI) {
+    this.client = client ?? new GoogleGenerativeAI(apiKey ?? '');
   }
 
   public async chat(messages: readonly LLMMessage[], settings: LLMSettings): Promise<LLMResult> {

@@ -1,4 +1,15 @@
 {
+  "llm_chat": {
+    "thinking": "🤔 思考中…",
+    "api_error": "呼叫 AI API 時發生錯誤,請稍後再試。",
+    "missing_api_key": "Provider `{{provider}}` 的 API 金鑰未設定(請於 .env 設定 `{{envVar}}`)。"
+  },
+  "auto_reply": {
+    "goodnight_reply": "健康に良くない！<:ave_mortis_bad_for_health:1333052644368846878>",
+    "fatcat_line": "肥貓好gay",
+    "mubaimu_line": "晴人杰",
+    "long_hair_line": "去spa"
+  },
   "gay": {
     "is_gay": "{{name}} 是 gay",
     "is_not_gay": "{{name}} 不是 gay"

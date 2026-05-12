@@ -7,14 +7,19 @@
  * Construction is deferred to first use; the registry caches the
  * instance after that.
  *
- * Adding a new provider:
- *   1. Implement {@link LLMProvider} (see existing providers under
- *      `src/infra/llm/`).
- *   2. Append the name to {@link LLMProviderName} in `./types`.
- *   3. Add one line to {@link defaultProviderRegistry} below.
+ * Phase 6 PR 2 changed the API-key sourcing path. Previously the
+ * registry read `process.env[PROVIDER_API_KEY_ENV[name]]` directly
+ * with an `eslint-disable no-restricted-syntax`. Now it takes a
+ * pre-resolved `apiKeys` map (populated by the composition root from
+ * the typed `Env`), so the strict env-access rule is honoured
+ * throughout `infra/llm`. The `MissingApiKeyError` gate semantics are
+ * unchanged: an empty / undefined key on a requested provider throws.
  *
- * Tests get an isolated registry via `new LlmProviderRegistry(map)`
- * so they can substitute fakes without monkey-patching modules.
+ * Adding a new provider:
+ *   1. Implement {@link LLMProvider}.
+ *   2. Append the name to {@link LLMProviderName} in `./types`.
+ *   3. Pass its API-key value in the `apiKeys` map at the call site.
+ *   4. Add one line to {@link createDefaultRegistry} below.
  */
 import {
   MissingApiKeyError,
@@ -25,33 +30,35 @@ import {
 
 export type LlmProviderFactory = () => LLMProvider;
 
+/** Pre-resolved per-provider API keys. `undefined` = unset / unused. */
+export type LlmProviderApiKeys = Readonly<Partial<Record<LLMProviderName, string | undefined>>>;
+
 export class LlmProviderRegistry {
   private readonly factories: Map<LLMProviderName, LlmProviderFactory>;
+  private readonly apiKeys: LlmProviderApiKeys;
   private readonly instances = new Map<LLMProviderName, LLMProvider>();
 
-  public constructor(factories: Iterable<readonly [LLMProviderName, LlmProviderFactory]>) {
+  public constructor(
+    factories: Iterable<readonly [LLMProviderName, LlmProviderFactory]>,
+    apiKeys: LlmProviderApiKeys = {},
+  ) {
     this.factories = new Map(factories);
+    this.apiKeys = apiKeys;
   }
 
   /**
    * Resolve a provider by name. Throws {@link MissingApiKeyError} if
-   * the provider's env-var-backed API key is empty / unset — the
-   * factory never runs, so the upstream SDK does not see a half-built
-   * credential. Throws a plain `Error` if the name is not registered.
+   * the provider's API key is empty / unset (callers see the env-var
+   * name in the error message so ops can locate the missing setting).
+   * Throws a plain `Error` if the name is not registered.
    */
   public resolve(name: LLMProviderName): LLMProvider {
     const cached = this.instances.get(name);
     if (cached !== undefined) return cached;
 
-    const envVar = PROVIDER_API_KEY_ENV[name];
-    // TODO(phase-6): move LLM keys into typed Env (`src/core/config`).
-    // This gate is the only place we need to introspect dynamic env-var
-    // names; once the typed Env carries the keys this becomes a typed
-    // lookup and the eslint-disable drops away.
-    // eslint-disable-next-line no-restricted-syntax
-    const keyValue = envVar.length > 0 ? process.env[envVar] : undefined;
+    const keyValue = this.apiKeys[name];
     if (keyValue === undefined || keyValue.length === 0) {
-      throw new MissingApiKeyError(name, envVar);
+      throw new MissingApiKeyError(name, PROVIDER_API_KEY_ENV[name]);
     }
 
     const factory = this.factories.get(name);

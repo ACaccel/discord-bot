@@ -78,16 +78,43 @@ const walk = (dir: string): readonly string[] => {
   return out;
 };
 
+/**
+ * Skip lines that are pure comments. The scanner targets user-facing
+ * string literals; CJK inside JSDoc / line comments is documentation
+ * (e.g. an inline example of the legacy reply text) and is not part
+ * of the translation contract. Tracking is line-based with a small
+ * block-comment cursor so unbalanced `/* … *\/` does not leak.
+ */
+const isCommentLine = (line: string, inBlockComment: boolean): boolean => {
+  const trimmed = line.trim();
+  if (inBlockComment) return true; // already inside /* ... */
+  return trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*');
+};
+
 const scanFile = (filePath: string): readonly Violation[] => {
   const rel = path.relative(ROOT, filePath);
   if (FILE_ALLOWLIST.has(rel)) return [];
   const source = fs.readFileSync(filePath, 'utf8');
   const lines = source.split('\n');
   const violations: Violation[] = [];
+  let inBlockComment = false;
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i] as string;
+    // Track block-comment state. A line that contains `/*` opens
+    // (unless it also closes with `*/` on the same line); a line that
+    // contains `*/` closes. This is heuristic — strings containing
+    // `/*` would confuse it — but real-world callsites do not embed
+    // those tokens in user-facing strings, and the cost of a false
+    // skip is one extra `// i18n-ignore` annotation.
+    const opensBlock = /\/\*/.test(line) && !/\*\//.test(line);
+    const closesBlock = /\*\//.test(line);
+    const wasInBlockComment = inBlockComment;
+    if (opensBlock) inBlockComment = true;
+    if (closesBlock) inBlockComment = false;
+
     if (!CJK_REGEX.test(line)) continue;
     if (IGNORE_LINE_PATTERN.test(line)) continue;
+    if (isCommentLine(line, wasInBlockComment)) continue;
     // The previous-line ignore form: `// i18n-ignore: ...\n<violation>`.
     const prev = i > 0 ? (lines[i - 1] as string) : '';
     if (IGNORE_LINE_PATTERN.test(prev)) continue;

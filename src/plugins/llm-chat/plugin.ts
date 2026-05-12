@@ -19,6 +19,7 @@
  */
 import type { Message } from 'discord.js';
 
+import type { Translator } from '../../core/i18n';
 import { TOKENS } from '../../core/ioc';
 import type { Plugin } from '../../core/plugin';
 import {
@@ -38,7 +39,6 @@ import * as legacyLogger from '../../utils/logger';
 const PLUGIN_ID = 'llm-chat';
 const PLUGIN_VERSION = '1.0.0';
 const PREWARM_PROVIDERS: LLMProviderName[] = ['xai', 'openai', 'anthropic', 'gemini'];
-const PLACEHOLDER_REPLY = '🤔 思考中…';
 const NO_MENTIONS = { parse: [] as const };
 const MAX_DISCORD_MESSAGE_LENGTH = 2000;
 
@@ -115,12 +115,16 @@ const handleChatError = async (
   clientId: string,
   guildId: string | null,
   placeholder: Message,
+  translator: Translator,
 ): Promise<void> => {
   legacyLogger.errorLogger(clientId, guildId, err);
   const content =
     err instanceof MissingApiKeyError
-      ? `Provider \`${err.provider}\` 的 API 金鑰未設定（請於 .env 設定 \`${err.envVar}\`）。`
-      : '呼叫 AI API 時發生錯誤，請稍後再試。';
+      ? translator.t('replies:llm_chat.missing_api_key', {
+          provider: err.provider,
+          envVar: err.envVar,
+        })
+      : translator.t('replies:llm_chat.api_error');
   try {
     await placeholder.edit({ content, allowedMentions: NO_MENTIONS });
   } catch {
@@ -132,7 +136,13 @@ const handleChatError = async (
 
 export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
   const sessions = new SessionManager();
-  const llmService = new LLMService(createDefaultRegistry());
+  // `llmService` is populated in `init()` from the resolved typed Env
+  // rather than at factory time, so the registry's API-key gate sees
+  // the values supplied through DI rather than direct `process.env`
+  // reads. The events handler below guards on `llmService` so a
+  // pre-init dispatch (impossible in production — host enforces
+  // ordering — but possible in tests) silently no-ops.
+  let llmService: LLMService | undefined;
 
   return {
     id: PLUGIN_ID,
@@ -140,7 +150,9 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
     scope: 'bot',
     critical: false,
 
-    async init(): Promise<void> {
+    async init(ctx): Promise<void> {
+      const env = ctx.resolve(TOKENS.Env);
+      llmService = new LLMService(createDefaultRegistry(env));
       // Pre-warm each provider's live model catalog at boot. The call
       // returns a fallback sync while kicking off the SDK fetch, so by
       // the time `/ai_settings` is invoked the cache is usually warm.
@@ -151,6 +163,7 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
 
     events: {
       messageCreate: async (ctx, message) => {
+        if (llmService === undefined) return;
         if (message.author.bot || message.guildId === null) return;
         const registry = ctx.resolve(TOKENS.GuildRegistry);
         const repos = registry.getRepos(message.guildId);
@@ -166,7 +179,14 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
         // critical so a reply to the bot does not get classed as a
         // fresh @-tag.
         if (message.mentions.has(config.clientId, { ignoreRepliedUser: true })) {
-          await handleNewSession(message, userDoc, sessions, llmService, config.clientId);
+          await handleNewSession(
+            message,
+            userDoc,
+            sessions,
+            llmService,
+            config.clientId,
+            ctx.translator,
+          );
           return;
         }
 
@@ -181,6 +201,7 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
             sessions,
             llmService,
             config.clientId,
+            ctx.translator,
           );
         }
       },
@@ -188,8 +209,11 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
   };
 };
 
-const sendPlaceholder = async (message: Message): Promise<Message> =>
-  (await message.reply({ content: PLACEHOLDER_REPLY, allowedMentions: NO_MENTIONS })) as Message;
+const sendPlaceholder = async (message: Message, translator: Translator): Promise<Message> =>
+  (await message.reply({
+    content: translator.t('replies:llm_chat.thinking'),
+    allowedMentions: NO_MENTIONS,
+  })) as Message;
 
 const handleNewSession = async (
   message: Message,
@@ -197,19 +221,20 @@ const handleNewSession = async (
   sessions: SessionManager,
   llmService: LLMService,
   clientId: string,
+  translator: Translator,
 ): Promise<void> => {
   const userText = stripMention(message.content, clientId);
   if (userText.length === 0) return;
 
   const settings = toSettings(userConfig);
   const userMsg: LLMMessage = { role: 'user', content: userText };
-  const placeholder = await sendPlaceholder(message);
+  const placeholder = await sendPlaceholder(message, translator);
 
   let result: LLMResult;
   try {
     result = await llmService.chat([userMsg], settings);
   } catch (err) {
-    await handleChatError(err, clientId, message.guildId, placeholder);
+    await handleChatError(err, clientId, message.guildId, placeholder, translator);
     return;
   }
 
@@ -236,6 +261,7 @@ const handleContinueSession = async (
   sessions: SessionManager,
   llmService: LLMService,
   clientId: string,
+  translator: Translator,
 ): Promise<void> => {
   const session = sessions.resolveSessionByBotMessage(refBotMessageId);
   if (session === null || session === undefined) return;
@@ -249,13 +275,13 @@ const handleContinueSession = async (
   const settings = toSettings(userConfig);
   const userMsg: LLMMessage = { role: 'user', content: userText };
   const history = [...session.history, userMsg];
-  const placeholder = await sendPlaceholder(message);
+  const placeholder = await sendPlaceholder(message, translator);
 
   let result: LLMResult;
   try {
     result = await llmService.chat(history, settings);
   } catch (err) {
-    await handleChatError(err, clientId, message.guildId, placeholder);
+    await handleChatError(err, clientId, message.guildId, placeholder, translator);
     return;
   }
 

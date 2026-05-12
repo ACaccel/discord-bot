@@ -9,7 +9,10 @@ const BASE = 'https://api.anthropic.com';
 const MESSAGES_PATH = '/v1/messages';
 
 const buildProvider = (): AnthropicProvider =>
-  new AnthropicProvider(new Anthropic({ apiKey: 'sk-test', baseURL: BASE, maxRetries: 0 }));
+  new AnthropicProvider(
+    'sk-test',
+    new Anthropic({ apiKey: 'sk-test', baseURL: BASE, maxRetries: 0 }),
+  );
 
 const callerSettings = settings({ provider: 'anthropic', model: 'claude-sonnet-4-6' });
 const callerMessages = [{ role: 'user', content: 'hi' } as const];

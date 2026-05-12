@@ -25,15 +25,8 @@ export class XAIProvider implements LLMProvider {
 
   private readonly client: OpenAI;
 
-  public constructor(client?: OpenAI) {
-    this.client =
-      client ??
-      new OpenAI({
-        // TODO(phase-6): move LLM keys into typed Env (`src/core/config`).
-        // eslint-disable-next-line no-restricted-syntax
-        apiKey: process.env['XAI_API_KEY'],
-        baseURL: BASE_URL,
-      });
+  public constructor(apiKey?: string, client?: OpenAI) {
+    this.client = client ?? new OpenAI({ apiKey, baseURL: BASE_URL });
   }
 
   public async chat(messages: readonly LLMMessage[], settings: LLMSettings): Promise<LLMResult> {
