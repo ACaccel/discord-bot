@@ -95,11 +95,13 @@ export default class inspect_member_ids extends Command {
         super();
         this.setConfig({
             name: "inspect_member_ids",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "檢查多個 ID 是否在本 guild，並列出可查資訊",
             options: {
                 string: [
                     {
                         name: "ids",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "可貼多個 ID（逗號/空白/換行分隔）",
                         required: true,
                     },
@@ -114,7 +116,7 @@ export default class inspect_member_ids extends Command {
         try {
             const guild = interaction.guild;
             if (!guild) {
-                await interaction.editReply({ content: "找不到伺服器資訊" });
+                await interaction.editReply({ content: bot.translator?.t('errors:command.guild_info_not_found') ?? '' });
                 return;
             }
 

@@ -12,11 +12,13 @@ export default class talk_signed extends Command {
         super();
         this.setConfig({
             name: "talk_signed",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "讓機器人說話(署名)",
             options: {
                 string: [
                     {
                         name: "content",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "就是內容",
                         required: true
                     }
@@ -37,7 +39,7 @@ export default class talk_signed extends Command {
             let guild = interaction.guild as Guild;
             let channel = interaction.channel;
             if (!channel?.isSendable()) {
-                await interaction.reply({ content: "頻道不存在或無法傳送訊息", flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('errors:command.channel_not_sendable') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
             let guild_member = interaction.member && 'displayName' in interaction.member ? interaction.member : null;

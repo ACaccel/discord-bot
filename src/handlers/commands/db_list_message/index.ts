@@ -104,11 +104,13 @@ export default class db_list_message extends Command {
         super();
         this.setConfig({
             name: "db_list_message",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "列出特定頻道、特定日期、特定時段(hour)的訊息紀錄",
             options: {
                 channel: [
                     {
                         name: "channel",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "要查詢的頻道/討論串",
                         required: true,
                     },
@@ -116,15 +118,19 @@ export default class db_list_message extends Command {
                 string: [
                     {
                         name: "date",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "日期 (YYYY-MM-DD)",
                         required: true,
                     },
                     {
                         name: "print",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "是否直接發成訊息 (yes: 直接發訊息, no: 文字檔, 預設 no)",
                         required: false,
                         choices: [
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "文字檔 (預設)", value: "no" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "訊息", value: "yes" },
                         ],
                     }
@@ -132,6 +138,7 @@ export default class db_list_message extends Command {
                 number: [
                     {
                         name: "hour",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "時段 (0-23)",
                         required: false,
                     },
@@ -146,13 +153,13 @@ export default class db_list_message extends Command {
         try {
             const guild = interaction.guild;
             if (!guild) {
-                await interaction.editReply({ content: "找不到伺服器" });
+                await interaction.editReply({ content: bot.translator?.t('errors:command.guild_not_found') ?? '' });
                 return;
             }
 
             const db = bot.guildInfo[guild.id].db;
             if (!db) {
-                await interaction.editReply({ content: "找不到資料庫" });
+                await interaction.editReply({ content: bot.translator?.t('errors:db.not_found') ?? '' });
                 return;
             }
 

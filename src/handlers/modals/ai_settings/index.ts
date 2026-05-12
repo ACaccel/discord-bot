@@ -25,7 +25,7 @@ export default class ai_settings_modal extends ModalHandler {
         const userId = interaction.user.id;
         const repos = bot.guildInfo[guildId]?.repos;
         if (!repos) {
-            await interaction.reply({ content: '資料庫連線異常，請稍後再試。', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('errors:db.connection_failed') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
 
@@ -54,7 +54,7 @@ export default class ai_settings_modal extends ModalHandler {
         try {
             const doc = await repos.userApiSetting.findByUserId(userId);
             if (!doc) {
-                await interaction.reply({ content: '你不在白名單中，請聯絡管理員。', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('errors:ai.not_whitelisted') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
             await repos.userApiSetting.update(userId, {
@@ -66,7 +66,7 @@ export default class ai_settings_modal extends ModalHandler {
             });
         } catch (err) {
             logger.errorLogger(bot.clientId, guildId, err);
-            await interaction.reply({ content: '資料庫操作失敗，請稍後再試。', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('errors:db.operation_failed') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
 

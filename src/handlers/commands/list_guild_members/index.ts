@@ -48,6 +48,7 @@ export default class list_guild_members extends Command {
         super();
         this.setConfig({
             name: "list_guild_members",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "列出目前伺服器所有成員（含機器人）",
         });
     }
@@ -58,7 +59,7 @@ export default class list_guild_members extends Command {
         try {
             const guild = interaction.guild;
             if (!guild) {
-                await interaction.editReply({ content: "找不到伺服器資訊" });
+                await interaction.editReply({ content: bot.translator?.t('errors:command.guild_info_not_found') ?? '' });
                 return;
             }
 

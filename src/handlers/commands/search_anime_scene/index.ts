@@ -12,11 +12,13 @@ export default class search_anime_scene extends Command {
         super();
         this.setConfig({
             name: "search_anime_scene",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "搜尋動漫截圖來源",
             options: {
                 attachment: [
                     {
                         name: "image",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "動漫截圖",
                         required: true
                     }
@@ -24,6 +26,7 @@ export default class search_anime_scene extends Command {
                 number: [
                     {
                         name: "display_num",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "顯示幾筆搜尋結果 (optional)",
                         required: false
                     }

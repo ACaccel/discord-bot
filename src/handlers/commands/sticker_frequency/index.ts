@@ -10,15 +10,19 @@ export default class sticker_frequency extends Command {
         super();
         this.setConfig({
             name: "sticker_frequency",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "統計貼圖使用頻率",
             options: {
                 string: [
                     {
                         name: "frequency",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "頻率順序 (optional)",
                         required: false,
                         choices: [
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "前n低頻率", value: "asc" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "前n高頻率", value: "desc" }
                         ]
                     }
@@ -26,10 +30,12 @@ export default class sticker_frequency extends Command {
                 number: [
                     {
                         name: "top_n",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "前n名 (optional, max: 30)",
                         required: false
                     },{
                         name: "last_n_months",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "搜尋過去n個月 (optional, max: 24)",
                         required: false
                     }
@@ -46,12 +52,12 @@ export default class sticker_frequency extends Command {
             let last_n_months = interaction.options.get("last_n_months")?.value as number || 1;
             const guild = interaction.guild;
             if (!guild) {
-                await interaction.editReply({ content: "找不到伺服器" });
+                await interaction.editReply({ content: bot.translator?.t('errors:command.guild_not_found') ?? '' });
                 return;
             }
             const db = bot.guildInfo[guild.id].db;
             if (!db) {
-                await interaction.editReply({ content: "請先設定資料庫" });
+                await interaction.editReply({ content: bot.translator?.t('errors:db.not_configured') ?? '' });
                 return;
             }
     

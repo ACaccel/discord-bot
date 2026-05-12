@@ -12,16 +12,19 @@ export default class roll_call extends Command {
         super();
         this.setConfig({
             name: "roll_call",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "點名",
             options: {
                 string: [
                     {
                         name: "users",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "被點名者 (ex: @user1 @user2...)",
                         required: false
                     },
                     {
                         name: "activity_id",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "活動ID (用於連動活動參與者點名)",
                         required: false
                     }
@@ -45,13 +48,13 @@ export default class roll_call extends Command {
             if (activity_id) {
                 const guild = interaction.guild;
                 if (!guild) {
-                    await interaction.reply({ content: "找不到伺服器", flags: MessageFlags.Ephemeral });
+                    await interaction.reply({ content: bot.translator?.t('errors:command.guild_not_found') ?? '', flags: MessageFlags.Ephemeral });
                     return;
                 }
 
                 const db = bot.guildInfo[guild.id].db;
                 if (!db) {
-                    await interaction.reply({ content: "找不到資料庫", flags: MessageFlags.Ephemeral });
+                    await interaction.reply({ content: bot.translator?.t('errors:db.not_found') ?? '', flags: MessageFlags.Ephemeral });
                     return;
                 }
 

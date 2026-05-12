@@ -11,6 +11,7 @@ export default class weather_forecast extends Command {
         super();
         this.setConfig({
             name: "weather_forecast",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "天氣預報(台北)"
         });
     }

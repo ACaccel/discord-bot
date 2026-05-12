@@ -19,16 +19,21 @@ export default class record extends Command {
         super();
         this.setConfig({
             name: "record",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "錄音",
             options: {
                 string: [
                     {
                         name: "action",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "開始或停止錄音",
                         required: true,
                         choices: [
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "開始", value: "start" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "停止", value: "stop" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "儲存音檔 (last n minutes)", value: "save" }
                         ]
                     }
@@ -36,6 +41,7 @@ export default class record extends Command {
                 number: [
                     {
                         name: "duration",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "錄音時間長度 (last n minutes) (optional)",
                         required: false
                     }

@@ -9,11 +9,13 @@ export default class bubble_wrap extends Command {
         super();
         this.setConfig({
             name: "bubble_wrap",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "產生泡泡紙",
             options: {
                 string: [
                     {
                         name: "str",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "隱藏字",
                         required: true
                     }

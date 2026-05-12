@@ -10,11 +10,13 @@ export default class activity_delete extends Command {
         super();
         this.setConfig({
             name: "activity_delete",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "刪除活動",
             options: {
                 string: [
                     {
                         name: "activity_id",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "活動ID",
                         required: true
                     }

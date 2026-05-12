@@ -12,11 +12,13 @@ export default class talk extends Command {
         super();
         this.setConfig({
             name: "talk",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "讓機器人說話",
             options: {
                 channel: [
                     {
                         name: "channel",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "選擇頻道",
                         required: true
                     }
@@ -24,6 +26,7 @@ export default class talk extends Command {
                 string: [
                     {
                         name: "content",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "就是內容",
                         required: true
                     }
@@ -45,7 +48,7 @@ export default class talk extends Command {
             let guild = interaction.guild as Guild;
             let channel = guild.channels.cache.get(ch);
             if (!channel?.isSendable()) {
-                await interaction.reply({ content: "頻道不存在或無法傳送訊息", flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('errors:command.channel_not_sendable') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
             

@@ -17,6 +17,7 @@ export default class update_role extends Command {
         super();
         this.setConfig({
             name: "update_role",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "更新Mee6等級身分組"
         });
     }

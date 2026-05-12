@@ -8,6 +8,7 @@ export default class ai_status extends Command {
         super();
         this.setConfig({
             name: 'ai_status',
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: '顯示你目前的 AI 設定',
         });
     }
@@ -17,13 +18,13 @@ export default class ai_status extends Command {
         const userId = interaction.user.id;
         const guildId = interaction.guildId;
         if (!guildId) {
-            await interaction.editReply({ content: '此指令只能在伺服器中使用。' });
+            await interaction.editReply({ content: bot.translator?.t('errors:command.guild_only') ?? '' });
             return;
         }
 
         const repos = bot.guildInfo[guildId]?.repos;
         if (!repos) {
-            await interaction.editReply({ content: '資料庫連線異常，請稍後再試。' });
+            await interaction.editReply({ content: bot.translator?.t('errors:db.connection_failed') ?? '' });
             return;
         }
 
@@ -31,7 +32,7 @@ export default class ai_status extends Command {
             const doc = await repos.userApiSetting.findByUserId(userId);
 
             if (!doc) {
-                await interaction.editReply({ content: '你不在白名單中，請聯絡管理員。' });
+                await interaction.editReply({ content: bot.translator?.t('errors:ai.not_whitelisted') ?? '' });
                 return;
             }
 
@@ -52,7 +53,7 @@ export default class ai_status extends Command {
             await interaction.editReply({ content: lines.join('\n') });
         } catch (err) {
             logger.errorLogger(bot.clientId, guildId, err);
-            await interaction.editReply({ content: '資料庫操作失敗，請稍後再試。' });
+            await interaction.editReply({ content: bot.translator?.t('errors:db.operation_failed') ?? '' });
         }
     }
 }

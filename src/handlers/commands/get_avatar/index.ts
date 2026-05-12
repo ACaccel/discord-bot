@@ -11,11 +11,13 @@ export default class get_avatar extends Command {
         super();
         this.setConfig({
             name: "get_avatar",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "取得使用者頭像",
             options: {
                 user: [
                     {
                         name: "user",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "選擇對象",
                         required: true
                     }
@@ -41,7 +43,7 @@ export default class get_avatar extends Command {
     
                 await interaction.editReply({ embeds: [embed] });
             } else {
-                await interaction.editReply({ content: "找不到使用者" });
+                await interaction.editReply({ content: bot.translator?.t('errors:command.user_not_found') ?? '' });
             }
         } catch (error) {
             logger.errorLogger(bot.clientId, interaction.guild?.id, error);

@@ -12,11 +12,13 @@ export default class role_message extends Command {
         super();
         this.setConfig({
             name: "role_message",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "發送身份組領取訊息",
             options: {
                 string: [
                     {
                         name: "roles",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "可領取身份組id (ex: @身份組1 @身份組2...)",
                         required: true
                     }
@@ -30,7 +32,7 @@ export default class role_message extends Command {
         try {
             const guild = interaction.guild;
             if (!guild) {
-                await interaction.editReply({ content: "找不到伺服器" });
+                await interaction.editReply({ content: bot.translator?.t('errors:command.guild_not_found') ?? '' });
                 return;
             }
             const member = interaction.member as GuildMember;

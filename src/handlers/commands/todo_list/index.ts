@@ -10,20 +10,26 @@ export default class todo_list extends Command {
         super();
         this.setConfig({
             name: "todo_list",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "待辦事項",
             options: {
                 string: [
                     {
                         name: "action",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "新增或刪除",
                         required: true,
                         choices: [
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "新增 (+ content: 內容)", value: "add" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "刪除 (+ content: 編號)", value: "delete" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "查看", value: "list" }
                         ]
                     },{
                         name: "content",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "內容 (optional)",
                         required: false
                     }
@@ -45,7 +51,7 @@ export default class todo_list extends Command {
     
             const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
             if (!repos) {
-                await interaction.editReply({ content: "找不到資料庫" });
+                await interaction.editReply({ content: bot.translator?.t('errors:db.not_found') ?? '' });
                 return;
             }
             const todos = repos.todo;

@@ -11,24 +11,37 @@ export default class change_avatar extends Command {
         super();
         this.setConfig({
             name: "change_avatar",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "人格變換",
             options: {
                 string: [
                     {
                         name: "identity",
+                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                         description: "就是身分",
                         required: true,
                         choices: [
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "高松燈", value: "高松燈" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "千早愛音", value: "千早愛音" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "長崎爽世", value: "長崎爽世" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "要樂奈", value: "要樂奈" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "椎名立希", value: "椎名立希" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "若葉睦", value: "若葉睦" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "豐川祥子", value: "豐川祥子" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "祐天寺にゃむ", value: "祐天寺にゃむ" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "三角初音", value: "三角初音" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "八幡海鈴", value: "八幡海鈴" },
+                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
                             { name: "純田真奈", value: "純田真奈" }
                         ]
                     }
@@ -43,7 +56,7 @@ export default class change_avatar extends Command {
             const guild = interaction.guild;
 
             if (!guild) {
-                await interaction.editReply({ content: "找不到伺服器"});
+                await interaction.editReply({ content: bot.translator?.t('errors:command.guild_not_found') ?? ''});
                 return;
             }
             if (!identity_config) {
@@ -56,7 +69,7 @@ export default class change_avatar extends Command {
             const oldName = bot.guildInfo[guild?.id].bot_name;
             const userBot = guild.members.cache.get(bot.client.user?.id as string);
             if (!userBot) {
-                await interaction.editReply({ content: "找不到機器人"});
+                await interaction.editReply({ content: bot.translator?.t('errors:command.bot_not_found') ?? ''});
                 return;
             }
             const new_identity = identity_config.find((e) => e.name === newName)

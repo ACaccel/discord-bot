@@ -12,7 +12,9 @@ export default class menu_get_sticker extends Command {
     constructor() {
         super();
         this.setConfig({
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             name: "取得表符/貼圖連結",
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: "取得訊息中的表符/貼圖連結 (單一表符或貼圖)",
             type: ApplicationCommandType.Message as ContextMenuCommandType,
         });

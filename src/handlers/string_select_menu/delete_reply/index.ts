@@ -12,7 +12,7 @@ export default class delete_reply extends SSMHandler {
 
         const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
         if (!repos) {
-            await interaction.reply({ content: "找不到資料庫", flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('errors:db.not_found') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
 

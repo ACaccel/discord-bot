@@ -10,6 +10,7 @@ export default class help extends Command {
         super();
         this.setConfig({
             name: 'help',
+            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
             description: '顯示指令清單與說明',
         });
     }
