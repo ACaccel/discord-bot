@@ -107,7 +107,13 @@ export default class emoji_frequency extends Command {
                 });
                 
                 messages.forEach((message) => {
-                const msgEmojis: string[] = message.content.match(/<a?:\w+:\d+>/g) || [];
+                // `content` is `required: false` on the schema → optional at the
+                // typed-model layer Phase 1 introduced. Older revisions of this
+                // file relied on the un-typed `Model<any>` to short-circuit the
+                // null check, which blocked `yarn nijika` once ts-node tried to
+                // compile under strict mode. Guard with `?.` so the runtime
+                // behaviour matches the schema's nullability.
+                const msgEmojis: string[] = message.content?.match(/<a?:\w+:\d+>/g) || [];
                 msgEmojis.forEach(emoji => {
                     if (textEmoji.has(emoji)) {
                     textEmoji.set(emoji, (textEmoji.get(emoji) || 0) + 1);
