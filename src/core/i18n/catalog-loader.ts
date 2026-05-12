@@ -34,9 +34,7 @@ export interface LoadCatalogOptions {
 }
 
 /** Read every locale folder under `localesDir` into a {@link CatalogResources}. */
-export const loadCatalogResources = (
-  options: LoadCatalogOptions = {},
-): CatalogResources => {
+export const loadCatalogResources = (options: LoadCatalogOptions = {}): CatalogResources => {
   const dir = options.localesDir ?? DEFAULT_LOCALES_DIR;
   if (!fs.existsSync(dir)) {
     // Surface a precise, actionable error here rather than the generic

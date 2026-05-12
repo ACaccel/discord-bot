@@ -52,7 +52,9 @@ describe('catalog-loader', () => {
 
   it('throws an actionable error when the locales directory does not exist', () => {
     expect(() =>
-      loadCatalogResources({ localesDir: path.join(os.tmpdir(), 'definitely-not-a-real-dir-xyz123') }),
+      loadCatalogResources({
+        localesDir: path.join(os.tmpdir(), 'definitely-not-a-real-dir-xyz123'),
+      }),
     ).toThrow(/locales directory not found/);
   });
 
