@@ -328,6 +328,22 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // Discord client; any critical failure surfaces before the bot
         // appears online.
         await host.initAll();
+        // Register the ClientReady listener BEFORE `client.login()`.
+        // Pre-fix, `init()` ran AFTER login + startAll and so could
+        // miss a `clientReady` event that already fired — observed as
+        // Konata's "重開機囉!" reboot message silently disappearing
+        // because `rebootMessage` only runs from inside that handler.
+        // The latch lets the handler observe a fully-set-up host
+        // (startAll done, dispatcher attached) before it invokes
+        // `host.readyAll()` and the rest of the startup pipeline.
+        let openReadyLatch: () => void = () => {};
+        const readyLatch = new Promise<void>((resolve) => {
+            openReadyLatch = resolve;
+        });
+        this.client.once(Events.ClientReady, async () => {
+            await readyLatch;
+            await this.handleClientReady(callback);
+        });
         await this.login();
         // start runs after login but BEFORE the EventDispatcher is
         // attached to client.on(...) — the dispatcher subscriptions are
@@ -336,7 +352,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // method returns.
         await host.startAll();
         this.attachDispatcherToClient(host);
-        await this.init(callback);
+        openReadyLatch();
         await this.listen();
     }
 
@@ -425,40 +441,48 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         }
     }
 
-    public init = async (callback?: () => Promise<void>) => {
-        this.client.once(Events.ClientReady, async () => {
-            try {
-                this.registerGuild();
-                await this.connectGuildDB();
-                await registerCommands(this);
-                await registerButtons(this);
-                await registerSSMs(this);
-                await registerModals(this);
-                await registerReactions(this);
-                // Giveaway / activity reboot logic moved to
-                // {@link createGiveawayPlugin} / {@link createActivityPlugin}
-                // in Phase 4b-3. Bots that need them call `.use()`
-                // with a `rebootJobs` closure in their composition root.
-                await this.rebootMessage();
-                if (callback) {
-                    await callback();
-                }
-                // readyAll runs *inside* ClientReady so plugins observe
-                // a fully-online client when their onReady hook fires.
-                // Failures here are logged but never fatal — the bot is
-                // already serving, mirroring host docstring policy.
-                if (this.pluginHost !== undefined) {
-                    try {
-                        await this.pluginHost.readyAll();
-                    } catch (readyErr: unknown) {
-                        logger.errorLogger(this.clientId, null, readyErr);
-                    }
-                }
-            } catch (err) {
-                logger.errorLogger(this.clientId, null, err);
+    /**
+     * Body of the `clientReady` handler. Extracted from the old
+     * `init()` method so {@link run} can register the `once()`
+     * listener BEFORE `client.login()` returns — that closes the
+     * race that caused Konata's reboot message to silently drop.
+     * The latch in {@link run} ensures this runs only after the
+     * plugin host's `startAll` + dispatcher attach completes, so
+     * `host.readyAll()` still observes the post-start invariants
+     * the host contract requires.
+     */
+    private handleClientReady = async (callback?: () => Promise<void>): Promise<void> => {
+        try {
+            this.registerGuild();
+            await this.connectGuildDB();
+            await registerCommands(this);
+            await registerButtons(this);
+            await registerSSMs(this);
+            await registerModals(this);
+            await registerReactions(this);
+            // Giveaway / activity reboot logic moved to
+            // {@link createGiveawayPlugin} / {@link createActivityPlugin}
+            // in Phase 4b-3. Bots that need them call `.use()`
+            // with a `rebootJobs` closure in their composition root.
+            await this.rebootMessage();
+            if (callback) {
+                await callback();
             }
-        });
-    }
+            // readyAll runs *after* clientReady so plugins observe a
+            // fully-online client when their onReady hook fires.
+            // Failures here are logged but never fatal — the bot is
+            // already serving, mirroring host docstring policy.
+            if (this.pluginHost !== undefined) {
+                try {
+                    await this.pluginHost.readyAll();
+                } catch (readyErr: unknown) {
+                    logger.errorLogger(this.clientId, null, readyErr);
+                }
+            }
+        } catch (err) {
+            logger.errorLogger(this.clientId, null, err);
+        }
+    };
     
     public listen = async () => {
         this.client.on(Events.InteractionCreate, async (interaction) => {
@@ -586,7 +610,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             if (guildInfo && guildInfo.channels && guildInfo.channels.debug) {
                 const debug_ch = guildInfo.channels.debug;
                 if (debug_ch.isSendable()) {
-                    await debug_ch.send(`${guild.bot_name}重開機囉!`);
+                    const message =
+                        this.translator?.t('replies:base_bot.reboot_notice', { botName: guild.bot_name }) ?? '';
+                    if (message.length > 0) {
+                        await debug_ch.send(message);
+                    }
                 }
             }
         });
