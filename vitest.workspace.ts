@@ -37,6 +37,17 @@ export default defineWorkspace([
       include: ['test/integration/**/*.test.ts'],
       environment: 'node',
       globalSetup: ['./test/integration/setup.ts'],
+      // The integration project shares one mongodb-memory-server
+      // (started by globalSetup). Parallel test files race on the
+      // same database — `dropDatabase` collides with concurrent
+      // index builds on adjacent files. Single-fork keeps the suite
+      // under a few seconds while serialising file execution.
+      // **Contract**: every integration `it()` must wrap its body in
+      // `withFreshConnection` from `test/integration/helpers/mongo.ts`
+      // — that helper is what provides per-test isolation. State
+      // leaks silently between cases if you skip it.
+      pool: 'forks',
+      poolOptions: { forks: { singleFork: true } },
     },
     resolve: { alias: aliases },
   },

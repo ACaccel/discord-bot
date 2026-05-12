@@ -1,13 +1,18 @@
 /**
- * Per-guild MongoDB connection factory.
+ * @deprecated Thin compatibility shim over `infra/mongo/connection-manager`.
  *
- * Each guild runs against its own database (URI appended with the
- * guild id + `?authSource=admin`). `dbConnect` returns a typed
- * `Models` map built by `buildModels` so callers get
- * `Model<MessageDoc>` etc. instead of the old `Model<any>`.
+ * Legacy call sites use `db.dbConnect(uri, guildId)` and then read
+ * `bot.guildInfo[g].db.models["X"]`. The connection lifecycle now lives
+ * in {@link MongoConnectionManager}; this file preserves the legacy
+ * one-shot factory so those call sites keep compiling. New code MUST
+ * inject a `ConnectionManager` (or repository) instead of importing
+ * `db.dbConnect` directly.
+ *
+ * Removed in Phase 4b.
  */
-import mongoose, { type Connection } from 'mongoose';
-import { buildModels, type Models } from './models';
+import type { Connection } from 'mongoose';
+import { asGuildId, type GuildId } from '../core/ids';
+import { MongoConnectionManager, buildGuildMongoUri, type Models } from '../infra/mongo';
 
 export interface GuildDb {
   readonly connection: Connection;
@@ -15,32 +20,42 @@ export interface GuildDb {
 }
 
 /**
- * Build the per-guild MongoDB connection URI. Extracted so the URI
- * shape is testable in isolation and a malformed `guild_id` cannot
- * silently corrupt the URI via string concatenation.
+ * One {@link MongoConnectionManager} per distinct base URI.
+ *
+ * Lazy and keyed-by-URI so:
+ *   - importing `@db` does not require `MONGO_URI` at module-evaluation time;
+ *   - tests or hypothetical multi-cluster setups that pass two different
+ *     URIs get two managers (and thus two connection pools), instead of
+ *     silently reusing the first one — an honest, testable contract for
+ *     the deprecated shim while it lives through Phase 4b.
  */
-export const buildGuildMongoUri = (baseUri: string, guildId: string): string => {
-  if (guildId.length === 0) {
-    throw new TypeError('buildGuildMongoUri: guildId must be non-empty');
-  }
-  // Conservative validation — Discord snowflake ids are digit-only.
-  if (!/^\d+$/.test(guildId)) {
-    throw new TypeError(`buildGuildMongoUri: guildId must be all digits, got "${guildId}"`);
-  }
-  return `${baseUri}${guildId}?authSource=admin`;
+const managers = new Map<string, MongoConnectionManager>();
+
+const getManager = (mongoURI: string): MongoConnectionManager => {
+  const existing = managers.get(mongoURI);
+  if (existing !== undefined) return existing;
+  const created = new MongoConnectionManager(mongoURI);
+  managers.set(mongoURI, created);
+  return created;
 };
 
+/**
+ * Legacy connection factory. Equivalent to:
+ *   `containerForBot.resolve(TOKENS.ConnectionManager).getConnection(asGuildId(id))`
+ */
 export const dbConnect = async (mongoURI: string, guild_id: string): Promise<GuildDb> => {
-  const modifiedURI = buildGuildMongoUri(mongoURI, guild_id);
-  const connection = await mongoose.createConnection(modifiedURI).asPromise();
-  const models = buildModels(connection);
-  return { connection, models };
+  const guildId: GuildId = asGuildId(guild_id);
+  const m = getManager(mongoURI);
+  const guildConn = await m.getConnection(guildId);
+  return { connection: guildConn.connection, models: guildConn.models };
 };
 
 const db = { dbConnect };
 export default db;
 
-export { buildModels, type Models } from './models';
+export { buildGuildMongoUri };
+
+export type { Models } from '../infra/mongo';
 export type {
   FetchDoc,
   MessageDoc,
@@ -50,5 +65,6 @@ export type {
   ActivityDoc,
   UserApiSettingDoc,
   DocByName,
-} from './types';
-export { SCHEMAS, type SchemaName } from './schema';
+  SchemaName,
+} from '../persistence/schemas';
+export { SCHEMAS } from '../persistence/schemas';
