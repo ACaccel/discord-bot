@@ -7,10 +7,9 @@ IoC container, a plugin host, Repository-pattern persistence, an LLM
 provider Strategy, structured errors + Result types, full i18n
 routing, and a CJK-literal scanner in strict mode.
 
-For the **why** behind every choice, see the original plan at
-`.claude/plans/codebase-1-eventual-whale.md`. For the day-to-day
-architecture overview, see [`docs/architecture.md`](docs/architecture.md).
-For setup + contribution flow, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+For the day-to-day architecture overview, see
+[`docs/architecture.md`](docs/architecture.md). For setup +
+contribution flow, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Directory layout
 
@@ -168,18 +167,16 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full developer flow:
 quality gates, the rules a reviewer agent will enforce, and step-by-step
 recipes for adding a slash command or a plugin.
 
-## Plan + agent reviewers
+## Agent reviewers
 
-The original refactor plan and the per-phase reviewer-agent definitions
-live in `.claude/`:
+The per-phase reviewer-agent definitions live in `.claude/agents/`:
 
-- `.claude/plans/codebase-1-eventual-whale.md` — the long-form plan,
-  including every architectural decision and the §7A
-  reviewer-agent rationale.
-- `.claude/agents/*.md` — the six specialist reviewers
-  (`architecture-reviewer`, `type-system-reviewer`,
-  `reliability-reviewer`, `test-architect`,
-  `config-and-security-reviewer`, `i18n-discipline-reviewer`).
+- `.claude/agents/architecture-reviewer.md`
+- `.claude/agents/type-system-reviewer.md`
+- `.claude/agents/reliability-reviewer.md`
+- `.claude/agents/test-architect.md`
+- `.claude/agents/config-and-security-reviewer.md`
+- `.claude/agents/i18n-discipline-reviewer.md`
 
 Run the relevant agent in Consult / Review / Audit mode before
 committing changes that touch `src/`. PR template asks for each
