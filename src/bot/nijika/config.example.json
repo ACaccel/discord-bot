@@ -13,5 +13,11 @@
     "commands": [
         "help",
         "COMMAND_NAME"
-    ]
+    ],
+    "blocked_channels": [
+        "YOUR_BLOCKED_CHANNEL_ID"
+    ],
+    "level_roles": {
+        "1": "YOUR_LEVEL_1_ROLE_ID"
+    }
 }
