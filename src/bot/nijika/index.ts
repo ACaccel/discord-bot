@@ -56,15 +56,36 @@ r.get('/', (_, res) => {
 })
 
 r.post('/earthquake', (_, res) => {
-    logger.systemLogger(nijika.clientId, `地震強震警報!!!`);
-    Object.entries(nijika.guildInfo).forEach(async ([_, guild_info]) => {
-        if (!guild_info.channels?.earthquake || !guild_info.roles?.earthquake) return;
-        earthquake_warning(
-            guild_info.channels.earthquake,
-            guild_info.roles.earthquake.id,
-            nijika.translator,
-        );
-    });
+    logger.systemLogger(nijika.clientId, 'Earthquake alert webhook received; broadcasting.');
+    // Webhook responds 200 immediately; the per-guild broadcast runs
+    // detached. The detached promise must NOT use `forEach(async)` —
+    // that drops every per-guild rejection on the floor. Wrap in a
+    // single async IIFE so failures inside any guild's send funnel into
+    // the structured logger (with the guild id) instead of becoming
+    // unhandledRejection. The outer try/catch is defence-in-depth: the
+    // per-guild map already catches its own errors, but a future await
+    // added BEFORE the .map() would otherwise reopen the
+    // unhandledRejection hole this code closes.
+    void (async () => {
+        try {
+            await Promise.all(
+                Object.entries(nijika.guildInfo).map(async ([guild_id, guild_info]) => {
+                    try {
+                        if (!guild_info.channels?.earthquake || !guild_info.roles?.earthquake) return;
+                        await earthquake_warning(
+                            guild_info.channels.earthquake,
+                            guild_info.roles.earthquake.id,
+                            nijika.translator,
+                        );
+                    } catch (err) {
+                        logger.errorLogger(nijika.clientId, guild_id, err);
+                    }
+                }),
+            );
+        } catch (err) {
+            logger.errorLogger(nijika.clientId, null, err);
+        }
+    })();
     res.status(200).send('OK');
 })
 
