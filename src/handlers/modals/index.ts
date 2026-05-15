@@ -1,10 +1,10 @@
-import { 
+import {
     ModalSubmitInteraction,
-    MessageFlags,
 } from 'discord.js';
 import { BaseBot } from "@bot";
 import { logger } from "@utils";
 import { HandlerFactory } from "handlers";
+import { replyTranslated } from "../reply-translated";
 
 export abstract class ModalHandler {
     public abstract execute(interaction: ModalSubmitInteraction, bot: BaseBot): Promise<void>;
@@ -26,7 +26,7 @@ export const registerModals = async (bot: BaseBot) => {
 
 export const executeModal = async (interaction: ModalSubmitInteraction, bot: BaseBot) => {
     if (!bot.modalHandler) {
-        interaction.reply({ content: "Modal handler not found.", flags: MessageFlags.Ephemeral });
+        await replyTranslated(interaction, bot.translator, 'errors:command.handler_not_initialised');
         return;
     }
 

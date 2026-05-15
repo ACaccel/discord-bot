@@ -1,10 +1,10 @@
-import { 
+import {
     StringSelectMenuInteraction,
-    MessageFlags,
 } from 'discord.js';
 import { BaseBot } from "@bot";
 import { logger } from "@utils";
 import { HandlerFactory } from "handlers";
+import { replyTranslated } from "../reply-translated";
 
 //==================================================//
 // String Select Menu Custom ID: <ssm_type|ssm_value>
@@ -30,7 +30,7 @@ export const registerSSMs = async (bot: BaseBot) => {
 
 export const executeSSM = async (interaction: StringSelectMenuInteraction, bot: BaseBot) => {
     if (!bot.ssmHandler) {
-        interaction.reply({ content: "String select menu handler not found.", flags: MessageFlags.Ephemeral });
+        await replyTranslated(interaction, bot.translator, 'errors:command.handler_not_initialised');
         return;
     }
 

@@ -1,10 +1,10 @@
-import { 
+import {
     ButtonInteraction,
-    MessageFlags,
 } from 'discord.js';
 import { BaseBot } from "@bot";
 import { logger } from "@utils";
 import { HandlerFactory } from "handlers";
+import { replyTranslated } from "../reply-translated";
 
 //==================================================//
 // Button Custom ID: <button_type>|<button_value>
@@ -30,7 +30,7 @@ export const registerButtons = async (bot: BaseBot) => {
 
 export const executeButton = async (interaction: ButtonInteraction, bot: BaseBot) => {
     if (!bot.buttonHandler) {
-        interaction.reply({ content: "Button handler not found.", flags: MessageFlags.Ephemeral });
+        await replyTranslated(interaction, bot.translator, 'errors:command.handler_not_initialised');
         return;
     }
 
