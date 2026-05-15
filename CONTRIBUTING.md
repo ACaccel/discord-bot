@@ -43,21 +43,21 @@ yarn deploy -t nijika  # register slash commands with Discord
 
 All gates run in CI; please run them locally before opening a PR.
 
-| Command                   | What it checks                                                                                                         |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `yarn typecheck`          | Strict TypeScript (`tsconfig.strict.json`) — `any`, `as any`, un-narrowed `unknown`, etc. fail                         |
-| `yarn lint`               | ESLint on every strict-mode directory                                                                                  |
-| `yarn format:check`       | Prettier (use `yarn format` to fix)                                                                                    |
-| `yarn handlers:gen:check` | Codegen registries match the on-disk handler layout                                                                    |
-| `yarn test:unit`          | Unit tests (Vitest project `unit`)                                                                                     |
-| `yarn test:int`           | Integration tests with mongodb-memory-server                                                                           |
-| `yarn test:contract`      | LLM provider contract tests via nock                                                                                   |
-| `yarn test:i18n`          | Catalog parity + CJK-literal scanner                                                                                   |
-| `yarn test`               | All four test projects                                                                                                 |
-| `yarn security`           | `yarn npm audit` + `gitleaks detect`                                                                                   |
-| `yarn knip`               | Unused files / dependencies / unlisted imports (errors); unused exports / types (warns; tracked for A.1 / A.2 / A.5).  |
+| Command                   | What it checks                                                                                                                                                                                                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `yarn typecheck`          | Strict TypeScript (`tsconfig.strict.json`) — `any`, `as any`, un-narrowed `unknown`, etc. fail                                                                                                                                                                          |
+| `yarn lint`               | ESLint on every strict-mode directory                                                                                                                                                                                                                                   |
+| `yarn format:check`       | Prettier (use `yarn format` to fix)                                                                                                                                                                                                                                     |
+| `yarn handlers:gen:check` | Codegen registries match the on-disk handler layout                                                                                                                                                                                                                     |
+| `yarn test:unit`          | Unit tests (Vitest project `unit`)                                                                                                                                                                                                                                      |
+| `yarn test:int`           | Integration tests with mongodb-memory-server                                                                                                                                                                                                                            |
+| `yarn test:contract`      | LLM provider contract tests via nock                                                                                                                                                                                                                                    |
+| `yarn test:i18n`          | Catalog parity + CJK-literal scanner                                                                                                                                                                                                                                    |
+| `yarn test`               | All four test projects                                                                                                                                                                                                                                                  |
+| `yarn security`           | `yarn npm audit` + `gitleaks detect`                                                                                                                                                                                                                                    |
+| `yarn knip`               | Unused files / dependencies / unlisted imports (errors); unused exports / types (warns; tracked for A.1 / A.2 / A.5).                                                                                                                                                   |
 | `yarn typecheck:emit`     | `tsc -p tsconfig.build.json` — emit-mode compile of the whole `src/` tree; catches broken imports outside the strict-tsconfig include scope. NOT a deploy build (runtime is `ts-node` from source; dist retains path aliases and does not bundle config / locale JSON). |
-| `yarn smoke`              | Pre-deploy boundary probe: `.env` load + Mongo admin.ping + Discord login until `ready`. Manual; not in the CI matrix. |
+| `yarn smoke`              | Pre-deploy boundary probe: `.env` load + Mongo admin.ping + Discord login until `ready`. Manual; not in the CI matrix.                                                                                                                                                  |
 
 A handful of legacy directories (`src/handlers/`, `src/plugins/`,
 `src/bot/`) are not yet on the strict tsconfig — they still pass
