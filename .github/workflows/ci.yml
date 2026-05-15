@@ -99,6 +99,42 @@ jobs:
           echo "::error::Phase $phase requires at least one contract test suite, but vitest reported 0."
           exit 1
 
+  knip:
+    # Plan §5.5 / §5.8: detects unused exports / files / dependencies.
+    #
+    # Today's `knip.json` rules table errors on file / dep drift but
+    # downgrades the per-symbol checks (`exports`, `types`,
+    # `nsExports`, `nsTypes`, `enumMembers`, `classMembers`) to `warn`.
+    # The unused-export findings overlap exactly with audit items A.1
+    # (Result<T,E> orphan), A.2 (DomainError barely used), and A.5
+    # (`src/features/` residual). Each of those waves' DoD includes
+    # flipping the matching rule(s) to `error` in the SAME commit that
+    # closes the wave — see CONTRIBUTING.md "Quality gates" and
+    # `.claude/plans/codebase-1-eventual-whale.md` Wave 3 #12-14.
+    #
+    # If you find this comment six months from now and the rules still
+    # say `warn`, that is the signal that the audit waves never closed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - run: yarn knip
+
+  build:
+    # Plan §5.8: confirm dist-emit `tsc` actually compiles outside the
+    # strict-tsconfig include scope. `yarn typecheck` runs noEmit on
+    # the strict project; this job catches a broken `import` outside
+    # that scope before runtime. The artifact-presence guard catches
+    # an accidental `noEmit: true` re-set in tsconfig.build.json (the
+    # job would otherwise stay green even when nothing got emitted).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - run: yarn build
+      - name: Verify dist artifacts emitted
+        run: test -n "$(find dist -name '*.js' -print -quit)"
+
   security:
     runs-on: ubuntu-latest
     steps:

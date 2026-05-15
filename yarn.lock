@@ -139,7 +139,7 @@
   dependencies:
     discord-api-types "^0.38.33"
 
-"@discordjs/voice@>=0.16.0":
+"@discordjs/voice@>=0.16.0", "@discordjs/voice@^0.17.0":
   version "0.17.0"
   resolved "https://registry.yarnpkg.com/@discordjs/voice/-/voice-0.17.0.tgz#37be97c20dc4144c4c4d27d8ad02f29373da7ea6"
   integrity sha512-hArn9FF5ZYi1IkxdJEVnJi+OxlwLV0NJYWpKXsmNOojtGtAZHxmsELA+MZlu2KW1F/K1/nt7lFOfcMXNYweq9w==
