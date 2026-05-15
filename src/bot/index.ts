@@ -604,20 +604,30 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         }
     }
 
-    public rebootMessage = async () => {
-        Object.entries(this.guildInfo).forEach(async ([guild_id, guild]) => {
-            const guildInfo = this.guildInfo[guild_id];
-            if (guildInfo && guildInfo.channels && guildInfo.channels.debug) {
-                const debug_ch = guildInfo.channels.debug;
-                if (debug_ch.isSendable()) {
+    public rebootMessage = async (): Promise<void> => {
+        // Use awaited `Promise.all(map(async))` rather than
+        // `forEach(async)` so the outer caller (handleClientReady)
+        // genuinely waits for every send before continuing into
+        // `pluginHost.readyAll`. Each per-guild send is wrapped in
+        // `try/catch` so one failure cannot abort the whole fan-out;
+        // failures are surfaced through the structured logger WITH
+        // the guild id, so ops can attribute a failed send. No retry
+        // here — the next boot re-enters this path; queuing retries
+        // would only delay readyAll behind a flaky guild's channel.
+        await Promise.all(
+            Object.values(this.guildInfo).map(async (guild) => {
+                try {
+                    const debug_ch = guild.channels?.debug;
+                    if (!debug_ch?.isSendable()) return;
                     const message =
                         this.translator?.t('replies:base_bot.reboot_notice', { botName: guild.bot_name }) ?? '';
-                    if (message.length > 0) {
-                        await debug_ch.send(message);
-                    }
+                    if (message.length === 0) return;
+                    await debug_ch.send(message);
+                } catch (err) {
+                    logger.errorLogger(this.clientId, guild.guild.id, err);
                 }
-            }
-        });
+            }),
+        );
     }
 
     /********** Event Listeners **********/
