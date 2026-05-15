@@ -139,6 +139,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/yarn-install
+      - name: Bootstrap per-bot config.json from config.example.json
+        # Each `src/bot/<name>/config.json` is gitignored (contains
+        # operator secrets — guild IDs, channel IDs, admin user id).
+        # `tsc` cannot resolve the `import config from './config.json'`
+        # without a file present, so seed each bot from its committed
+        # example. The values are placeholder; only the JSON shape
+        # matters for type resolution.
+        run: |
+          for bot in nijika konata tomori msg-archive; do
+            cp "src/bot/${bot}/config.example.json" "src/bot/${bot}/config.json"
+          done
       - run: yarn typecheck:emit
 
   security:
