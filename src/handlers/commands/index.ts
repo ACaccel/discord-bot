@@ -1,4 +1,4 @@
-import { 
+import {
     ApplicationCommandDataResolvable,
     ChatInputCommandInteraction,
     ContextMenuCommandInteraction,
@@ -6,11 +6,11 @@ import {
     REST,
     Routes,
     RateLimitData,
-    MessageFlags,
 } from 'discord.js';
 import { BaseBot } from "@bot";
 import { logger, bot_cmd } from "@utils";
 import { HandlerFactory } from "handlers";
+import { replyTranslated } from "../reply-translated";
 
 export interface CommandConfig {
     name: string;   // command name for handler lookup and display
@@ -118,11 +118,11 @@ export const registerCommands = async (bot: BaseBot) => {
 
 export const executeCommand = async (interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot, blocked_channels?: string[]) => {
     if (!bot.config.commands) {
-        interaction.reply({ content: "Config of commands not found.", flags: MessageFlags.Ephemeral });
+        await replyTranslated(interaction, bot.translator, 'errors:command.config_missing');
         return;
     }
     if (!bot.commandHandlers) {
-        interaction.reply({ content: "Command handler not found.", flags: MessageFlags.Ephemeral });
+        await replyTranslated(interaction, bot.translator, 'errors:command.handler_not_initialised');
         return;
     }
 
@@ -130,7 +130,7 @@ export const executeCommand = async (interaction: ChatInputCommandInteraction | 
     if (handler) {
         await handler.execute(interaction, bot);
     } else {
-        interaction.reply({ content: "Command not found.", flags: MessageFlags.Ephemeral });
+        await replyTranslated(interaction, bot.translator, 'errors:command.not_found', { name: interaction.commandName });
     }
     
     const parentId = interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null;

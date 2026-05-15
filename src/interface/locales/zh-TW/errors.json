@@ -8,7 +8,9 @@
     "channel_not_sendable": "頻道不存在或無法傳送訊息",
     "user_not_found": "找不到使用者",
     "bot_not_found": "找不到機器人",
-    "unsupported_interaction_type": "目前尚不支援此類型的指令"
+    "unsupported_interaction_type": "目前尚不支援此類型的指令",
+    "config_missing": "指令清單尚未設定,請聯絡管理員。",
+    "handler_not_initialised": "指令派發器尚未就緒,請稍後再試。"
   },
   "validation": {
     "field_required": "參數「{{field}}」不可為空,請重新輸入。",
