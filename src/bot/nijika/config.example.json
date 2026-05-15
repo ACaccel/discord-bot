@@ -18,6 +18,6 @@
         "YOUR_BLOCKED_CHANNEL_ID"
     ],
     "level_roles": {
-        "1": "YOUR_LEVEL_1_ROLE_ID"
+        "level_1": "YOUR_LEVEL_1_ROLE_NAME"
     }
 }
