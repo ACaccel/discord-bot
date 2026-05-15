@@ -56,7 +56,7 @@ All gates run in CI; please run them locally before opening a PR.
 | `yarn test`               | All four test projects                                                                                                 |
 | `yarn security`           | `yarn npm audit` + `gitleaks detect`                                                                                   |
 | `yarn knip`               | Unused files / dependencies / unlisted imports (errors); unused exports / types (warns; tracked for A.1 / A.2 / A.5).  |
-| `yarn build`              | `tsc -p tsconfig.build.json` — confirms dist-emit compiles cleanly outside the strict-tsconfig include scope.          |
+| `yarn typecheck:emit`     | `tsc -p tsconfig.build.json` — emit-mode compile of the whole `src/` tree; catches broken imports outside the strict-tsconfig include scope. NOT a deploy build (runtime is `ts-node` from source; dist retains path aliases and does not bundle config / locale JSON). |
 | `yarn smoke`              | Pre-deploy boundary probe: `.env` load + Mongo admin.ping + Discord login until `ready`. Manual; not in the CI matrix. |
 
 A handful of legacy directories (`src/handlers/`, `src/plugins/`,

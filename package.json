@@ -28,7 +28,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "smoke": "ts-node scripts/smoke.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "typecheck:emit": "tsc -p tsconfig.build.json",
     "knip": "knip",
     "handlers:gen": "ts-node scripts/gen-registry.ts",
     "handlers:gen:check": "ts-node scripts/gen-registry.ts --check",

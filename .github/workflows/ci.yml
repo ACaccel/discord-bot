@@ -120,20 +120,26 @@ jobs:
       - uses: ./.github/actions/yarn-install
       - run: yarn knip
 
-  build:
-    # Plan §5.8: confirm dist-emit `tsc` actually compiles outside the
-    # strict-tsconfig include scope. `yarn typecheck` runs noEmit on
-    # the strict project; this job catches a broken `import` outside
-    # that scope before runtime. The artifact-presence guard catches
-    # an accidental `noEmit: true` re-set in tsconfig.build.json (the
-    # job would otherwise stay green even when nothing got emitted).
+  typecheck-emit:
+    # Plan §5.8: confirm `tsc -p tsconfig.build.json` actually
+    # compiles outside the strict-tsconfig include scope. `yarn
+    # typecheck` runs noEmit on the strict project; this job runs the
+    # whole src/ tree through emit-mode tsc so a broken `import`
+    # outside the strict scope is caught at PR time, not runtime.
+    #
+    # NOTE: this is NOT a deploy build. Runtime is `ts-node` from
+    # source (see `yarn nijika` etc. in package.json). The emitted
+    # `dist/` retains TS path aliases (`require("@utils")`) and does
+    # not bundle non-TS assets (config.json / locale JSON), so
+    # invoking `node dist/...` would fail. The artifact-presence
+    # check that used to live here was misleading and was removed
+    # — the only signal this job carries is whether tsc emits
+    # cleanly.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/yarn-install
-      - run: yarn build
-      - name: Verify dist artifacts emitted
-        run: test -n "$(find dist -name '*.js' -print -quit)"
+      - run: yarn typecheck:emit
 
   security:
     runs-on: ubuntu-latest
