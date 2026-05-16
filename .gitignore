@@ -18,3 +18,5 @@ avatar_url_list.txt
 remove_list.txt
 snippet.ts
 debug.sh
+/coverage
+

@@ -83,6 +83,16 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public clientId: string;
     public config: TConfig;
     public guildInfo: Record<string, GuildInfo>;
+    /**
+     * Guilds for which `connectOneGuild` failed during the startup
+     * fan-out (audit 3.7). Operators read this through `bot.health()`
+     * style introspection; handlers consult it via the
+     * `requireGuildRepos` helper (audit 3.8) to distinguish "this
+     * guild's DB never came up" from the generic "repos slot empty"
+     * case. The map clears for a given guild when a subsequent
+     * `connectOneGuild` succeeds (new-guild-join path).
+     */
+    public disabledGuilds: Map<string, Error> = new Map();
 
     public commandHandlers: Map<string, Command>;
     public buttonHandler: Map<string, ButtonHandler>;
@@ -263,6 +273,10 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         const guildConn = await cm.getConnection(branded);
         slot.db = { connection: guildConn.connection, models: guildConn.models };
         slot.repos = repos;
+        // Successful (re-)connect clears any prior disabled-marker so a
+        // recovered guild stops returning `errors:db.guild_disabled`
+        // on the next handler invocation. See audit 3.7.
+        this.disabledGuilds.delete(guildId);
     }
 
     public run = async (callback?: () => Promise<void>) => {
@@ -611,7 +625,23 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                     await this.connectOneGuild(guild_id);
                     logger.systemLogger(this.clientId, `MongoDB for guild: ${guild_id} - ${guild.guild.name} connected.`);
                 } catch (err) {
-                    logger.systemLogger(this.clientId, `Failed to connect to MongoDB for guild ${guild_id}: ${err}`);
+                    // Audit 3.7: distinguish "this guild's DB never came
+                    // up at boot" from the generic missing-repos case.
+                    // Recording the error lets `requireGuildRepos` (audit
+                    // 3.8) surface `errors:db.guild_disabled` so ops can
+                    // identify the broken guild instead of seeing a
+                    // generic not_found across every command. The error
+                    // is normalised to `Error` so callers can rely on
+                    // `.message` / `.stack` without instance gymnastics.
+                    const normalised =
+                        err instanceof Error
+                            ? err
+                            : new Error(typeof err === 'string' ? err : 'connectOneGuild failed');
+                    this.disabledGuilds.set(guild_id, normalised);
+                    logger.systemLogger(
+                        this.clientId,
+                        `Failed to connect to MongoDB for guild ${guild_id}: ${normalised.message}`,
+                    );
                 }
             }));
         } catch (err) {

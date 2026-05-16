@@ -4,6 +4,7 @@ import {
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { logger } from '@utils';
+import { requireGuildRepos } from '../../require-guild-repos';
 
 export default class add_reply extends Command {
     constructor() {
@@ -36,11 +37,8 @@ export default class add_reply extends Command {
             const input = interaction.options.get("keyword")?.value as string;
             const reply = interaction.options.get("reply")?.value as string;
 
-            const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
-            if (!repos) {
-                await interaction.editReply({ content: bot.translator?.t('errors:db.not_found') ?? '' });
-                return;
-            }
+            const repos = await requireGuildRepos(bot, interaction);
+            if (repos === null) return;
             const existPair = await repos.reply.findExactPair(input, reply);
 
             if (existPair.length === 0) {

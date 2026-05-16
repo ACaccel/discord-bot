@@ -3,6 +3,7 @@ import { BaseBot } from '@bot';
 import { ModalHandler } from '@modal';
 import { logger } from '@utils';
 import { LLMProviderName } from '@llm_chat';
+import { requireGuildRepos } from '../../require-guild-repos';
 
 const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set(['xai', 'openai', 'anthropic', 'gemini']);
 
@@ -16,18 +17,9 @@ export default class ai_settings_modal extends ModalHandler {
         }
         const provider = providerRaw as LLMProviderName;
 
-        const guildId = interaction.guildId;
-        if (!guildId) {
-            await interaction.reply({ content: bot.translator?.t('errors:command.guild_only') ?? '', flags: MessageFlags.Ephemeral });
-            return;
-        }
-
         const userId = interaction.user.id;
-        const repos = bot.guildInfo[guildId]?.repos;
-        if (!repos) {
-            await interaction.reply({ content: bot.translator?.t('errors:db.connection_failed') ?? '', flags: MessageFlags.Ephemeral });
-            return;
-        }
+        const repos = await requireGuildRepos(bot, interaction);
+        if (repos === null) return;
 
         // Read fields. Select menus return readonly string[].
         const modelValues = interaction.fields.getStringSelectValues('model');
@@ -65,7 +57,7 @@ export default class ai_settings_modal extends ModalHandler {
                 system_prompt: systemPrompt,
             });
         } catch (err) {
-            logger.errorLogger(bot.clientId, guildId, err);
+            logger.errorLogger(bot.clientId, interaction.guildId, err);
             await interaction.reply({ content: bot.translator?.t('errors:db.operation_failed') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }

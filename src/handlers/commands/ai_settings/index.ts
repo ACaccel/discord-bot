@@ -12,6 +12,7 @@ import { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { logger } from '@utils';
 import { LLMProviderName, listProviderModels } from '@llm_chat';
+import { requireGuildRepos } from '../../require-guild-repos';
 
 interface UserApiDoc {
     provider: string;
@@ -52,23 +53,14 @@ export default class ai_settings extends Command {
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         const provider = interaction.options.getString('provider', true) as LLMProviderName;
         const userId = interaction.user.id;
-        const guildId = interaction.guildId;
-        if (!guildId) {
-            await interaction.reply({ content: bot.translator?.t('errors:command.guild_only') ?? '', flags: MessageFlags.Ephemeral });
-            return;
-        }
-
-        const repos = bot.guildInfo[guildId]?.repos;
-        if (!repos) {
-            await interaction.reply({ content: bot.translator?.t('errors:db.connection_failed') ?? '', flags: MessageFlags.Ephemeral });
-            return;
-        }
+        const repos = await requireGuildRepos(bot, interaction);
+        if (repos === null) return;
 
         let doc: UserApiDoc | undefined;
         try {
             doc = (await repos.userApiSetting.findByUserId(userId)) as UserApiDoc | undefined;
         } catch (err) {
-            logger.errorLogger(bot.clientId, guildId, err);
+            logger.errorLogger(bot.clientId, interaction.guildId, err);
             await interaction.reply({ content: bot.translator?.t('errors:db.operation_failed') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }

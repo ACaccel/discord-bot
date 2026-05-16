@@ -2,6 +2,7 @@ import { ChatInputCommandInteraction, MessageFlags } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { logger } from '@utils';
+import { requireGuildRepos } from '../../require-guild-repos';
 
 export default class ai_whitelist_list extends Command {
     constructor() {
@@ -15,17 +16,8 @@ export default class ai_whitelist_list extends Command {
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        const guildId = interaction.guildId;
-        if (!guildId) {
-            await interaction.editReply({ content: bot.translator?.t('errors:command.guild_only') ?? '' });
-            return;
-        }
-
-        const repos = bot.guildInfo[guildId]?.repos;
-        if (!repos) {
-            await interaction.editReply({ content: bot.translator?.t('errors:db.connection_failed') ?? '' });
-            return;
-        }
+        const repos = await requireGuildRepos(bot, interaction);
+        if (repos === null) return;
 
         try {
             const docs = await repos.userApiSetting.listAll();
@@ -57,7 +49,7 @@ export default class ai_whitelist_list extends Command {
                 await interaction.followUp({ content: pages[i]!, flags: MessageFlags.Ephemeral });
             }
         } catch (err) {
-            logger.errorLogger(bot.clientId, guildId, err);
+            logger.errorLogger(bot.clientId, interaction.guildId, err);
             await interaction.editReply({ content: bot.translator?.t('errors:db.operation_failed') ?? '' });
         }
     }
