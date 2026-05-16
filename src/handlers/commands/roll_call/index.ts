@@ -52,13 +52,13 @@ export default class roll_call extends Command {
                     return;
                 }
 
-                const db = bot.guildInfo[guild.id].db;
-                if (!db) {
+                const repos = bot.guildInfo[guild.id]?.repos;
+                if (!repos) {
                     await interaction.reply({ content: bot.translator?.t('errors:db.not_found') ?? '', flags: MessageFlags.Ephemeral });
                     return;
                 }
 
-                const activity = await db.models["Activity"].findOne({ activity_id });
+                const activity = await repos.activity.findByActivityId(activity_id);
                 if (!activity) {
                     await interaction.reply({ content: bot.translator?.t('replies:roll_call.activity_not_found', { id: activity_id }) ?? '', flags: MessageFlags.Ephemeral });
                     return;
@@ -77,7 +77,7 @@ export default class roll_call extends Command {
                     return;
                 }
 
-                await db.models["Activity"].deleteOne({ activity_id });
+                await repos.activity.deleteByActivityId(activity_id);
             } else if (users) {
                 if (!users.match(/^<@\d+>(\s*<@\d+>)*$/)) {
                     await interaction.reply({ content: bot.translator?.t('replies:roll_call.format_error') ?? '', flags: MessageFlags.Ephemeral });

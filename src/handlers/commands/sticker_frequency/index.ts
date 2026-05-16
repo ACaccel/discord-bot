@@ -55,8 +55,8 @@ export default class sticker_frequency extends Command {
                 await interaction.editReply({ content: bot.translator?.t('errors:command.guild_not_found') ?? '' });
                 return;
             }
-            const db = bot.guildInfo[guild.id].db;
-            if (!db) {
+            const repos = bot.guildInfo[guild.id]?.repos;
+            if (!repos) {
                 await interaction.editReply({ content: bot.translator?.t('errors:db.not_configured') ?? '' });
                 return;
             }
@@ -80,22 +80,19 @@ export default class sticker_frequency extends Command {
                 const monthEnd = new Date();
                 monthEnd.setMonth(monthEnd.getMonth() - monthOffset);
                 
-                const messages = await db.models['Message'].find({
-                $expr: {
-                    $and: [
-                    { $gte: [{ $toLong: "$timestamp" }, monthStart.getTime()] },
-                    { $lt: [{ $toLong: "$timestamp" }, monthEnd.getTime()] }
-                    ]
-                }
-                });
-                
+                const messages = await repos.message.findByTimestampRange(
+                    monthStart.getTime(),
+                    monthEnd.getTime(),
+                );
+
                 messages.forEach((message) => {
-                const stickers: any[] = message.stickers || [];
-                stickers.forEach((sticker) => {
-                    if (stickerMap.has(sticker.name)) {
-                    stickerMap.set(sticker.name, (stickerMap.get(sticker.name) || 0) + 1);
-                    }
-                });
+                    const stickers = message.stickers ?? [];
+                    stickers.forEach((sticker) => {
+                        const name = sticker.name;
+                        if (typeof name === 'string' && stickerMap.has(name)) {
+                            stickerMap.set(name, (stickerMap.get(name) ?? 0) + 1);
+                        }
+                    });
                 });
                 
                 // update progress

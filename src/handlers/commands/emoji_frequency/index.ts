@@ -67,8 +67,8 @@ export default class emoji_frequency extends Command {
                 await interaction.editReply({ content: bot.translator?.t('errors:command.guild_not_found') ?? '' });
                 return;
             }
-            const db = bot.guildInfo[guild.id].db;
-            if (!db) {
+            const repos = bot.guildInfo[guild.id]?.repos;
+            if (!repos) {
                 await interaction.editReply({ content: bot.translator?.t('errors:db.not_configured') ?? '' });
                 return;
             }
@@ -97,14 +97,10 @@ export default class emoji_frequency extends Command {
                 const monthEnd = new Date();
                 monthEnd.setMonth(monthEnd.getMonth() - monthOffset);
                 
-                const messages = await db.models['Message'].find({
-                $expr: {
-                    $and: [
-                    { $gte: [{ $toLong: "$timestamp" }, monthStart.getTime()] },
-                    { $lt: [{ $toLong: "$timestamp" }, monthEnd.getTime()] }
-                    ]
-                }
-                });
+                const messages = await repos.message.findByTimestampRange(
+                    monthStart.getTime(),
+                    monthEnd.getTime(),
+                );
                 
                 messages.forEach((message) => {
                 // `content` is `required: false` on the schema → optional at the

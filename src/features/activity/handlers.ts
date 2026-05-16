@@ -39,8 +39,8 @@ export const handleActivityCreate = async (
             return;
         }
 
-        const db = bot.guildInfo[guild.id].db;
-        if (!db) {
+        const repos = bot.guildInfo[guild.id]?.repos;
+        if (!repos) {
             await interaction.editReply({ content: "找不到資料庫" });
             return;
         }
@@ -71,16 +71,15 @@ export const handleActivityCreate = async (
         }
 
         // save activity to database
-        const newActivity = new db.models["Activity"]({
-            activity_id: activity_id,
-            message_id: message_id,
-            title: title,
+        await repos.activity.create({
+            activity_id,
+            message_id,
+            title,
             description: description || "",
             expired_at: end_time,
             channel_id: channel.id,
             participants: [],
         });
-        await newActivity.save();
 
         // schedule job to close activity
         if (await findActivity(bot, guild.id, activity_id)) {

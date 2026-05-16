@@ -157,8 +157,8 @@ export default class db_list_message extends Command {
                 return;
             }
 
-            const db = bot.guildInfo[guild.id].db;
-            if (!db) {
+            const repos = bot.guildInfo[guild.id]?.repos;
+            if (!repos) {
                 await interaction.editReply({ content: bot.translator?.t('errors:db.not_found') ?? '' });
                 return;
             }
@@ -191,18 +191,11 @@ export default class db_list_message extends Command {
 
             const { startMs, endMs } = range;
 
-            const messages = (await db.models["Message"]
-                .find({
-                    channelId: channel.id,
-                    $expr: {
-                        $and: [
-                            { $gte: [{ $toLong: "$timestamp" }, startMs] },
-                            { $lt: [{ $toLong: "$timestamp" }, endMs] },
-                        ],
-                    },
-                })
-                .sort({ timestamp: 1 })
-                .lean()) as unknown as DbMessage[];
+            const messages = (await repos.message.findByChannelAndTimestampRange(
+                channel.id as import('../../../core/ids').ChannelId,
+                startMs,
+                endMs,
+            )) as unknown as DbMessage[];
 
             if (messages.length === 0) {
                 const scopeText = hour === null || hour === undefined
