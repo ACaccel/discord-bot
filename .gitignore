@@ -1,4 +1,5 @@
 /node_modules
+/dist
 /logs
 /errors
 /data
@@ -8,6 +9,7 @@
 # `.claude/agents/` IS tracked — those are shared dev tooling.
 .claude/settings.json
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 .env
 config.json
