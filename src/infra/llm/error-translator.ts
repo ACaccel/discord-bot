@@ -157,20 +157,39 @@ export const translateProviderError = (
 const messageKeyFor = (code: LlmProviderErrorCode): string => {
   switch (code) {
     case 'LLM_RATE_LIMITED':
-      return 'errors.llm.rate_limited';
+      return 'errors:llm.rate_limited';
     case 'LLM_INVALID_API_KEY':
-      return 'errors.llm.invalid_api_key';
+      return 'errors:llm.invalid_api_key';
     case 'LLM_CONTEXT_TOO_LONG':
-      return 'errors.llm.context_too_long';
+      return 'errors:llm.context_too_long';
     case 'LLM_UPSTREAM_5XX':
-      return 'errors.llm.upstream_failure';
+      return 'errors:llm.upstream_failure';
     case 'LLM_TIMEOUT':
-      return 'errors.llm.timeout';
+      return 'errors:llm.timeout';
     case 'LLM_UNKNOWN':
     default:
-      return 'errors.llm.unknown';
+      return 'errors:llm.unknown';
   }
 };
+
+/**
+ * Construct a typed {@link LlmProviderError} for the "provider returned
+ * an HTTP-200 but empty content" boundary failure. The SDK did not
+ * throw — it returned a structurally invalid payload — so the generic
+ * translator above does not apply. Surfaces as `LLM_UNKNOWN` so the
+ * user message is the safe generic fallback; ops sees the typed kind
+ * plus the operation string in the log.
+ */
+export const emptyResponseError = (
+  provider: LLMProviderName,
+  operation: string,
+): LlmProviderError<{ provider: string; status: string }> =>
+  new LlmProviderError({
+    code: 'LLM_UNKNOWN',
+    messageKey: 'errors:llm.unknown',
+    messageParams: { provider, status: 'empty_response' },
+    context: { operation, input: { provider } },
+  });
 
 /** Test-only re-export so contract tests can introspect the classifier. */
 export const __test = { normalise, codeFor, isContextLengthError };

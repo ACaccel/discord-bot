@@ -8,7 +8,7 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 
-import { translateProviderError } from './error-translator';
+import { emptyResponseError, translateProviderError } from './error-translator';
 import type { LLMMessage, LLMProvider, LLMResult, LLMSettings } from './types';
 
 const OPERATION = 'AnthropicProvider.chat';
@@ -47,7 +47,7 @@ export class AnthropicProvider implements LLMProvider {
         .map((block) => block.text)
         .join('');
       if (text.length === 0) {
-        throw new Error('AnthropicProvider.chat: empty text response from Anthropic API');
+        throw emptyResponseError('anthropic', OPERATION);
       }
       const u = response.usage;
       return {

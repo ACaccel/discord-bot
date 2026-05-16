@@ -8,6 +8,7 @@ import type {
 import { DiscordAPIError, MessageFlags } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { logger } from '@utils';
+import { ops } from '../core/logger';
 import type { Repos } from '../persistence/repositories';
 
 /**
@@ -54,10 +55,7 @@ const replyOrEdit = async (
             // nothing else we can tell the user, and re-throwing would
             // just walk into the dispatcher's catch and try the same
             // reply again. The structured log preserves the trail.
-            logger.systemLogger(
-                bot.clientId,
-                `requireGuildRepos: discord reply skipped (expired interaction, code=${err.code}).`,
-            );
+            logger.systemLogger(bot.clientId, ops.router.replySkipped(err.code));
             return;
         }
         throw err;

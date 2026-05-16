@@ -6,3 +6,4 @@ export {
   type InstallProcessHandlersInput,
 } from './process-handlers';
 export { createLoggerFromProcessEnv } from './from-process-env';
+export { ops } from './messages';

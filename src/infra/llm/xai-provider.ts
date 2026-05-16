@@ -14,7 +14,7 @@
  */
 import OpenAI from 'openai';
 
-import { translateProviderError } from './error-translator';
+import { emptyResponseError, translateProviderError } from './error-translator';
 import type { LLMMessage, LLMProvider, LLMResult, LLMSettings } from './types';
 
 const OPERATION = 'XAIProvider.chat';
@@ -56,7 +56,7 @@ export class XAIProvider implements LLMProvider {
     });
     const content = response.choices[0]?.message?.content;
     if (content === null || content === undefined || content.length === 0) {
-      throw new Error('XAIProvider.chat: empty response from xAI Chat Completions API');
+      throw emptyResponseError('xai', `${OPERATION}.chat_completions`);
     }
     const u = response.usage;
     return {
@@ -89,7 +89,7 @@ export class XAIProvider implements LLMProvider {
     });
     const content = response.output_text;
     if (content === null || content === undefined || content.length === 0) {
-      throw new Error('XAIProvider.chat: empty response from xAI Responses API');
+      throw emptyResponseError('xai', `${OPERATION}.responses`);
     }
     const u = response.usage;
     return {

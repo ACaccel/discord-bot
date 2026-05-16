@@ -9,6 +9,7 @@ import {
 } from 'discord.js';
 import { BaseBot } from "@bot";
 import { logger, bot_cmd } from "@utils";
+import { ops } from "../../core/logger";
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
 
@@ -60,7 +61,7 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
     const rest_commands: ApplicationCommandDataResolvable[] = Array.from(commandHandlers.values())
         .filter((cmd: Command) => {
             if (!cmd.config) {
-                logger.errorLogger(bot.clientId, null, `Command ${cmd} has no config.`);
+                logger.errorLogger(bot.clientId, null, ops.command.handlerMissingConfig(String(cmd)));
                 return false;
             }
             return true;
@@ -70,7 +71,7 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
 }
 
 export const registerCommands = async (bot: BaseBot) => {
-    logger.systemLogger(bot.clientId, "Registering commands...");
+    logger.systemLogger(bot.clientId, ops.command.registerStart());
 
     // const rest = new REST({ version: "10" }).setToken(bot.getToken());
     // rest.on('rateLimited', (info: RateLimitData) => {
@@ -82,7 +83,7 @@ export const registerCommands = async (bot: BaseBot) => {
 
     try {
         if (!bot.config.commands) {
-            logger.systemLogger(bot.clientId, "No commands to register.");
+            logger.systemLogger(bot.clientId, ops.command.registerEmpty());
             return;
         }
 
@@ -110,13 +111,22 @@ export const registerCommands = async (bot: BaseBot) => {
         //     await new Promise(resolve => setTimeout(resolve, 60000)); // to avoid rate limit
         // }
 
-        logger.systemLogger(bot.clientId, `Successfully register ${bot.commandHandlers.size} application (/) commands.`)
+        logger.systemLogger(bot.clientId, ops.command.registerSuccess(bot.commandHandlers.size));
     } catch (err) {
-        logger.systemLogger(bot.clientId, `Failed to register commands: ${err}`);
+        logger.systemLogger(bot.clientId, ops.command.registerFailed(String(err)));
     }
 }
 
-export const executeCommand = async (interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot, blocked_channels?: string[]) => {
+/**
+ * Dispatch a slash-command / context-menu interaction to its handler.
+ *
+ * Channel + guild logging used to live here (with a `blocked_channels`
+ * 3rd arg threaded in from `nijika`); audit B-2 lifted that into
+ * `createChannelLoggingMiddleware` so policy lives at the composition
+ * root rather than buried in this dispatcher. The function is now
+ * purely concerned with handler lookup.
+ */
+export const executeCommand = async (interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot) => {
     if (!bot.config.commands) {
         await replyTranslated(interaction, bot.translator, 'errors:command.config_missing');
         return;
@@ -131,16 +141,6 @@ export const executeCommand = async (interaction: ChatInputCommandInteraction | 
         await handler.execute(interaction, bot);
     } else {
         await replyTranslated(interaction, bot.translator, 'errors:command.not_found', { name: interaction.commandName });
-    }
-    
-    const parentId = interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null;
-    if (!(blocked_channels && (blocked_channels.includes(interaction.channelId) || (parentId && blocked_channels.includes(parentId))))) {
-        const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channelId}>`;
-        logger.channelLogger(bot.guildInfo[interaction.guildId as string]?.channels?.debug, undefined, channel_log);
-    }
-    if (interaction.guild) {
-        const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
-        logger.guildLogger(bot.clientId, interaction.guild.id, 'interaction_create', guild_log, interaction.guild?.name as string);
     }
 }
 

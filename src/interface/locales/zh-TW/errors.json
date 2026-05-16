@@ -33,7 +33,7 @@
     "guild_disabled": "本伺服器的資料庫於啟動時連線失敗,指令暫時無法使用,請聯絡管理員。錯誤編號:{{traceId}}"
   },
   "llm": {
-    "rate_limited": "AI 服務目前忙線中(限流),請於 {{retryAfter}} 秒後再試。",
+    "rate_limited": "AI 服務 `{{provider}}` 目前忙線中(限流),請稍後再試。",
     "invalid_api_key": "Provider `{{provider}}` 的 API 金鑰未設定或無效,請於 .env 設定後重試。",
     "context_too_long": "對話內容超過 `{{provider}}` 模型的上下文長度限制,請縮短輸入或重新開始對話。",
     "upstream_failure": "AI 服務 `{{provider}}` 暫時無法存取(狀態 {{status}}),請稍後再試。",

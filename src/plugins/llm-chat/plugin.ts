@@ -19,12 +19,12 @@
  */
 import type { Message } from 'discord.js';
 
+import type { LlmProviderError } from '../../core/errors';
 import type { Translator } from '../../core/i18n';
 import { TOKENS } from '../../core/ioc';
 import type { Plugin } from '../../core/plugin';
 import {
   LLMService,
-  MissingApiKeyError,
   SessionManager,
   createDefaultRegistry,
   formatUsageFooter,
@@ -110,21 +110,29 @@ const deliverChunked = async (
   return sent;
 };
 
+/**
+ * Render an LLM failure into a Discord reply. The error has already been
+ * translated into a typed {@link LlmProviderError} by `LLMService.chat`,
+ * so this handler does not need to discriminate on instance kinds — it
+ * reads `messageKey` + `messageParams` directly. The legacy log line
+ * keeps the err object intact so pino's serialiser captures the cause
+ * chain.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyLlmProviderError = LlmProviderError<any>;
+
 const handleChatError = async (
-  err: unknown,
+  llmErr: AnyLlmProviderError,
   clientId: string,
   guildId: string | null,
   placeholder: Message,
   translator: Translator,
 ): Promise<void> => {
-  legacyLogger.errorLogger(clientId, guildId, err);
-  const content =
-    err instanceof MissingApiKeyError
-      ? translator.t('replies:llm_chat.missing_api_key', {
-          provider: err.provider,
-          envVar: err.envVar,
-        })
-      : translator.t('replies:llm_chat.api_error');
+  legacyLogger.errorLogger(clientId, guildId, llmErr);
+  const content = translator.t(
+    llmErr.messageKey,
+    llmErr.messageParams as Record<string, string | number> | undefined,
+  );
   try {
     await placeholder.edit({ content, allowedMentions: NO_MENTIONS });
   } catch {
@@ -230,13 +238,12 @@ const handleNewSession = async (
   const userMsg: LLMMessage = { role: 'user', content: userText };
   const placeholder = await sendPlaceholder(message, translator);
 
-  let result: LLMResult;
-  try {
-    result = await llmService.chat([userMsg], settings);
-  } catch (err) {
-    await handleChatError(err, clientId, message.guildId, placeholder, translator);
+  const chatResult = await llmService.chat([userMsg], settings);
+  if (!chatResult.ok) {
+    await handleChatError(chatResult.error, clientId, message.guildId, placeholder, translator);
     return;
   }
+  const result: LLMResult = chatResult.value;
 
   // Create the session before the user can send a follow-up so
   // back-to-back messages do not race the session table.
@@ -277,13 +284,12 @@ const handleContinueSession = async (
   const history = [...session.history, userMsg];
   const placeholder = await sendPlaceholder(message, translator);
 
-  let result: LLMResult;
-  try {
-    result = await llmService.chat(history, settings);
-  } catch (err) {
-    await handleChatError(err, clientId, message.guildId, placeholder, translator);
+  const chatResult = await llmService.chat(history, settings);
+  if (!chatResult.ok) {
+    await handleChatError(chatResult.error, clientId, message.guildId, placeholder, translator);
     return;
   }
+  const result: LLMResult = chatResult.value;
 
   const finalText = appendUsageFooter(result, settings.model);
   const botMsgs = await deliverChunked(message, placeholder, finalText);

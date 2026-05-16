@@ -1,3 +1,25 @@
+/**
+ * Slash-command deploy CLI.
+ *
+ * Audit B-5 (3.11) flipped the default registration scope from
+ * guild-side to **global**: a single `rest.put(Routes.applicationCommands)`
+ * call now publishes the bot's command set to every guild it is in
+ * (and every guild it joins later). The guild-side path is preserved
+ * as an opt-in dev path via `--dev-guild <id>` so iteration on a
+ * single test guild stays instant (Discord propagation for global
+ * commands can take up to an hour).
+ *
+ * The `--cleanup-guild-commands` flag wipes the legacy guild-scoped
+ * registrations: it iterates `userGuilds()` and PUTs an empty array
+ * to each guild's command bucket. Operators run this once during the
+ * guild → global migration window so users do not see duplicate
+ * entries (global + legacy guild-scoped at once).
+ *
+ * Usage:
+ *   yarn deploy -t nijika                 # global (default)
+ *   yarn deploy -t nijika --dev-guild ID  # guild-side fast iteration
+ *   yarn deploy -t nijika --cleanup-guild-commands
+ */
 import { REST, Routes, ApplicationCommandDataResolvable } from "discord.js";
 import fs from "fs";
 import path from "path";
@@ -6,7 +28,11 @@ import dotenv from "dotenv";
 import { createCommand } from "@cmd";
 import { bot_cmd } from "@utils";
 
-type DeployArgs = { bot?: string };
+type DeployArgs = {
+    bot?: string;
+    devGuild?: string;
+    cleanupGuildCommands?: boolean;
+};
 
 type BotConfig = {
     commands?: string[];
@@ -18,6 +44,10 @@ function parseArgs(argv: string[]): DeployArgs {
         const a = argv[i];
         if ((a === "-b" || a === "--bot" || a === "-t" || a === "--target") && argv[i + 1]) {
             out.bot = argv[++i];
+        } else if (a === "--dev-guild" && argv[i + 1]) {
+            out.devGuild = argv[++i];
+        } else if (a === "--cleanup-guild-commands") {
+            out.cleanupGuildCommands = true;
         }
     }
 
@@ -76,7 +106,7 @@ function buildCommandsFromConfig(commands: string[]): ApplicationCommandDataReso
     return out;
 }
 
-async function deployCommands(botName: string) {
+async function deployGlobal(botName: string): Promise<void> {
     const { token, clientId, commands } = loadBotConfig(botName);
 
     const body = buildCommandsFromConfig(commands);
@@ -87,39 +117,107 @@ async function deployCommands(botName: string) {
 
     const rest = new REST({ version: "10" }).setToken(token);
 
+    console.log(
+        `Deploying ${body.length} commands for bot "${botName}" GLOBALLY (visible in every guild after Discord propagation, typically minutes).`,
+    );
+
+    const res = (await rest.put(Routes.applicationCommands(clientId), {
+        body,
+    })) as unknown as { id: string }[];
+
+    console.log(`Successfully registered ${res.length} global command(s).`);
+}
+
+async function deployDevGuild(botName: string, guildId: string): Promise<void> {
+    const { token, clientId, commands } = loadBotConfig(botName);
+
+    const body = buildCommandsFromConfig(commands);
+    if (body.length === 0) {
+        console.error("No commands to deploy (after filtering).");
+        process.exit(1);
+    }
+
+    const rest = new REST({ version: "10" }).setToken(token);
+
+    console.log(
+        `Deploying ${body.length} commands for bot "${botName}" to dev guild ${guildId} (guild-scoped — instant propagation).`,
+    );
+
+    const res = (await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
+        body,
+    })) as unknown as { id: string }[];
+
+    console.log(`Successfully registered ${res.length} command(s) in dev guild.`);
+}
+
+/**
+ * One-shot migration tool. NOT safe to invoke routinely on bots with
+ * many hundreds of guilds: Discord's per-route + global rate limits
+ * apply, and the discord.js REST queue handles retries but the loop
+ * still walks each guild sequentially. A `rateLimited` listener is
+ * registered so operators can see when the queue is throttling, and
+ * an explicit per-iteration delay paces the worst case under the
+ * 50 req/s global ceiling. Increase `PER_ITER_DELAY_MS` if your
+ * deployment regularly hits the global limit during cleanup.
+ */
+const PER_ITER_DELAY_MS = 250;
+
+async function cleanupGuildCommands(botName: string): Promise<void> {
+    const { token, clientId } = loadBotConfig(botName);
+
+    const rest = new REST({ version: "10" }).setToken(token);
+    rest.on('rateLimited', (info) => {
+        console.warn(
+            `[rate-limit] route=${info.route} timeout=${info.timeToReset}ms global=${info.global}`,
+        );
+    });
     const guilds = (await rest.get(Routes.userGuilds())) as { id: string; name: string }[];
 
-    console.log(`Deploying ${body.length} commands for bot "${botName}" to ${guilds.length} guild(s).`);
+    console.log(
+        `Cleanup mode: removing guild-scoped commands from ${guilds.length} guild(s). Global commands left untouched.`,
+    );
+    if (guilds.length > 50) {
+        console.warn(
+            `[warn] ${guilds.length} guilds detected. Cleanup is a one-shot migration tool; ` +
+                `consider running off-peak. Pacing at ${PER_ITER_DELAY_MS}ms between PUTs.`,
+        );
+    }
 
     for (const guild of guilds) {
         try {
-            console.log(`- Deploying to guild ${guild.name} (${guild.id})...`);
-
-            const res = (await rest.put(
-                Routes.applicationGuildCommands(clientId, guild.id),
-                { body }
-            )) as unknown as any[];
-
-            console.log(`  Successfully registered ${res.length} command(s).`);
+            await rest.put(Routes.applicationGuildCommands(clientId, guild.id), { body: [] });
+            console.log(`- Cleared guild commands: ${guild.name} (${guild.id}).`);
         } catch (err) {
-            console.error(`  Failed to register commands for guild ${guild.id}:`, err);
+            console.error(`- Failed to clear commands for guild ${guild.id}:`, err);
         }
+        await new Promise((resolve) => setTimeout(resolve, PER_ITER_DELAY_MS));
     }
 
-    console.log("Done.");
+    console.log("Cleanup done.");
 }
 
 async function main() {
     const args = parseArgs(process.argv.slice(2));
     const bot = args.bot;
 
-    if (!bot || !args.bot) {
-        console.error("Usage: yarn deploy -t <bot_name>");
+    if (!bot) {
+        console.error(
+            "Usage:\n" +
+                "  yarn deploy -t <bot_name>                          # global (default)\n" +
+                "  yarn deploy -t <bot_name> --dev-guild <guild_id>   # guild-side fast iteration\n" +
+                "  yarn deploy -t <bot_name> --cleanup-guild-commands # remove legacy guild-scoped commands",
+        );
         process.exit(1);
     }
 
     try {
-        await deployCommands(bot);
+        if (args.cleanupGuildCommands === true) {
+            await cleanupGuildCommands(bot);
+        } else if (args.devGuild !== undefined) {
+            await deployDevGuild(bot, args.devGuild);
+        } else {
+            await deployGlobal(bot);
+        }
     } catch (err) {
         console.error(err);
         process.exit(1);

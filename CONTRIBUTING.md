@@ -36,8 +36,17 @@ Run a bot in development:
 
 ```bash
 yarn nijika          # or konata / tomori / msg-archive
-yarn deploy -t nijika  # register slash commands with Discord
+
+# Slash-command registration (audit B-5 / 3.11):
+yarn deploy -t nijika                          # GLOBAL — visible in every guild after Discord propagation (~minutes, up to 1h)
+yarn deploy -t nijika --dev-guild <guild_id>   # guild-scoped fast iteration (instant)
+yarn deploy -t nijika --cleanup-guild-commands # one-shot: remove legacy guild-scoped registrations
 ```
+
+The default is **global** registration so a freshly-invited guild
+sees the full command set without an operator re-running deploy. Use
+`--dev-guild` only while iterating on a test guild; production rolls
+through the default global path.
 
 ## Quality gates
 
@@ -170,7 +179,10 @@ Discord.
 
 6. **Register with Discord.** `yarn deploy -t <bot-name>` after the bot
    has been started at least once (so the slash command registration
-   token cache is populated).
+   token cache is populated). Default is global registration — new
+   guilds the bot joins later see the command without re-running
+   deploy. Use `--dev-guild <id>` only for fast iteration on a single
+   test guild.
 
 ## Adding a plugin
 
