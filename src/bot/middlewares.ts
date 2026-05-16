@@ -25,7 +25,7 @@ import { executeCommand } from '@cmd';
 import { executeButton } from '@button';
 import { executeModal } from '@modal';
 import { executeSSM } from '@select-menu';
-import { logger } from '@utils';
+import { logGuildEvent, sendChannelLog } from '@core/logger';
 import type { InteractionContext, InteractionMiddleware } from '../core/plugin';
 import { replyTranslated } from '../handlers/reply-translated';
 
@@ -95,7 +95,8 @@ export const createChannelLoggingMiddleware = (
                         (parentId !== null && blocked.includes(parentId)));
                 if (!isBlocked && interaction.guildId !== null) {
                     const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channelId}>`;
-                    logger.channelLogger(
+                    void sendChannelLog(
+                        bot.logger,
                         bot.guildInfo[interaction.guildId]?.channels?.debug,
                         undefined,
                         channel_log,
@@ -103,7 +104,8 @@ export const createChannelLoggingMiddleware = (
                 }
                 if (interaction.guild) {
                     const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
-                    logger.guildLogger(
+                    logGuildEvent(
+                        bot.logger,
                         bot.clientId,
                         interaction.guild.id,
                         'interaction_create',

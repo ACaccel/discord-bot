@@ -30,7 +30,12 @@ import type { Plugin } from '../../core/plugin';
 // `utils/bot_cmd.ts` files, which still use `@bot` / `@cmd` path
 // aliases not present in `tsconfig.strict.json`. `utils/logger.ts`
 // itself was rewritten as a strict-clean shim in Phase 3.
-import * as legacyLogger from '../../utils/logger';
+import {
+  archiveDeletedAttachment,
+  logError,
+  logGuildEvent,
+  type Logger,
+} from '../../core/logger';
 
 const PLUGIN_ID = 'guild-events';
 const PLUGIN_VERSION = '1.0.0';
@@ -101,6 +106,7 @@ const resolveEventChannel = (
 const safeSendEmbed = async (
   channel: TextChannel,
   embed: EmbedBuilder,
+  logger: Logger | undefined,
   clientId: string,
   guildId: string,
   context: string,
@@ -108,7 +114,8 @@ const safeSendEmbed = async (
   try {
     await channel.send({ embeds: [embed] });
   } catch (err: unknown) {
-    legacyLogger.errorLogger(
+    logError(
+      logger,
       clientId,
       guildId,
       new Error(`guild-events: failed to mirror ${context} embed: ${String(err)}`),
@@ -138,6 +145,7 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
       messageUpdate: async (ctx, oldMessage, newMessage) => {
         await handleMessageUpdate(
           ctx.resolve(TOKENS.GuildRegistry),
+          ctx.resolve(TOKENS.Logger),
           config.blockedChannels,
           config.clientId,
           oldMessage,
@@ -147,6 +155,7 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
       messageDelete: async (ctx, message) => {
         await handleMessageDelete(
           ctx.resolve(TOKENS.GuildRegistry),
+          ctx.resolve(TOKENS.Logger),
           config.blockedChannels,
           config.clientId,
           message,
@@ -154,6 +163,7 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
       },
       guildMemberUpdate: async (ctx, oldMember, newMember) => {
         const guildId = newMember.guild.id;
+        const logger = ctx.resolve(TOKENS.Logger);
         const eventChannel = resolveEventChannel(ctx.resolve(TOKENS.GuildRegistry), guildId);
         const oldRoles = oldMember.roles.cache;
         const newRoles = newMember.roles.cache;
@@ -186,13 +196,14 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
               },
             )
             .setTimestamp();
-          await safeSendEmbed(eventChannel, embed, config.clientId, guildId, 'guild_member_update');
+          await safeSendEmbed(eventChannel, embed, logger, config.clientId, guildId, 'guild_member_update');
         }
         // Audit-log line preserved verbatim from legacy
         // `detectGuildMemberUpdate`. Decoupled from the embed write so
         // a missing `event` channel does not suppress the audit trail.
         const log = `User: ${newMember.user.username}, Added: ${addedRolesList}, Removed: ${removedRolesList}`;
-        legacyLogger.guildLogger(
+        logGuildEvent(
+          logger,
           config.clientId,
           guildId,
           'guild_member_update',
@@ -209,6 +220,7 @@ export const __test = { safeSendEmbed };
 
 const handleMessageUpdate = async (
   registry: GuildRegistry,
+  logger: Logger | undefined,
   blockedChannels: readonly string[],
   clientId: string,
   oldMessage: Message | PartialMessage,
@@ -245,7 +257,7 @@ const handleMessageUpdate = async (
         { name: 'new message', value: truncate(newMessage.content), inline: false },
       )
       .setTimestamp();
-    await safeSendEmbed(eventChannel, embed, clientId, newMessage.guildId, 'message_update');
+    await safeSendEmbed(eventChannel, embed, logger, clientId, newMessage.guildId, 'message_update');
   }
 
   // Audit-log side effect from legacy `detectMessageUpdate` — emitted
@@ -256,7 +268,8 @@ const handleMessageUpdate = async (
   const log =
     `User: ${newMessage.author.username}, Channel: ${channelName ?? '<unknown>'}, ` +
     `Old: ${oldMessage.content}, New: ${newMessage.content}`;
-  legacyLogger.guildLogger(
+  logGuildEvent(
+    logger,
     clientId,
     newMessage.guildId,
     'message_update',
@@ -267,6 +280,7 @@ const handleMessageUpdate = async (
 
 const handleMessageDelete = async (
   registry: GuildRegistry,
+  logger: Logger | undefined,
   blockedChannels: readonly string[],
   clientId: string,
   message: Message | PartialMessage,
@@ -308,7 +322,7 @@ const handleMessageDelete = async (
         }
       });
     }
-    await safeSendEmbed(eventChannel, embed, clientId, message.guildId, 'message_delete');
+    await safeSendEmbed(eventChannel, embed, logger, clientId, message.guildId, 'message_delete');
   }
 
   // Forensic attachment download (legacy `detectMessageDelete` ran
@@ -318,7 +332,7 @@ const handleMessageDelete = async (
   // log below.
   if (message.attachments.size > 0) {
     message.attachments.forEach((attachment) => {
-      void legacyLogger.attachmentLogger(message.guildId as string, attachment);
+      void archiveDeletedAttachment(logger, message.guildId as string, attachment);
     });
   }
 
@@ -328,5 +342,5 @@ const handleMessageDelete = async (
   const log =
     `User: ${message.author.username}, Channel: ${channelName ?? '<unknown>'}, ` +
     `Message: ${message.content ?? ''}`;
-  legacyLogger.guildLogger(clientId, message.guildId, 'message_delete', log, message.guild.name);
+  logGuildEvent(logger, clientId, message.guildId, 'message_delete', log, message.guild.name);
 };

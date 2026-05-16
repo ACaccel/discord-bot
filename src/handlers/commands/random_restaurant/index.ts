@@ -4,8 +4,8 @@ import {
 import axios from 'axios';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { logError } from '@core/logger';
 export default class random_restaurant extends Command {
     constructor() {
         super();
@@ -148,7 +148,7 @@ export default class random_restaurant extends Command {
                 }),
             });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
 
             const now = new Date();
             // 換算成台灣時間 (UTC+8)

@@ -5,8 +5,9 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger, bot_cmd } from '@utils';
+import { bot_cmd } from '@utils';
 
+import { logError } from '@core/logger';
 export default class role_message extends Command {
     constructor() {
         super();
@@ -75,7 +76,7 @@ export default class role_message extends Command {
                 components: rows
             });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:role_message.failed') ?? '' });
         }
     }

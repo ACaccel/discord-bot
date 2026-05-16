@@ -4,7 +4,8 @@ import {
 import Mee6LevelsApi from 'mee6-levels-api';
 import { BaseBot, Config } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
+
+import { logError } from '@core/logger';
 // import { Nijika } from 'bot/nijika/nijika';
 
 interface UpdateRoleConfig extends Config {
@@ -87,7 +88,7 @@ export default class update_role extends Command {
             }));
             await interaction.editReply({ content: bot.translator?.t('replies:update_role.done') ?? '' });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:update_role.failed') ?? '' });
         }
     }

@@ -10,12 +10,14 @@
  *   - validates the level against the typed allowlist
  *   - pretty-prints outside production
  *
- * Two callers need a logger BEFORE `loadEnv()` runs (the lazy IoC
- * Logger factory in `BaseBot.run()`, and the `utils/logger.ts`
- * shim's pre-`initLegacyLogger` default), so a typed-Env-based
+ * Used as the lazy IoC Logger factory in `BaseBot.run()` — the
+ * factory needs a Logger BEFORE `loadEnv()` runs, so a typed-Env-based
  * logger build is not possible at that point. This bootstrap is
  * intentionally permanent for that reason — the previous file's
- * `TODO(phase-4): delete this module` marker was misleading.
+ * `TODO(phase-4): delete this module` marker was misleading. The
+ * `utils/logger.ts` shim that also relied on this bootstrap was
+ * retired in PR-F2 (audit C-6) when handler callsites moved to the
+ * `core/logger` helpers directly.
  */
 import { createLogger, type Logger, type LogLevel } from '../logger/logger';
 

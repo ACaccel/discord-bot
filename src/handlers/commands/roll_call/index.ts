@@ -5,8 +5,9 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger, bot_cmd } from '@utils';
+import { bot_cmd } from '@utils';
 
+import { logError } from '@core/logger';
 export default class roll_call extends Command {
     constructor() {
         super();
@@ -130,7 +131,7 @@ export default class roll_call extends Command {
             bot_cmd.msgReact(msg, ["<:slowpoke_wave_lr:1178718404102848573>"])
             await interaction.reply({ content: bot.translator?.t('replies:roll_call.sent') ?? '', flags: MessageFlags.Ephemeral })
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.reply({ content: bot.translator?.t('replies:roll_call.failed') ?? '', flags: MessageFlags.Ephemeral });
         }
     }

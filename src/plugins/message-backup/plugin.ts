@@ -40,7 +40,7 @@ import type { Logger } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
 import type { MessageRepo, Repos } from '../../persistence/repositories';
 import type { MessageDoc } from '../../persistence/schemas/message.schema';
-import * as legacyLogger from '../../utils/logger';
+import { logError } from '../../core/logger';
 
 const PLUGIN_ID = 'message-backup';
 const PLUGIN_VERSION = '1.0.0';
@@ -142,6 +142,7 @@ const retryFetch = async <T>(fn: () => Promise<T>, maxAttempts = 5): Promise<T> 
 const collectChannels = async (
   guild: Guild,
   clientId: string,
+  logger: Logger,
 ): Promise<{ channels: TextBasedChannel[]; liveChannelIds: Set<string> }> => {
   await guild.channels.fetch();
   const channels: TextBasedChannel[] = [];
@@ -179,7 +180,8 @@ const collectChannels = async (
       const active = await retryFetch(() => anyChannel.threads!.fetchActive!());
       active.threads.forEach((t) => addChannel(t));
     } catch (err) {
-      legacyLogger.errorLogger(
+      logError(
+        logger,
         clientId,
         guild.id,
         `fetchActive threads failed for ${anyChannel.name ?? channel.id}: ${String(err)}`,
@@ -207,7 +209,8 @@ const collectChannels = async (
           if (!archived.hasMore) break;
         }
       } catch (err) {
-        legacyLogger.errorLogger(
+        logError(
+          logger,
           clientId,
           guild.id,
           `fetchArchived ${type} threads failed for ${anyChannel.name ?? channel.id}: ${String(err)}`,
@@ -330,6 +333,7 @@ const backupChannel = async (
   repos: Repos,
   guildId: string,
   clientId: string,
+  logger: Logger,
   onProgress: () => Promise<void>,
 ): Promise<{ added: number; stats: ChannelBackupStats }> => {
   type FetchOpts = { limit: number; before?: string; after?: string };
@@ -430,7 +434,8 @@ const backupChannel = async (
     stats.endMsgContent = globalNewest?.content;
   } catch (err: unknown) {
     stats.error = String(err);
-    legacyLogger.errorLogger(
+    logError(
+      logger,
       clientId,
       guildId,
       `Failed to backup channel ${ch.name ?? ch.id}: ${String(err)}`,
@@ -454,13 +459,13 @@ const performBackup = async (
   }
   const repos = registry.getRepos(guildId);
   if (repos === undefined) {
-    legacyLogger.errorLogger(clientId, guildId, 'Repos not available for guild');
+    logError(pluginLogger, clientId, guildId, 'Repos not available for guild');
     return;
   }
 
   const debugCh = registry.getChannel(guildId, 'debug');
   if (debugCh === undefined || !debugCh.isSendable()) {
-    legacyLogger.errorLogger(clientId, guildId, 'Debug channel not sendable');
+    logError(pluginLogger, clientId, guildId, 'Debug channel not sendable');
     return;
   }
 
@@ -476,7 +481,7 @@ const performBackup = async (
       `[ SYSTEM ] Backup started. DB contains ${existingCount} messages.`,
     );
 
-    const { channels, liveChannelIds } = await collectChannels(guild, clientId);
+    const { channels, liveChannelIds } = await collectChannels(guild, clientId, pluginLogger);
 
     log.writeln('=== MSG ARCHIVE BACKUP ===');
     log.writeln(`Guild:    ${guildId}`);
@@ -495,7 +500,7 @@ const performBackup = async (
     const allStats: ChannelBackupStats[] = [];
     for (let i = 0; i < channels.length; i += 1) {
       const channel = channels[i]!;
-      const { added, stats } = await backupChannel(channel, repos, guildId, clientId, async () => {
+      const { added, stats } = await backupChannel(channel, repos, guildId, clientId, pluginLogger, async () => {
         await statusMsg
           .edit(
             `[ SYSTEM ] Backup in progress. DB now contains (${existingCount}+${newCount}) messages.`,
@@ -576,7 +581,7 @@ const performBackup = async (
           : ''),
     );
   } catch (err: unknown) {
-    legacyLogger.errorLogger(clientId, guildId, err);
+    logError(pluginLogger, clientId, guildId, err);
     log.writeln(`FATAL ERROR: ${String(err)}`);
   } finally {
     log.close();
@@ -607,7 +612,8 @@ export const createMessageBackupPlugin = (
       const runOnce = async (): Promise<void> => {
         for (const guildId of config.backupServers) {
           if (running.has(guildId)) {
-            legacyLogger.errorLogger(
+            logError(
+              ctx.logger,
               clientId,
               guildId,
               'Backup already running, skipping this tick',

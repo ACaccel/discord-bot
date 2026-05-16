@@ -2,8 +2,9 @@ import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
 import { BaseBot } from '../../../bot';
 import { bindTranslator } from '../../../core/i18n';
-import { bot_cmd, JobManager, logger } from '../../../utils';
+import { bot_cmd, JobManager } from '../../../utils';
 
+import { logError } from '@core/logger';
 export interface IGiveawayBot {
     jobs: Map<string, Job>
 }
@@ -188,11 +189,11 @@ export const rebootGiveawayJobs = async (bot: BaseBot) => {
                             );
                         }
                     } catch (rowErr) {
-                        logger.errorLogger(bot.clientId, guild_info.guild.id, rowErr);
+                        logError(bot.logger, bot.clientId, guild_info.guild.id, rowErr);
                     }
                 }
             } catch (err) {
-                logger.errorLogger(bot.clientId, guild_info.guild.id, err);
+                logError(bot.logger, bot.clientId, guild_info.guild.id, err);
                 const debugCh = guild_info.channels?.debug;
                 if (debugCh?.isSendable()) {
                     await debugCh
@@ -200,7 +201,7 @@ export const rebootGiveawayJobs = async (bot: BaseBot) => {
                             `[ ops ] giveaway reboot listAll failed for guild ${guild_info.guild.id} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
                         )
                         .catch((sendErr) =>
-                            logger.errorLogger(bot.clientId, guild_info.guild.id, sendErr),
+                            logError(bot.logger, bot.clientId, guild_info.guild.id, sendErr),
                         );
                 }
             }

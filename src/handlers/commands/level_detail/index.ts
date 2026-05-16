@@ -4,8 +4,8 @@ import {
 import Mee6LevelsApi from 'mee6-levels-api';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { logError } from '@core/logger';
 export default class level_detail extends Command {
     constructor() {
         super();
@@ -60,7 +60,7 @@ export default class level_detail extends Command {
                 await interaction.editReply({ content: bot.translator?.t('replies:level_detail.too_long') ?? '' });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:level_detail.failed') ?? '' });
         }
     }

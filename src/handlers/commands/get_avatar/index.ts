@@ -4,8 +4,8 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { logError } from '@core/logger';
 export default class get_avatar extends Command {
     constructor() {
         super();
@@ -46,7 +46,7 @@ export default class get_avatar extends Command {
                 await interaction.editReply({ content: bot.translator?.t('errors:command.user_not_found') ?? '' });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:get_avatar.failed') ?? '' });
         }
     }

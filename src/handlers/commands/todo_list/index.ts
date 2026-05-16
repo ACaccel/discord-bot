@@ -3,9 +3,10 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
+
 import { requireGuildRepos } from '../../require-guild-repos';
 
+import { logError } from '@core/logger';
 export default class todo_list extends Command {
     constructor() {
         super();
@@ -85,7 +86,7 @@ export default class todo_list extends Command {
                 await interaction.editReply({ content });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:todo_list.failed') ?? '' });
         }
     }

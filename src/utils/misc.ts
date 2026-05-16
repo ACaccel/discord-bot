@@ -4,6 +4,7 @@ import schedule from 'node-schedule';
 import * as fs from 'fs/promises';
 import { createCanvas, loadImage } from 'canvas';
 
+import { logError } from '@core/logger';
 export interface CanvasOptions {
     itemsPerRow: number;
     itemSize: number;
@@ -197,7 +198,7 @@ export const parseDuration = (duration: string): number | null => {
 //         await guild.setIcon(profile.url);
 //         await guild.setName(profile.name);
 //     } catch (error) {
-//         logger.errorLogger(bot.clientId, guildId, error);
+//         logError(bot.logger, bot.clientId, guildId, error);
 //     }
 // }
 

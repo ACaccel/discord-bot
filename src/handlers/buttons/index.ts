@@ -2,7 +2,7 @@ import {
     ButtonInteraction,
 } from 'discord.js';
 import { BaseBot } from "@bot";
-import { logger } from "@utils";
+
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
 
@@ -15,16 +15,16 @@ export abstract class ButtonHandler {
 }
 
 export const registerButtons = async (bot: BaseBot) => {
-    logger.systemLogger(bot.clientId, "Registering button handlers...");
+    logSystem(bot.logger, bot.clientId, "Registering button handlers...");
 
     try {
         // todo: whether to specify handlers for each bot
         // import all button handlers
         bot.buttonHandler = createAllButtonHandlers();
 
-        logger.systemLogger(bot.clientId, `Successfully register ${bot.buttonHandler.size} button handlers.`)
+        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.buttonHandler.size} button handlers.`)
     } catch (err) {
-        logger.systemLogger(bot.clientId, `Failed to register button handlers: ${err}`);
+        logSystem(bot.logger, bot.clientId, `Failed to register button handlers: ${err}`);
     }
 }
 
@@ -44,6 +44,7 @@ export const executeButton = async (interaction: ButtonInteraction, bot: BaseBot
 
 import { BUTTON_REGISTRY } from './registry.generated';
 
+import { logSystem } from '@core/logger';
 const buttonHandlerFactory = new HandlerFactory<ButtonHandler>();
 buttonHandlerFactory.registerFromRegistry(BUTTON_REGISTRY);
 

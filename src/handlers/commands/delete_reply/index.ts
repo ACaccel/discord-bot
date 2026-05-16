@@ -6,9 +6,10 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
+
 import { requireGuildRepos } from '../../require-guild-repos';
 
+import { logError } from '@core/logger';
 export default class delete_reply extends Command {
     constructor() {
         super();
@@ -131,7 +132,7 @@ export default class delete_reply extends Command {
                 components: [...selectRows]
             });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:delete_reply.failed') ?? '' });
         }
     }

@@ -2,7 +2,7 @@ import {
     StringSelectMenuInteraction,
 } from 'discord.js';
 import { BaseBot } from "@bot";
-import { logger } from "@utils";
+
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
 
@@ -15,16 +15,16 @@ export abstract class SSMHandler {
 }
 
 export const registerSSMs = async (bot: BaseBot) => {
-    logger.systemLogger(bot.clientId, "Registering string select menu handlers...");
+    logSystem(bot.logger, bot.clientId, "Registering string select menu handlers...");
 
     try {
         // todo: whether to specify handlers for each bot
         // import all string select menu handlers
         bot.ssmHandler = createAllSSMHandlers();
 
-        logger.systemLogger(bot.clientId, `Successfully register ${bot.ssmHandler.size} string select menu handlers.`)
+        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.ssmHandler.size} string select menu handlers.`)
     } catch (err) {
-        logger.systemLogger(bot.clientId, `Failed to register string select menu handlers: ${err}`);
+        logSystem(bot.logger, bot.clientId, `Failed to register string select menu handlers: ${err}`);
     }
 }
 
@@ -44,6 +44,7 @@ export const executeSSM = async (interaction: StringSelectMenuInteraction, bot: 
 
 import { SSM_REGISTRY } from './registry.generated';
 
+import { logSystem } from '@core/logger';
 const ssmHandlerFactory = new HandlerFactory<SSMHandler>();
 ssmHandlerFactory.registerFromRegistry(SSM_REGISTRY);
 

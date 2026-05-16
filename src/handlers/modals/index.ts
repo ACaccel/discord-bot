@@ -2,7 +2,7 @@ import {
     ModalSubmitInteraction,
 } from 'discord.js';
 import { BaseBot } from "@bot";
-import { logger } from "@utils";
+
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
 
@@ -11,16 +11,16 @@ export abstract class ModalHandler {
 }
 
 export const registerModals = async (bot: BaseBot) => {
-    logger.systemLogger(bot.clientId, "Registering modal handlers...");
+    logSystem(bot.logger, bot.clientId, "Registering modal handlers...");
 
     try {
         // todo: whether to specify handlers for each bot
         // import all modal handlers
         bot.modalHandler = createAllModalHandlers();
 
-        logger.systemLogger(bot.clientId, `Successfully register ${bot.modalHandler.size} modal handlers.`)
+        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.modalHandler.size} modal handlers.`)
     } catch (err) {
-        logger.systemLogger(bot.clientId, `Failed to register modal handlers: ${err}`);
+        logSystem(bot.logger, bot.clientId, `Failed to register modal handlers: ${err}`);
     }
 }
 
@@ -40,6 +40,7 @@ export const executeModal = async (interaction: ModalSubmitInteraction, bot: Bas
 
 import { MODAL_REGISTRY } from './registry.generated';
 
+import { logSystem } from '@core/logger';
 const modalHandlerFactory = new HandlerFactory<ModalHandler>();
 modalHandlerFactory.registerFromRegistry(MODAL_REGISTRY);
 

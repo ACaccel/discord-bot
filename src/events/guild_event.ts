@@ -10,8 +10,8 @@
 import { Guild } from 'discord.js';
 import { BaseBot, GuildInfo } from '@bot';
 import { getCommandJsonBody } from '@cmd';
-import { logger } from '@utils';
 
+import { logSystem } from '@core/logger';
 export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
     // guild info initialization
     let newGuild: GuildInfo = {
@@ -39,9 +39,9 @@ export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
     const rest_commands = getCommandJsonBody(bot.commandHandlers, bot);
     bot.client.application?.commands.set(rest_commands, guild.id)
     .catch((err) => {
-        logger.systemLogger(bot.clientId, `Failed to register guild (/) commands: ${err}`);
+        logSystem(bot.logger, bot.clientId, `Failed to register guild (/) commands: ${err}`);
     });
 
     // notification
-    logger.systemLogger(bot.clientId, `Bot added to guild: ${guild.name} (${guild.id})`);
+    logSystem(bot.logger, bot.clientId, `Bot added to guild: ${guild.name} (${guild.id})`);
 }

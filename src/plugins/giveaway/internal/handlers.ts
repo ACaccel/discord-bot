@@ -3,7 +3,7 @@ import {
 } from 'discord.js';
 import { BaseBot } from '../../../bot';
 import { bindTranslator } from '../../../core/i18n';
-import { logger, misc, JobManager } from '../../../utils';
+import { misc, JobManager } from '../../../utils';
 import {
     giveawayAnnouncement,
     findGiveaway,
@@ -12,6 +12,7 @@ import {
     giveawayJobKey,
 } from './giveaway';
 
+import { logError } from '@core/logger';
 export const handleGiveawayCreate = async (
     interaction: ChatInputCommandInteraction,
     bot: BaseBot & IGiveawayBot,
@@ -101,7 +102,7 @@ export const handleGiveawayCreate = async (
             }),
         });
     } catch (error) {
-        logger.errorLogger(bot.clientId, interaction.guild?.id ?? null, error);
+        logError(bot.logger, bot.clientId, interaction.guild?.id ?? null, error);
         await interaction.editReply({ content: t('replies:giveaway.create_failed') });
     }
 };
@@ -135,7 +136,7 @@ export const handleGiveawayDelete = async (
 
         await interaction.editReply({ content: t('replies:giveaway.delete_success') });
     } catch (error) {
-        logger.errorLogger(bot.clientId, interaction.guild?.id ?? null, error);
+        logError(bot.logger, bot.clientId, interaction.guild?.id ?? null, error);
         await interaction.editReply({ content: t('replies:giveaway.delete_failed') });
     }
 };

@@ -5,8 +5,8 @@ import {
 } from "discord.js";
 import { BaseBot } from "@bot";
 import { Command } from "@cmd";
-import { logger } from "@utils";
 
+import { logError } from '@core/logger';
 const MAX_DESCRIPTION_LENGTH = 3800;
 
 const chunkLines = (lines: string[], maxLength: number): string[] => {
@@ -107,7 +107,7 @@ export default class list_guild_members extends Command {
                 await interaction.followUp({ embeds: [pageEmbed] });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:list_guild_members.failed') ?? '' });
         }
     }

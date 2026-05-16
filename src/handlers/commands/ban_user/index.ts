@@ -6,8 +6,9 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger, bot_cmd, misc } from '@utils';
+import { bot_cmd, misc } from '@utils';
 
+import { logError } from '@core/logger';
 export default class ban_user extends Command {
     constructor() {
         super();
@@ -82,7 +83,7 @@ export default class ban_user extends Command {
                         try {
                             await msg.delete();
                         } catch (err) {
-                            logger.errorLogger(bot.clientId, interaction.guild?.id, err);
+                            logError(bot.logger, bot.clientId, interaction.guild?.id, err);
                         }
                     }
                 };
@@ -119,7 +120,7 @@ export default class ban_user extends Command {
             }
             misc.scheduleJob(end_time_date, () => ban_judgement());
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:ban_user.failed') ?? '' });
         }
     }

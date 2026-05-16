@@ -7,10 +7,11 @@ import {
 } from "discord.js";
 import { BaseBot } from "@bot";
 import { Command } from "@cmd";
-import { logger } from "@utils";
+
 import type { ChannelId } from "../../../core/ids";
 import type { MessageDoc } from "../../../persistence/schemas/message.schema";
 
+import { logError } from '@core/logger';
 // Audit C-1 reviewer follow-up: the local DbMessage shape was a hand-
 // maintained copy of the persistence schema. Aliasing it to the typed
 // `MessageDoc` keeps the handler reactive to schema changes — a future
@@ -322,7 +323,7 @@ export default class db_list_message extends Command {
                 });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:db_list_message.failed') ?? '' });
         }
     }

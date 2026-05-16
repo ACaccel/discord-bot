@@ -1,9 +1,10 @@
 import { ChatInputCommandInteraction, MessageFlags } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
+
 import { requireGuildRepos } from '../../require-guild-repos';
 
+import { logError } from '@core/logger';
 export default class ai_whitelist_list extends Command {
     constructor() {
         super();
@@ -49,7 +50,7 @@ export default class ai_whitelist_list extends Command {
                 await interaction.followUp({ content: pages[i]!, flags: MessageFlags.Ephemeral });
             }
         } catch (err) {
-            logger.errorLogger(bot.clientId, interaction.guildId, err);
+            logError(bot.logger, bot.clientId, interaction.guildId, err);
             await interaction.editReply({ content: bot.translator?.t('errors:db.operation_failed') ?? '' });
         }
     }

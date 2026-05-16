@@ -3,7 +3,7 @@ import {
 } from 'discord.js';
 import { BaseBot } from '../../../bot';
 import { bindTranslator } from '../../../core/i18n';
-import { logger, misc, JobManager } from '../../../utils';
+import { misc, JobManager } from '../../../utils';
 import {
     activityAnnouncement,
     findActivity,
@@ -13,6 +13,7 @@ import {
     activityJobKey,
 } from './activity';
 
+import { logError } from '@core/logger';
 export const handleActivityCreate = async (
     interaction: ChatInputCommandInteraction,
     bot: BaseBot & IActivityBot,
@@ -96,7 +97,7 @@ export const handleActivityCreate = async (
             }),
         });
     } catch (error) {
-        logger.errorLogger(bot.clientId, interaction.guild?.id ?? null, error);
+        logError(bot.logger, bot.clientId, interaction.guild?.id ?? null, error);
         await interaction.editReply({ content: t('replies:activity.create_failed') });
     }
 };
@@ -130,7 +131,7 @@ export const handleActivityDelete = async (
 
         await interaction.editReply({ content: t('replies:activity.delete_success') });
     } catch (error) {
-        logger.errorLogger(bot.clientId, interaction.guild?.id ?? null, error);
+        logError(bot.logger, bot.clientId, interaction.guild?.id ?? null, error);
         await interaction.editReply({ content: t('replies:activity.delete_failed') });
     }
 };
