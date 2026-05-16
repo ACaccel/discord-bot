@@ -63,18 +63,13 @@ const FILE_ALLOWLIST: ReadonlySet<string> = new Set<string>([]);
 /**
  * Directory-level skip list. Entries here are subdirectories whose
  * legacy contents are tracked for i18n migration but excluded from
- * the strict scanner until they are rewritten.
- *
- * `src/plugins/<plugin-id>/internal/**` — PR-E E-4 (audit C-3)
- * relocated the original `src/features/{activity,giveaway}/**` files
- * into the per-plugin `internal/` directories verbatim. The 46 CJK
- * literals they carry are real user-facing strings that should
- * eventually flow through the translator, but the relocation itself
- * is structural (Phase 4b-3 carve-out). The follow-up migration is
- * tracked as a separate item; this skip prevents the move from
- * appearing as a scanner regression.
+ * the strict scanner until they are rewritten. Empty in PR-F1
+ * onwards — the `src/plugins/<plugin-id>/internal/` carve-out from
+ * PR-E E-4 was removed once the 46 CJK literals in
+ * `activity/internal/` + `giveaway/internal/` were routed through
+ * the translator.
  */
-const SKIP_PATH_PATTERNS: readonly RegExp[] = [/\/internal\//];
+const SKIP_PATH_PATTERNS: readonly RegExp[] = [];
 
 const CJK_REGEX = /[぀-ゟ゠-ヿ一-鿿가-힯]/;
 // Require a non-empty reason after the colon so reviewers see WHY a
