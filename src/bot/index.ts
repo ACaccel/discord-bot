@@ -29,13 +29,12 @@ import { asGuildId } from '../core/ids';
 import { buildRepos, type Repos } from '../persistence/repositories';
 import type { ConnectionManager } from '../infra/mongo/connection-manager';
 import {
-  createLoggerFromProcessEnv,
   installProcessHandlers,
   type Logger,
   ops,
 } from '../core/logger';
 import { initLegacyLogger } from '../utils/logger';
-import { loadEnv, type Env } from '../core/config';
+import { createBootstrapLogger, loadEnv, type Env } from '../core/config';
 import { createDefaultTranslator, type Translator } from '../core/i18n';
 import { systemClock, type Clock } from '../core/time';
 import {
@@ -194,7 +193,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // bound with `{ bot: clientId }` so every line carries the bot
         // identity without callers passing it explicitly.
         this.container.registerSingleton(TOKENS.Logger, () =>
-            createLoggerFromProcessEnv({ bot: this.clientId }),
+            createBootstrapLogger({ bot: this.clientId }),
         );
         // ConnectionManager is keyed by URI through `getMongoConnectionManagerForUri`,
         // shared with the legacy `db.dbConnect()` shim — one pool per process per URI.
@@ -752,7 +751,17 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         return undefined;
     }
 
-    public interactionEventListener = async (interaction: Interaction): Promise<void> => {
+    /**
+     * Entry point Discord calls on every `InteractionCreate` event.
+     *
+     * **Final.** Subclasses MUST NOT override this — extend the bot by
+     * pushing middleware through {@link configureInteractionRouter}
+     * instead. The arrow-property + `readonly` modifier together
+     * prevent both prototype-override and re-assignment, so a child
+     * class accidentally restoring the pre-B-2 inline switch is a
+     * compile error rather than a silent dispatch divergence.
+     */
+    public readonly interactionEventListener = async (interaction: Interaction): Promise<void> => {
         // Audit B-2: every interaction goes through the
         // Chain-of-Responsibility middleware stack. The router is
         // built inside `run()`; pre-`run()` (test paths) we fall
