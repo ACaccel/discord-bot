@@ -5,8 +5,9 @@ import type {
     ModalSubmitInteraction,
     StringSelectMenuInteraction,
 } from 'discord.js';
-import { MessageFlags } from 'discord.js';
+import { DiscordAPIError, MessageFlags } from 'discord.js';
 import type { BaseBot } from '@bot';
+import { logger } from '@utils';
 import type { Repos } from '../persistence/repositories';
 
 /**
@@ -24,25 +25,44 @@ type RepliableHandlerInteraction =
     | StringSelectMenuInteraction
     | ContextMenuCommandInteraction;
 
+/**
+ * Discord error codes that mean "the interaction is dead, replying
+ * again will just rejection-spam". See discord.js docs / Discord API
+ * gateway-error reference. We never bubble these — surfacing them to
+ * the dispatcher's outer catch only triggers another doomed reply.
+ */
+const EXPIRED_INTERACTION_CODES: ReadonlySet<number> = new Set([
+    10062, // Unknown Interaction (>3s window elapsed)
+    40060, // Interaction has already been acknowledged
+]);
+
 const replyOrEdit = async (
+    bot: BaseBot,
     interaction: RepliableHandlerInteraction,
     content: string,
 ): Promise<void> => {
     if (content.length === 0) return;
-    if (interaction.deferred || interaction.replied) {
-        await interaction.editReply({ content });
-        return;
+    try {
+        if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({ content });
+            return;
+        }
+        await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+    } catch (err) {
+        if (err instanceof DiscordAPIError && EXPIRED_INTERACTION_CODES.has(Number(err.code))) {
+            // The interaction is gone. Log once and swallow — there is
+            // nothing else we can tell the user, and re-throwing would
+            // just walk into the dispatcher's catch and try the same
+            // reply again. The structured log preserves the trail.
+            logger.systemLogger(
+                bot.clientId,
+                `requireGuildRepos: discord reply skipped (expired interaction, code=${err.code}).`,
+            );
+            return;
+        }
+        throw err;
     }
-    await interaction.reply({ content, flags: MessageFlags.Ephemeral });
 };
-
-/**
- * Short, non-cryptographic trace id used to correlate a user-facing
- * `errors:db.guild_disabled` message with the boot-time log line
- * recorded by `BaseBot.connectGuildDB`. 6 base-36 chars is enough to
- * make the id grep-able without bloating the user message.
- */
-const makeTraceId = (): string => Math.random().toString(36).slice(2, 8);
 
 /**
  * Resolve the guild's `Repos` bundle or reply to the user with the
@@ -68,18 +88,23 @@ export const requireGuildRepos = async (
     const guildId = interaction.guild?.id;
     if (guildId === undefined) {
         await replyOrEdit(
+            bot,
             interaction,
             bot.translator?.t('errors:command.guild_only') ?? '',
         );
         return null;
     }
 
-    const disabledError = bot.disabledGuilds.get(guildId);
-    if (disabledError !== undefined) {
-        const traceId = makeTraceId();
+    const disabled = bot.disabledGuilds.get(guildId);
+    if (disabled !== undefined) {
+        // The traceId was stamped at boot when `connectOneGuild` failed
+        // for this guild, and is in the systemLogger line. Surfacing
+        // the same id here lets operators correlate a support ticket
+        // ("got error xxxxxx") with the originating boot failure.
         await replyOrEdit(
+            bot,
             interaction,
-            bot.translator?.t('errors:db.guild_disabled', { traceId }) ?? '',
+            bot.translator?.t('errors:db.guild_disabled', { traceId: disabled.traceId }) ?? '',
         );
         return null;
     }
@@ -87,6 +112,7 @@ export const requireGuildRepos = async (
     const repos = bot.guildInfo[guildId]?.repos;
     if (repos === undefined) {
         await replyOrEdit(
+            bot,
             interaction,
             bot.translator?.t('errors:db.not_found') ?? '',
         );
