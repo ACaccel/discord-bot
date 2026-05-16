@@ -1,9 +1,5 @@
-import { Client, Interaction, MessageFlags } from 'discord.js';
+import { Client } from 'discord.js';
 import { BaseBot, Config } from '@bot';
-import { executeCommand } from '@cmd';
-import { executeButton } from '@button';
-import { executeModal } from '@modal';
-import { executeSSM } from '@select-menu';
 import { activity, giveaway } from '@features';
 import {
     AutoReplyPlugin,
@@ -25,10 +21,11 @@ export class Nijika extends BaseBot<NijikaConfig> {
         // the translator is loaded — see audit 3.4.
         this.helpMessageKey = 'replies:nijika.help_message';
 
-        // Phase 4b plugin registration. The interactionEventListener
-        // override below stays because nijika threads `blocked_channels`
-        // into executeCommand — InteractionRouter middleware will
-        // absorb that in a later phase.
+        // Phase 4b plugin registration. Audit B-2 removed the previous
+        // `interactionEventListener` override: blocked_channels now
+        // flows through the InteractionRouter via the
+        // `channelLoggingBlockedChannels` hook below, and the dispatch
+        // logic is the default `createDispatchMiddleware`.
         this.use(AutoReplyPlugin);
         this.use(TtsReplyPlugin);
         this.use(createGuildEventsPlugin({
@@ -39,29 +36,7 @@ export class Nijika extends BaseBot<NijikaConfig> {
         this.use(createActivityPlugin({ rebootJobs: () => activity.rebootActivityJobs(this) }));
     }
 
-    public override interactionEventListener = async (interaction: Interaction): Promise<void> => {
-        switch (true) {
-            case interaction.isChatInputCommand() || interaction.isContextMenuCommand():
-                await executeCommand(interaction, this, this.config.blocked_channels);
-                break;
-            case interaction.isModalSubmit():
-                await executeModal(interaction, this);
-                break;
-            case interaction.isButton():
-                await executeButton(interaction, this);
-                break;
-            case interaction.isStringSelectMenu():
-                await executeSSM(interaction, this);
-                break;
-            default:
-                if (!interaction.isAutocomplete()) {
-                    await interaction.reply({
-                        content:
-                            this.translator?.t('errors:command.unsupported_interaction_type') ?? '',
-                        flags: MessageFlags.Ephemeral,
-                    });
-                }
-                break;
-        }
+    protected override channelLoggingBlockedChannels(): readonly string[] {
+        return this.config.blocked_channels;
     }
 }

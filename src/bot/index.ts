@@ -37,13 +37,22 @@ import { initLegacyLogger } from '../utils/logger';
 import { loadEnv, type Env } from '../core/config';
 import { createDefaultTranslator, type Translator } from '../core/i18n';
 import { systemClock, type Clock } from '../core/time';
-import { PluginHost, type Plugin } from '../core/plugin';
+import {
+    InteractionRouter,
+    PluginHost,
+    type InteractionContext,
+    type Plugin,
+} from '../core/plugin';
+import {
+    createChannelLoggingMiddleware,
+    createDispatchMiddleware,
+} from '../handlers/middlewares';
 import type { GuildRegistry } from '../core/guild-registry';
 import { Job } from 'node-schedule';
-import { Command, registerCommands, executeCommand } from "@cmd";
-import { ButtonHandler, registerButtons, executeButton } from '@button';
-import { ModalHandler, registerModals, executeModal } from '@modal';
-import { registerSSMs, SSMHandler, executeSSM } from '@select-menu';
+import { Command, registerCommands } from "@cmd";
+import { ButtonHandler, registerButtons } from '@button';
+import { ModalHandler, registerModals } from '@modal';
+import { registerSSMs, SSMHandler } from '@select-menu';
 import { logger } from "@utils";
 import { detectGuildCreate } from "@event";
 import { ReactionHandler, executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
@@ -142,6 +151,15 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * are flushed into the host as part of `run()`'s startup sequence.
      */
     private pluginHost: PluginHost | undefined;
+
+    /**
+     * Chain-of-Responsibility dispatcher for inbound interactions.
+     * Built in {@link run} once the translator + clock are loaded;
+     * `interactionEventListener` forwards every interaction through
+     * the chain. Subclasses may inject extra middleware via
+     * {@link configureInteractionRouter}.
+     */
+    protected interactionRouter: InteractionRouter | undefined;
     private readonly pendingPlugins: Array<{ plugin: Plugin<unknown>; config: unknown }> = [];
 
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: TConfig) {
@@ -355,6 +373,21 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         if (this.helpMessageKey !== undefined) {
             this.help_msg = translator.t(this.helpMessageKey);
         }
+        // Audit B-2: assemble the Chain-of-Responsibility interaction
+        // router. Subclass-injected middleware runs FIRST (typical use
+        // case: gate / filter / context-priming), then the terminal
+        // dispatch + observability stages. The
+        // `configureInteractionRouter` hook stays sync because routing
+        // setup never needs IO — middleware itself owns the async
+        // work.
+        this.interactionRouter = new InteractionRouter();
+        this.configureInteractionRouter(this.interactionRouter);
+        this.interactionRouter.use(createDispatchMiddleware(this));
+        this.interactionRouter.use(
+            createChannelLoggingMiddleware(this, {
+                blockedChannels: this.channelLoggingBlockedChannels(),
+            }),
+        );
         // Build the host now that Translator + Clock + Logger are all
         // bound. Phase 4b-1 passes empty core registries because the
         // legacy registerCommands/registerButtons/... paths still feed
@@ -689,30 +722,64 @@ export abstract class BaseBot<TConfig extends Config = Config> {
 
     /********** Event Listeners **********/
 
+    /**
+     * Subclass hook: append middleware to the bot's
+     * {@link InteractionRouter} BEFORE the terminal dispatch /
+     * channel-logging stages run. Default is a no-op. Subclasses MUST
+     * NOT keep a reference to the router beyond this call — every
+     * middleware should be self-contained.
+     */
+    protected configureInteractionRouter(_router: InteractionRouter): void {
+        // default: no extra middleware
+    }
+
+    /**
+     * Subclass hook returning channels (and parent thread channels)
+     * whose slash-command activity should NOT be logged to the debug
+     * channel. Default `undefined` means "log everything". Nijika
+     * surfaces its `config.blocked_channels` here.
+     */
+    protected channelLoggingBlockedChannels(): readonly string[] | undefined {
+        return undefined;
+    }
+
     public interactionEventListener = async (interaction: Interaction): Promise<void> => {
-        switch (true) {
-            case interaction.isChatInputCommand() || interaction.isContextMenuCommand():
-                await executeCommand(interaction, this);
-                break;
-            case interaction.isModalSubmit():
-                await executeModal(interaction, this);
-                break;
-            case interaction.isButton():
-                await executeButton(interaction, this);
-                break;
-            case interaction.isStringSelectMenu():
-                await executeSSM(interaction, this);
-                break;
-            default:
-                if (!interaction.isAutocomplete()) {
-                    await interaction.reply({
-                        content:
-                            this.translator?.t('errors:command.unsupported_interaction_type') ?? '',
-                        flags: MessageFlags.Ephemeral,
-                    });
-                }
-                break;
+        // Audit B-2: every interaction goes through the
+        // Chain-of-Responsibility middleware stack. The router is
+        // built inside `run()`; pre-`run()` (test paths) we fall
+        // through to a minimal default reply.
+        if (this.interactionRouter === undefined) {
+            if (!interaction.isAutocomplete() && interaction.isRepliable()) {
+                await interaction.reply({
+                    content:
+                        this.translator?.t('errors:command.handler_not_initialised') ?? '',
+                    flags: MessageFlags.Ephemeral,
+                });
+            }
+            return;
         }
+        const traceId = Math.random().toString(36).slice(2, 8).padStart(6, '0');
+        const rootLogger = this.container.resolve<Logger>(TOKENS.Logger);
+        const clock = this.container.resolve<Clock>(TOKENS.Clock);
+        const translator = this.translator;
+        if (translator === undefined) {
+            // Defensive: translator is set immediately before the
+            // router; either both are present or both absent. This
+            // branch is unreachable in production but keeps strict
+            // typing honest.
+            return;
+        }
+        const ctx: InteractionContext = {
+            interaction,
+            traceId,
+            logger: rootLogger.child({ traceId }),
+            translator,
+            clock,
+            resolve: <T>(token: import('../core/ioc').ServiceToken<T>): T =>
+                this.container.resolve<T>(token),
+            state: new Map<string, unknown>(),
+        };
+        await this.interactionRouter.dispatch(ctx);
     }
 
     /**

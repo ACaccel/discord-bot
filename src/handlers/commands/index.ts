@@ -116,7 +116,16 @@ export const registerCommands = async (bot: BaseBot) => {
     }
 }
 
-export const executeCommand = async (interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot, blocked_channels?: string[]) => {
+/**
+ * Dispatch a slash-command / context-menu interaction to its handler.
+ *
+ * Channel + guild logging used to live here (with a `blocked_channels`
+ * 3rd arg threaded in from `nijika`); audit B-2 lifted that into
+ * `createChannelLoggingMiddleware` so policy lives at the composition
+ * root rather than buried in this dispatcher. The function is now
+ * purely concerned with handler lookup.
+ */
+export const executeCommand = async (interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot) => {
     if (!bot.config.commands) {
         await replyTranslated(interaction, bot.translator, 'errors:command.config_missing');
         return;
@@ -131,16 +140,6 @@ export const executeCommand = async (interaction: ChatInputCommandInteraction | 
         await handler.execute(interaction, bot);
     } else {
         await replyTranslated(interaction, bot.translator, 'errors:command.not_found', { name: interaction.commandName });
-    }
-    
-    const parentId = interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null;
-    if (!(blocked_channels && (blocked_channels.includes(interaction.channelId) || (parentId && blocked_channels.includes(parentId))))) {
-        const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channelId}>`;
-        logger.channelLogger(bot.guildInfo[interaction.guildId as string]?.channels?.debug, undefined, channel_log);
-    }
-    if (interaction.guild) {
-        const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
-        logger.guildLogger(bot.clientId, interaction.guild.id, 'interaction_create', guild_log, interaction.guild?.name as string);
     }
 }
 
