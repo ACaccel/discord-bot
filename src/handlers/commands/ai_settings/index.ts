@@ -11,7 +11,7 @@ import {
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { logger } from '@utils';
-import { LLMProviderName, listProviderModels } from '@llm_chat';
+import { type LLMProviderName, listProviderModels } from '../../../infra/llm';
 import { requireGuildRepos } from '../../require-guild-repos';
 
 interface UserApiDoc {

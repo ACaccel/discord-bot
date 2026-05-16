@@ -1,7 +1,7 @@
 import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
-import { BaseBot } from '@bot';
-import { bot_cmd, JobManager, logger } from '@utils';
+import { BaseBot } from '../../../bot';
+import { bot_cmd, JobManager, logger } from '../../../utils';
 
 export interface IActivityBot {
     jobs: Map<string, Job>

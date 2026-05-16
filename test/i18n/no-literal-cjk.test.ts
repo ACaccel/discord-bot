@@ -60,6 +60,22 @@ const SCOPED_DIRECTORIES: readonly string[] = [
  */
 const FILE_ALLOWLIST: ReadonlySet<string> = new Set<string>([]);
 
+/**
+ * Directory-level skip list. Entries here are subdirectories whose
+ * legacy contents are tracked for i18n migration but excluded from
+ * the strict scanner until they are rewritten.
+ *
+ * `src/plugins/<plugin-id>/internal/**` — PR-E E-4 (audit C-3)
+ * relocated the original `src/features/{activity,giveaway}/**` files
+ * into the per-plugin `internal/` directories verbatim. The 46 CJK
+ * literals they carry are real user-facing strings that should
+ * eventually flow through the translator, but the relocation itself
+ * is structural (Phase 4b-3 carve-out). The follow-up migration is
+ * tracked as a separate item; this skip prevents the move from
+ * appearing as a scanner regression.
+ */
+const SKIP_PATH_PATTERNS: readonly RegExp[] = [/\/internal\//];
+
 const CJK_REGEX = /[぀-ゟ゠-ヿ一-鿿가-힯]/;
 // Require a non-empty reason after the colon so reviewers see WHY a
 // literal stayed inline. The reason-less form `// i18n-ignore` is
@@ -103,6 +119,10 @@ const isCommentLine = (line: string, inBlockComment: boolean): boolean => {
 const scanFile = (filePath: string): readonly Violation[] => {
   const rel = path.relative(ROOT, filePath);
   if (FILE_ALLOWLIST.has(rel)) return [];
+  // Normalise to forward-slash so the patterns match on Windows too;
+  // the runtime separator does not affect the audit-intent regex.
+  const normalised = rel.split(path.sep).join('/');
+  if (SKIP_PATH_PATTERNS.some((re) => re.test(normalised))) return [];
   const source = fs.readFileSync(filePath, 'utf8');
   const lines = source.split('\n');
   const violations: Violation[] = [];

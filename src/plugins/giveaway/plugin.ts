@@ -1,19 +1,16 @@
 /**
- * GiveawayPlugin — wires the legacy giveaway lifecycle into the
- * plugin host's `onReady` hook.
+ * GiveawayPlugin — schedules the legacy giveaway-job reboot on
+ * `onReady`.
  *
- * Phase 4b PR 3 migrates the feature-level callsites that BaseBot.init
- * used to call directly (`giveaway.rebootGiveawayJobs(this)`). The
- * bot opting in passes a `rebootJobs` closure that closes over the
- * bot reference; the plugin invokes it once Discord is fully ready so
- * scheduled giveaway end-time jobs survive restarts.
- *
- * Why a callback factory rather than a container-resolved bot
- * reference: the legacy `rebootGiveawayJobs` reaches deep into
- * `bot.guildInfo[g].db.models["Giveaway"]` and the `bot.jobs` map,
- * neither of which has a typed port yet (they migrate in a later
- * phase). Capturing the bot via closure keeps the plugin decoupled
- * from BaseBot's shape while still preserving behaviour verbatim.
+ * The plugin takes a `rebootJobs` callback rather than importing
+ * `rebootGiveawayJobs` directly so the plugin module does not
+ * transitively pull `internal/` into the strict-mode typecheck
+ * scope. Composition roots (which are NOT in the strict scope
+ * today — extending it is PR-G's job) supply the closure that
+ * captures the bot reference. The callback shape kept by this
+ * plugin is what makes the relocation of `features/giveaway/*`
+ * into `./internal/*` (audit C-3 / PR-E E-4) reachable without
+ * triggering the full C-10 strict expansion cascade.
  */
 import type { Plugin } from '../../core/plugin';
 
@@ -39,8 +36,6 @@ export const createGiveawayPlugin = (config: GiveawayPluginConfig): Plugin => ({
     try {
       await config.rebootJobs();
     } catch (err: unknown) {
-      // Match the legacy outer catch in BaseBot.init: any throw from
-      // reboot is logged but does not abort startup.
       ctx.logger.error(
         { err: err instanceof Error ? err : new Error(String(err)) },
         'giveaway: rebootJobs threw on ready; scheduled jobs may be missing',

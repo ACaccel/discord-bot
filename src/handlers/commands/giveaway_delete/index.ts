@@ -3,7 +3,7 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { giveaway } from '@features';
+import * as giveaway from '../../../plugins/giveaway/internal';
 
 export default class giveaway_delete extends Command {
     constructor() {

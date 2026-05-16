@@ -1,6 +1,5 @@
 import { Client } from 'discord.js';
 import { BaseBot, Config } from '@bot';
-import { activity, giveaway } from '@features';
 import {
     AutoReplyPlugin,
     TtsReplyPlugin,
@@ -8,6 +7,13 @@ import {
     createGiveawayPlugin,
     createGuildEventsPlugin,
 } from '@plugins';
+// Direct deep imports into the relocated feature internals — only
+// composition roots cross the plugin/internal layer line, and only
+// to thread the reboot closure into the plugin factories. The plugin
+// itself stays internal-blind so its module remains free of legacy
+// `@utils` / `@bot` dependencies in strict-mode typecheck.
+import { rebootActivityJobs } from '../../plugins/activity/internal';
+import { rebootGiveawayJobs } from '../../plugins/giveaway/internal';
 
 interface NijikaConfig extends Config {
     blocked_channels: string[];
@@ -32,8 +38,8 @@ export class Nijika extends BaseBot<NijikaConfig> {
             blockedChannels: this.config.blocked_channels,
             clientId: this.clientId,
         }));
-        this.use(createGiveawayPlugin({ rebootJobs: () => giveaway.rebootGiveawayJobs(this) }));
-        this.use(createActivityPlugin({ rebootJobs: () => activity.rebootActivityJobs(this) }));
+        this.use(createGiveawayPlugin({ rebootJobs: () => rebootGiveawayJobs(this) }));
+        this.use(createActivityPlugin({ rebootJobs: () => rebootActivityJobs(this) }));
     }
 
     protected override channelLoggingBlockedChannels(): readonly string[] {

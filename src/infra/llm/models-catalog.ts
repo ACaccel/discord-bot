@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
-import { LLMProviderName, PROVIDER_API_KEY_ENV } from '../../../infra/llm';
+import { type LLMProviderName, PROVIDER_API_KEY_ENV } from './types';
 
 /** TTL for cached model lists. */
 const CACHE_TTL_MS = 15 * 60 * 1000;

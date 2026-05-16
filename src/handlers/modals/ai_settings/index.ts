@@ -2,7 +2,7 @@ import { ModalSubmitInteraction, MessageFlags } from 'discord.js';
 import { BaseBot } from '@bot';
 import { ModalHandler } from '@modal';
 import { logger } from '@utils';
-import { LLMProviderName } from '@llm_chat';
+import { type LLMProviderName } from '../../../infra/llm';
 import { requireGuildRepos } from '../../require-guild-repos';
 
 const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set(['xai', 'openai', 'anthropic', 'gemini']);

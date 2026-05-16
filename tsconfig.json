@@ -17,8 +17,6 @@
       "@reaction": ["handlers/reactions/index"],
       "@utils": ["utils/index"],
       "@event": ["events/index"],
-      "@features": ["features/index"],
-      "@llm_chat": ["features/llm_chat/index"],
       "@core/*": ["core/*"],
       "@plugins": ["plugins/index"]
     },

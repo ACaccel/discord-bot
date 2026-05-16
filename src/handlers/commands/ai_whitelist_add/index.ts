@@ -2,7 +2,7 @@ import { ChatInputCommandInteraction, MessageFlags } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { logger } from '@utils';
-import { DEFAULT_MODELS } from '@llm_chat';
+import { DEFAULT_MODELS } from '../../../infra/llm';
 import { requireGuildRepos } from '../../require-guild-repos';
 
 export default class ai_whitelist_add extends Command {

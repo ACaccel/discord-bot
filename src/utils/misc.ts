@@ -3,9 +3,6 @@ import { AttachmentBuilder, Guild } from "discord.js";
 import schedule from 'node-schedule';
 import * as fs from 'fs/promises';
 import { createCanvas, loadImage } from 'canvas';
-import { BaseBot } from "@bot";
-import { logger } from "@utils";
-// import guild_profile from '../guild_profile.json';
 
 export interface CanvasOptions {
     itemsPerRow: number;
@@ -119,7 +116,9 @@ export const listInOneImage = async (content: CanvasContent[], options?: Partial
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         for (let i = 0; i < content.length; i++) {
-            const { url, text } = content[i];
+            const item = content[i];
+            if (item === undefined) continue;
+            const { url, text } = item;
             const row = Math.floor(i / itemsPerRow);
             const col = i % itemsPerRow;
             const x = col * (itemSize + padding) + padding;
@@ -153,8 +152,15 @@ export const parseDuration = (duration: string): number | null => {
     const match = duration.match(/^(\d+)([smhdw])$/);
     if (!match) return null;
 
-    const value = parseInt(match[1], 10);
-    const unit = match[2];
+    // Capture-group `match[1]` and `[2]` are guaranteed by the regex
+    // match success, but `noUncheckedIndexedAccess` widens them. The
+    // assertions below collapse the optionals — pattern-matched by the
+    // regex's own contract above.
+    const rawValue = match[1];
+    const rawUnit = match[2];
+    if (rawValue === undefined || rawUnit === undefined) return null;
+    const value = parseInt(rawValue, 10);
+    const unit = rawUnit;
 
     if (isNaN(value)) return null;
     switch (unit) {

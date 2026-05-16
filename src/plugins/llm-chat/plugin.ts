@@ -25,7 +25,6 @@ import { TOKENS } from '../../core/ioc';
 import type { Plugin } from '../../core/plugin';
 import {
   LLMService,
-  SessionManager,
   createDefaultRegistry,
   formatUsageFooter,
   listProviderModels,
@@ -33,7 +32,8 @@ import {
   type LLMProviderName,
   type LLMResult,
   type LLMSettings,
-} from '../../features/llm_chat';
+} from '../../infra/llm';
+import { SessionManager } from './internal';
 import * as legacyLogger from '../../utils/logger';
 
 const PLUGIN_ID = 'llm-chat';

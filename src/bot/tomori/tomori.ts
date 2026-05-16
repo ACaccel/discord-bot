@@ -1,7 +1,8 @@
 import { Client } from 'discord.js';
 import { BaseBot, Config } from '@bot';
-import { activity, giveaway } from '@features';
 import { AutoReplyPlugin, createActivityPlugin, createGiveawayPlugin } from '@plugins';
+import { rebootActivityJobs } from '../../plugins/activity/internal';
+import { rebootGiveawayJobs } from '../../plugins/giveaway/internal';
 
 interface TomoriConfig extends Config {}
 
@@ -13,7 +14,7 @@ export class Tomori extends BaseBot<TomoriConfig> {
         // for every bot. Tomori preserves that behaviour by opting
         // into the same three plugins explicitly.
         this.use(AutoReplyPlugin);
-        this.use(createGiveawayPlugin({ rebootJobs: () => giveaway.rebootGiveawayJobs(this) }));
-        this.use(createActivityPlugin({ rebootJobs: () => activity.rebootActivityJobs(this) }));
+        this.use(createGiveawayPlugin({ rebootJobs: () => rebootGiveawayJobs(this) }));
+        this.use(createActivityPlugin({ rebootJobs: () => rebootActivityJobs(this) }));
     }
 }

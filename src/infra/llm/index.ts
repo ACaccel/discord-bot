@@ -6,9 +6,13 @@
  * the boundary surface (types, registry), or translates upstream
  * errors into the shared domain taxonomy (`error-translator`).
  *
- * Domain-level concerns (pricing math, model catalog metadata, the
- * in-memory session manager) stay in `features/llm_chat/` — that
- * boundary is intentional and worth preserving.
+ * Audit C-3 / PR-E E-4 folded the LLM domain helpers (`models-catalog`,
+ * `pricing`) that used to live under `src/features/llm_chat/llm/`
+ * into this directory — both are pure LLM-provider knowledge and
+ * have no dependency on Discord, plugins, or the bot composition
+ * root. The plugin-specific `SessionManager` moved into
+ * `src/plugins/llm-chat/internal/` instead because that one IS
+ * plugin-shaped state.
  */
 export {
   type LLMMessage,
@@ -32,3 +36,6 @@ export { OpenAIProvider } from './openai-provider';
 export { AnthropicProvider } from './anthropic-provider';
 export { GeminiProvider } from './gemini-provider';
 export { XAIProvider } from './xai-provider';
+
+export { listProviderModels } from './models-catalog';
+export { calculateCost, formatUsageFooter } from './pricing';
