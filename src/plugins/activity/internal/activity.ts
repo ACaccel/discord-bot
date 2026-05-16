@@ -154,19 +154,32 @@ export const rebootActivityJobs = async (bot: BaseBot) => {
                 if (!guild_info.repos) return;
                 const activities = await rebootRetry(() => guild_info.repos!.activity.listAll());
                 for (const a of activities) {
-                    const expired_at = new Date(a.expired_at);
-                    if (expired_at > new Date()) {
-                        jobManager.schedule(activityJobKey(a.activity_id), expired_at, async () => {
-                            if (await findActivity(bot, guild_info.guild.id, a.activity_id)) {
-                                await scheduleActivity(bot, guild_info.guild.id, a.activity_id);
-                            }
-                        });
-                    } else {
-                        await deleteActivity(bot as BaseBot & IActivityBot, guild_info.guild.id, a.activity_id);
+                    // Per-row try/catch so a transient Mongo blip on a
+                    // single delete does not abort the rest of the
+                    // guild's scheduling pass (reviewer WARN: previous
+                    // shape left the remainder un-scheduled). Errors
+                    // are logged but not escalated — the listAll
+                    // exhaustion path below is the operator-visible
+                    // failure mode.
+                    try {
+                        const expired_at = new Date(a.expired_at);
+                        if (expired_at > new Date()) {
+                            jobManager.schedule(activityJobKey(a.activity_id), expired_at, async () => {
+                                if (await findActivity(bot, guild_info.guild.id, a.activity_id)) {
+                                    await scheduleActivity(bot, guild_info.guild.id, a.activity_id);
+                                }
+                            });
+                        } else {
+                            await rebootRetry(() =>
+                                deleteActivity(bot as BaseBot & IActivityBot, guild_info.guild.id, a.activity_id),
+                            );
+                        }
+                    } catch (rowErr) {
+                        logger.errorLogger(bot.clientId, guild_info.guild.id, rowErr);
                     }
                 }
             } catch (err) {
-                // After all retries exhausted: surface to operators via
+                // listAll exhaustion: log + surface to operators via
                 // the debug channel so a sustained outage is visible,
                 // not just buried in the log file.
                 logger.errorLogger(bot.clientId, guild_info.guild.id, err);
@@ -174,9 +187,11 @@ export const rebootActivityJobs = async (bot: BaseBot) => {
                 if (debugCh?.isSendable()) {
                     await debugCh
                         .send(
-                            `[ ops ] activity reboot failed for guild ${guild_info.guild.id} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
+                            `[ ops ] activity reboot listAll failed for guild ${guild_info.guild.id} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
                         )
-                        .catch(() => undefined);
+                        .catch((sendErr) =>
+                            logger.errorLogger(bot.clientId, guild_info.guild.id, sendErr),
+                        );
                 }
             }
         }),

@@ -272,8 +272,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
 
     /**
      * Open (or reuse) the per-guild MongoDB connection and populate
-     * BOTH `guildInfo[g].db` (legacy shape, for unmigrated callsites)
-     * and `guildInfo[g].repos` (typed bag, for new code).
+     * `guildInfo[g].repos` with the typed repository bag. Audit C-2
+     * (PR-E) retired the legacy `guildInfo[g].db` slot — `repos` is
+     * now the only entry point.
      *
      * Reused by the startup loop in {@link connectGuildDB} and by the
      * new-guild-join path in `src/events/guild_event.ts`.

@@ -257,6 +257,11 @@ const saveBatch = async (
     if (newestId === undefined || BigInt(msg.id) > BigInt(newestId)) newestId = msg.id;
   }
 
+  // Pre-filter for the bulk insert below. NOT a correctness gate —
+  // the `messageId` unique index plus `insertManyIgnoringDuplicates`
+  // would absorb any double-write even without this lookup. The
+  // pre-filter exists so the steady-state incremental backup avoids
+  // the BulkWriteError round-trip on already-seen messages.
   const existingSet = await messageRepo.findExistingMessageIds(ids);
 
   let skippedBots = 0;

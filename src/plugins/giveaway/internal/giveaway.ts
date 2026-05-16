@@ -160,15 +160,23 @@ export const rebootGiveawayJobs = async (bot: BaseBot) => {
                 if (!guild_info.repos) return;
                 const giveaways = await rebootRetry(() => guild_info.repos!.giveaway.listAll());
                 for (const g of giveaways) {
-                    const end_time = new Date(g.end_time);
-                    if (end_time > new Date()) {
-                        jobManager.schedule(giveawayJobKey(g.message_id), end_time, async () => {
-                            if (await findGiveaway(bot, guild_info.guild.id, g.message_id)) {
-                                await scheduleGiveaway(bot, guild_info.guild.id, g.message_id);
-                            }
-                        });
-                    } else {
-                        await deleteGiveaway(bot, guild_info.guild.id, g.message_id);
+                    // Per-row try/catch so one transient Mongo blip on
+                    // a delete does not abort the remaining giveaways.
+                    try {
+                        const end_time = new Date(g.end_time);
+                        if (end_time > new Date()) {
+                            jobManager.schedule(giveawayJobKey(g.message_id), end_time, async () => {
+                                if (await findGiveaway(bot, guild_info.guild.id, g.message_id)) {
+                                    await scheduleGiveaway(bot, guild_info.guild.id, g.message_id);
+                                }
+                            });
+                        } else {
+                            await rebootRetry(() =>
+                                deleteGiveaway(bot, guild_info.guild.id, g.message_id),
+                            );
+                        }
+                    } catch (rowErr) {
+                        logger.errorLogger(bot.clientId, guild_info.guild.id, rowErr);
                     }
                 }
             } catch (err) {
@@ -177,9 +185,11 @@ export const rebootGiveawayJobs = async (bot: BaseBot) => {
                 if (debugCh?.isSendable()) {
                     await debugCh
                         .send(
-                            `[ ops ] giveaway reboot failed for guild ${guild_info.guild.id} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
+                            `[ ops ] giveaway reboot listAll failed for guild ${guild_info.guild.id} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
                         )
-                        .catch(() => undefined);
+                        .catch((sendErr) =>
+                            logger.errorLogger(bot.clientId, guild_info.guild.id, sendErr),
+                        );
                 }
             }
         }),
