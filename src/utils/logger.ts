@@ -24,13 +24,14 @@ import type { Attachment, Channel, EmbedBuilder } from 'discord.js';
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
-import { createLoggerFromProcessEnv, type Logger } from '../core/logger';
+import type { Logger } from '../core/logger';
+import { createBootstrapLogger } from '../core/config';
 
 let current: Logger | undefined;
 
 const getLogger = (): Logger => {
   if (current === undefined) {
-    current = createLoggerFromProcessEnv({ scope: 'legacy' });
+    current = createBootstrapLogger({ scope: 'legacy' });
   }
   return current;
 };
