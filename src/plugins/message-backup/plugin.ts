@@ -34,10 +34,12 @@ import {
   type TextBasedChannel,
 } from 'discord.js';
 
-import type { GuildDbHandle, GuildRegistry } from '../../core/guild-registry';
+import type { GuildRegistry } from '../../core/guild-registry';
 import { TOKENS } from '../../core/ioc';
 import type { Logger } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
+import type { MessageRepo, Repos } from '../../persistence/repositories';
+import type { MessageDoc } from '../../persistence/schemas/message.schema';
 import * as legacyLogger from '../../utils/logger';
 
 const PLUGIN_ID = 'message-backup';
@@ -229,10 +231,7 @@ interface BatchResult {
 const saveBatch = async (
   fetched: { values: () => Iterable<unknown> },
   ch: { id: string; name?: string },
-  // Legacy db handle from `bot.guildInfo[g].db`. Phase 4b PR 3 keeps
-  // the inline `models["Message"]` access verbatim — Phase 5 / Phase 7
-  // refactors this layer to the typed Repos bag.
-  db: GuildDbHandle,
+  messageRepo: MessageRepo,
 ): Promise<BatchResult> => {
   const messages = [...fetched.values()] as Array<{
     id: string;
@@ -258,11 +257,7 @@ const saveBatch = async (
     if (newestId === undefined || BigInt(msg.id) > BigInt(newestId)) newestId = msg.id;
   }
 
-  const existingDocs = (await db.models['Message']!.find(
-    { messageId: { $in: ids } },
-    { messageId: 1 },
-  )) as Array<{ messageId: string }>;
-  const existingSet = new Set(existingDocs.map((d) => d.messageId));
+  const existingSet = await messageRepo.findExistingMessageIds(ids);
 
   let skippedBots = 0;
   let skippedDuplicates = 0;
@@ -315,24 +310,19 @@ const saveBatch = async (
     return { inserted: 0, skippedBots, skippedDuplicates, oldestId, newestId, oldestMsg, newestMsg };
   }
 
-  let inserted = 0;
-  try {
-    const result = (await db.models['Message']!.insertMany(toInsert, { ordered: false })) as unknown;
-    inserted = Array.isArray(result) ? result.length : toInsert.length;
-  } catch (err: unknown) {
-    const e = err as { code?: number; name?: string; insertedCount?: number };
-    if (e.code === 11000 || e.name === 'BulkWriteError') {
-      inserted = e.insertedCount ?? 0;
-    } else {
-      throw err;
-    }
-  }
+  // `insertManyIgnoringDuplicates` already converts BulkWriteError on
+  // duplicate-key into a partial-success count (see message.repo.ts);
+  // no try/catch needed here. Cast: `toInsert` is structurally a
+  // MessageDoc minus the readonly `_id` (Mongo generates it on write).
+  const { inserted } = await messageRepo.insertManyIgnoringDuplicates(
+    toInsert as unknown as readonly MessageDoc[],
+  );
   return { inserted, skippedBots, skippedDuplicates, oldestId, newestId, oldestMsg, newestMsg };
 };
 
 const backupChannel = async (
   channel: TextBasedChannel,
-  db: GuildDbHandle,
+  repos: Repos,
   guildId: string,
   clientId: string,
   onProgress: () => Promise<void>,
@@ -358,15 +348,9 @@ const backupChannel = async (
   };
 
   try {
-    let fetchRecord = (await db.models['Fetch']!.findOne({ channelID: ch.id })) as
-      | { lastMessageID?: string }
-      | null;
-    if (fetchRecord === null) {
-      fetchRecord = (await db.models['Fetch']!.create({
-        channel: ch.name ?? '',
-        channelID: ch.id,
-        lastMessageID: '',
-      })) as { lastMessageID?: string };
+    let fetchRecord = await repos.fetch.findByChannelId(ch.id);
+    if (fetchRecord === undefined) {
+      fetchRecord = await repos.fetch.create(ch.name ?? '', ch.id, '');
     }
     const lastMessageID = fetchRecord.lastMessageID ?? '';
     let latestMessageId: string | undefined;
@@ -395,7 +379,7 @@ const backupChannel = async (
           ch.messages.fetch({ limit: 100, after: cursor }),
         );
         if (fetched.size === 0) break;
-        const batch = await saveBatch(fetched, ch, db);
+        const batch = await saveBatch(fetched, ch, repos.message);
         stats.batches += 1;
         stats.totalFetched += fetched.size;
         stats.newMessages += batch.inserted;
@@ -416,7 +400,7 @@ const backupChannel = async (
         if (cursor !== undefined) opts.before = cursor;
         const fetched = await retryFetch(() => ch.messages.fetch(opts));
         if (fetched.size === 0) break;
-        const batch = await saveBatch(fetched, ch, db);
+        const batch = await saveBatch(fetched, ch, repos.message);
         stats.batches += 1;
         stats.totalFetched += fetched.size;
         stats.newMessages += batch.inserted;
@@ -433,11 +417,7 @@ const backupChannel = async (
     }
 
     if (latestMessageId !== undefined) {
-      await db.models['Fetch']!.findOneAndUpdate(
-        { channelID: ch.id },
-        { channel: ch.name ?? '', lastMessageID: latestMessageId },
-        { upsert: true },
-      );
+      await repos.fetch.upsertLastMessageID(ch.name ?? '', ch.id, latestMessageId);
     }
     stats.startMsgId = globalOldest?.id;
     stats.startMsgContent = globalOldest?.content;
@@ -462,17 +442,14 @@ const performBackup = async (
   clientId: string,
   pluginLogger: Logger,
 ): Promise<void> => {
-  // GuildRegistry returns the legacy `db` handle alongside `repos`
-  // until the message-archive layer is rewritten on top of the typed
-  // bag (deferred to a later phase — keeping verbatim behaviour here).
   const guild = client.guilds.cache.get(guildId);
   if (guild === undefined) {
     pluginLogger.warn({ guildId }, 'message-backup: guild not in cache');
     return;
   }
-  const db = registry.getDb(guildId);
-  if (db === undefined) {
-    legacyLogger.errorLogger(clientId, guildId, 'Database not found');
+  const repos = registry.getRepos(guildId);
+  if (repos === undefined) {
+    legacyLogger.errorLogger(clientId, guildId, 'Repos not available for guild');
     return;
   }
 
@@ -488,7 +465,7 @@ const performBackup = async (
   try {
     const startTime = Date.now();
     let newCount = 0;
-    const existingCount = (await db.models['Message']!.countDocuments({})) as number;
+    const existingCount = await repos.message.countAll();
 
     const statusMsg = await debugCh.send(
       `[ SYSTEM ] Backup started. DB contains ${existingCount} messages.`,
@@ -513,7 +490,7 @@ const performBackup = async (
     const allStats: ChannelBackupStats[] = [];
     for (let i = 0; i < channels.length; i += 1) {
       const channel = channels[i]!;
-      const { added, stats } = await backupChannel(channel, db, guildId, clientId, async () => {
+      const { added, stats } = await backupChannel(channel, repos, guildId, clientId, async () => {
         await statusMsg
           .edit(
             `[ SYSTEM ] Backup in progress. DB now contains (${existingCount}+${newCount}) messages.`,
@@ -553,24 +530,22 @@ const performBackup = async (
       log.writeln();
     }
 
-    const allFetchDocs = (await db.models['Fetch']!.find({}, { channelID: 1 })) as Array<{
-      channelID: string;
-    }>;
+    const allFetchChannelIds = await repos.fetch.listChannelIds();
     const deletedChannelIds: string[] = [];
-    for (const doc of allFetchDocs) {
-      if (liveChannelIds.has(doc.channelID)) continue;
+    for (const channelID of allFetchChannelIds) {
+      if (liveChannelIds.has(channelID)) continue;
       try {
-        await client.channels.fetch(doc.channelID, { force: true });
+        await client.channels.fetch(channelID, { force: true });
       } catch (err) {
         if (err instanceof DiscordAPIError && err.code === 10003) {
-          await db.models['Fetch']!.deleteOne({ channelID: doc.channelID });
-          deletedChannelIds.push(doc.channelID);
+          await repos.fetch.deleteByChannelId(channelID);
+          deletedChannelIds.push(channelID);
         }
       }
     }
 
     const duration = (Date.now() - startTime) / 1000;
-    const finalCount = (await db.models['Message']!.countDocuments({})) as number;
+    const finalCount = await repos.message.countAll();
     const totalFetched = allStats.reduce((s, x) => s + x.totalFetched, 0);
     const totalBots = allStats.reduce((s, x) => s + x.skippedBots, 0);
     const totalDupes = allStats.reduce((s, x) => s + x.skippedDuplicates, 0);

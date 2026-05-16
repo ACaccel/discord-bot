@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGuildMongoUri } from '../../../src/db';
+import { buildGuildMongoUri } from '../../../../src/infra/mongo';
 
 describe('buildGuildMongoUri', () => {
   it('appends the guild id and authSource query for a valid snowflake', () => {
