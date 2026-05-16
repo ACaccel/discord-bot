@@ -226,6 +226,7 @@
     "sent": "點名已發送!",
     "failed": "無法進行點名",
     "activity_not_found": "找不到活動ID為 {{id}} 的活動",
+    "activity_already_consumed": "活動 {{id}} 已經被另一次點名指令消化過了。",
     "user_not_found": "找不到ID為 {{id}} 的使用者, 請確認ID是否正確",
     "announcement_header": "初華大人的點名簿:<@{{userId}}> 發起了點名!\n",
     "activity_id_line": "(活動ID: {{id}})\n",

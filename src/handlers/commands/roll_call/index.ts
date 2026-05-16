@@ -77,7 +77,22 @@ export default class roll_call extends Command {
                     return;
                 }
 
-                await repos.activity.deleteByActivityId(activity_id);
+                // Mongo's deleteOne is atomic: the boolean return is the
+                // TOCTOU signal. If two concurrent /roll_call calls race
+                // on the same activity_id, the first wins and the second
+                // sees `deleted === false`; bail before re-posting the
+                // announcement so the channel does not see duplicates.
+                const deleted = await repos.activity.deleteByActivityId(activity_id);
+                if (!deleted) {
+                    await interaction.reply({
+                        content:
+                            bot.translator?.t('replies:roll_call.activity_already_consumed', {
+                                id: activity_id,
+                            }) ?? '',
+                        flags: MessageFlags.Ephemeral,
+                    });
+                    return;
+                }
             } else if (users) {
                 if (!users.match(/^<@\d+>(\s*<@\d+>)*$/)) {
                     await interaction.reply({ content: bot.translator?.t('replies:roll_call.format_error') ?? '', flags: MessageFlags.Ephemeral });

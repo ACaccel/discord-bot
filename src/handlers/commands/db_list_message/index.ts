@@ -8,6 +8,7 @@ import {
 import { BaseBot } from "@bot";
 import { Command } from "@cmd";
 import { logger } from "@utils";
+import type { ChannelId } from "../../../core/ids";
 
 type DbMessage = {
     channelId: string;
@@ -192,7 +193,7 @@ export default class db_list_message extends Command {
             const { startMs, endMs } = range;
 
             const messages = (await repos.message.findByChannelAndTimestampRange(
-                channel.id as import('../../../core/ids').ChannelId,
+                channel.id as ChannelId,
                 startMs,
                 endMs,
             )) as unknown as DbMessage[];
