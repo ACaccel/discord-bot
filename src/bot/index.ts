@@ -83,6 +83,17 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public clientId: string;
     public config: TConfig;
     public guildInfo: Record<string, GuildInfo>;
+    /**
+     * Guilds whose MongoDB initialisation has failed (audit 3.7).
+     * Populated by `connectOneGuild` (both the startup fan-out AND the
+     * new-guild-join path go through that single helper), cleared on
+     * the next successful `connectOneGuild`. Each entry carries a
+     * stable `traceId` so the user-facing
+     * `errors:db.guild_disabled` message can be correlated to the
+     * boot-time log line by `grep traceId=<id>`. Handlers consult the
+     * map indirectly via `requireGuildRepos`.
+     */
+    public disabledGuilds: Map<string, { error: Error; traceId: string }> = new Map();
 
     public commandHandlers: Map<string, Command>;
     public buttonHandler: Map<string, ButtonHandler>;
@@ -92,6 +103,15 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public voice?: Voice;
 
     public help_msg: string;
+    /**
+     * Translator key for the bot's `/help` message body. Set by
+     * subclasses (e.g. `Nijika`) in their constructor; resolved during
+     * {@link run} once the translator is loaded and the rendered string
+     * stored in {@link help_msg}. Keeping the key (rather than the
+     * resolved text) in the subclass avoids hard-coded CJK in
+     * composition roots — see audit 3.4 / i18n scanner scope.
+     */
+    protected helpMessageKey?: string;
     public jobs: Map<string, Job>;
 
     /**
@@ -243,17 +263,45 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             return;
         }
         const branded = asGuildId(guildId);
-        // Resolve through the registered ReposFactory so the registration
-        // is exercised by the only consumer (single code path; future
-        // composition roots get the same builder).
-        const reposFactory = this.container.resolve<ReposFactory>(TOKENS.ReposFactory);
-        const repos = await reposFactory(branded);
-        const cm = this.container.resolve<ConnectionManager>(TOKENS.ConnectionManager);
-        // The connection is cached inside ConnectionManager so this is the
-        // same instance the factory just built repos against.
-        const guildConn = await cm.getConnection(branded);
-        slot.db = { connection: guildConn.connection, models: guildConn.models };
-        slot.repos = repos;
+        try {
+            // Resolve every async dependency BEFORE touching `slot`. A throw
+            // partway through previously left `slot.db` set with `slot.repos`
+            // missing, which is the worst of both worlds — handlers
+            // dereference the half-baked state and the disabled marker is
+            // never recorded.
+            const reposFactory = this.container.resolve<ReposFactory>(TOKENS.ReposFactory);
+            const repos = await reposFactory(branded);
+            const cm = this.container.resolve<ConnectionManager>(TOKENS.ConnectionManager);
+            const guildConn = await cm.getConnection(branded);
+            // Both dependencies resolved successfully — only NOW mutate the
+            // shared slot. Either both fields land or neither does.
+            slot.db = { connection: guildConn.connection, models: guildConn.models };
+            slot.repos = repos;
+            // Successful (re-)connect clears any prior disabled-marker so a
+            // recovered guild stops returning `errors:db.guild_disabled`
+            // on the next handler invocation. See audit 3.7.
+            this.disabledGuilds.delete(guildId);
+        } catch (err) {
+            // Audit 3.7 plus reliability review: this is the single chokepoint
+            // for "MongoDB unavailable for this guild" so BOTH callers (the
+            // startup fan-out AND the new-guild-join path in
+            // src/events/guild_event.ts) populate the same map. Generate a
+            // stable trace id now so the user-facing message can be grep'd
+            // against the log line below — see requireGuildRepos.
+            const normalised =
+                err instanceof Error
+                    ? err
+                    : new Error(typeof err === 'string' ? err : 'connectOneGuild failed');
+            const traceId = Math.random().toString(36).slice(2, 8).padStart(6, '0');
+            this.disabledGuilds.set(guildId, { error: normalised, traceId });
+            logger.systemLogger(
+                this.clientId,
+                `connectOneGuild failed for guild ${guildId} traceId=${traceId}: ${normalised.message}`,
+            );
+            // Re-throw so existing callers (connectGuildDB, guild_event.ts)
+            // keep their previous control-flow semantics.
+            throw normalised;
+        }
     }
 
     public run = async (callback?: () => Promise<void>) => {
@@ -301,6 +349,12 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // canonical access point until the per-interaction ctx shape
         // lands.
         this.translator = translator;
+        // Resolve the deferred help-message key now that the translator
+        // is loaded. Subclasses set `helpMessageKey` in their ctor; the
+        // composition root carries no inline user-facing CJK.
+        if (this.helpMessageKey !== undefined) {
+            this.help_msg = translator.t(this.helpMessageKey);
+        }
         // Build the host now that Translator + Clock + Logger are all
         // bound. Phase 4b-1 passes empty core registries because the
         // legacy registerCommands/registerButtons/... paths still feed
@@ -595,8 +649,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 try {
                     await this.connectOneGuild(guild_id);
                     logger.systemLogger(this.clientId, `MongoDB for guild: ${guild_id} - ${guild.guild.name} connected.`);
-                } catch (err) {
-                    logger.systemLogger(this.clientId, `Failed to connect to MongoDB for guild ${guild_id}: ${err}`);
+                } catch {
+                    // connectOneGuild already populated `disabledGuilds`
+                    // and logged with traceId; swallow here so one bad
+                    // guild does not abort the fan-out. The disabled state
+                    // is the durable record handlers consult.
                 }
             }));
         } catch (err) {

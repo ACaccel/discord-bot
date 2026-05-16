@@ -4,17 +4,15 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { SSMHandler } from '@select-menu';
+import { requireGuildRepos } from '../../require-guild-repos';
 
 export default class delete_reply extends SSMHandler {
     public override async execute(interaction: StringSelectMenuInteraction, bot: BaseBot): Promise<void> {
         const key = interaction.customId.split('|')[1];
         const value = interaction.values[0];
 
-        const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
-        if (!repos) {
-            await interaction.reply({ content: bot.translator?.t('errors:db.not_found') ?? '', flags: MessageFlags.Ephemeral });
-            return;
-        }
+        const repos = await requireGuildRepos(bot, interaction);
+        if (repos === null) return;
 
         const pair = await repos.reply.findById(value);
         if (!pair) {

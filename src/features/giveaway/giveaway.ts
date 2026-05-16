@@ -1,7 +1,7 @@
 import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
 import { BaseBot } from '@bot';
-import { bot_cmd, JobManager } from '@utils';
+import { bot_cmd, JobManager, logger } from '@utils';
 
 export interface IGiveawayBot {
     jobs: Map<string, Job>
@@ -132,23 +132,28 @@ export const deleteGiveaway = async (bot: BaseBot & IGiveawayBot, guild_id: stri
 
 export const rebootGiveawayJobs = async (bot: BaseBot) => {
     const jobManager = new JobManager(bot.jobs);
-    Object.values(bot.guildInfo).forEach(guild_info => { 
-        if (!guild_info.db) return "Database not found";
-        guild_info.db.models["Giveaway"].find({}).then((giveaways: any) => {
-            giveaways.forEach((g: any) => {
-                const end_time = new Date(g.end_time);
-                if (end_time > new Date()) {
-                    jobManager.schedule(giveawayJobKey(g.message_id), end_time, async () => {
-                        if (await findGiveaway(bot, guild_info.guild.id, g.message_id)) {
-                            await scheduleGiveaway(bot, guild_info.guild.id, g.message_id);
-                        }
-                    });
-                } else {
-                    deleteGiveaway(bot, guild_info.guild.id, g.message_id);
+    await Promise.all(
+        Object.values(bot.guildInfo).map(async (guild_info) => {
+            try {
+                if (!guild_info.db) return;
+                const giveaways = await guild_info.db.models["Giveaway"].find({});
+                for (const g of giveaways as Array<{ message_id: string; end_time: number | string | Date }>) {
+                    const end_time = new Date(g.end_time);
+                    if (end_time > new Date()) {
+                        jobManager.schedule(giveawayJobKey(g.message_id), end_time, async () => {
+                            if (await findGiveaway(bot, guild_info.guild.id, g.message_id)) {
+                                await scheduleGiveaway(bot, guild_info.guild.id, g.message_id);
+                            }
+                        });
+                    } else {
+                        await deleteGiveaway(bot, guild_info.guild.id, g.message_id);
+                    }
                 }
-            });
-        });
-    });
+            } catch (err) {
+                logger.errorLogger(bot.clientId, guild_info.guild.id, err);
+            }
+        }),
+    );
 
     return null;
 }

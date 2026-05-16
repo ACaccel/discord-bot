@@ -4,6 +4,7 @@ import {
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { logger } from '@utils';
+import { requireGuildRepos } from '../../require-guild-repos';
 
 export default class todo_list extends Command {
     constructor() {
@@ -49,11 +50,8 @@ export default class todo_list extends Command {
                 return;
             }
     
-            const repos = bot.guildInfo[interaction.guild?.id as string]?.repos;
-            if (!repos) {
-                await interaction.editReply({ content: bot.translator?.t('errors:db.not_found') ?? '' });
-                return;
-            }
+            const repos = await requireGuildRepos(bot, interaction);
+            if (repos === null) return;
             const todos = repos.todo;
 
             if (action == "add") {

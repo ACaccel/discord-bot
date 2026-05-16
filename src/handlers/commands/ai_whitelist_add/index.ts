@@ -3,6 +3,7 @@ import { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { logger } from '@utils';
 import { DEFAULT_MODELS } from '@llm_chat';
+import { requireGuildRepos } from '../../require-guild-repos';
 
 export default class ai_whitelist_add extends Command {
     constructor() {
@@ -32,17 +33,8 @@ export default class ai_whitelist_add extends Command {
         }
 
         const target = interaction.options.getUser('user', true);
-        const guildId = interaction.guildId;
-        if (!guildId) {
-            await interaction.editReply({ content: bot.translator?.t('errors:command.guild_only') ?? '' });
-            return;
-        }
-
-        const repos = bot.guildInfo[guildId]?.repos;
-        if (!repos) {
-            await interaction.editReply({ content: bot.translator?.t('errors:db.connection_failed') ?? '' });
-            return;
-        }
+        const repos = await requireGuildRepos(bot, interaction);
+        if (repos === null) return;
 
         try {
             const existing = await repos.userApiSetting.findByUserId(target.id);
@@ -59,7 +51,7 @@ export default class ai_whitelist_add extends Command {
             });
             await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.added', { user: target.displayName }) ?? '' });
         } catch (err) {
-            logger.errorLogger(bot.clientId, guildId, err);
+            logger.errorLogger(bot.clientId, interaction.guildId, err);
             await interaction.editReply({ content: bot.translator?.t('errors:db.operation_failed') ?? '' });
         }
     }

@@ -38,7 +38,8 @@ export class Konata extends BaseBot<Config> {
      */
     private registerPresence(): void {
         this.client.once(Events.ClientReady, () => {
-            const text = '貧乳はステータスだ、希少価値だ！';
+            const text = this.translator?.t('replies:konata.presence_text') ?? '';
+            if (text.length === 0) return;
             this.client.user?.setPresence({
                 status: 'online',
                 activities: [{

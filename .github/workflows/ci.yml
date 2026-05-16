@@ -35,6 +35,17 @@ jobs:
       - run: yarn test:unit
       - run: yarn test:i18n
 
+  test-coverage:
+    # Plan §5.1 floors (`src/core/**` ≥ 90%, overall ≥ baseline). The
+    # thresholds live in vitest.config.ts; this job is the gate. Raise
+    # the overall floor inside PR-C once legacy `src/features/*` +
+    # `src/utils/*` are folded into plugins and start carrying tests.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - run: yarn test:coverage
+
   test-int:
     runs-on: ubuntu-latest
     steps:

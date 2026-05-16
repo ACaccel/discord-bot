@@ -1,7 +1,7 @@
 import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
 import { BaseBot } from '@bot';
-import { bot_cmd, JobManager } from '@utils';
+import { bot_cmd, JobManager, logger } from '@utils';
 
 export interface IActivityBot {
     jobs: Map<string, Job>
@@ -129,23 +129,28 @@ export const deleteActivity = async (bot: BaseBot & IActivityBot, guild_id: stri
 
 export const rebootActivityJobs = async (bot: BaseBot) => {
     const jobManager = new JobManager(bot.jobs);
-    Object.values(bot.guildInfo).forEach(guild_info => { 
-        if (!guild_info.db) return "Database not found";
-        guild_info.db.models["Activity"].find({}).then((activities: any) => {
-            activities.forEach((a: any) => {
-                const expired_at = new Date(a.expired_at);
-                if (expired_at > new Date()) {
-                    jobManager.schedule(activityJobKey(a.activity_id), expired_at, async () => {
-                        if (await findActivity(bot, guild_info.guild.id, a.activity_id)) {
-                            await scheduleActivity(bot, guild_info.guild.id, a.activity_id);
-                        }
-                    });
-                } else {
-                    deleteActivity(bot as BaseBot & IActivityBot, guild_info.guild.id, a.activity_id);
+    await Promise.all(
+        Object.values(bot.guildInfo).map(async (guild_info) => {
+            try {
+                if (!guild_info.db) return;
+                const activities = await guild_info.db.models["Activity"].find({});
+                for (const a of activities as Array<{ activity_id: string; expired_at: number | string | Date }>) {
+                    const expired_at = new Date(a.expired_at);
+                    if (expired_at > new Date()) {
+                        jobManager.schedule(activityJobKey(a.activity_id), expired_at, async () => {
+                            if (await findActivity(bot, guild_info.guild.id, a.activity_id)) {
+                                await scheduleActivity(bot, guild_info.guild.id, a.activity_id);
+                            }
+                        });
+                    } else {
+                        await deleteActivity(bot as BaseBot & IActivityBot, guild_info.guild.id, a.activity_id);
+                    }
                 }
-            });
-        });
-    });
+            } catch (err) {
+                logger.errorLogger(bot.clientId, guild_info.guild.id, err);
+            }
+        }),
+    );
 
     return null;
 }

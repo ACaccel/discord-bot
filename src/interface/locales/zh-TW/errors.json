@@ -29,7 +29,8 @@
     "connection_failed": "資料庫連線異常,請稍後再試。",
     "operation_failed": "資料庫操作失敗,請稍後再試。",
     "not_found": "找不到資料庫",
-    "not_configured": "請先設定資料庫"
+    "not_configured": "請先設定資料庫",
+    "guild_disabled": "本伺服器的資料庫於啟動時連線失敗,指令暫時無法使用,請聯絡管理員。錯誤編號:{{traceId}}"
   },
   "llm": {
     "rate_limited": "AI 服務目前忙線中(限流),請於 {{retryAfter}} 秒後再試。",
