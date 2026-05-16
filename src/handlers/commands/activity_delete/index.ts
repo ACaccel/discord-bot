@@ -3,7 +3,7 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { activity } from '@features';
+import * as activity from '../../../plugins/activity/internal';
 
 export default class activity_delete extends Command {
     constructor() {

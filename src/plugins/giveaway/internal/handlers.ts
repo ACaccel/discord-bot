@@ -1,8 +1,8 @@
 import {
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '@bot';
-import { logger, misc, JobManager } from '@utils';
+import { BaseBot } from '../../../bot';
+import { logger, misc, JobManager } from '../../../utils';
 import {
     giveawayAnnouncement,
     findGiveaway,

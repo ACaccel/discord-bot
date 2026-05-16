@@ -7,20 +7,26 @@
  * via DI — never on a concrete provider — so swapping a provider
  * (or adding a new one) does not ripple beyond the registry.
  *
- * Audit B-1 (Result at the LLM boundary): `chat()` now returns
+ * Audit B-1 (Result at the LLM boundary): `chat()` returns
  * `Result<LLMResult, LlmProviderError>`. Both expected failure modes
  * (the registry's missing-key gate, and the upstream SDK / HTTP
- * failures already typed by `error-translator.ts`) are translated into
- * the typed error channel. Programmer errors (e.g. asking for a
+ * failures already typed by `error-translator.ts`) flow through the
+ * typed error channel. Programmer errors (e.g. asking for a
  * web-search-capable model from a provider that lacks the capability)
  * stay as thrown native errors — the Result contract is for recoverable
  * boundary failures only.
+ *
+ * PR-E E-6 (B-3 reviewer): the inner `try/catch` around
+ * `registry.resolve` is gone. The registry's new `tryResolve` returns
+ * a Result-shaped value with the same already-translated
+ * `LlmProviderError`, so this method short-circuits with a clean
+ * Result branch instead.
  */
 import { LlmProviderError } from '../../core/errors';
 import { err, ok, type Result } from '../../core/result';
 import type { LlmProviderRegistry } from './registry';
 import type { LLMMessage, LLMResult, LLMSettings } from './types';
-import { MissingApiKeyError, PROVIDER_API_KEY_ENV } from './types';
+import { PROVIDER_API_KEY_ENV } from './types';
 
 /**
  * Widened LlmProviderError that erases the params-shape generic so the
@@ -30,15 +36,6 @@ import { MissingApiKeyError, PROVIDER_API_KEY_ENV } from './types';
  * doesn't survive past the boundary anyway.
  */
 type AnyLlmProviderError = LlmProviderError<Readonly<Record<string, string | number>>>;
-
-const missingApiKeyToLlmError = (e: MissingApiKeyError): AnyLlmProviderError =>
-  new LlmProviderError({
-    code: 'LLM_INVALID_API_KEY',
-    messageKey: 'errors:llm.invalid_api_key',
-    messageParams: { provider: e.provider, envVar: e.envVar },
-    context: { operation: 'LLMService.chat' },
-    cause: e,
-  }) as AnyLlmProviderError;
 
 const unknownToLlmError = (e: unknown, provider: string): AnyLlmProviderError => {
   const message = e instanceof Error ? e.message : String(e);
@@ -57,7 +54,7 @@ export class LLMService {
   /**
    * Send a chat request. Returns a `Result` whose success carries the
    * provider's response and whose error is a {@link LlmProviderError}
-   * already translated (by either `registry.resolve` for missing-key
+   * already translated (by either `registry.tryResolve` for missing-key
    * gating, or by `error-translator.ts` inside each provider).
    *
    * Throws (does NOT use the Result channel) if the caller asks for
@@ -69,17 +66,9 @@ export class LLMService {
     messages: readonly LLMMessage[],
     settings: LLMSettings,
   ): Promise<Result<LLMResult, AnyLlmProviderError>> {
-    let provider;
-    try {
-      provider = this.registry.resolve(settings.provider);
-    } catch (e) {
-      if (e instanceof MissingApiKeyError) {
-        return err(missingApiKeyToLlmError(e));
-      }
-      // Programmer error (unregistered provider name with no key gate):
-      // let it escape so it surfaces in tests / startup.
-      throw e;
-    }
+    const resolveResult = this.registry.tryResolve(settings.provider);
+    if (!resolveResult.ok) return resolveResult;
+    const provider = resolveResult.value;
 
     if (settings.webSearch && !provider.supportsWebSearch) {
       throw new Error(

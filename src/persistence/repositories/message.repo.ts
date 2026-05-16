@@ -75,6 +75,17 @@ export interface MessageRepo {
     startMs: number,
     endMs: number,
   ): Promise<readonly MessageDoc[]>;
+
+  /**
+   * Subset of `messageIds` that are already stored in this guild's
+   * collection. The msg-archive batch path uses this to filter
+   * already-seen messages before calling `insertManyIgnoringDuplicates`
+   * — Mongo's duplicate-key fallback is correct but expensive, the
+   * pre-filter avoids the round-trip when most messages are already
+   * known (the steady-state condition for an incremental backup).
+   * Returns a Set so callers can do `O(1)` membership checks.
+   */
+  findExistingMessageIds(messageIds: readonly string[]): Promise<ReadonlySet<string>>;
 }
 
 /** Mongoose-backed implementation. */
@@ -190,6 +201,24 @@ export class MongoMessageRepo implements MessageRepo {
       throw databaseErrorFrom(err, {
         operation: 'MongoMessageRepo.findByTimestampRange',
         input: { startMs, endMs },
+      });
+    }
+  }
+
+  public async findExistingMessageIds(messageIds: readonly string[]): Promise<ReadonlySet<string>> {
+    if (messageIds.length === 0) return new Set<string>();
+    try {
+      const docs = await this.conn.models.Message.find(
+        { messageId: { $in: [...messageIds] } },
+        { messageId: 1 },
+      )
+        .lean<Array<{ messageId: string }>>()
+        .exec();
+      return new Set(docs.map((d) => d.messageId));
+    } catch (err: unknown) {
+      throw databaseErrorFrom(err, {
+        operation: 'MongoMessageRepo.findExistingMessageIds',
+        input: { count: messageIds.length },
       });
     }
   }

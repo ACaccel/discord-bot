@@ -18,7 +18,24 @@ import {
 } from 'discord.js';
 import { VoiceConnection } from "@discordjs/voice";
 import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
-import db, { type GuildDb, getMongoConnectionManagerForUri } from '@db';
+import { MongoConnectionManager } from '../infra/mongo/connection-manager';
+
+/**
+ * Process-wide pool of {@link MongoConnectionManager}s keyed by base
+ * URI. Two BaseBots sharing a URI reuse the same manager (and thus
+ * the same per-guild connection pool), and tests / multi-cluster
+ * setups that pass distinct URIs get distinct managers. Audit C-2
+ * inlined this here after the legacy `@db` shim that previously
+ * exported the same map was deleted.
+ */
+const sharedConnectionManagers = new Map<string, MongoConnectionManager>();
+const sharedConnectionManagerForUri = (uri: string): MongoConnectionManager => {
+    const existing = sharedConnectionManagers.get(uri);
+    if (existing !== undefined) return existing;
+    const created = new MongoConnectionManager(uri);
+    sharedConnectionManagers.set(uri, created);
+    return created;
+};
 import {
   createContainer,
   TOKENS,
@@ -68,16 +85,6 @@ export interface GuildInfo {
     guild: Guild;
     channels?: Record<string, Channel>;
     roles?: Record<string, Role>;
-    /**
-     * @deprecated Use `repos` for typed access. The slot is kept solely
-     * because the `message-backup` plugin still reads raw Mongoose
-     * models for its hot-loop archive write path; migrating that one
-     * consumer to a `MessageRepo` + `FetchRepo` shaped contract is
-     * tracked as the C-1 follow-up that finally closes audit 2.1 / 2.7.
-     * Every other historical user (16 handler / feature sites) migrated
-     * in PR-C.
-     */
-    db?: GuildDb;
     /** Per-guild repository bag built from the IoC container at connect time. */
     repos?: Repos;
 }
@@ -195,8 +202,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         this.container.registerSingleton(TOKENS.Logger, () =>
             createBootstrapLogger({ bot: this.clientId }),
         );
-        // ConnectionManager is keyed by URI through `getMongoConnectionManagerForUri`,
-        // shared with the legacy `db.dbConnect()` shim — one pool per process per URI.
+        // ConnectionManager is process-shared via
+        // `sharedConnectionManagerForUri` — one pool per URI keeps
+        // multi-bot processes from opening duplicate Mongo connections.
         const uri = this.mongoURI;
         this.container.registerSingleton(TOKENS.ConnectionManager, () => {
             if (uri === undefined || uri.length === 0) {
@@ -204,7 +212,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                     'BaseBot: ConnectionManager resolved but no MONGO_URI was supplied to the bot constructor.',
                 );
             }
-            return getMongoConnectionManagerForUri(uri);
+            return sharedConnectionManagerForUri(uri);
         });
         const reposFactory: ReposFactory = async (guildId: ReturnType<typeof asGuildId>) => {
             const cm = this.container.resolve<ConnectionManager>(TOKENS.ConnectionManager);
@@ -224,18 +232,6 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // composition root stays small; tests provide their own fake.
         const guildRegistry: GuildRegistry = {
             getRepos: (guildId) => this.guildInfo[guildId]?.repos,
-            getDb: (guildId) => {
-                const db = this.guildInfo[guildId]?.db;
-                if (db === undefined) return undefined;
-                // Cast the model bag's value type to the plugin-facing
-                // `Model<unknown>` — the legacy `GuildDb` shape stores
-                // `Model<any>` which would otherwise leak `any` into
-                // strict-mode consumers.
-                return {
-                    connection: db.connection,
-                    models: db.models as unknown as Record<string, import('mongoose').Model<unknown>>,
-                };
-            },
             getChannel: (guildId, name) => this.guildInfo[guildId]?.channels?.[name],
             getRole: (guildId, name) => this.guildInfo[guildId]?.roles?.[name],
             listGuildIds: () => Object.keys(this.guildInfo),
@@ -276,8 +272,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
 
     /**
      * Open (or reuse) the per-guild MongoDB connection and populate
-     * BOTH `guildInfo[g].db` (legacy shape, for unmigrated callsites)
-     * and `guildInfo[g].repos` (typed bag, for new code).
+     * `guildInfo[g].repos` with the typed repository bag. Audit C-2
+     * (PR-E) retired the legacy `guildInfo[g].db` slot — `repos` is
+     * now the only entry point.
      *
      * Reused by the startup loop in {@link connectGuildDB} and by the
      * new-guild-join path in `src/events/guild_event.ts`.
@@ -290,18 +287,13 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         }
         const branded = asGuildId(guildId);
         try {
-            // Resolve every async dependency BEFORE touching `slot`. A throw
-            // partway through previously left `slot.db` set with `slot.repos`
-            // missing, which is the worst of both worlds — handlers
-            // dereference the half-baked state and the disabled marker is
-            // never recorded.
+            // Resolve the typed repository bag BEFORE touching `slot`
+            // so a partial connect cannot leave a half-baked state.
+            // The shared ConnectionManager primes its per-guild pool
+            // inside reposFactory.
             const reposFactory = this.container.resolve<ReposFactory>(TOKENS.ReposFactory);
             const repos = await reposFactory(branded);
-            const cm = this.container.resolve<ConnectionManager>(TOKENS.ConnectionManager);
-            const guildConn = await cm.getConnection(branded);
-            // Both dependencies resolved successfully — only NOW mutate the
-            // shared slot. Either both fields land or neither does.
-            slot.db = { connection: guildConn.connection, models: guildConn.models };
+            // Single mutation — atomic from the handlers' point of view.
             slot.repos = repos;
             // Successful (re-)connect clears any prior disabled-marker so a
             // recovered guild stops returning `errors:db.guild_disabled`

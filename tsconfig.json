@@ -16,10 +16,7 @@
       "@modal": ["handlers/modals/index"],
       "@reaction": ["handlers/reactions/index"],
       "@utils": ["utils/index"],
-      "@db": ["db/index"],
       "@event": ["events/index"],
-      "@features": ["features/index"],
-      "@llm_chat": ["features/llm_chat/index"],
       "@core/*": ["core/*"],
       "@plugins": ["plugins/index"]
     },

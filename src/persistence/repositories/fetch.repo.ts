@@ -25,6 +25,13 @@ export interface FetchRepo {
   setLastMessageID(channelID: string, lastMessageID: string): Promise<boolean>;
   /** Delete a marker; returns whether a document was removed. */
   deleteByChannelId(channelID: string): Promise<boolean>;
+  /**
+   * Idempotent equivalent of `create + setLastMessageID`. The
+   * msg-archive `backupChannel` loop uses this at the tail of every
+   * batch: the marker may or may not exist depending on whether this
+   * is a fresh channel or an incremental resume.
+   */
+  upsertLastMessageID(channel: string, channelID: string, lastMessageID: string): Promise<void>;
 }
 
 export class MongoFetchRepo implements FetchRepo {
@@ -65,5 +72,17 @@ export class MongoFetchRepo implements FetchRepo {
   public async deleteByChannelId(channelID: string): Promise<boolean> {
     const res = await this.conn.models.Fetch.deleteOne({ channelID }).exec();
     return res.deletedCount > 0;
+  }
+
+  public async upsertLastMessageID(
+    channel: string,
+    channelID: string,
+    lastMessageID: string,
+  ): Promise<void> {
+    await this.conn.models.Fetch.updateOne(
+      { channelID },
+      { $set: { channel, lastMessageID } },
+      { upsert: true },
+    ).exec();
   }
 }

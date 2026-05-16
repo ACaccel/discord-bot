@@ -21,17 +21,12 @@
     "@modal": ["src/handlers/modals/index.ts"],
     "@reaction": ["src/handlers/reactions/index.ts"],
     "@utils": ["src/utils/index.ts"],
-    "@db": ["src/db/index.ts"],
     "@event": ["src/events/index.ts"],
-    "@features": ["src/features/index.ts"],
-    "@llm_chat": ["src/features/llm_chat/index.ts"],
     "@core/*": ["src/core/*"],
     "@plugins": ["src/plugins/index.ts"]
   },
   "ignoreDependencies": ["sodium", "tsconfig-paths", "pino-pretty"],
   "ignore": [
-    "src/db/**",
-    "src/features/**",
     "src/persistence/index.ts",
     "src/persistence/repositories/index.ts",
     "src/persistence/schemas/index.ts",

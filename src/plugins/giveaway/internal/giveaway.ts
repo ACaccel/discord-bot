@@ -1,7 +1,7 @@
 import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
-import { BaseBot } from '@bot';
-import { bot_cmd, JobManager, logger } from '@utils';
+import { BaseBot } from '../../../bot';
+import { bot_cmd, JobManager, logger } from '../../../utils';
 
 export interface IGiveawayBot {
     jobs: Map<string, Job>
@@ -130,27 +130,67 @@ export const deleteGiveaway = async (bot: BaseBot & IGiveawayBot, guild_id: stri
     return null;
 }
 
+/**
+ * Same exponential-backoff retry as `activity.rebootRetry`. Audit C-1
+ * reviewer follow-up — a transient Mongo blip during boot used to
+ * silently leave the guild's scheduled giveaways un-rebuilt for the
+ * process lifetime.
+ */
+const REBOOT_MAX_ATTEMPTS = 3;
+const rebootRetry = async <T>(op: () => Promise<T>): Promise<T> => {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < REBOOT_MAX_ATTEMPTS; attempt += 1) {
+        try {
+            return await op();
+        } catch (err) {
+            lastErr = err;
+            if (attempt < REBOOT_MAX_ATTEMPTS - 1) {
+                await new Promise((resolve) => setTimeout(resolve, 250 * Math.pow(2, attempt)));
+            }
+        }
+    }
+    throw lastErr;
+};
+
 export const rebootGiveawayJobs = async (bot: BaseBot) => {
     const jobManager = new JobManager(bot.jobs);
     await Promise.all(
         Object.values(bot.guildInfo).map(async (guild_info) => {
             try {
                 if (!guild_info.repos) return;
-                const giveaways = await guild_info.repos.giveaway.listAll();
+                const giveaways = await rebootRetry(() => guild_info.repos!.giveaway.listAll());
                 for (const g of giveaways) {
-                    const end_time = new Date(g.end_time);
-                    if (end_time > new Date()) {
-                        jobManager.schedule(giveawayJobKey(g.message_id), end_time, async () => {
-                            if (await findGiveaway(bot, guild_info.guild.id, g.message_id)) {
-                                await scheduleGiveaway(bot, guild_info.guild.id, g.message_id);
-                            }
-                        });
-                    } else {
-                        await deleteGiveaway(bot, guild_info.guild.id, g.message_id);
+                    // Per-row try/catch so one transient Mongo blip on
+                    // a delete does not abort the remaining giveaways.
+                    try {
+                        const end_time = new Date(g.end_time);
+                        if (end_time > new Date()) {
+                            jobManager.schedule(giveawayJobKey(g.message_id), end_time, async () => {
+                                if (await findGiveaway(bot, guild_info.guild.id, g.message_id)) {
+                                    await scheduleGiveaway(bot, guild_info.guild.id, g.message_id);
+                                }
+                            });
+                        } else {
+                            await rebootRetry(() =>
+                                deleteGiveaway(bot, guild_info.guild.id, g.message_id),
+                            );
+                        }
+                    } catch (rowErr) {
+                        logger.errorLogger(bot.clientId, guild_info.guild.id, rowErr);
                     }
                 }
             } catch (err) {
                 logger.errorLogger(bot.clientId, guild_info.guild.id, err);
+                const debugCh = guild_info.channels?.debug;
+                if (debugCh?.isSendable()) {
+                    await debugCh
+                        .send(
+                            `[ ops ] giveaway reboot listAll failed for guild ${guild_info.guild.id} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
+                        )
+                        .catch((sendErr) =>
+                            logger.errorLogger(bot.clientId, guild_info.guild.id, sendErr),
+                        );
+                }
             }
         }),
     );

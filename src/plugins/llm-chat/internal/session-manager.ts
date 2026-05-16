@@ -1,4 +1,4 @@
-import { LLMMessage } from '../../infra/llm';
+import { LLMMessage } from '../../../infra/llm';
 
 interface Session {
     userId: string;

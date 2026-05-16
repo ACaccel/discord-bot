@@ -63,28 +63,29 @@ src/
 │   └── msg-archive/
 │
 ├── events/                # legacy event helpers (shrinking each phase)
-├── features/              # legacy feature code (migrating into plugins/)
 ├── utils/                 # transitional grab-bag; only `logger.ts` is strict
 └── deploy.ts              # slash-command registration entry point
 ```
 
 ## Path aliases (`tsconfig.json`)
 
-| Alias          | Resolves to                                                        |
-| -------------- | ------------------------------------------------------------------ |
-| `@bot`         | `src/bot/index`                                                    |
-| `@cmd`         | `src/handlers/commands/index`                                      |
-| `@button`      | `src/handlers/buttons/index`                                       |
-| `@modal`       | `src/handlers/modals/index`                                        |
-| `@select-menu` | `src/handlers/select-menus/index`                                  |
-| `@reaction`    | `src/handlers/reactions/index`                                     |
-| `@utils`       | `src/utils/index`                                                  |
-| `@db`          | `src/db/index` (legacy shim — prefer `@persistence`-style imports) |
-| `@event`       | `src/events/index`                                                 |
-| `@features`    | `src/features/index`                                               |
-| `@llm_chat`    | `src/features/llm_chat/index`                                      |
-| `@core/*`      | `src/core/*`                                                       |
-| `@plugins`     | `src/plugins/index`                                                |
+| Alias          | Resolves to                       |
+| -------------- | --------------------------------- |
+| `@bot`         | `src/bot/index`                   |
+| `@cmd`         | `src/handlers/commands/index`     |
+| `@button`      | `src/handlers/buttons/index`      |
+| `@modal`       | `src/handlers/modals/index`       |
+| `@select-menu` | `src/handlers/select-menus/index` |
+| `@reaction`    | `src/handlers/reactions/index`    |
+| `@utils`       | `src/utils/index`                 |
+| `@event`       | `src/events/index`                |
+| `@core/*`      | `src/core/*`                      |
+| `@plugins`     | `src/plugins/index`               |
+
+The `@db`, `@features`, and `@llm_chat` aliases were retired in
+audit PR-E (C-2 + C-3) when the legacy `src/db/` shim and the
+`src/features/` directory were folded into typed `Repos` and
+`src/plugins/<x>/internal/` respectively.
 
 ## Key abstractions
 

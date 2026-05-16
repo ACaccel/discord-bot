@@ -25,15 +25,16 @@ import { TOKENS } from '../../core/ioc';
 import type { Plugin } from '../../core/plugin';
 import {
   LLMService,
-  SessionManager,
+  ModelCatalog,
   createDefaultRegistry,
   formatUsageFooter,
-  listProviderModels,
+  setActiveModelCatalog,
   type LLMMessage,
   type LLMProviderName,
   type LLMResult,
   type LLMSettings,
-} from '../../features/llm_chat';
+} from '../../infra/llm';
+import { SessionManager } from './internal';
 import * as legacyLogger from '../../utils/logger';
 
 const PLUGIN_ID = 'llm-chat';
@@ -161,11 +162,24 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
     async init(ctx): Promise<void> {
       const env = ctx.resolve(TOKENS.Env);
       llmService = new LLMService(createDefaultRegistry(env));
+      // Build a per-bot ModelCatalog with the typed-Env-derived
+      // API-key map and publish it as the active catalog (handlers
+      // reach it through `listProviderModels`, which delegates to
+      // this instance). Encapsulating the cache + api-key map in a
+      // class avoids the previous free-function module globals that
+      // would have clobbered keys across multiple bots in one process.
+      const modelCatalog = new ModelCatalog({
+        xai: env.XAI_API_KEY,
+        openai: env.OPENAI_API_KEY,
+        anthropic: env.ANTHROPIC_API_KEY,
+        gemini: env.GEMINI_API_KEY,
+      });
+      setActiveModelCatalog(modelCatalog);
       // Pre-warm each provider's live model catalog at boot. The call
       // returns a fallback sync while kicking off the SDK fetch, so by
       // the time `/ai_settings` is invoked the cache is usually warm.
       for (const provider of PREWARM_PROVIDERS) {
-        listProviderModels(provider);
+        modelCatalog.list(provider);
       }
     },
 
