@@ -20,9 +20,13 @@
  *   - `src/events/**` is on the way out (Phase 4b stripped most of it)
  *     but the remaining `detectGuildCreate` still emits user-visible
  *     guild-create chatter — covered for that reason.
- *   - `src/bot/<name>/<name>.ts` contains help_msg seeds (e.g.
- *     Nijika's), so we cover those subclasses too. The BaseBot itself
- *     in `src/bot/index.ts` only emits ops-log lines; excluded.
+ *   - `src/bot/**` (composition roots + bot subclasses) is scanned
+ *     in strict mode after audit 3.4. Composition roots used to seed
+ *     help_msg / presence as inline CJK; they now must route through
+ *     the translator (e.g. Nijika's `helpMessageKey`, Konata's
+ *     `replies:konata.presence_text`). `src/bot/index.ts` BaseBot only
+ *     emits ops-log lines that are deliberately English; if a future
+ *     change reintroduces CJK there, the scanner catches it.
  *   - `src/utils/` and `src/features/` carry domain code that is not
  *     yet a user-facing boundary; left alone for now.
  */
@@ -40,7 +44,7 @@ const STRICT_MODE_PHASE = 6; // PR 6-3b: scanner now strict at PHASE >= 6.
  * catalog sweep WILL fail in strict mode — coordinate with the
  * migration PR.
  */
-const SCOPED_DIRECTORIES: readonly string[] = ['src/handlers', 'src/plugins', 'src/events'];
+const SCOPED_DIRECTORIES: readonly string[] = ['src/handlers', 'src/plugins', 'src/events', 'src/bot'];
 
 /**
  * Per-file allowlist. Use sparingly — every entry should carry a

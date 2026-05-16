@@ -92,6 +92,15 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public voice?: Voice;
 
     public help_msg: string;
+    /**
+     * Translator key for the bot's `/help` message body. Set by
+     * subclasses (e.g. `Nijika`) in their constructor; resolved during
+     * {@link run} once the translator is loaded and the rendered string
+     * stored in {@link help_msg}. Keeping the key (rather than the
+     * resolved text) in the subclass avoids hard-coded CJK in
+     * composition roots — see audit 3.4 / i18n scanner scope.
+     */
+    protected helpMessageKey?: string;
     public jobs: Map<string, Job>;
 
     /**
@@ -301,6 +310,12 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // canonical access point until the per-interaction ctx shape
         // lands.
         this.translator = translator;
+        // Resolve the deferred help-message key now that the translator
+        // is loaded. Subclasses set `helpMessageKey` in their ctor; the
+        // composition root carries no inline user-facing CJK.
+        if (this.helpMessageKey !== undefined) {
+            this.help_msg = translator.t(this.helpMessageKey);
+        }
         // Build the host now that Translator + Clock + Logger are all
         // bound. Phase 4b-1 passes empty core registries because the
         // legacy registerCommands/registerButtons/... paths still feed
