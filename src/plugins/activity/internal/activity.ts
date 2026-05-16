@@ -1,6 +1,7 @@
 import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
 import { BaseBot } from '../../../bot';
+import { bindTranslator } from '../../../core/i18n';
 import { bot_cmd, JobManager, logger } from '../../../utils';
 
 export interface IActivityBot {
@@ -26,14 +27,13 @@ export const activityAnnouncement = async (
 ) => {
     if (!channel.isSendable()) return null;
 
-    const t = (key: string, params?: Record<string, string | number>): string =>
-        bot.translator?.t(key, params) ?? '';
+    const t = bindTranslator(bot.translator);
 
     const embed = new EmbedBuilder()
         .setTitle(t('replies:activity.announce_title', { title }))
         .addFields(
             { name: t('replies:activity.announce_field_id'), value: activity_id },
-            { name: t('replies:activity.announce_field_description'), value: description || t('replies:activity.empty_value') },
+            { name: t('replies:activity.announce_field_description'), value: description || t('replies:common.empty_value') },
             { name: t('replies:activity.announce_field_endtime'), value: end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }) },
         )
         .setColor("#00BFFF")
@@ -102,8 +102,7 @@ export const scheduleActivity = async (bot: BaseBot, guild_id: string, activity_
     await repos.activity.setParticipants(activity_id, participantsArray);
 
     // Send results
-    const t = (key: string, params?: Record<string, string | number>): string =>
-        bot.translator?.t(key, params) ?? '';
+    const t = bindTranslator(bot.translator);
     const resultContent = participantsArray.length > 0
         ? t('replies:activity.result_with_participants', {
             title: activity.title,

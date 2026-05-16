@@ -1,6 +1,7 @@
 import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
 import { BaseBot } from '../../../bot';
+import { bindTranslator } from '../../../core/i18n';
 import { bot_cmd, JobManager, logger } from '../../../utils';
 
 export interface IGiveawayBot {
@@ -27,8 +28,7 @@ export const giveawayAnnouncement = async (
 ) => {
     if (!channel.isSendable()) return null;
 
-    const t = (key: string, params?: Record<string, string | number>): string =>
-        bot.translator?.t(key, params) ?? '';
+    const t = bindTranslator(bot.translator);
 
     const embed = new EmbedBuilder()
         .setTitle(t('replies:giveaway.announce_title', { prize }))
@@ -36,7 +36,7 @@ export const giveawayAnnouncement = async (
             { name: t('replies:giveaway.announce_field_owner'), value: `<@${prize_owner_id}>` },
             { name: t('replies:giveaway.announce_field_winners'), value: winner_num.toString() },
             { name: t('replies:giveaway.announce_field_endtime'), value: end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }) },
-            { name: t('replies:giveaway.announce_field_description'), value: description || t('replies:giveaway.empty_value') }
+            { name: t('replies:giveaway.announce_field_description'), value: description || t('replies:common.empty_value') }
         )
         .setColor("#F9F900")
         .setFooter({ text: t('replies:giveaway.announce_footer') });
@@ -108,8 +108,7 @@ export const scheduleGiveaway = async (bot: BaseBot, guild_id: string, message_i
     }
 
     // Send results
-    const t = (key: string, params?: Record<string, string | number>): string =>
-        bot.translator?.t(key, params) ?? '';
+    const t = bindTranslator(bot.translator);
     const resultContent = winners.length > 0
         ? t('replies:giveaway.result_with_winners', {
             prize: giveaway.prize,

@@ -2,6 +2,7 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '../../../bot';
+import { bindTranslator } from '../../../core/i18n';
 import { logger, misc, JobManager } from '../../../utils';
 import {
     activityAnnouncement,
@@ -17,8 +18,7 @@ export const handleActivityCreate = async (
     bot: BaseBot & IActivityBot,
 ): Promise<void> => {
     await interaction.deferReply();
-    const t = (key: string, params?: Record<string, string | number>): string =>
-        bot.translator?.t(key, params) ?? '';
+    const t = bindTranslator(bot.translator);
     try {
         const title = interaction.options.get("title")?.value as string | null;
         const duration = interaction.options.get("duration")?.value as string | null;
@@ -37,7 +37,7 @@ export const handleActivityCreate = async (
 
         const channel = interaction.channel;
         if (!channel?.isSendable()) {
-            await interaction.editReply({ content: t('replies:activity.channel_not_sendable') });
+            await interaction.editReply({ content: t('errors:command.channel_not_sendable') });
             return;
         }
 
@@ -64,7 +64,7 @@ export const handleActivityCreate = async (
             activity_id,
             channel,
             title,
-            description || t('replies:activity.empty_value'),
+            description || t('replies:common.empty_value'),
             end_time_date,
             bot,
         );
@@ -106,8 +106,7 @@ export const handleActivityDelete = async (
     bot: BaseBot & IActivityBot,
 ): Promise<void> => {
     await interaction.deferReply();
-    const t = (key: string, params?: Record<string, string | number>): string =>
-        bot.translator?.t(key, params) ?? '';
+    const t = bindTranslator(bot.translator);
     try {
         const activity_id = interaction.options.get("activity_id")?.value as string | null;
         if (!activity_id) {

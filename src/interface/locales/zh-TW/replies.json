@@ -289,6 +289,9 @@
   "earthquake": {
     "alert": "# <@&{{role}}> 台北強震警報!!! (4級以上)\n> 為什麼要地震!?"
   },
+  "common": {
+    "empty_value": "無"
+  },
   "giveaway": {
     "missing_required_fields": "請輸入持續時間、得獎人數和獎品",
     "channel_not_configured": "抽獎頻道未設定",
@@ -300,7 +303,6 @@
     "delete_failed_with_reason": "無法刪除抽獎: {{reason}}",
     "delete_success": "抽獎已刪除",
     "delete_failed": "無法刪除抽獎",
-    "empty_value": "無",
     "announce_title": "🎉 抽獎: {{prize}}",
     "announce_field_owner": "🎁 獎品提供者",
     "announce_field_winners": "👤 中獎人數",
@@ -312,7 +314,6 @@
   },
   "activity": {
     "missing_required_fields": "請輸入活動標題和持續時間",
-    "channel_not_sendable": "找不到頻道或頻道不可發送訊息",
     "invalid_duration": "無效的持續時間",
     "create_announce_failed": "無法建立活動",
     "create_failed": "無法建立活動",
@@ -321,7 +322,6 @@
     "delete_failed_with_reason": "無法刪除活動: {{reason}}",
     "delete_success": "活動已刪除",
     "delete_failed": "無法刪除活動",
-    "empty_value": "無",
     "announce_title": "📢 活動: {{title}}",
     "announce_field_id": "🆔 活動ID",
     "announce_field_description": "📌 說明",

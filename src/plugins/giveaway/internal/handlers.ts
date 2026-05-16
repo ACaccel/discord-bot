@@ -2,6 +2,7 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '../../../bot';
+import { bindTranslator } from '../../../core/i18n';
 import { logger, misc, JobManager } from '../../../utils';
 import {
     giveawayAnnouncement,
@@ -16,8 +17,7 @@ export const handleGiveawayCreate = async (
     bot: BaseBot & IGiveawayBot,
 ): Promise<void> => {
     await interaction.deferReply();
-    const t = (key: string, params?: Record<string, string | number>): string =>
-        bot.translator?.t(key, params) ?? '';
+    const t = bindTranslator(bot.translator);
     try {
         const duration = interaction.options.get("duration")?.value as string | null;
         const winner_num = interaction.options.get("winner_num")?.value as number | null;
@@ -71,7 +71,7 @@ export const handleGiveawayCreate = async (
             interaction.user.id,
             winner_num,
             end_time_date,
-            description || t('replies:giveaway.empty_value'),
+            description || t('replies:common.empty_value'),
             bot,
         );
         if (!message_id) {
@@ -111,8 +111,7 @@ export const handleGiveawayDelete = async (
     bot: BaseBot & IGiveawayBot,
 ): Promise<void> => {
     await interaction.deferReply();
-    const t = (key: string, params?: Record<string, string | number>): string =>
-        bot.translator?.t(key, params) ?? '';
+    const t = bindTranslator(bot.translator);
     try {
         const message_id = interaction.options.get("message_id")?.value as string | null;
         if (!message_id) {

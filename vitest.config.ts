@@ -12,9 +12,10 @@ import path from 'path';
  *     locks in the audit baseline.
  *   - Overall lines floor (`lines: 45`) is the post-PR-F1 baseline; it
  *     stops accidental regressions without demanding fixes the
- *     pending PR-C legacy-cleanup hasn't shipped yet. Raise this to
- *     the plan's ≥ 75% target inside PR-C once `src/features/*` and
- *     `src/utils/*` get folded into plugins.
+ *     pending PR-G coverage-raise hasn't shipped yet. Raise this to
+ *     the plan's ≥ 75% target inside PR-G once `core/plugin/host`,
+ *     `core/ioc/container`, and the persistence repos all have
+ *     dedicated unit tests (audit 3.13 / C-13).
  *   - `domain/` + `application/` layers are intentionally absent (see
  *     audit 1.4); no thresholds defined for them.
  */
