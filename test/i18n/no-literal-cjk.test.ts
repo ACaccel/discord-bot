@@ -44,7 +44,12 @@ const STRICT_MODE_PHASE = 6; // PR 6-3b: scanner now strict at PHASE >= 6.
  * catalog sweep WILL fail in strict mode — coordinate with the
  * migration PR.
  */
-const SCOPED_DIRECTORIES: readonly string[] = ['src/handlers', 'src/plugins', 'src/events', 'src/bot'];
+const SCOPED_DIRECTORIES: readonly string[] = [
+  'src/handlers',
+  'src/plugins',
+  'src/events',
+  'src/bot',
+];
 
 /**
  * Per-file allowlist. Use sparingly — every entry should carry a
