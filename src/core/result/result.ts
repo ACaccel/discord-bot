@@ -17,13 +17,14 @@
 import type { DomainError } from '../errors/domain-error';
 
 /**
- * The constraint deliberately uses the open-ended `DomainError<string,
- * any>` shape rather than `DomainError` (which defaults `Params` to
- * `undefined`). This lets a Result hold an error whose `messageParams`
- * is a typed record (e.g. `LlmProviderError<{provider, envVar}>`)
- * without forcing every consumer to widen the type. The
- * params-narrowing is preserved on the value itself; the constraint
- * only relaxes the structural bound the type parameter must satisfy.
+ * Open bound for `Result`'s error channel. The DomainError class
+ * constrains Params to `Readonly<Record<string, string | number>> |
+ * undefined`, so the bound here uses `any` rather than `unknown` —
+ * `unknown` would violate the parent constraint. The widening only
+ * affects the type parameter's structural bound; value-level
+ * narrowing on `Err<E>` is preserved (callers holding the concrete
+ * subclass still see typed params on `.error.messageParams`). The
+ * eslint-disable is the targeted exception for this one alias.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DomainErrorBound = DomainError<string, any>;

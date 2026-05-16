@@ -150,15 +150,38 @@ async function deployDevGuild(botName: string, guildId: string): Promise<void> {
     console.log(`Successfully registered ${res.length} command(s) in dev guild.`);
 }
 
+/**
+ * One-shot migration tool. NOT safe to invoke routinely on bots with
+ * many hundreds of guilds: Discord's per-route + global rate limits
+ * apply, and the discord.js REST queue handles retries but the loop
+ * still walks each guild sequentially. A `rateLimited` listener is
+ * registered so operators can see when the queue is throttling, and
+ * an explicit per-iteration delay paces the worst case under the
+ * 50 req/s global ceiling. Increase `PER_ITER_DELAY_MS` if your
+ * deployment regularly hits the global limit during cleanup.
+ */
+const PER_ITER_DELAY_MS = 250;
+
 async function cleanupGuildCommands(botName: string): Promise<void> {
     const { token, clientId } = loadBotConfig(botName);
 
     const rest = new REST({ version: "10" }).setToken(token);
+    rest.on('rateLimited', (info) => {
+        console.warn(
+            `[rate-limit] route=${info.route} timeout=${info.timeToReset}ms global=${info.global}`,
+        );
+    });
     const guilds = (await rest.get(Routes.userGuilds())) as { id: string; name: string }[];
 
     console.log(
         `Cleanup mode: removing guild-scoped commands from ${guilds.length} guild(s). Global commands left untouched.`,
     );
+    if (guilds.length > 50) {
+        console.warn(
+            `[warn] ${guilds.length} guilds detected. Cleanup is a one-shot migration tool; ` +
+                `consider running off-peak. Pacing at ${PER_ITER_DELAY_MS}ms between PUTs.`,
+        );
+    }
 
     for (const guild of guilds) {
         try {
@@ -167,6 +190,7 @@ async function cleanupGuildCommands(botName: string): Promise<void> {
         } catch (err) {
             console.error(`- Failed to clear commands for guild ${guild.id}:`, err);
         }
+        await new Promise((resolve) => setTimeout(resolve, PER_ITER_DELAY_MS));
     }
 
     console.log("Cleanup done.");

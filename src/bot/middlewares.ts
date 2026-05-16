@@ -20,14 +20,14 @@
  *     instead of overriding `executeCommand`.
  */
 import { MessageFlags } from 'discord.js';
-import type { BaseBot } from '@bot';
+import type { BaseBot } from './index';
 import { executeCommand } from '@cmd';
 import { executeButton } from '@button';
 import { executeModal } from '@modal';
 import { executeSSM } from '@select-menu';
 import { logger } from '@utils';
 import type { InteractionContext, InteractionMiddleware } from '../core/plugin';
-import { replyTranslated } from './reply-translated';
+import { replyTranslated } from '../handlers/reply-translated';
 
 /**
  * Routes the inbound interaction to the matching dispatcher. Calls
@@ -75,35 +75,43 @@ export const createChannelLoggingMiddleware = (
 ): InteractionMiddleware => ({
     name: 'channel-logging',
     async run(ctx: InteractionContext, next): Promise<void> {
-        await next();
-        const interaction = ctx.interaction;
-        if (!interaction.isChatInputCommand() && !interaction.isContextMenuCommand()) return;
-        const blocked = config.blockedChannels;
-        const parentId =
-            interaction.channel && 'parentId' in interaction.channel
-                ? interaction.channel.parentId
-                : null;
-        const isBlocked =
-            blocked !== undefined &&
-            (blocked.includes(interaction.channelId) ||
-                (parentId !== null && blocked.includes(parentId)));
-        if (!isBlocked) {
-            const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channelId}>`;
-            logger.channelLogger(
-                bot.guildInfo[interaction.guildId as string]?.channels?.debug,
-                undefined,
-                channel_log,
-            );
-        }
-        if (interaction.guild) {
-            const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
-            logger.guildLogger(
-                bot.clientId,
-                interaction.guild.id,
-                'interaction_create',
-                guild_log,
-                interaction.guild?.name as string,
-            );
+        // try/finally so the durable guild audit-trail entry STILL
+        // lands even if dispatch threw — reviewer-flagged BLOCK on a
+        // previous draft. Re-throw any caught error so the outer
+        // handler still surfaces it to the user.
+        try {
+            await next();
+        } finally {
+            const interaction = ctx.interaction;
+            if (interaction.isChatInputCommand() || interaction.isContextMenuCommand()) {
+                const blocked = config.blockedChannels;
+                const parentId =
+                    interaction.channel && 'parentId' in interaction.channel
+                        ? interaction.channel.parentId
+                        : null;
+                const isBlocked =
+                    blocked !== undefined &&
+                    (blocked.includes(interaction.channelId) ||
+                        (parentId !== null && blocked.includes(parentId)));
+                if (!isBlocked && interaction.guildId !== null) {
+                    const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channelId}>`;
+                    logger.channelLogger(
+                        bot.guildInfo[interaction.guildId]?.channels?.debug,
+                        undefined,
+                        channel_log,
+                    );
+                }
+                if (interaction.guild) {
+                    const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
+                    logger.guildLogger(
+                        bot.clientId,
+                        interaction.guild.id,
+                        'interaction_create',
+                        guild_log,
+                        interaction.guild?.name as string,
+                    );
+                }
+            }
         }
     },
 });

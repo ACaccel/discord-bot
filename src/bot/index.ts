@@ -47,7 +47,7 @@ import {
 import {
     createChannelLoggingMiddleware,
     createDispatchMiddleware,
-} from '../handlers/middlewares';
+} from './middlewares';
 import type { GuildRegistry } from '../core/guild-registry';
 import { Job } from 'node-schedule';
 import { Command, registerCommands } from "@cmd";
@@ -780,7 +780,38 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 this.container.resolve<T>(token),
             state: new Map<string, unknown>(),
         };
-        await this.interactionRouter.dispatch(ctx);
+        try {
+            await this.interactionRouter.dispatch(ctx);
+        } catch (err) {
+            // Reviewer-flagged BLOCK: a dispatch-chain throw must still
+            // produce a user-visible reply. The outer Events.InteractionCreate
+            // handler only logs; without this catch the user sees an
+            // indefinite "thinking…" or a silent failure. Surface the
+            // traceId so support tickets correlate to logs.
+            logger.errorLogger(this.clientId, interaction.guildId, err);
+            if (interaction.isRepliable()) {
+                const content =
+                    translator.t('errors:unexpected', { traceId }) ??
+                    `Internal error (traceId=${traceId}).`;
+                try {
+                    if (interaction.deferred || interaction.replied) {
+                        await interaction.followUp({
+                            content,
+                            flags: MessageFlags.Ephemeral,
+                        });
+                    } else {
+                        await interaction.reply({
+                            content,
+                            flags: MessageFlags.Ephemeral,
+                        });
+                    }
+                } catch (replyErr) {
+                    // Expired interaction or already-acked race; nothing
+                    // else we can do. Already logged the root cause above.
+                    logger.systemLogger(this.clientId, ops.router.replySkipped(String(replyErr)));
+                }
+            }
+        }
     }
 
     /**
