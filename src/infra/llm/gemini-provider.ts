@@ -7,7 +7,7 @@
  */
 import { GoogleGenerativeAI, type Content, type Tool } from '@google/generative-ai';
 
-import { translateProviderError } from './error-translator';
+import { emptyResponseError, translateProviderError } from './error-translator';
 import type { LLMMessage, LLMProvider, LLMResult, LLMSettings } from './types';
 
 const OPERATION = 'GeminiProvider.chat';
@@ -37,14 +37,18 @@ export class GeminiProvider implements LLMProvider {
       }));
       const lastMessage = messages[messages.length - 1];
       if (lastMessage === undefined) {
-        throw new Error('GeminiProvider.chat: no messages provided');
+        // Programmer error: caller passed an empty messages array.
+        // DomainError taxonomy reserves itself for boundary failures;
+        // this is a contract violation by upstream code (the plugin
+        // would never knowingly call chat() with no messages).
+        throw new TypeError('GeminiProvider.chat: no messages provided');
       }
 
       const chat = model.startChat({ history });
       const result = await chat.sendMessage(lastMessage.content);
       const text = result.response.text();
       if (text.length === 0) {
-        throw new Error('GeminiProvider.chat: empty response from Gemini API');
+        throw emptyResponseError('gemini', OPERATION);
       }
       const meta = result.response.usageMetadata;
       return {

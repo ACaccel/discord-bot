@@ -63,7 +63,10 @@ export class LlmProviderRegistry {
 
     const factory = this.factories.get(name);
     if (factory === undefined) {
-      throw new Error(`LlmProviderRegistry.resolve: unknown provider "${name}"`);
+      // Programmer error: a hard-coded LLMProviderName slipped past the
+      // registry's known set. Native TypeError per the DomainError
+      // convention ("DomainError is for expected failure modes only").
+      throw new TypeError(`LlmProviderRegistry.resolve: unknown provider "${name}"`);
     }
     const instance = factory();
     this.instances.set(name, instance);

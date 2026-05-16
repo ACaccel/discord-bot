@@ -14,7 +14,7 @@
  */
 import OpenAI from 'openai';
 
-import { translateProviderError } from './error-translator';
+import { emptyResponseError, translateProviderError } from './error-translator';
 import type { LLMMessage, LLMProvider, LLMResult, LLMSettings } from './types';
 
 const OPERATION = 'OpenAIProvider.chat';
@@ -62,7 +62,7 @@ export class OpenAIProvider implements LLMProvider {
 
     const content = response.choices[0]?.message?.content;
     if (content === null || content === undefined || content.length === 0) {
-      throw new Error('OpenAIProvider.chat: empty response from OpenAI Chat Completions API');
+      throw emptyResponseError('openai', `${OPERATION}.chat_completions`);
     }
     const u = response.usage;
     return {
@@ -92,7 +92,7 @@ export class OpenAIProvider implements LLMProvider {
     });
     const content = response.output_text;
     if (content === null || content === undefined || content.length === 0) {
-      throw new Error('OpenAIProvider.chat: empty response from OpenAI Responses API');
+      throw emptyResponseError('openai', `${OPERATION}.responses`);
     }
     const u = response.usage;
     return {
