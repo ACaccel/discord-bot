@@ -44,28 +44,28 @@ export const findActivity = async (bot: BaseBot, guild_id: string, activity_id: 
     if (!guild) {
         return false;
     }
-    const db = bot.guildInfo[guild.id].db;
-    if (!db) {
+    const repos = bot.guildInfo[guild.id]?.repos;
+    if (!repos) {
         return false;
     }
-    const activity = await db.models["Activity"].findOne({ activity_id });
+    const activity = await repos.activity.findByActivityId(activity_id);
     if (!activity) return false;
     return true;
 }
 
 export const scheduleActivity = async (bot: BaseBot, guild_id: string, activity_id: string) => {
     if (!isActivityBot(bot)) return "Bot does not implement IActivityBot";
-    
+
     const guild = bot.client.guilds.cache.get(guild_id);
     if (!guild) {
         return "Guild not found";
     }
-    const db = bot.guildInfo[guild.id].db;
-    if (!db) {
+    const repos = bot.guildInfo[guild.id]?.repos;
+    if (!repos) {
         return "Database not found";
     }
-    
-    const activity = await db.models["Activity"].findOne({ activity_id });
+
+    const activity = await repos.activity.findByActivityId(activity_id);
     if (!activity) return "Activity not found";
     const activityChannel = guild.channels.cache.get(activity.channel_id);
     if (!activityChannel?.isSendable()) return "Activity channel not found";
@@ -89,14 +89,11 @@ export const scheduleActivity = async (bot: BaseBot, guild_id: string, activity_
     const participantsArray = participantsMembers.map(m => m.id);
 
     // Update activity with participants
-    await db.models["Activity"].updateOne(
-        { activity_id },
-        { $set: { participants: participantsArray } }
-    );
+    await repos.activity.setParticipants(activity_id, participantsArray);
 
     // Send results
-    await activityChannel.send({ 
-        content: 
+    await activityChannel.send({
+        content:
         `📢 **活動結束!** 📢\n\n**活動: ${activity.title}**\n\n${
             participantsArray.length > 0
                 ? `✅ **參與者:**\n${participantsArray.map(id => `<@${id}>`).join('\n')}\n\n共 ${participantsArray.length} 人參與活動！`
@@ -116,13 +113,13 @@ export const deleteActivity = async (bot: BaseBot & IActivityBot, guild_id: stri
     if (!guild) {
         return "Guild not found";
     }
-    const db = bot.guildInfo[guild.id].db;
-    if (!db) {
+    const repos = bot.guildInfo[guild.id]?.repos;
+    if (!repos) {
         return "Database not found";
     }
 
     new JobManager(bot.jobs).cancel(activityJobKey(activity_id));
-    await db.models["Activity"].deleteOne({ activity_id });
+    await repos.activity.deleteByActivityId(activity_id);
 
     return null;
 }
@@ -132,9 +129,9 @@ export const rebootActivityJobs = async (bot: BaseBot) => {
     await Promise.all(
         Object.values(bot.guildInfo).map(async (guild_info) => {
             try {
-                if (!guild_info.db) return;
-                const activities = await guild_info.db.models["Activity"].find({});
-                for (const a of activities as Array<{ activity_id: string; expired_at: number | string | Date }>) {
+                if (!guild_info.repos) return;
+                const activities = await guild_info.repos.activity.listAll();
+                for (const a of activities) {
                     const expired_at = new Date(a.expired_at);
                     if (expired_at > new Date()) {
                         jobManager.schedule(activityJobKey(a.activity_id), expired_at, async () => {

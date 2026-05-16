@@ -56,6 +56,25 @@ export interface MessageRepo {
    * progress markers without re-counting.
    */
   insertManyIgnoringDuplicates(docs: readonly MessageDoc[]): Promise<InsertResult>;
+
+  /**
+   * Messages whose `timestamp` falls within `[startMs, endMs)`, across
+   * every channel in this guild. Used by the sticker/emoji-frequency
+   * metrics commands that walk a month at a time. `startMs` / `endMs`
+   * are millisecond epochs.
+   */
+  findByTimestampRange(startMs: number, endMs: number): Promise<readonly MessageDoc[]>;
+
+  /**
+   * Messages from a single channel whose `timestamp` falls within
+   * `[startMs, endMs)`, sorted oldest-first. Used by `db_list_message`
+   * to render a chronological transcript of one channel/day.
+   */
+  findByChannelAndTimestampRange(
+    channelId: ChannelId,
+    startMs: number,
+    endMs: number,
+  ): Promise<readonly MessageDoc[]>;
 }
 
 /** Mongoose-backed implementation. */
@@ -139,6 +158,70 @@ export class MongoMessageRepo implements MessageRepo {
       throw databaseErrorFrom(err, {
         operation: 'MongoMessageRepo.insertManyIgnoringDuplicates',
         input: { batchSize: docs.length },
+      });
+    }
+  }
+
+  public async findByTimestampRange(
+    startMs: number,
+    endMs: number,
+  ): Promise<readonly MessageDoc[]> {
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) {
+      throw new TypeError(
+        `MongoMessageRepo.findByTimestampRange: invalid window [${startMs}, ${endMs})`,
+      );
+    }
+    try {
+      // The stored `timestamp` field is a String per the legacy
+      // schema; the `$toLong` projection makes the comparison
+      // numeric, matching the original handler queries.
+      const docs = await this.conn.models.Message.find({
+        $expr: {
+          $and: [
+            { $gte: [{ $toLong: '$timestamp' }, startMs] },
+            { $lt: [{ $toLong: '$timestamp' }, endMs] },
+          ],
+        },
+      })
+        .lean<MessageDoc[]>()
+        .exec();
+      return docs;
+    } catch (err: unknown) {
+      throw databaseErrorFrom(err, {
+        operation: 'MongoMessageRepo.findByTimestampRange',
+        input: { startMs, endMs },
+      });
+    }
+  }
+
+  public async findByChannelAndTimestampRange(
+    channelId: ChannelId,
+    startMs: number,
+    endMs: number,
+  ): Promise<readonly MessageDoc[]> {
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) {
+      throw new TypeError(
+        `MongoMessageRepo.findByChannelAndTimestampRange: invalid window [${startMs}, ${endMs})`,
+      );
+    }
+    try {
+      const docs = await this.conn.models.Message.find({
+        channelId,
+        $expr: {
+          $and: [
+            { $gte: [{ $toLong: '$timestamp' }, startMs] },
+            { $lt: [{ $toLong: '$timestamp' }, endMs] },
+          ],
+        },
+      })
+        .sort({ timestamp: 1 })
+        .lean<MessageDoc[]>()
+        .exec();
+      return docs;
+    } catch (err: unknown) {
+      throw databaseErrorFrom(err, {
+        operation: 'MongoMessageRepo.findByChannelAndTimestampRange',
+        input: { channelId: String(channelId), startMs, endMs },
       });
     }
   }

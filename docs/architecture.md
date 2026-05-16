@@ -73,6 +73,27 @@ imports anything else in `src/`.**
 | Plugins           | `src/plugins/`           | Self-contained feature modules with their own state, jobs, and event subscriptions. One folder per plugin                                               | `core/*`, `persistence/*`, `infra/*`, `@bot` |
 | Bots              | `src/bot/<name>/`        | Composition root: builds the Discord client, instantiates `BaseBot`, registers plugins, runs                                                            | Everything above                             |
 
+### Intentionally absent: `domain/` and `application/`
+
+The original refactor plan proposed `src/domain/<feature>/` (pure
+business models) and `src/application/<feature>/` (use-case
+orchestrators) as additional layers between `persistence/` and
+`plugins/`. **Neither was built and neither will be.**
+
+Rationale: every use case in this project has exactly one consumer
+(one plugin per bot per feature). Splitting `domain/` + `application/`
+out of the plugin would add two interfaces and a directory hop for
+each plugin without enabling a single new use case. The plugin file
+itself is the application layer; the typed Mongoose schema +
+repository is the domain artifact.
+
+If a future feature gains a second consumer (e.g. an HTTP endpoint
+that needs the same use case as a slash command), the affected
+plugin should grow an `internal/` subdirectory factoring the shared
+logic out — not a top-level `application/` directory. The audit
+recorded this decision under item 1.4; this note is the canonical
+statement so readers stop searching for the missing folders.
+
 ## Core abstractions
 
 ### Plugin contract

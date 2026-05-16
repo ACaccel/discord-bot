@@ -69,7 +69,15 @@ export interface GuildInfo {
     guild: Guild;
     channels?: Record<string, Channel>;
     roles?: Record<string, Role>;
-    /** @deprecated Use `repos` for typed access. Kept for unmigrated callsites; removed in Phase 4b. */
+    /**
+     * @deprecated Use `repos` for typed access. The slot is kept solely
+     * because the `message-backup` plugin still reads raw Mongoose
+     * models for its hot-loop archive write path; migrating that one
+     * consumer to a `MessageRepo` + `FetchRepo` shaped contract is
+     * tracked as the C-1 follow-up that finally closes audit 2.1 / 2.7.
+     * Every other historical user (16 handler / feature sites) migrated
+     * in PR-C.
+     */
     db?: GuildDb;
     /** Per-guild repository bag built from the IoC container at connect time. */
     repos?: Repos;

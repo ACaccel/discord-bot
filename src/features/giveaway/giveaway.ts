@@ -45,28 +45,28 @@ export const findGiveaway = async (bot: BaseBot, guild_id: string, message_id: s
     if (!guild) {
         return false;
     }
-    const db = bot.guildInfo[guild.id].db;
-    if (!db) {
+    const repos = bot.guildInfo[guild.id]?.repos;
+    if (!repos) {
         return false;
     }
-    const giveaway = await db.models["Giveaway"].findOne({ message_id });
+    const giveaway = await repos.giveaway.findByMessageId(message_id);
     if (!giveaway) return false;
     return true;
 }
 
 export const scheduleGiveaway = async (bot: BaseBot, guild_id: string, message_id: string) => {
     if (!isGiveawayBot(bot)) return "Bot does not implement IGiveawayBot";
-    
+
     const guild = bot.client.guilds.cache.get(guild_id);
     if (!guild) {
         return "Guild not found";
     }
-    const db = bot.guildInfo[guild.id].db;
-    if (!db) {
+    const repos = bot.guildInfo[guild.id]?.repos;
+    if (!repos) {
         return "Database not found";
     }
-    
-    const giveaway = await db.models["Giveaway"].findOne({ message_id });
+
+    const giveaway = await repos.giveaway.findByMessageId(message_id);
     if (!giveaway) return "Giveaway not found";
     const giveawayChannel = guild.channels.cache.get(giveaway.channel_id);
     if (!giveawayChannel?.isSendable()) return "Giveaway channel not found";
@@ -106,7 +106,7 @@ export const scheduleGiveaway = async (bot: BaseBot, guild_id: string, message_i
         }`
     });
 
-    await db.models["Giveaway"].deleteOne({ message_id });
+    await repos.giveaway.deleteByMessageId(message_id);
     new JobManager(bot.jobs).cancel(giveawayJobKey(message_id));
 
     return null;
@@ -119,13 +119,13 @@ export const deleteGiveaway = async (bot: BaseBot & IGiveawayBot, guild_id: stri
     if (!guild) {
         return "Guild not found";
     }
-    const db = bot.guildInfo[guild.id].db;
-    if (!db) {
+    const repos = bot.guildInfo[guild.id]?.repos;
+    if (!repos) {
         return "Database not found";
     }
 
     new JobManager(bot.jobs).cancel(giveawayJobKey(message_id));
-    await db.models["Giveaway"].deleteOne({ message_id });
+    await repos.giveaway.deleteByMessageId(message_id);
 
     return null;
 }
@@ -135,9 +135,9 @@ export const rebootGiveawayJobs = async (bot: BaseBot) => {
     await Promise.all(
         Object.values(bot.guildInfo).map(async (guild_info) => {
             try {
-                if (!guild_info.db) return;
-                const giveaways = await guild_info.db.models["Giveaway"].find({});
-                for (const g of giveaways as Array<{ message_id: string; end_time: number | string | Date }>) {
+                if (!guild_info.repos) return;
+                const giveaways = await guild_info.repos.giveaway.listAll();
+                for (const g of giveaways) {
                     const end_time = new Date(g.end_time);
                     if (end_time > new Date()) {
                         jobManager.schedule(giveawayJobKey(g.message_id), end_time, async () => {

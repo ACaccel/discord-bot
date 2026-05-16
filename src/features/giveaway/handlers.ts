@@ -45,8 +45,8 @@ export const handleGiveawayCreate = async (
             return;
         }
 
-        const db = bot.guildInfo[guild.id].db;
-        if (!db) {
+        const repos = bot.guildInfo[guild.id]?.repos;
+        if (!repos) {
             await interaction.editReply({ content: "找不到資料庫" });
             return;
         }
@@ -77,16 +77,15 @@ export const handleGiveawayCreate = async (
         }
 
         // save giveaway to database
-        const newGiveaway = new db.models["Giveaway"]({
-            winner_num: winner_num,
-            prize: prize,
-            end_time: end_time,
+        await repos.giveaway.create({
+            winner_num,
+            prize,
+            end_time,
             channel_id: channel.id,
             prize_owner_id: interaction.user.id,
             participants: [],
-            message_id: message_id
+            message_id,
         });
-        await newGiveaway.save();
 
         // schedule job to find winner
         if (await findGiveaway(bot, guild.id, message_id)) {

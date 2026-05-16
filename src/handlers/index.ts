@@ -1,16 +1,13 @@
 /**
  * Generic handler registry / factory.
  *
- * Phase 1: the runtime `fs.readdirSync + require()` discovery is replaced
- * by codegen — each handler subdirectory has a `registry.generated.ts`
- * mapping `<subdir name> -> HandlerConstructor`. The `Command` /
- * `ButtonHandler` / etc. index files import their registry and call
- * `factory.registerFromRegistry(REGISTRY)`. The old `register(handlerDir)`
- * shim still works (for any legacy in-tree caller) but is deprecated and
- * will be removed in a later phase.
+ * Audit C-5: the legacy `register(handlerDir)` runtime-discovery shim
+ * is gone. The codegen path (`scripts/gen-registry.ts` + each handler
+ * subdirectory's `registry.generated.ts`) has been the sole live entry
+ * since Phase 1; the shim survived only as a 0-caller back-compat
+ * stub keeping `eslint-disable @typescript-eslint/no-var-requires`
+ * alive in production code. Both are deleted now.
  */
-import fs from 'fs';
-import path from 'path';
 
 type HandlerConstructor<T> = new () => T;
 
@@ -31,29 +28,6 @@ export class HandlerFactory<T> {
         throw new Error(`HandlerFactory: duplicate handler name "${name}"`);
       }
       this.handlerMap.set(name, Ctor);
-    }
-  }
-
-  /**
-   * @deprecated Use {@link registerFromRegistry} with the codegen-produced
-   * registry object. Retained only for back-compat with legacy callers
-   * that have not migrated yet; will be removed once every site uses the
-   * static registry.
-   */
-  public register(handlerDir: string): void {
-    const entries = fs.readdirSync(handlerDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-
-      const name = entry.name;
-      const modulePath = path.join(handlerDir, name);
-
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const mod = require(modulePath) as { default?: HandlerConstructor<T> };
-      if (!mod.default) continue;
-
-      this.handlerMap.set(name, mod.default);
     }
   }
 
