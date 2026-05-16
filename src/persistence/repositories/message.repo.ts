@@ -205,9 +205,7 @@ export class MongoMessageRepo implements MessageRepo {
     }
   }
 
-  public async findExistingMessageIds(
-    messageIds: readonly string[],
-  ): Promise<ReadonlySet<string>> {
+  public async findExistingMessageIds(messageIds: readonly string[]): Promise<ReadonlySet<string>> {
     if (messageIds.length === 0) return new Set<string>();
     try {
       const docs = await this.conn.models.Message.find(

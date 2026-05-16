@@ -12,8 +12,17 @@
  * with an `eslint-disable no-restricted-syntax`. Now it takes a
  * pre-resolved `apiKeys` map (populated by the composition root from
  * the typed `Env`), so the strict env-access rule is honoured
- * throughout `infra/llm`. The `MissingApiKeyError` gate semantics are
- * unchanged: an empty / undefined key on a requested provider throws.
+ * throughout `infra/llm`.
+ *
+ * PR-E E-6 (B-3 reviewer follow-up): two-shape resolution. `tryResolve`
+ * returns `Result<LLMProvider, LlmProviderError>` for the recoverable
+ * missing-key path so `LLMService` can stay on the Result rail end-
+ * to-end. `resolve` keeps the throwing shape for callers that
+ * already handle `MissingApiKeyError` (test fixtures, anything that
+ * predates the Result contract).
+ *
+ * Both shapes still throw a native `TypeError` for the unknown-provider
+ * programmer error per the DomainError convention.
  *
  * Adding a new provider:
  *   1. Implement {@link LLMProvider}.
@@ -21,6 +30,8 @@
  *   3. Pass its API-key value in the `apiKeys` map at the call site.
  *   4. Add one line to {@link createDefaultRegistry} below.
  */
+import { LlmProviderError } from '../../core/errors';
+import { err, ok, type Result } from '../../core/result';
 import {
   MissingApiKeyError,
   PROVIDER_API_KEY_ENV,
@@ -32,6 +43,22 @@ export type LlmProviderFactory = () => LLMProvider;
 
 /** Pre-resolved per-provider API keys. `undefined` = unset / unused. */
 export type LlmProviderApiKeys = Readonly<Partial<Record<LLMProviderName, string | undefined>>>;
+
+/**
+ * Widened LlmProviderError used as the Err branch of {@link tryResolve}.
+ * Erases the messageParams generic so consumers handle a single
+ * concrete type regardless of which translation branch produced it.
+ */
+type AnyLlmProviderError = LlmProviderError<Readonly<Record<string, string | number>>>;
+
+const missingApiKeyToLlmError = (provider: LLMProviderName, envVar: string): AnyLlmProviderError =>
+  new LlmProviderError({
+    code: 'LLM_INVALID_API_KEY',
+    messageKey: 'errors:llm.invalid_api_key',
+    messageParams: { provider, envVar },
+    context: { operation: 'LlmProviderRegistry.tryResolve' },
+    cause: new MissingApiKeyError(provider, envVar),
+  }) as AnyLlmProviderError;
 
 export class LlmProviderRegistry {
   private readonly factories: Map<LLMProviderName, LlmProviderFactory>;
@@ -48,9 +75,10 @@ export class LlmProviderRegistry {
 
   /**
    * Resolve a provider by name. Throws {@link MissingApiKeyError} if
-   * the provider's API key is empty / unset (callers see the env-var
-   * name in the error message so ops can locate the missing setting).
-   * Throws a plain `Error` if the name is not registered.
+   * the provider's API key is empty / unset; throws a native
+   * `TypeError` if the name is not registered. Prefer
+   * {@link tryResolve} for new code so the missing-key path stays
+   * on the Result rail.
    */
   public resolve(name: LLMProviderName): LLMProvider {
     const cached = this.instances.get(name);
@@ -71,6 +99,31 @@ export class LlmProviderRegistry {
     const instance = factory();
     this.instances.set(name, instance);
     return instance;
+  }
+
+  /**
+   * Result-shaped resolution. Returns `Ok(LLMProvider)` on success,
+   * `Err(LlmProviderError)` for the recoverable missing-key path
+   * (already translated through the i18n catalog). Throws `TypeError`
+   * only for the programmer-error case (unknown provider name) — a
+   * domain that is genuinely uncatchable.
+   */
+  public tryResolve(name: LLMProviderName): Result<LLMProvider, AnyLlmProviderError> {
+    const cached = this.instances.get(name);
+    if (cached !== undefined) return ok(cached);
+
+    const keyValue = this.apiKeys[name];
+    if (keyValue === undefined || keyValue.length === 0) {
+      return err(missingApiKeyToLlmError(name, PROVIDER_API_KEY_ENV[name]));
+    }
+
+    const factory = this.factories.get(name);
+    if (factory === undefined) {
+      throw new TypeError(`LlmProviderRegistry.tryResolve: unknown provider "${name}"`);
+    }
+    const instance = factory();
+    this.instances.set(name, instance);
+    return ok(instance);
   }
 
   /** True if the provider is registered (regardless of whether its key is set). */

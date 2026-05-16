@@ -130,13 +130,35 @@ export const deleteGiveaway = async (bot: BaseBot & IGiveawayBot, guild_id: stri
     return null;
 }
 
+/**
+ * Same exponential-backoff retry as `activity.rebootRetry`. Audit C-1
+ * reviewer follow-up — a transient Mongo blip during boot used to
+ * silently leave the guild's scheduled giveaways un-rebuilt for the
+ * process lifetime.
+ */
+const REBOOT_MAX_ATTEMPTS = 3;
+const rebootRetry = async <T>(op: () => Promise<T>): Promise<T> => {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < REBOOT_MAX_ATTEMPTS; attempt += 1) {
+        try {
+            return await op();
+        } catch (err) {
+            lastErr = err;
+            if (attempt < REBOOT_MAX_ATTEMPTS - 1) {
+                await new Promise((resolve) => setTimeout(resolve, 250 * Math.pow(2, attempt)));
+            }
+        }
+    }
+    throw lastErr;
+};
+
 export const rebootGiveawayJobs = async (bot: BaseBot) => {
     const jobManager = new JobManager(bot.jobs);
     await Promise.all(
         Object.values(bot.guildInfo).map(async (guild_info) => {
             try {
                 if (!guild_info.repos) return;
-                const giveaways = await guild_info.repos.giveaway.listAll();
+                const giveaways = await rebootRetry(() => guild_info.repos!.giveaway.listAll());
                 for (const g of giveaways) {
                     const end_time = new Date(g.end_time);
                     if (end_time > new Date()) {
@@ -151,6 +173,14 @@ export const rebootGiveawayJobs = async (bot: BaseBot) => {
                 }
             } catch (err) {
                 logger.errorLogger(bot.clientId, guild_info.guild.id, err);
+                const debugCh = guild_info.channels?.debug;
+                if (debugCh?.isSendable()) {
+                    await debugCh
+                        .send(
+                            `[ ops ] giveaway reboot failed for guild ${guild_info.guild.id} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
+                        )
+                        .catch(() => undefined);
+                }
             }
         }),
     );

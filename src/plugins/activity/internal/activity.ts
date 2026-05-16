@@ -124,13 +124,35 @@ export const deleteActivity = async (bot: BaseBot & IActivityBot, guild_id: stri
     return null;
 }
 
+/**
+ * Retry helper. Exponential backoff: 250ms → 500ms → 1000ms before
+ * giving up. Audit C-1 reviewer follow-up — the reboot loop used to
+ * log-and-continue on a transient Mongo blip, silently leaving the
+ * guild's scheduled jobs un-rebuilt for the lifetime of the process.
+ */
+const REBOOT_MAX_ATTEMPTS = 3;
+const rebootRetry = async <T>(op: () => Promise<T>): Promise<T> => {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < REBOOT_MAX_ATTEMPTS; attempt += 1) {
+        try {
+            return await op();
+        } catch (err) {
+            lastErr = err;
+            if (attempt < REBOOT_MAX_ATTEMPTS - 1) {
+                await new Promise((resolve) => setTimeout(resolve, 250 * Math.pow(2, attempt)));
+            }
+        }
+    }
+    throw lastErr;
+};
+
 export const rebootActivityJobs = async (bot: BaseBot) => {
     const jobManager = new JobManager(bot.jobs);
     await Promise.all(
         Object.values(bot.guildInfo).map(async (guild_info) => {
             try {
                 if (!guild_info.repos) return;
-                const activities = await guild_info.repos.activity.listAll();
+                const activities = await rebootRetry(() => guild_info.repos!.activity.listAll());
                 for (const a of activities) {
                     const expired_at = new Date(a.expired_at);
                     if (expired_at > new Date()) {
@@ -144,7 +166,18 @@ export const rebootActivityJobs = async (bot: BaseBot) => {
                     }
                 }
             } catch (err) {
+                // After all retries exhausted: surface to operators via
+                // the debug channel so a sustained outage is visible,
+                // not just buried in the log file.
                 logger.errorLogger(bot.clientId, guild_info.guild.id, err);
+                const debugCh = guild_info.channels?.debug;
+                if (debugCh?.isSendable()) {
+                    await debugCh
+                        .send(
+                            `[ ops ] activity reboot failed for guild ${guild_info.guild.id} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
+                        )
+                        .catch(() => undefined);
+                }
             }
         }),
     );

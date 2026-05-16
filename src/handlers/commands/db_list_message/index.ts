@@ -9,18 +9,14 @@ import { BaseBot } from "@bot";
 import { Command } from "@cmd";
 import { logger } from "@utils";
 import type { ChannelId } from "../../../core/ids";
+import type { MessageDoc } from "../../../persistence/schemas/message.schema";
 
-type DbMessage = {
-    channelId: string;
-    content?: string;
-    messageId: string;
-    userId: string;
-    userName: string;
-    attachments?: { id?: string; name?: string; url?: string; contentType?: string }[];
-    reactions?: { id?: string | null; name?: string | null; animated?: boolean; count?: number; userIds?: string[] }[];
-    stickers?: { id?: string; name?: string }[];
-    timestamp: number | string;
-};
+// Audit C-1 reviewer follow-up: the local DbMessage shape was a hand-
+// maintained copy of the persistence schema. Aliasing it to the typed
+// `MessageDoc` keeps the handler reactive to schema changes — a future
+// field add becomes a compile error in the rendering code instead of a
+// silent drift between two definitions.
+type DbMessage = MessageDoc;
 
 const isValidDateString = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date);
 
