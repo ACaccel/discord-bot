@@ -9,6 +9,7 @@ import {
 } from 'discord.js';
 import { BaseBot } from "@bot";
 import { logger, bot_cmd } from "@utils";
+import { ops } from "../../core/logger";
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
 
@@ -60,7 +61,7 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
     const rest_commands: ApplicationCommandDataResolvable[] = Array.from(commandHandlers.values())
         .filter((cmd: Command) => {
             if (!cmd.config) {
-                logger.errorLogger(bot.clientId, null, `Command ${cmd} has no config.`);
+                logger.errorLogger(bot.clientId, null, ops.command.handlerMissingConfig(String(cmd)));
                 return false;
             }
             return true;
@@ -70,7 +71,7 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
 }
 
 export const registerCommands = async (bot: BaseBot) => {
-    logger.systemLogger(bot.clientId, "Registering commands...");
+    logger.systemLogger(bot.clientId, ops.command.registerStart());
 
     // const rest = new REST({ version: "10" }).setToken(bot.getToken());
     // rest.on('rateLimited', (info: RateLimitData) => {
@@ -82,7 +83,7 @@ export const registerCommands = async (bot: BaseBot) => {
 
     try {
         if (!bot.config.commands) {
-            logger.systemLogger(bot.clientId, "No commands to register.");
+            logger.systemLogger(bot.clientId, ops.command.registerEmpty());
             return;
         }
 
@@ -110,9 +111,9 @@ export const registerCommands = async (bot: BaseBot) => {
         //     await new Promise(resolve => setTimeout(resolve, 60000)); // to avoid rate limit
         // }
 
-        logger.systemLogger(bot.clientId, `Successfully register ${bot.commandHandlers.size} application (/) commands.`)
+        logger.systemLogger(bot.clientId, ops.command.registerSuccess(bot.commandHandlers.size));
     } catch (err) {
-        logger.systemLogger(bot.clientId, `Failed to register commands: ${err}`);
+        logger.systemLogger(bot.clientId, ops.command.registerFailed(String(err)));
     }
 }
 

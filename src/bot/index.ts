@@ -32,6 +32,7 @@ import {
   createLoggerFromProcessEnv,
   installProcessHandlers,
   type Logger,
+  ops,
 } from '../core/logger';
 import { initLegacyLogger } from '../utils/logger';
 import { loadEnv, type Env } from '../core/config';
@@ -277,7 +278,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public connectOneGuild = async (guildId: string): Promise<void> => {
         const slot = this.guildInfo[guildId];
         if (slot === undefined) {
-            logger.systemLogger(this.clientId, `connectOneGuild: no guildInfo slot for ${guildId}`);
+            logger.systemLogger(this.clientId, ops.guildDb.slotMissing(guildId));
             return;
         }
         const branded = asGuildId(guildId);
@@ -314,7 +315,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             this.disabledGuilds.set(guildId, { error: normalised, traceId });
             logger.systemLogger(
                 this.clientId,
-                `connectOneGuild failed for guild ${guildId} traceId=${traceId}: ${normalised.message}`,
+                ops.guildDb.connectFailed(guildId, traceId, normalised.message),
             );
             // Re-throw so existing callers (connectGuildDB, guild_event.ts)
             // keep their previous control-flow semantics.
@@ -671,9 +672,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     }
 
     public connectGuildDB = async () => {
-        logger.systemLogger(this.clientId, "Connecting to MongoDB...");
+        logger.systemLogger(this.clientId, ops.guildDb.poolStart());
         if (!this.mongoURI) {
-            logger.systemLogger(this.clientId, "No MongoDB URI.");
+            logger.systemLogger(this.clientId, ops.guildDb.uriMissing());
             return;
         }
 
@@ -681,7 +682,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             await Promise.all(Object.entries(this.guildInfo).map(async ([guild_id, guild]) => {
                 try {
                     await this.connectOneGuild(guild_id);
-                    logger.systemLogger(this.clientId, `MongoDB for guild: ${guild_id} - ${guild.guild.name} connected.`);
+                    logger.systemLogger(this.clientId, ops.guildDb.connectSuccess(guild_id, guild.guild.name));
                 } catch {
                     // connectOneGuild already populated `disabledGuilds`
                     // and logged with traceId; swallow here so one bad
@@ -690,7 +691,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 }
             }));
         } catch (err) {
-            logger.systemLogger(this.clientId, `Failed to connect to MongoDB: ${err}`);
+            logger.systemLogger(this.clientId, ops.guildDb.poolStartFailed(String(err)));
         }
     }
 
