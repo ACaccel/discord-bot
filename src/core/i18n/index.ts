@@ -17,3 +17,4 @@ export {
   createDefaultTranslator,
   type LoadCatalogOptions,
 } from './catalog-loader';
+export { bindTranslator, type BoundTranslate } from './bind';

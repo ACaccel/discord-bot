@@ -1,6 +1,7 @@
 import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
 import { BaseBot } from '../../../bot';
+import { bindTranslator } from '../../../core/i18n';
 import { bot_cmd, JobManager, logger } from '../../../utils';
 
 export interface IActivityBot {
@@ -16,19 +17,28 @@ export const activityJobKey = (activity_id: string) => `activity:${activity_id}`
 export const isActivityJobKey = (key: string, activityId: string) =>
     key.startsWith('activity:') && key.split(':')[1] === activityId;
 
-export const activityAnnouncement = async (activity_id: string, channel: Channel, title: string, description: string, end_time_date: Date) => {
+export const activityAnnouncement = async (
+    activity_id: string,
+    channel: Channel,
+    title: string,
+    description: string,
+    end_time_date: Date,
+    bot: BaseBot,
+) => {
     if (!channel.isSendable()) return null;
 
+    const t = bindTranslator(bot.translator);
+
     const embed = new EmbedBuilder()
-        .setTitle(`📢 活動: ${title}`)
+        .setTitle(t('replies:activity.announce_title', { title }))
         .addFields(
-            { name: "🆔 活動ID", value: activity_id },
-            { name: "📌 說明", value: description || "無" },
-            { name: "⏰ 活動結束於", value: `${end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}` },
+            { name: t('replies:activity.announce_field_id'), value: activity_id },
+            { name: t('replies:activity.announce_field_description'), value: description || t('replies:common.empty_value') },
+            { name: t('replies:activity.announce_field_endtime'), value: end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }) },
         )
         .setColor("#00BFFF")
-        .setFooter({ text: "點擊 ✅ 表情符號參加活動!" });
-    
+        .setFooter({ text: t('replies:activity.announce_footer') });
+
     const message = await channel.send({ embeds: [embed] });
     if (!message) return null;
     else {
@@ -92,14 +102,15 @@ export const scheduleActivity = async (bot: BaseBot, guild_id: string, activity_
     await repos.activity.setParticipants(activity_id, participantsArray);
 
     // Send results
-    await activityChannel.send({
-        content:
-        `📢 **活動結束!** 📢\n\n**活動: ${activity.title}**\n\n${
-            participantsArray.length > 0
-                ? `✅ **參與者:**\n${participantsArray.map(id => `<@${id}>`).join('\n')}\n\n共 ${participantsArray.length} 人參與活動！`
-                : '😢 **沒有人參加活動**'
-        }`
-    });
+    const t = bindTranslator(bot.translator);
+    const resultContent = participantsArray.length > 0
+        ? t('replies:activity.result_with_participants', {
+            title: activity.title,
+            participants: participantsArray.map(id => `<@${id}>`).join('\n'),
+            count: participantsArray.length,
+        })
+        : t('replies:activity.result_no_participants', { title: activity.title });
+    await activityChannel.send({ content: resultContent });
 
     new JobManager(bot.jobs).cancel(activityJobKey(activity_id));
 

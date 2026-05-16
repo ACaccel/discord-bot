@@ -1,6 +1,7 @@
 import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
 import { Job } from 'node-schedule';
 import { BaseBot } from '../../../bot';
+import { bindTranslator } from '../../../core/i18n';
 import { bot_cmd, JobManager, logger } from '../../../utils';
 
 export interface IGiveawayBot {
@@ -16,20 +17,30 @@ export const giveawayJobKey = (message_id: string) => `giveaway:${message_id}`;
 export const isGiveawayJobKey = (key: string, messageId: string) =>
     key.startsWith('giveaway:') && key.split(':')[1] === messageId;
 
-export const giveawayAnnouncement = async (channel: Channel, prize: string, prize_owner_id: string, winner_num: number, end_time_date: Date, description: string) => {
+export const giveawayAnnouncement = async (
+    channel: Channel,
+    prize: string,
+    prize_owner_id: string,
+    winner_num: number,
+    end_time_date: Date,
+    description: string,
+    bot: BaseBot,
+) => {
     if (!channel.isSendable()) return null;
 
+    const t = bindTranslator(bot.translator);
+
     const embed = new EmbedBuilder()
-        .setTitle(`🎉 抽獎: ${prize}`)
+        .setTitle(t('replies:giveaway.announce_title', { prize }))
         .addFields(
-            { name: "🎁 獎品提供者", value: `<@${prize_owner_id}>` },
-            { name: "👤 中獎人數", value: winner_num.toString() },
-            { name: "⏰ 抽獎結束於", value: `${end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}` },
-            { name: "📌 備註", value: description || "無" }
+            { name: t('replies:giveaway.announce_field_owner'), value: `<@${prize_owner_id}>` },
+            { name: t('replies:giveaway.announce_field_winners'), value: winner_num.toString() },
+            { name: t('replies:giveaway.announce_field_endtime'), value: end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }) },
+            { name: t('replies:giveaway.announce_field_description'), value: description || t('replies:common.empty_value') }
         )
         .setColor("#F9F900")
-        .setFooter({ text: "點擊 🎉 表情符號參加抽獎!" });
-    
+        .setFooter({ text: t('replies:giveaway.announce_footer') });
+
     const message = await channel.send({ embeds: [embed] });
     if (!message) return null;
     else {
@@ -97,14 +108,15 @@ export const scheduleGiveaway = async (bot: BaseBot, guild_id: string, message_i
     }
 
     // Send results
-    await giveawayChannel.send({ 
-        content: 
-        `🎉 **抽獎結束!** 🎉\n\n**獎品: ${giveaway.prize}**\n\n${
-            winners.length > 0
-                ? `🏆 **得獎者:**\n${winners.map(winner => `<@${winner.id}>`).join('\n')}\n\n恭喜以上得獎者！請與 <@${giveaway.prize_owner_id}> 聯繫領取獎品!`
-                : '😢 **沒有人參加抽獎**'
-        }`
-    });
+    const t = bindTranslator(bot.translator);
+    const resultContent = winners.length > 0
+        ? t('replies:giveaway.result_with_winners', {
+            prize: giveaway.prize,
+            winners: winners.map(w => `<@${w.id}>`).join('\n'),
+            ownerId: giveaway.prize_owner_id,
+        })
+        : t('replies:giveaway.result_no_participants', { prize: giveaway.prize });
+    await giveawayChannel.send({ content: resultContent });
 
     await repos.giveaway.deleteByMessageId(message_id);
     new JobManager(bot.jobs).cancel(giveawayJobKey(message_id));

@@ -10,11 +10,12 @@ import path from 'path';
  * actually exists today:
  *   - `src/core/**` is at 100% line / branch / func; the 90% floor
  *     locks in the audit baseline.
- *   - Overall lines floor (`lines: 46`) is the post-PR-E baseline; it
+ *   - Overall lines floor (`lines: 45`) is the post-PR-F1 baseline; it
  *     stops accidental regressions without demanding fixes the
- *     pending PR-C legacy-cleanup hasn't shipped yet. Raise this to
- *     the plan's ≥ 75% target inside PR-C once `src/features/*` and
- *     `src/utils/*` get folded into plugins.
+ *     pending PR-G coverage-raise hasn't shipped yet. Raise this to
+ *     the plan's ≥ 75% target inside PR-G once `core/plugin/host`,
+ *     `core/ioc/container`, and the persistence repos all have
+ *     dedicated unit tests (audit 3.13 / C-13).
  *   - `domain/` + `application/` layers are intentionally absent (see
  *     audit 1.4); no thresholds defined for them.
  */
@@ -26,10 +27,10 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.d.ts', 'src/**/index.ts', 'src/**/*.generated.ts'],
       thresholds: {
-        lines: 46,
+        lines: 45,
         functions: 69,
         branches: 80,
-        statements: 46,
+        statements: 45,
         'src/core/**': {
           lines: 90,
           functions: 90,

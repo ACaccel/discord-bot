@@ -2,6 +2,7 @@ import {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import { BaseBot } from '../../../bot';
+import { bindTranslator } from '../../../core/i18n';
 import { logger, misc, JobManager } from '../../../utils';
 import {
     activityAnnouncement,
@@ -17,38 +18,39 @@ export const handleActivityCreate = async (
     bot: BaseBot & IActivityBot,
 ): Promise<void> => {
     await interaction.deferReply();
+    const t = bindTranslator(bot.translator);
     try {
         const title = interaction.options.get("title")?.value as string | null;
         const duration = interaction.options.get("duration")?.value as string | null;
         const description = interaction.options.get("description")?.value as string | null;
 
         if (!duration || !title) {
-            await interaction.editReply({ content: "請輸入活動標題和持續時間" });
+            await interaction.editReply({ content: t('replies:activity.missing_required_fields') });
             return;
         }
 
         const guild = interaction.guild;
         if (!guild) {
-            await interaction.editReply({ content: "找不到伺服器" });
+            await interaction.editReply({ content: t('errors:command.guild_not_found') });
             return;
         }
 
         const channel = interaction.channel;
         if (!channel?.isSendable()) {
-            await interaction.editReply({ content: "找不到頻道或頻道不可發送訊息" });
+            await interaction.editReply({ content: t('errors:command.channel_not_sendable') });
             return;
         }
 
         const repos = bot.guildInfo[guild.id]?.repos;
         if (!repos) {
-            await interaction.editReply({ content: "找不到資料庫" });
+            await interaction.editReply({ content: t('errors:db.not_found') });
             return;
         }
 
         // parse duration
         const durationMs = misc.parseDuration(duration);
         if (durationMs === null) {
-            await interaction.editReply({ content: "無效的持續時間" });
+            await interaction.editReply({ content: t('replies:activity.invalid_duration') });
             return;
         }
 
@@ -62,11 +64,12 @@ export const handleActivityCreate = async (
             activity_id,
             channel,
             title,
-            description || "無",
-            end_time_date
+            description || t('replies:common.empty_value'),
+            end_time_date,
+            bot,
         );
         if (!message_id) {
-            await interaction.editReply({ content: "無法建立活動" });
+            await interaction.editReply({ content: t('replies:activity.create_announce_failed') });
             return;
         }
 
@@ -86,12 +89,15 @@ export const handleActivityCreate = async (
             new JobManager(bot.jobs).schedule(activityJobKey(activity_id), end_time_date, () => scheduleActivity(bot, guild.id, activity_id));
         }
 
-        await interaction.editReply({ 
-            content: `活動已建立！\n**活動ID**: ${activity_id}\n將於 ${end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })} 結束` 
+        await interaction.editReply({
+            content: t('replies:activity.create_success', {
+                activityId: activity_id,
+                endTime: end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }),
+            }),
         });
     } catch (error) {
         logger.errorLogger(bot.clientId, interaction.guild?.id ?? null, error);
-        await interaction.editReply({ content: "無法建立活動" });
+        await interaction.editReply({ content: t('replies:activity.create_failed') });
     }
 };
 
@@ -100,28 +106,31 @@ export const handleActivityDelete = async (
     bot: BaseBot & IActivityBot,
 ): Promise<void> => {
     await interaction.deferReply();
+    const t = bindTranslator(bot.translator);
     try {
         const activity_id = interaction.options.get("activity_id")?.value as string | null;
         if (!activity_id) {
-            await interaction.editReply({ content: "請提供活動ID" });
+            await interaction.editReply({ content: t('replies:activity.missing_activity_id') });
             return;
         }
 
         const guild = interaction.guild;
         if (!guild) {
-            await interaction.editReply({ content: "找不到伺服器" });
+            await interaction.editReply({ content: t('errors:command.guild_not_found') });
             return;
         }
 
         const result = await deleteActivity(bot, guild.id, activity_id);
         if (typeof result === 'string' && result !== null) {
-            await interaction.editReply({ content: `無法刪除活動: ${result}` });
+            await interaction.editReply({
+                content: t('replies:activity.delete_failed_with_reason', { reason: result }),
+            });
             return;
         }
 
-        await interaction.editReply({ content: "活動已刪除" });
+        await interaction.editReply({ content: t('replies:activity.delete_success') });
     } catch (error) {
         logger.errorLogger(bot.clientId, interaction.guild?.id ?? null, error);
-        await interaction.editReply({ content: "無法刪除活動" });
+        await interaction.editReply({ content: t('replies:activity.delete_failed') });
     }
 };
