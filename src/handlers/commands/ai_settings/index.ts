@@ -10,10 +10,11 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
+
 import { type LLMProviderName, listProviderModels } from '../../../infra/llm';
 import { requireGuildRepos } from '../../require-guild-repos';
 
+import { logError } from '@core/logger';
 interface UserApiDoc {
     provider: string;
     model: string;
@@ -60,7 +61,7 @@ export default class ai_settings extends Command {
         try {
             doc = (await repos.userApiSetting.findByUserId(userId)) as UserApiDoc | undefined;
         } catch (err) {
-            logger.errorLogger(bot.clientId, interaction.guildId, err);
+            logError(bot.logger, bot.clientId, interaction.guildId, err);
             await interaction.reply({ content: bot.translator?.t('errors:db.operation_failed') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }

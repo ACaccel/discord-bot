@@ -47,10 +47,11 @@ import { buildRepos, type Repos } from '../persistence/repositories';
 import type { ConnectionManager } from '../infra/mongo/connection-manager';
 import {
   installProcessHandlers,
+  logError,
+  logSystem,
   type Logger,
   ops,
 } from '../core/logger';
-import { initLegacyLogger } from '../utils/logger';
 import { createBootstrapLogger, loadEnv, type Env } from '../core/config';
 import { createDefaultTranslator, type Translator } from '../core/i18n';
 import { systemClock, type Clock } from '../core/time';
@@ -70,7 +71,7 @@ import { Command, registerCommands } from "@cmd";
 import { ButtonHandler, registerButtons } from '@button';
 import { ModalHandler, registerModals } from '@modal';
 import { registerSSMs, SSMHandler } from '@select-menu';
-import { logger } from "@utils";
+
 import { detectGuildCreate } from "@event";
 import { ReactionHandler, executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
 
@@ -158,6 +159,18 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * context the field is guaranteed defined.
      */
     public translator: Translator | undefined;
+
+    /**
+     * Bot-scoped structured logger. Populated at the top of {@link run}
+     * from the IoC container so handler callsites (which pre-date
+     * constructor-injected loggers) can reach a typed pino instance
+     * without resolving the container themselves. Mirrors the
+     * {@link translator} access pattern.
+     *
+     * Optional only to model the pre-`run()` window; in any handler
+     * context the field is guaranteed defined.
+     */
+    public logger: Logger | undefined;
 
     /**
      * PluginHost: lazily constructed in {@link run} once async Translator
@@ -282,7 +295,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public connectOneGuild = async (guildId: string): Promise<void> => {
         const slot = this.guildInfo[guildId];
         if (slot === undefined) {
-            logger.systemLogger(this.clientId, ops.guildDb.slotMissing(guildId));
+            logSystem(this.logger, this.clientId, ops.guildDb.slotMissing(guildId));
             return;
         }
         const branded = asGuildId(guildId);
@@ -312,7 +325,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                     : new Error(typeof err === 'string' ? err : 'connectOneGuild failed');
             const traceId = Math.random().toString(36).slice(2, 8).padStart(6, '0');
             this.disabledGuilds.set(guildId, { error: normalised, traceId });
-            logger.systemLogger(
+            logSystem(
+                this.logger,
                 this.clientId,
                 ops.guildDb.connectFailed(guildId, traceId, normalised.message),
             );
@@ -327,7 +341,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // `logger.systemLogger(...)` callsites route through the same
         // bot-scoped pino instance the IoC container holds.
         const rootLogger = this.container.resolve<Logger>(TOKENS.Logger);
-        initLegacyLogger(rootLogger);
+        this.logger = rootLogger;
         // Process-level safety net. `installProcessHandlers` is
         // idempotent so multi-bot processes (one node process running
         // >1 BaseBot) install exactly once.
@@ -512,16 +526,16 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     }
 
     public login = async () => {
-        logger.systemLogger(this.clientId, "Logging in...");
+        logSystem(this.logger, this.clientId, "Logging in...");
         await this.client.login(this.token)
         .catch((err) => {
-            logger.systemLogger(this.clientId, `Failed to login: ${err}`);
+            logSystem(this.logger, this.clientId, `Failed to login: ${err}`);
         });
         if (!this.client.user) {
-            logger.systemLogger(this.clientId, "Failed to login: No user found.");
+            logSystem(this.logger, this.clientId, "Failed to login: No user found.");
             return;
         }
-        logger.systemLogger(this.clientId, `Logged in as ${this.client.user.username}!`);
+        logSystem(this.logger, this.clientId, `Logged in as ${this.client.user.username}!`);
 
         if (this.config.admin) {
             this.adminId = this.config.admin;
@@ -563,53 +577,53 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 try {
                     await this.pluginHost.readyAll();
                 } catch (readyErr: unknown) {
-                    logger.errorLogger(this.clientId, null, readyErr);
+                    logError(this.logger, this.clientId, null, readyErr);
                 }
             }
         } catch (err) {
-            logger.errorLogger(this.clientId, null, err);
+            logError(this.logger, this.clientId, null, err);
         }
     };
     
     public listen = async () => {
         this.client.on(Events.InteractionCreate, async (interaction) => {
             await this.interactionEventListener(interaction).catch((err) => {
-                logger.errorLogger(this.clientId, interaction.guildId || null, err);
+                logError(this.logger, this.clientId, interaction.guildId || null, err);
             });
         });
         this.client.on(Events.MessageCreate, async (message) => {
             await this.messageCreateListener(message).catch((err) => {
-                logger.errorLogger(this.clientId, message.guildId || null, err);
+                logError(this.logger, this.clientId, message.guildId || null, err);
             });
         });
         this.client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
             await this.messageUpdateListener(oldMessage, newMessage).catch((err) => {
-                logger.errorLogger(this.clientId, newMessage.guildId || null, err);
+                logError(this.logger, this.clientId, newMessage.guildId || null, err);
             });
         });
         this.client.on(Events.MessageDelete, async (message) => {
             await this.messageDeleteListener(message).catch((err) => {
-                logger.errorLogger(this.clientId, message.guildId || null, err);
+                logError(this.logger, this.clientId, message.guildId || null, err);
             });
         });
         this.client.on(Events.MessageReactionAdd, async (reaction, user) => {
             await this.messageReactionAddListener(reaction, user).catch((err) => {
-                logger.errorLogger(this.clientId, reaction.message.guildId || null, err);
+                logError(this.logger, this.clientId, reaction.message.guildId || null, err);
             });
         });
         this.client.on(Events.MessageReactionRemove, async (reaction, user) => {
             await this.messageReactionRemoveListener(reaction, user).catch((err) => {
-                logger.errorLogger(this.clientId, reaction.message.guildId || null, err);
+                logError(this.logger, this.clientId, reaction.message.guildId || null, err);
             });
         });
         this.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
             await this.guildMemberUpdateListener(oldMember, newMember).catch((err) => {
-                logger.errorLogger(this.clientId, newMember.guild.id || null, err);
+                logError(this.logger, this.clientId, newMember.guild.id || null, err);
             });
         });
         this.client.on(Events.GuildCreate, async (guild) => {
             await this.guildCreateListener(guild).catch((err) => {
-                logger.errorLogger(this.clientId, guild.id || null, err);
+                logError(this.logger, this.clientId, guild.id || null, err);
             });
         });
     }
@@ -629,7 +643,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     }
 
     public registerGuild = () => {
-        logger.systemLogger(this.clientId, "Registering guilds...");
+        logSystem(this.logger, this.clientId, "Registering guilds...");
         try {            
             let guild_num = 0;
             this.client.guilds.cache.forEach((guild) => {
@@ -661,19 +675,19 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 };
                 this.guildInfo[guild.id] = newGuild;
                 guild_num++;
-                logger.systemLogger(this.clientId, `${guild_num}. ${guild.id} - ${guild.name}`);
+                logSystem(this.logger, this.clientId, `${guild_num}. ${guild.id} - ${guild.name}`);
             });
 
-            logger.systemLogger(this.clientId, "Successfully registered all guilds.");
+            logSystem(this.logger, this.clientId, "Successfully registered all guilds.");
         } catch (err) {
-            logger.systemLogger(this.clientId, `Cannot register guild: ${err}`);
+            logSystem(this.logger, this.clientId, `Cannot register guild: ${err}`);
         }
     }
 
     public connectGuildDB = async () => {
-        logger.systemLogger(this.clientId, ops.guildDb.poolStart());
+        logSystem(this.logger, this.clientId, ops.guildDb.poolStart());
         if (!this.mongoURI) {
-            logger.systemLogger(this.clientId, ops.guildDb.uriMissing());
+            logSystem(this.logger, this.clientId, ops.guildDb.uriMissing());
             return;
         }
 
@@ -681,7 +695,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             await Promise.all(Object.entries(this.guildInfo).map(async ([guild_id, guild]) => {
                 try {
                     await this.connectOneGuild(guild_id);
-                    logger.systemLogger(this.clientId, ops.guildDb.connectSuccess(guild_id, guild.guild.name));
+                    logSystem(this.logger, this.clientId, ops.guildDb.connectSuccess(guild_id, guild.guild.name));
                 } catch {
                     // connectOneGuild already populated `disabledGuilds`
                     // and logged with traceId; swallow here so one bad
@@ -690,7 +704,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 }
             }));
         } catch (err) {
-            logger.systemLogger(this.clientId, ops.guildDb.poolStartFailed(String(err)));
+            logSystem(this.logger, this.clientId, ops.guildDb.poolStartFailed(String(err)));
         }
     }
 
@@ -714,7 +728,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                     if (message.length === 0) return;
                     await debug_ch.send(message);
                 } catch (err) {
-                    logger.errorLogger(this.clientId, guild.guild.id, err);
+                    logError(this.logger, this.clientId, guild.guild.id, err);
                 }
             }),
         );
@@ -797,7 +811,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             // handler only logs; without this catch the user sees an
             // indefinite "thinking…" or a silent failure. Surface the
             // traceId so support tickets correlate to logs.
-            logger.errorLogger(this.clientId, interaction.guildId, err);
+            logError(this.logger, this.clientId, interaction.guildId, err);
             if (interaction.isRepliable()) {
                 const content =
                     translator.t('errors:unexpected', { traceId }) ??
@@ -817,7 +831,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 } catch (replyErr) {
                     // Expired interaction or already-acked race; nothing
                     // else we can do. Already logged the root cause above.
-                    logger.systemLogger(this.clientId, ops.router.replySkipped(String(replyErr)));
+                    logSystem(this.logger, this.clientId, ops.router.replySkipped(String(replyErr)));
                 }
             }
         }

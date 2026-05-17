@@ -5,11 +5,11 @@ import {
 import dotenv from "dotenv";
 import express from 'express';
 
-import { logger } from '@utils';
 import { earthquake_warning } from '@event';
 import { Nijika } from './nijika';
 import config from './config.json';
 
+import { logError, logSystem } from '@core/logger';
 dotenv.config({ path: './src/bot/nijika/.env' });
 
 // discord client
@@ -56,7 +56,7 @@ r.get('/', (_, res) => {
 })
 
 r.post('/earthquake', (_, res) => {
-    logger.systemLogger(nijika.clientId, 'Earthquake alert webhook received; broadcasting.');
+    logSystem(nijika.logger, nijika.clientId, 'Earthquake alert webhook received; broadcasting.');
     // Webhook responds 200 immediately; the per-guild broadcast runs
     // detached. The detached promise must NOT use `forEach(async)` —
     // that drops every per-guild rejection on the floor. Wrap in a
@@ -78,17 +78,17 @@ r.post('/earthquake', (_, res) => {
                             nijika.translator,
                         );
                     } catch (err) {
-                        logger.errorLogger(nijika.clientId, guild_id, err);
+                        logError(nijika.logger, nijika.clientId, guild_id, err);
                     }
                 }),
             );
         } catch (err) {
-            logger.errorLogger(nijika.clientId, null, err);
+            logError(nijika.logger, nijika.clientId, null, err);
         }
     })();
     res.status(200).send('OK');
 })
 
 app.listen(process.env.PORT, () => {
-    logger.systemLogger(nijika.clientId, `discord bot server is running on port ${process.env.PORT}`)
+    logSystem(nijika.logger, nijika.clientId, `discord bot server is running on port ${process.env.PORT}`)
 });

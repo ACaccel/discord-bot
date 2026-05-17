@@ -197,7 +197,7 @@ export const parseDuration = (duration: string): number | null => {
 //         await guild.setIcon(profile.url);
 //         await guild.setName(profile.name);
 //     } catch (error) {
-//         logger.errorLogger(bot.clientId, guildId, error);
+//         logError(bot.logger, bot.clientId, guildId, error);
 //     }
 // }
 

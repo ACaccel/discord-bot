@@ -5,8 +5,8 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { logError } from '@core/logger';
 export default class talk_signed extends Command {
     constructor() {
         super();
@@ -58,7 +58,7 @@ export default class talk_signed extends Command {
                 await channel.send(`${guild_member.displayName}(${interaction.user.username}): ${content}`);
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.reply({ content: bot.translator?.t('replies:talk_signed.send_failed') ?? '', flags: MessageFlags.Ephemeral });
         }
     }

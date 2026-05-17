@@ -4,8 +4,8 @@ import {
 import axios from 'axios';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { logError } from '@core/logger';
 export default class weather_forecast extends Command {
     constructor() {
         super();
@@ -38,7 +38,7 @@ export default class weather_forecast extends Command {
             const formattedContentWithBackticks = formattedContent;
             await interaction.editReply({ content: formattedContentWithBackticks });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:weather_forecast.failed') ?? '' });
         }
     }

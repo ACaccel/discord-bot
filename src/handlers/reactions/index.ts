@@ -3,7 +3,7 @@ import {
     User,
 } from "discord.js";
 import { BaseBot } from "@bot";
-import { logger } from "@utils";
+
 import { HandlerFactory } from "handlers";
 
 export abstract class ReactionHandler {
@@ -12,21 +12,21 @@ export abstract class ReactionHandler {
 }
 
 export const registerReactions = async (bot: BaseBot) => {
-    logger.systemLogger(bot.clientId, "Registering reaction handlers...");
+    logSystem(bot.logger, bot.clientId, "Registering reaction handlers...");
     try {
         // todo: whether to specify handlers for each bot
         // import all reaction handlers
         bot.reactionHandler = createAllReactionHandlers();
 
-        logger.systemLogger(bot.clientId, `Successfully register ${bot.reactionHandler.size} reaction handlers.`);
+        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.reactionHandler.size} reaction handlers.`);
     } catch (err) {
-        logger.systemLogger(bot.clientId, `Failed to register reaction handlers: ${err}`);
+        logSystem(bot.logger, bot.clientId, `Failed to register reaction handlers: ${err}`);
     }
 }
 
 export const executeReactionAdded = async (reaction: MessageReaction, user: User, bot: BaseBot) => {
     if (!bot.reactionHandler) {
-        logger.systemLogger(bot.clientId, "Reaction handler not found.");
+        logSystem(bot.logger, bot.clientId, "Reaction handler not found.");
         return;
     }
 
@@ -38,7 +38,7 @@ export const executeReactionAdded = async (reaction: MessageReaction, user: User
 
 export const executeReactionRemoved = async (reaction: MessageReaction, user: User, bot: BaseBot) => {
     if (!bot.reactionHandler) {
-        logger.systemLogger(bot.clientId, "Reaction handler not found.");
+        logSystem(bot.logger, bot.clientId, "Reaction handler not found.");
         return;
     }
 
@@ -50,6 +50,7 @@ export const executeReactionRemoved = async (reaction: MessageReaction, user: Us
 
 import { REACTION_REGISTRY } from './registry.generated';
 
+import { logSystem } from '@core/logger';
 const reactionHandlerFactory = new HandlerFactory<ReactionHandler>();
 reactionHandlerFactory.registerFromRegistry(REACTION_REGISTRY);
 

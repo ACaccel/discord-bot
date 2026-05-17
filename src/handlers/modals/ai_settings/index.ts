@@ -1,10 +1,11 @@
 import { ModalSubmitInteraction, MessageFlags } from 'discord.js';
 import { BaseBot } from '@bot';
 import { ModalHandler } from '@modal';
-import { logger } from '@utils';
+
 import { type LLMProviderName } from '../../../infra/llm';
 import { requireGuildRepos } from '../../require-guild-repos';
 
+import { logError } from '@core/logger';
 const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set(['xai', 'openai', 'anthropic', 'gemini']);
 
 export default class ai_settings_modal extends ModalHandler {
@@ -57,7 +58,7 @@ export default class ai_settings_modal extends ModalHandler {
                 system_prompt: systemPrompt,
             });
         } catch (err) {
-            logger.errorLogger(bot.clientId, interaction.guildId, err);
+            logError(bot.logger, bot.clientId, interaction.guildId, err);
             await interaction.reply({ content: bot.translator?.t('errors:db.operation_failed') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }

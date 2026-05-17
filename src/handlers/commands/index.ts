@@ -8,7 +8,7 @@ import {
     RateLimitData,
 } from 'discord.js';
 import { BaseBot } from "@bot";
-import { logger, bot_cmd } from "@utils";
+import { bot_cmd } from "@utils";
 import { ops } from "../../core/logger";
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
@@ -61,7 +61,7 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
     const rest_commands: ApplicationCommandDataResolvable[] = Array.from(commandHandlers.values())
         .filter((cmd: Command) => {
             if (!cmd.config) {
-                logger.errorLogger(bot.clientId, null, ops.command.handlerMissingConfig(String(cmd)));
+                logError(bot.logger, bot.clientId, null, ops.command.handlerMissingConfig(String(cmd)));
                 return false;
             }
             return true;
@@ -71,7 +71,7 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
 }
 
 export const registerCommands = async (bot: BaseBot) => {
-    logger.systemLogger(bot.clientId, ops.command.registerStart());
+    logSystem(bot.logger, bot.clientId, ops.command.registerStart());
 
     // const rest = new REST({ version: "10" }).setToken(bot.getToken());
     // rest.on('rateLimited', (info: RateLimitData) => {
@@ -83,7 +83,7 @@ export const registerCommands = async (bot: BaseBot) => {
 
     try {
         if (!bot.config.commands) {
-            logger.systemLogger(bot.clientId, ops.command.registerEmpty());
+            logSystem(bot.logger, bot.clientId, ops.command.registerEmpty());
             return;
         }
 
@@ -103,17 +103,17 @@ export const registerCommands = async (bot: BaseBot) => {
         //         Routes.applicationGuildCommands(bot.clientId, guildId),
         //         { body: rest_commands },
         //     ).then(() => {
-        //         logger.systemLogger(bot.clientId, `Registered ${rest_commands.length} commands for guild ${guildId}`);
+        //         logSystem(bot.logger, bot.clientId, `Registered ${rest_commands.length} commands for guild ${guildId}`);
         //     }).catch((err) => {
         //         console.error(err);
-        //         logger.errorLogger(bot.clientId, guildId, `Failed to register commands for guild ${guildId}: ${err}`);
+        //         logError(bot.logger, bot.clientId, guildId, `Failed to register commands for guild ${guildId}: ${err}`);
         //     });
         //     await new Promise(resolve => setTimeout(resolve, 60000)); // to avoid rate limit
         // }
 
-        logger.systemLogger(bot.clientId, ops.command.registerSuccess(bot.commandHandlers.size));
+        logSystem(bot.logger, bot.clientId, ops.command.registerSuccess(bot.commandHandlers.size));
     } catch (err) {
-        logger.systemLogger(bot.clientId, ops.command.registerFailed(String(err)));
+        logSystem(bot.logger, bot.clientId, ops.command.registerFailed(String(err)));
     }
 }
 
@@ -146,6 +146,7 @@ export const executeCommand = async (interaction: ChatInputCommandInteraction | 
 
 import { COMMAND_REGISTRY } from './registry.generated';
 
+import { logError, logSystem } from '@core/logger';
 const commandHandlerFactory = new HandlerFactory<Command>();
 commandHandlerFactory.registerFromRegistry(COMMAND_REGISTRY);
 

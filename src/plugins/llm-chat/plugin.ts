@@ -35,7 +35,7 @@ import {
   type LLMSettings,
 } from '../../infra/llm';
 import { SessionManager } from './internal';
-import * as legacyLogger from '../../utils/logger';
+import { logError, type Logger } from '../../core/logger';
 
 const PLUGIN_ID = 'llm-chat';
 const PLUGIN_VERSION = '1.0.0';
@@ -124,12 +124,13 @@ type AnyLlmProviderError = LlmProviderError<any>;
 
 const handleChatError = async (
   llmErr: AnyLlmProviderError,
+  logger: Logger | undefined,
   clientId: string,
   guildId: string | null,
   placeholder: Message,
   translator: Translator,
 ): Promise<void> => {
-  legacyLogger.errorLogger(clientId, guildId, llmErr);
+  logError(logger, clientId, guildId, llmErr);
   const content = translator.t(
     llmErr.messageKey,
     llmErr.messageParams as Record<string, string | number> | undefined,
@@ -197,6 +198,8 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
           | undefined;
         if (userDoc === undefined || userDoc === null) return; // not whitelisted
 
+        const logger = ctx.resolve(TOKENS.Logger);
+
         // Case 1: @-mention -> new session. `ignoreRepliedUser` is
         // critical so a reply to the bot does not get classed as a
         // fresh @-tag.
@@ -206,6 +209,7 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
             userDoc,
             sessions,
             llmService,
+            logger,
             config.clientId,
             ctx.translator,
           );
@@ -222,6 +226,7 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
             userDoc,
             sessions,
             llmService,
+            logger,
             config.clientId,
             ctx.translator,
           );
@@ -242,6 +247,7 @@ const handleNewSession = async (
   userConfig: UserApiDoc,
   sessions: SessionManager,
   llmService: LLMService,
+  logger: Logger | undefined,
   clientId: string,
   translator: Translator,
 ): Promise<void> => {
@@ -254,7 +260,7 @@ const handleNewSession = async (
 
   const chatResult = await llmService.chat([userMsg], settings);
   if (!chatResult.ok) {
-    await handleChatError(chatResult.error, clientId, message.guildId, placeholder, translator);
+    await handleChatError(chatResult.error, logger, clientId, message.guildId, placeholder, translator);
     return;
   }
   const result: LLMResult = chatResult.value;
@@ -281,6 +287,7 @@ const handleContinueSession = async (
   userConfig: UserApiDoc,
   sessions: SessionManager,
   llmService: LLMService,
+  logger: Logger | undefined,
   clientId: string,
   translator: Translator,
 ): Promise<void> => {
@@ -300,7 +307,7 @@ const handleContinueSession = async (
 
   const chatResult = await llmService.chat(history, settings);
   if (!chatResult.ok) {
-    await handleChatError(chatResult.error, clientId, message.guildId, placeholder, translator);
+    await handleChatError(chatResult.error, logger, clientId, message.guildId, placeholder, translator);
     return;
   }
   const result: LLMResult = chatResult.value;

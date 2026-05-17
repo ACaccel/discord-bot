@@ -6,3 +6,4 @@ export {
   type InstallProcessHandlersInput,
 } from './process-handlers';
 export { ops } from './messages';
+export { logError, logSystem, logGuildEvent } from './legacy';

@@ -6,8 +6,8 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { logError } from '@core/logger';
 export default class menu_get_sticker extends Command {
     constructor() {
         super();
@@ -71,7 +71,7 @@ export default class menu_get_sticker extends Command {
             // No stickers or emoji found
             await interaction.editReply({ content: bot.translator?.t('replies:menu_get_sticker.not_found') ?? '' });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:menu_get_sticker.failed') ?? '' });
         }
     }

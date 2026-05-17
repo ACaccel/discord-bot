@@ -50,7 +50,14 @@ describe('safeSendEmbed', () => {
     // surrounding handler before its guildLogger / attachmentLogger
     // call sites run.
     await expect(
-      guildEventsTest.safeSendEmbed(fakeChannel, embed, 'bot-1', 'guild-1', 'message_update'),
+      guildEventsTest.safeSendEmbed(
+        fakeChannel,
+        embed,
+        undefined,
+        'bot-1',
+        'guild-1',
+        'message_update',
+      ),
     ).resolves.toBeUndefined();
     expect(fakeChannel.send).toHaveBeenCalledTimes(1);
   });
@@ -60,7 +67,14 @@ describe('safeSendEmbed', () => {
       send: vi.fn(async () => undefined),
     } as unknown as TextChannel;
     const embed = new EmbedBuilder().setTitle('x');
-    await guildEventsTest.safeSendEmbed(fakeChannel, embed, 'bot-1', 'guild-1', 'message_delete');
+    await guildEventsTest.safeSendEmbed(
+      fakeChannel,
+      embed,
+      undefined,
+      'bot-1',
+      'guild-1',
+      'message_delete',
+    );
     expect(fakeChannel.send).toHaveBeenCalledTimes(1);
   });
 });

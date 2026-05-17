@@ -6,8 +6,8 @@ import {
 } from "discord.js";
 import { BaseBot } from "@bot";
 import { Command } from "@cmd";
-import { logger } from "@utils";
 
+import { logError } from '@core/logger';
 const MAX_IDS_PER_RUN = 20;
 
 const parseIds = (raw: string): string[] => {
@@ -169,7 +169,7 @@ export default class inspect_member_ids extends Command {
                 await interaction.followUp({ embeds: [embed] });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:inspect_member_ids.failed') ?? '' });
         }
     }

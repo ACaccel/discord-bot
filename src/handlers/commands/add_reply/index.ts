@@ -3,9 +3,10 @@ import {
 } from 'discord.js';
 import { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
+
 import { requireGuildRepos } from '../../require-guild-repos';
 
+import { logError } from '@core/logger';
 export default class add_reply extends Command {
     constructor() {
         super();
@@ -48,7 +49,7 @@ export default class add_reply extends Command {
                 await interaction.editReply({ content: bot.translator?.t('replies:add_reply.already_exists', { input, reply }) ?? '' });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
             await interaction.editReply({ content: bot.translator?.t('replies:add_reply.failed') ?? '' });
         }
     }
