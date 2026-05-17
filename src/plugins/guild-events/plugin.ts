@@ -30,12 +30,8 @@ import type { Plugin } from '../../core/plugin';
 // `utils/bot_cmd.ts` files, which still use `@bot` / `@cmd` path
 // aliases not present in `tsconfig.strict.json`. `utils/logger.ts`
 // itself was rewritten as a strict-clean shim in Phase 3.
-import {
-  archiveDeletedAttachment,
-  logError,
-  logGuildEvent,
-  type Logger,
-} from '../../core/logger';
+import { logError, logGuildEvent, type Logger } from '../../core/logger';
+import { archiveDeletedAttachment } from '../../infra/discord';
 
 const PLUGIN_ID = 'guild-events';
 const PLUGIN_VERSION = '1.0.0';

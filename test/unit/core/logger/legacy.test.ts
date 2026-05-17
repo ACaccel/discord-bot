@@ -1,17 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import axios from 'axios';
-
-import {
-  archiveDeletedAttachment,
-  logError,
-  logGuildEvent,
-  logSystem,
-  sendChannelLog,
-} from '../../../../src/core/logger';
+import { logError, logGuildEvent, logSystem } from '../../../../src/core/logger';
 import type { Logger } from '../../../../src/core/logger';
-
-vi.mock('axios');
 
 interface FakeLogger {
   error: ReturnType<typeof vi.fn>;
@@ -98,55 +88,5 @@ describe('logGuildEvent', () => {
       { eventType: 'ROLE_ADD', msg: 'line1\\nline2' },
       'guild event',
     );
-  });
-});
-
-describe('sendChannelLog', () => {
-  it('returns immediately when channel is undefined or not sendable', async () => {
-    const fake = makeFake();
-    await sendChannelLog(fake as unknown as Logger, undefined, undefined, 'hi');
-    await sendChannelLog(
-      fake as unknown as Logger,
-      { isSendable: () => false } as never,
-      undefined,
-      'hi',
-    );
-    expect(fake.error).not.toHaveBeenCalled();
-  });
-
-  it('sends log and embed when both provided', async () => {
-    const send = vi.fn(async () => undefined);
-    const channel = { isSendable: () => true, send } as never;
-    await sendChannelLog(undefined, channel, { x: 1 } as never, 'hi');
-    expect(send).toHaveBeenCalledTimes(2);
-    expect(send).toHaveBeenNthCalledWith(1, 'hi');
-    expect(send).toHaveBeenNthCalledWith(2, { embeds: [{ x: 1 }] });
-  });
-
-  it('logs structured error on send failure', async () => {
-    const fake = makeFake();
-    const channel = {
-      isSendable: () => true,
-      send: vi.fn(async () => {
-        throw new Error('Missing Permissions');
-      }),
-    } as never;
-    await sendChannelLog(fake as unknown as Logger, channel, undefined, 'hi');
-    expect(fake.error).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('archiveDeletedAttachment', () => {
-  it('logs warn when the upstream fetch fails (no disk write)', async () => {
-    const fake = makeFake();
-    (axios.get as unknown as ReturnType<typeof vi.fn>) = vi.fn(async () => {
-      throw new Error('upstream 404');
-    });
-    const attachment = {
-      name: 'pic.png',
-      url: 'https://example.invalid/pic.png',
-    } as never;
-    await archiveDeletedAttachment(fake as unknown as Logger, 'g-1', attachment);
-    expect(fake.warn).toHaveBeenCalledTimes(1);
   });
 });

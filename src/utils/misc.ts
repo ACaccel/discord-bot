@@ -4,7 +4,6 @@ import schedule from 'node-schedule';
 import * as fs from 'fs/promises';
 import { createCanvas, loadImage } from 'canvas';
 
-import { logError } from '@core/logger';
 export interface CanvasOptions {
     itemsPerRow: number;
     itemSize: number;

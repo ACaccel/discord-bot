@@ -25,7 +25,8 @@ import { executeCommand } from '@cmd';
 import { executeButton } from '@button';
 import { executeModal } from '@modal';
 import { executeSSM } from '@select-menu';
-import { logGuildEvent, sendChannelLog } from '@core/logger';
+import { logGuildEvent } from '@core/logger';
+import { sendChannelLog } from '../infra/discord';
 import type { InteractionContext, InteractionMiddleware } from '../core/plugin';
 import { replyTranslated } from '../handlers/reply-translated';
 
