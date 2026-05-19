@@ -36,13 +36,21 @@ import type { Logger } from '../logger';
 import type { Clock } from '../time';
 
 import { EventDispatcher } from './event-dispatcher';
-import { type ContributionSource, DuplicateContributionError, mergeRegistries } from './registries';
+import { DuplicateContributionError } from './registries';
+import {
+  buildEffectiveRegistries as buildEffectiveRegistriesFn,
+  type EffectiveRegistries as EffectiveRegistriesType,
+} from './host/contributes-merger';
+import {
+  PluginRegistrationError as PluginRegistrationErrorClass,
+  CriticalPluginFailureError as CriticalPluginFailureErrorClass,
+  DependencyDisabledError as DependencyDisabledErrorClass,
+} from './host/errors';
+import { topologicalOrder, buildDependentsIndex } from './host/topology';
 import type {
   ContributedRegistry,
   DisabledPlugin,
-  HandlerConstructor,
   Plugin,
-  PluginContributions,
   PluginEventSubscriptions,
   PluginId,
   PluginInitContext,
@@ -52,45 +60,14 @@ import type {
   TypedResolver,
 } from './types';
 
-// ---------------------------------------------------------------------------
-// Public errors
-// ---------------------------------------------------------------------------
-
-/** Throws during `register()`. */
-export class PluginRegistrationError extends Error {
-  public override readonly name = 'PluginRegistrationError';
-  public readonly pluginId: PluginId | undefined;
-  public readonly reason:
-    | 'DUPLICATE_ID'
-    | 'INVALID_CONFIG'
-    | 'UNSUPPORTED_SCOPE'
-    | 'MISSING_DEPENDENCY'
-    | 'CIRCULAR_DEPENDENCY';
-
-  constructor(reason: PluginRegistrationError['reason'], message: string, pluginId?: PluginId) {
-    super(message);
-    this.reason = reason;
-    this.pluginId = pluginId;
-  }
-}
-
-/** Thrown when a `critical: true` plugin fails during init / start. */
-export class CriticalPluginFailureError extends Error {
-  public override readonly name = 'CriticalPluginFailureError';
-  public readonly pluginId: PluginId;
-  public readonly phase: DisabledPlugin['phase'];
-  public override readonly cause: unknown;
-
-  constructor(pluginId: PluginId, phase: DisabledPlugin['phase'], cause: unknown) {
-    super(
-      `CriticalPluginFailureError: plugin "${pluginId}" failed during ${phase}; rethrown because critical=true.`,
-      { cause },
-    );
-    this.pluginId = pluginId;
-    this.phase = phase;
-    this.cause = cause;
-  }
-}
+// Public errors live in `host/errors.ts` (audit C-8 split). Re-exported
+// here so existing callers continue to import them from `core/plugin`.
+export const PluginRegistrationError = PluginRegistrationErrorClass;
+export type PluginRegistrationError = PluginRegistrationErrorClass;
+export const CriticalPluginFailureError = CriticalPluginFailureErrorClass;
+export type CriticalPluginFailureError = CriticalPluginFailureErrorClass;
+export const DependencyDisabledError = DependencyDisabledErrorClass;
+export type DependencyDisabledError = DependencyDisabledErrorClass;
 
 // ---------------------------------------------------------------------------
 // Host
@@ -118,35 +95,7 @@ export interface PluginHostOptions {
 }
 
 /** Result of {@link PluginHost.buildEffectiveRegistries}. */
-export interface EffectiveRegistries {
-  readonly commands: Readonly<Record<string, HandlerConstructor>>;
-  readonly buttons: Readonly<Record<string, HandlerConstructor>>;
-  readonly modals: Readonly<Record<string, HandlerConstructor>>;
-  readonly selectMenus: Readonly<Record<string, HandlerConstructor>>;
-  readonly reactions: Readonly<Record<string, HandlerConstructor>>;
-}
-
-/**
- * Thrown by the host (not by the failing plugin) when a plugin is
- * disabled as a transitive consequence of one of its dependencies
- * failing. `rootPluginId` names the original failure; the cascade
- * victim's own hook never ran.
- */
-export class DependencyDisabledError extends Error {
-  public override readonly name = 'DependencyDisabledError';
-  public readonly pluginId: PluginId;
-  public readonly rootPluginId: PluginId;
-  public override readonly cause: unknown;
-  constructor(pluginId: PluginId, rootPluginId: PluginId, rootCause: unknown) {
-    super(
-      `DependencyDisabledError: plugin "${pluginId}" was disabled because its dependency "${rootPluginId}" failed; ${pluginId}'s lifecycle hooks did not run.`,
-      { cause: rootCause },
-    );
-    this.pluginId = pluginId;
-    this.rootPluginId = rootPluginId;
-    this.cause = rootCause;
-  }
-}
+export type EffectiveRegistries = EffectiveRegistriesType;
 
 export class PluginHost {
   private readonly registered = new Map<PluginId, RegisteredPlugin>();
@@ -211,57 +160,19 @@ export class PluginHost {
   }
 
   /** Merge codegen registries with plugin contributions; cached. */
+  /**
+   * Merge codegen-shipped + plugin-contributed handlers into the
+   * effective per-handler-type registries. Cached after the first call.
+   * Implementation extracted to `host/contributes-merger.ts` (audit
+   * C-8 split).
+   */
   public buildEffectiveRegistries(): EffectiveRegistries {
     if (this.effectiveRegistries !== undefined) return this.effectiveRegistries;
-
-    const sourcesFor = (
-      pick: (c: PluginContributions) => ContributedRegistry | undefined,
-      coreReg: ContributedRegistry | undefined,
-    ): ContributionSource[] => {
-      const sources: ContributionSource[] = [];
-      if (coreReg !== undefined && Object.keys(coreReg).length > 0) {
-        // TODO(phase-5): if a later phase introduces multiple codegen
-        // sources per handler type, this single `'core'` provenance id
-        // would collide with itself. Replace with per-source tagging
-        // (`'core:commands'`, `'core:context-menu'`, ...) once that
-        // need materialises.
-        sources.push({ id: 'core', registry: coreReg });
-      }
-      // Iterate plugins in registration order; mergeRegistries throws
-      // on duplicate name so plugin-vs-plugin conflicts surface both ids.
-      for (const id of this.order) {
-        const slot = this.registered.get(id);
-        if (slot === undefined) continue;
-        const reg = pick(slot.plugin.contributes ?? {});
-        if (reg !== undefined && Object.keys(reg).length > 0) {
-          sources.push({ id, registry: reg });
-        }
-      }
-      return sources;
-    };
-
-    const built: EffectiveRegistries = {
-      commands: mergeRegistries(
-        'command',
-        sourcesFor((c) => c.commands, this.options.coreRegistries.commands),
-      ),
-      buttons: mergeRegistries(
-        'button',
-        sourcesFor((c) => c.buttons, this.options.coreRegistries.buttons),
-      ),
-      modals: mergeRegistries(
-        'modal',
-        sourcesFor((c) => c.modals, this.options.coreRegistries.modals),
-      ),
-      selectMenus: mergeRegistries(
-        'select-menu',
-        sourcesFor((c) => c.selectMenus, this.options.coreRegistries.selectMenus),
-      ),
-      reactions: mergeRegistries(
-        'reaction',
-        sourcesFor((c) => c.reactions, this.options.coreRegistries.reactions),
-      ),
-    };
+    const built = buildEffectiveRegistriesFn(
+      this.order,
+      this.registered,
+      this.options.coreRegistries,
+    );
     this.effectiveRegistries = built;
     return built;
   }
@@ -392,70 +303,15 @@ export class PluginHost {
     }
   }
 
-  /**
-   * Kahn's algorithm. Throws on cycle. Determinism: ties broken by
-   * the original registration order via `Map` iteration semantics +
-   * a sort on cohorts.
-   */
+  // Topology helpers extracted to `host/topology.ts` (audit C-8 split).
+  // These private methods stay as thin wrappers so the lifecycle
+  // sites keep their original call shape.
   private topologicalOrder(): readonly PluginId[] {
-    const indegree = new Map<PluginId, number>();
-    const adjacency = new Map<PluginId, PluginId[]>();
-    for (const id of this.registered.keys()) {
-      indegree.set(id, 0);
-      adjacency.set(id, []);
-    }
-    for (const [id, entry] of this.registered) {
-      for (const dep of entry.plugin.dependencies ?? []) {
-        adjacency.get(dep.id)?.push(id);
-        indegree.set(id, (indegree.get(id) ?? 0) + 1);
-      }
-    }
-
-    const queue: PluginId[] = [];
-    // Preserve registration order for deterministic output.
-    for (const id of this.registered.keys()) {
-      if ((indegree.get(id) ?? 0) === 0) queue.push(id);
-    }
-    const out: PluginId[] = [];
-    while (queue.length > 0) {
-      const next = queue.shift();
-      if (next === undefined) break;
-      out.push(next);
-      for (const downstream of adjacency.get(next) ?? []) {
-        const decremented = (indegree.get(downstream) ?? 0) - 1;
-        indegree.set(downstream, decremented);
-        if (decremented === 0) {
-          queue.push(downstream);
-        }
-      }
-    }
-
-    if (out.length !== this.registered.size) {
-      const remaining = [...this.registered.keys()].filter((id) => !out.includes(id));
-      throw new PluginRegistrationError(
-        'CIRCULAR_DEPENDENCY',
-        `PluginHost.finalizeRegistration: circular dependency among plugins [${remaining.join(', ')}].`,
-      );
-    }
-    return Object.freeze(out);
+    return topologicalOrder(this.registered);
   }
 
-  /**
-   * Forward-edge index: for each plugin id, the set of plugins that
-   * named it as a dependency. Built once at finalize time and walked
-   * by {@link cascadeDisable} when a dependency fails.
-   */
   private buildDependentsIndex(): Map<PluginId, Set<PluginId>> {
-    const out = new Map<PluginId, Set<PluginId>>();
-    for (const id of this.registered.keys()) {
-      out.set(id, new Set());
-    }
-    for (const [id, entry] of this.registered) {
-      for (const dep of entry.plugin.dependencies ?? []) {
-        out.get(dep.id)?.add(id);
-      }
-    }
-    return out;
+    return buildDependentsIndex(this.registered);
   }
 
   /**
