@@ -6,7 +6,7 @@
  */
 import type { Guild } from 'discord.js';
 
-export interface BuildGuildInput {
+interface BuildGuildInput {
   readonly id?: string;
   readonly name?: string;
   /** Pre-populated channel cache. Tests pass channels built by `buildTextChannel`. */

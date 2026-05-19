@@ -7,13 +7,13 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 
 import { buildGuild } from './guild-builder';
 
-export interface InteractionMockSink {
+interface InteractionMockSink {
   readonly replies: Array<{ content?: string; ephemeral?: boolean }>;
   readonly editReplies: Array<{ content?: string }>;
   readonly deferred: { value: boolean };
 }
 
-export interface BuildChatInputInteractionInput {
+interface BuildChatInputInteractionInput {
   readonly commandName?: string;
   readonly userId?: string;
   readonly guildId?: string | null;
