@@ -1,15 +1,30 @@
 # Discord test fixtures
 
-This directory is reserved for the custom Discord interaction / channel /
-guild / member builders introduced in Phase 2 (when the first integration
-tests against `InteractionRouter` and the use-case layer arrive).
+Minimal structural builders for the Discord types that handler / plugin
+tests touch. Builders return plain objects shaped to the structural
+minimum the SUT reads — no third-party mock libraries. Added in PR-G5
+(audit C-12).
 
-Conventions (lock these in before adding builders):
+## Files
 
-- Builders are plain functions returning the structural minimum needed by
-  the SUT — e.g. `buildChatInputInteraction({ commandName, options, user,
-guild, locale })`. No third-party mock libraries.
-- One file per Discord type: `interaction-builder.ts`, `message-builder.ts`,
-  `guild-builder.ts`, `member-builder.ts`, `client-fake.ts`.
-- Tests import builders, not bare object literals, when the shape is used
-  in 3 or more places.
+- `guild-builder.ts` — `buildGuild({ id, name, channels, members })`
+- `member-builder.ts` — `buildGuildMember({ id, displayName, voiceChannelId, roleIds })`
+- `message-builder.ts` — `buildMessage({ id, content, authorId, guildId, sink })`
+- `interaction-builder.ts` — `buildChatInputInteraction({ commandName, userId, guildId, options, sink })`
+- `client-fake.ts` — `buildFakeClient({ userId, guilds })` returning a
+  `{ client, fireEvent }` handle so listener-driven flows can be pumped
+
+## Conventions
+
+- One file per Discord type.
+- Tests import builders, not bare object literals, when the shape is
+  used in 3 or more places.
+- Each builder accepts an optional `sink` object so call-recording
+  stays explicit (no global `vi.fn()` magic).
+- Builders cast to the public discord.js type at the end (`as unknown
+as X`) — keep test files free of these casts so the shape change
+  surface stays one file per type.
+
+See `test/integration/interaction-router/router-dispatch.int.test.ts`
+for the first integration test that exercises the full router chain
+through these fixtures.

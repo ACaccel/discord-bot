@@ -10,12 +10,17 @@ import path from 'path';
  * actually exists today:
  *   - `src/core/**` is at 100% line / branch / func; the 90% floor
  *     locks in the audit baseline.
- *   - Overall lines floor (`lines: 45`) is the post-PR-F1 baseline; it
- *     stops accidental regressions without demanding fixes the
- *     pending PR-G coverage-raise hasn't shipped yet. Raise this to
- *     the plan's ≥ 75% target inside PR-G once `core/plugin/host`,
- *     `core/ioc/container`, and the persistence repos all have
- *     dedicated unit tests (audit 3.13 / C-13).
+ *   - Overall lines floor (`lines: 46`) is the post-PR-G5 baseline.
+ *     `src/core/**` and the persistence repos are well-covered (90% /
+ *     integration tests via mongodb-memory-server); the remaining gap
+ *     to the plan's ≥ 75% target is in `src/handlers/**`, `src/bot/**`,
+ *     `src/utils/**`, and `src/events/**` — handler-side fixtures
+ *     ship in PR-G5 (audit C-12) and the targeted unit tests for the
+ *     pure helpers in `core/plugin/host/topology.ts` +
+ *     `core/plugin/host/contributes-merger.ts` land alongside. The
+ *     remaining raise to ≥ 75% is a multi-day effort on the legacy
+ *     layers and is deferred to a follow-up after the final
+ *     `refactor/architecture-overhaul → main` merge.
  *   - `domain/` + `application/` layers are intentionally absent (see
  *     audit 1.4); no thresholds defined for them.
  */
@@ -27,10 +32,10 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.d.ts', 'src/**/index.ts', 'src/**/*.generated.ts'],
       thresholds: {
-        lines: 45,
+        lines: 46,
         functions: 69,
         branches: 80,
-        statements: 45,
+        statements: 46,
         'src/core/**': {
           lines: 90,
           functions: 90,

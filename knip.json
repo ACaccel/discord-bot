@@ -43,7 +43,8 @@
     "src/infra/mongo/index.ts",
     "src/plugins/index.ts",
     "src/plugins/*/index.ts",
-    "src/handlers/*/index.ts"
+    "src/handlers/*/index.ts",
+    "test/fixtures/discord/*.ts"
   ],
   "rules": {
     "files": "error",
