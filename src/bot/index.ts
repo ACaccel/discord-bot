@@ -16,9 +16,8 @@ import {
     PartialUser,
     MessageFlags,
 } from 'discord.js';
-import { VoiceConnection } from "@discordjs/voice";
-import { VoiceRecorder } from '@kirdock/discordjs-voice-recorder';
 import { MongoConnectionManager } from '../infra/mongo/connection-manager';
+import { getActiveVoiceController, type VoiceController } from '../plugins/voice/internal';
 
 /**
  * Process-wide pool of {@link MongoConnectionManager}s keyed by base
@@ -95,11 +94,6 @@ interface GuildConfig {
     roles: Record<string, string>;
 }
 
-export interface Voice {
-    recorder: VoiceRecorder;
-    connection: VoiceConnection | null;
-}
-
 export abstract class BaseBot<TConfig extends Config = Config> {
     private token: string;
     private mongoURI?: string;
@@ -125,7 +119,14 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public ssmHandler: Map<string, SSMHandler>;
     public modalHandler: Map<string, ModalHandler>;
     public reactionHandler: Map<string, ReactionHandler>;
-    public voice?: Voice;
+    /**
+     * Bot-scoped voice controller. Populated in {@link run} after
+     * `host.initAll()` returns — the {@link createVoicePlugin VoicePlugin}
+     * constructs the controller in its `init` hook and stores it in
+     * the module-scoped holder we read here. Optional only to model
+     * bots that do not register the plugin (e.g. msg-archive).
+     */
+    public voice?: VoiceController;
 
     public help_msg: string;
     /**
@@ -336,10 +337,48 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         }
     }
 
+    /**
+     * Orchestrator. Walks the four startup phases in the order they
+     * depend on each other. Each phase is its own private helper to
+     * keep the contract explicit (and to make subclasses' interaction
+     * with each phase grep-able):
+     *
+     *   1. {@link setupContainer} — env, logger, translator, help_msg
+     *   2. {@link buildHost} — router middleware + plugin host + initAll
+     *   3. login (`client.login`) — Discord side
+     *   4. {@link attachListeners} — startAll + dispatcher attach +
+     *      clientReady latch + event listeners
+     *
+     * Splitting the original ~120 LOC `run` body into named phases
+     * (audit C-7) trades one method for four; the lifecycle invariants
+     * (host.initAll before login, host.startAll after login but before
+     * dispatcher attach, clientReady latch closed only after dispatcher
+     * is hot) are now expressed by the orchestrator's call sequence.
+     */
     public run = async (callback?: () => Promise<void>) => {
-        // Wire the structured logger before any handler runs so legacy
-        // `logger.systemLogger(...)` callsites route through the same
-        // bot-scoped pino instance the IoC container holds.
+        const rootLogger = this.setupContainer();
+        const host = await this.buildHost(rootLogger);
+        const openReadyLatch = this.armReadyLatch(callback);
+        await this.login();
+        // start runs after login but BEFORE the EventDispatcher is
+        // attached to client.on(...) — dispatcher subscriptions are
+        // collected by attachEventSubscriptions() inside startAll().
+        await host.startAll();
+        this.attachDispatcherToClient(host);
+        openReadyLatch();
+        await this.listen();
+    }
+
+    /**
+     * Phase 1: bind structured logger, install process safety nets,
+     * load the typed Env, resolve Translator, render `help_msg`.
+     * Returns the bot-scoped logger so the caller can hand it to phase 2
+     * without going through the container twice.
+     */
+    private setupContainer = (): Logger => {
+        // Wire the structured logger before any handler runs so the
+        // bot-scoped pino instance the IoC container holds is reachable
+        // from `bot.logger`.
         const rootLogger = this.container.resolve<Logger>(TOKENS.Logger);
         this.logger = rootLogger;
         // Process-level safety net. `installProcessHandlers` is
@@ -349,17 +388,14 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             logger: rootLogger,
             gracefulShutdown: () => this.shutdown(),
         });
-        // Translator load is async (i18next.init); we register it as a
-        // singleton holding the resolved instance so plugin init contexts
-        // can call `resolve(TOKENS.Translator)` synchronously.
         // Load the typed Env once at run() so plugins resolve LLM API
         // keys and other configuration through `TOKENS.Env` instead of
-        // touching `process.env` directly. Failures here are
-        // non-fatal: legacy bots still pass TOKEN / MONGO_URI / CLIENT_ID
-        // through the constructor, so a deployment with a partially
-        // valid env still boots. The structured warning lets ops see
-        // when typed Env is unavailable so the no-restricted-syntax
-        // rule is the only failure mode left for misconfigured keys.
+        // touching `process.env` directly. Failures here are non-fatal:
+        // legacy bots still pass TOKEN / MONGO_URI / CLIENT_ID through
+        // the constructor, so a deployment with a partially valid env
+        // still boots. The warning lets ops see when typed Env is
+        // unavailable so the no-restricted-syntax rule is the only
+        // failure mode left for misconfigured keys.
         try {
             const env = loadEnv({
                 exitOnFailure: false,
@@ -372,14 +408,27 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 'BaseBot.run: typed Env load failed; TOKENS.Env will be unbound. Plugins requiring it (e.g. LlmChatPlugin) will fail at init.',
             );
         }
+        return rootLogger;
+    };
+
+    /**
+     * Phase 2: resolve the Translator (async), surface it on the bot,
+     * assemble the InteractionRouter Chain-of-Responsibility, build the
+     * PluginHost, register pending plugins, run host `initAll()`.
+     *
+     * Sync inside except for the Translator await — i18next.init is
+     * the only IO. Returns the live `PluginHost` so the orchestrator
+     * can drive `startAll()` after `login()`.
+     */
+    private buildHost = async (rootLogger: Logger): Promise<PluginHost> => {
+        // Translator load is async (i18next.init); we register it as a
+        // singleton holding the resolved instance so plugin init contexts
+        // can call `resolve(TOKENS.Translator)` synchronously.
         const translator = await createDefaultTranslator();
         this.container.registerSingleton(TOKENS.Translator, () => translator);
         // Surface the resolved Translator on the bot itself so legacy
         // handlers (which still receive `bot: BaseBot` rather than a
         // per-interaction context) can call `bot.translator.t(...)`.
-        // PR 6-2/6-3 migrates handlers; the field stays as the
-        // canonical access point until the per-interaction ctx shape
-        // lands.
         this.translator = translator;
         // Resolve the deferred help-message key now that the translator
         // is loaded. Subclasses set `helpMessageKey` in their ctor; the
@@ -390,10 +439,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // Audit B-2: assemble the Chain-of-Responsibility interaction
         // router. Subclass-injected middleware runs FIRST (typical use
         // case: gate / filter / context-priming), then the terminal
-        // dispatch + observability stages. The
-        // `configureInteractionRouter` hook stays sync because routing
-        // setup never needs IO — middleware itself owns the async
-        // work.
+        // dispatch + observability stages.
         this.interactionRouter = new InteractionRouter();
         this.configureInteractionRouter(this.interactionRouter);
         this.interactionRouter.use(createDispatchMiddleware(this));
@@ -404,9 +450,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         );
         // Build the host now that Translator + Clock + Logger are all
         // bound. Phase 4b-1 passes empty core registries because the
-        // legacy registerCommands/registerButtons/... paths still feed
-        // the BaseBot's Map<>s directly; Phase 4b-3 fold codegen output
-        // into PluginHostOptions.coreRegistries.
+        // legacy registerCommands/... paths still feed the BaseBot's
+        // Map<>s directly.
         const host = new PluginHost({
             container: this.container,
             logger: rootLogger,
@@ -429,14 +474,28 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // Discord client; any critical failure surfaces before the bot
         // appears online.
         await host.initAll();
-        // Register the ClientReady listener BEFORE `client.login()`.
-        // Pre-fix, `init()` ran AFTER login + startAll and so could
-        // miss a `clientReady` event that already fired — observed as
-        // Konata's "重開機囉!" reboot message silently disappearing
-        // because `rebootMessage` only runs from inside that handler.
-        // The latch lets the handler observe a fully-set-up host
-        // (startAll done, dispatcher attached) before it invokes
-        // `host.readyAll()` and the rest of the startup pipeline.
+        // Surface the VoicePlugin's controller on the bot AFTER
+        // initAll so the handler-side access path `bot.voice.start(...)`
+        // is populated when the record slash-command first fires.
+        // Bots that do not register the plugin (msg-archive) leave the
+        // field undefined; the record handler null-checks before use.
+        this.voice = getActiveVoiceController();
+        return host;
+    };
+
+    /**
+     * Phase 3 prelude: register the ClientReady listener BEFORE
+     * `client.login()`. Pre-fix, `init()` ran AFTER login + startAll and
+     * so could miss a `clientReady` event that already fired — observed
+     * as Konata's reboot reply silently disappearing because
+     * `rebootMessage` only runs from inside that handler. The latch
+     * lets the handler observe a fully-set-up host (startAll done,
+     * dispatcher attached) before it invokes `host.readyAll()`.
+     *
+     * Returns the latch opener — the orchestrator calls it after
+     * `attachDispatcherToClient` so the deferred handler is unblocked.
+     */
+    private armReadyLatch = (callback?: () => Promise<void>): (() => void) => {
         let openReadyLatch: () => void = () => {};
         const readyLatch = new Promise<void>((resolve) => {
             openReadyLatch = resolve;
@@ -445,17 +504,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             await readyLatch;
             await this.handleClientReady(callback);
         });
-        await this.login();
-        // start runs after login but BEFORE the EventDispatcher is
-        // attached to client.on(...) — the dispatcher subscriptions are
-        // collected by attachEventSubscriptions() inside startAll() and
-        // the host doc requires we defer client.on() wiring until the
-        // method returns.
-        await host.startAll();
-        this.attachDispatcherToClient(host);
-        openReadyLatch();
-        await this.listen();
-    }
+        return openReadyLatch;
+    };
 
     /**
      * Forward every event a plugin currently subscribes to from the

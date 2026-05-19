@@ -13,3 +13,4 @@ export { createGiveawayPlugin, type GiveawayPluginConfig } from './giveaway';
 export { createActivityPlugin, type ActivityPluginConfig } from './activity';
 export { createMessageBackupPlugin, type MessageBackupPluginConfig } from './message-backup';
 export { createLlmChatPlugin, type LlmChatPluginConfig } from './llm-chat';
+export { createVoicePlugin } from './voice/plugin';

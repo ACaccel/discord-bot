@@ -1,6 +1,6 @@
 import { Client } from 'discord.js';
 import { BaseBot, Config } from '@bot';
-import { AutoReplyPlugin, createActivityPlugin, createGiveawayPlugin } from '@plugins';
+import { AutoReplyPlugin, createActivityPlugin, createGiveawayPlugin, createVoicePlugin } from '@plugins';
 import { rebootActivityJobs } from '../../plugins/activity/internal';
 import { rebootGiveawayJobs } from '../../plugins/giveaway/internal';
 
@@ -16,5 +16,6 @@ export class Tomori extends BaseBot<TomoriConfig> {
         this.use(AutoReplyPlugin);
         this.use(createGiveawayPlugin({ rebootJobs: () => rebootGiveawayJobs(this) }));
         this.use(createActivityPlugin({ rebootJobs: () => rebootActivityJobs(this) }));
+        this.use(createVoicePlugin());
     }
 }
