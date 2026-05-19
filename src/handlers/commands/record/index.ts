@@ -1,12 +1,13 @@
-import {
+import type {
     ChatInputCommandInteraction,
-    GuildMember,
+    GuildMember} from 'discord.js';
+import {
     AttachmentBuilder,
 } from 'discord.js';
 import type { DiscordGatewayAdapterCreator } from "@discordjs/voice";
 import fs from 'fs';
 import path from 'path';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { logError } from '@core/logger';

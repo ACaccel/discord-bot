@@ -1,9 +1,10 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
-    GuildMember,
+    GuildMember} from 'discord.js';
+import {
     MessageFlags,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { bot_cmd } from '@utils';
 
@@ -44,7 +45,7 @@ export default class roll_call extends Command {
                 return;
             }
 
-            let validUsers: GuildMember[] = [];
+            const validUsers: GuildMember[] = [];
 
             if (activity_id) {
                 const guild = interaction.guild;

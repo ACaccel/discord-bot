@@ -1,8 +1,8 @@
-import { 
+import type { 
     MessageReaction,
     User,
 } from "discord.js";
-import { BaseBot } from "@bot";
+import type { BaseBot } from "@bot";
 
 import { HandlerFactory } from "handlers";
 

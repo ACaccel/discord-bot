@@ -1,8 +1,9 @@
-import { 
-    ChatInputCommandInteraction,
+import type { 
+    ChatInputCommandInteraction} from 'discord.js';
+import {
     MessageFlags,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { logError } from '@core/logger';
@@ -28,7 +29,7 @@ export default class bug_report extends Command {
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         try {
-            let content = interaction.options.get("content")?.value as string;
+            const content = interaction.options.get("content")?.value as string;
             if (!content) {
                 await interaction.reply({ content: bot.translator?.t('replies:bug_report.empty_content') ?? '', flags: MessageFlags.Ephemeral });
                 return;

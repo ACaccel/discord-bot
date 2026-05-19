@@ -1,8 +1,8 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
 import Mee6LevelsApi from 'mee6-levels-api';
-import { BaseBot, Config } from '@bot';
+import type { BaseBot, Config } from '@bot';
 import { Command } from '@cmd';
 
 import { logError } from '@core/logger';
@@ -39,17 +39,17 @@ export default class update_role extends Command {
                 return;
             }
 
-            let leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
-            let guild = bot.guildInfo[interaction.guild?.id as string].guild;
+            const leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
+            const guild = bot.guildInfo[interaction.guild?.id as string].guild;
             const channel = interaction.channel;
             if (!channel?.isSendable()) return;
             // let alive_role = guild.roles.cache.find(role => role.name === "活人");
     
             await Promise.all(leaderboard.map(async (member) => {
-                let { id, level } = member;
-                let guildMember = guild.members.cache.get(id);
+                const { id, level } = member;
+                const guildMember = guild.members.cache.get(id);
     
-                if (guildMember) { } else return;
+                if (!guildMember) return;
                 // live people role.
                 // if(level >= 6) {
                 // 	if (!guildMember.roles.cache.some(role => role.name === "活人")) {

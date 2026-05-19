@@ -1,9 +1,10 @@
-import {
+import type {
     ChatInputCommandInteraction,
-    EmbedBuilder,
-    GuildMember,
+    GuildMember} from "discord.js";
+import {
+    EmbedBuilder
 } from "discord.js";
-import { BaseBot } from "@bot";
+import type { BaseBot } from "@bot";
 import { Command } from "@cmd";
 
 import { logError } from '@core/logger';

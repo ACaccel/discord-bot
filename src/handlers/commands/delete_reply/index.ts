@@ -1,10 +1,11 @@
+import type {
+    ChatInputCommandInteraction} from 'discord.js';
 import { 
     ActionRowBuilder,
-    ChatInputCommandInteraction,
     StringSelectMenuBuilder,
     StringSelectMenuOptionBuilder,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { requireGuildRepos } from '../../require-guild-repos';
@@ -39,7 +40,7 @@ export default class delete_reply extends Command {
             const existPair = await repos.reply.findByInput(key);
 
             // select menu
-            let selectRows = []
+            const selectRows = []
             for (let i = 0; i < existPair.length; i += 25) {
                 const select = new StringSelectMenuBuilder()
                     .setCustomId(`delete_reply|${key}|${i/25}`)

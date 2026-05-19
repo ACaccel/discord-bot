@@ -1,7 +1,7 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { misc } from '@utils';
 
@@ -115,7 +115,7 @@ export default class sticker_frequency extends Command {
             });
 
             // create a preview image
-            let canvasContent: misc.CanvasContent[] = [];
+            const canvasContent: misc.CanvasContent[] = [];
             for (let i = 0; i < sortedStickers.length; i++) {
                 const [stickerName, count] = sortedStickers[i];
                 const sticker = guild.stickers.cache.find(s => s.name === stickerName);

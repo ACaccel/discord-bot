@@ -1,14 +1,15 @@
-import {
+import type {
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '../../../bot';
+import type { BaseBot } from '../../../bot';
 import { bindTranslator } from '../../../core/i18n';
 import { misc, JobManager } from '../../../utils';
+import type {
+    IGiveawayBot} from './giveaway';
 import {
     giveawayAnnouncement,
     findGiveaway,
     scheduleGiveaway,
-    IGiveawayBot,
     giveawayJobKey,
 } from './giveaway';
 

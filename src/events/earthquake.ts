@@ -1,4 +1,4 @@
-import { Channel } from "discord.js";
+import type { Channel } from "discord.js";
 import type { Translator } from "../core/i18n";
 
 export const earthquake_warning = async (

@@ -1,8 +1,8 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
 import axios from 'axios';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { logError } from '@core/logger';
@@ -113,13 +113,13 @@ export default class random_restaurant extends Command {
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply();
         try {
-            var api_route = "https://food-api-kappa-hazel.vercel.app/recommend";
+            const api_route = "https://food-api-kappa-hazel.vercel.app/recommend";
             const type = interaction.options.get("type")?.value as string;
             const name_keyword = interaction.options.get("name_keyword")?.value as string;
             const addr_keyword = interaction.options.get("address_keyword")?.value as string;
-            const budget = interaction.options.get("budget")?.value as Number;
-            const min_rating = interaction.options.get("min_rating")?.value as Number;
-            const max_rating = interaction.options.get("max_rating")?.value as Number;
+            const budget = interaction.options.get("budget")?.value as number;
+            const min_rating = interaction.options.get("min_rating")?.value as number;
+            const max_rating = interaction.options.get("max_rating")?.value as number;
             const response = await axios.get(api_route, {
                 params: {
                     type,

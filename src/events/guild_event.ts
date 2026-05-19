@@ -7,14 +7,14 @@
  * commandHandlers — both shapes that the plugin layer does not yet
  * expose as ports. A future phase will fold this into a plugin too.
  */
-import { Guild } from 'discord.js';
-import { BaseBot, GuildInfo } from '@bot';
+import type { Guild } from 'discord.js';
+import type { BaseBot, GuildInfo } from '@bot';
 import { getCommandJsonBody } from '@cmd';
 
 import { logSystem } from '@core/logger';
 export const detectGuildCreate = async (guild: Guild, bot: BaseBot) => {
     // guild info initialization
-    let newGuild: GuildInfo = {
+    const newGuild: GuildInfo = {
         bot_name: guild.members.cache.get(bot.clientId)?.displayName as string,
         guild: guild,
         channels: {},

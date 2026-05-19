@@ -1,7 +1,5 @@
-import {
+import type {
     Client,
-    type ClientEvents,
-    Events,
     Guild,
     Channel,
     Role,
@@ -13,7 +11,10 @@ import {
     PartialMessageReaction,
     Interaction,
     User,
-    PartialUser,
+    PartialUser} from 'discord.js';
+import {
+    type ClientEvents,
+    Events,
     MessageFlags,
 } from 'discord.js';
 import { MongoConnectionManager } from '../infra/mongo/connection-manager';
@@ -65,14 +66,19 @@ import {
     createDispatchMiddleware,
 } from './middlewares';
 import type { GuildRegistry } from '../core/guild-registry';
-import { Job } from 'node-schedule';
-import { Command, registerCommands } from "@cmd";
-import { ButtonHandler, registerButtons } from '@button';
-import { ModalHandler, registerModals } from '@modal';
-import { registerSSMs, SSMHandler } from '@select-menu';
+import type { Job } from 'node-schedule';
+import type { Command} from "@cmd";
+import { registerCommands } from "@cmd";
+import type { ButtonHandler} from '@button';
+import { registerButtons } from '@button';
+import type { ModalHandler} from '@modal';
+import { registerModals } from '@modal';
+import type { SSMHandler } from '@select-menu';
+import { registerSSMs } from '@select-menu';
 
 import { detectGuildCreate } from "@event";
-import { ReactionHandler, executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
+import type { ReactionHandler} from "@reaction";
+import { executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
 
 export interface Config {
     admin?: string;
@@ -172,6 +178,17 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * context the field is guaranteed defined.
      */
     public logger: Logger | undefined;
+
+    /**
+     * Typed, validated process environment. Populated in
+     * {@link setupContainer} after `loadEnv()` succeeds. Optional only
+     * to model the (defensive) case where env validation has failed
+     * — handler callsites null-check before reading. Surfaces ad-hoc
+     * keys (e.g. `ACCUWEATHER_KEY`) that don't justify a separate IoC
+     * token but still need typed access from handlers without
+     * importing the container.
+     */
+    public env: Env | undefined;
 
     /**
      * PluginHost: lazily constructed in {@link run} once async Translator
@@ -402,6 +419,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 requireDb: this.mongoURI !== undefined,
             });
             this.container.registerSingleton(TOKENS.Env, () => env);
+            this.env = env;
         } catch (envErr: unknown) {
             rootLogger.warn(
                 { err: envErr instanceof Error ? envErr : new Error(String(envErr)) },
@@ -699,8 +717,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             this.client.guilds.cache.forEach((guild) => {
                 const config = this.config.guilds?.[guild.id];
                 
-                let newChannel: Record<string, Channel> = {};
-                let newRole: Record<string, Role> = {};
+                const newChannel: Record<string, Channel> = {};
+                const newRole: Record<string, Role> = {};
                 if (config) {
                     // register channels
                     Object.entries(config.channels).forEach(([name, id]) => {
@@ -717,7 +735,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                     });
                 }
 
-                let newGuild: GuildInfo = {
+                const newGuild: GuildInfo = {
                     bot_name: guild.members.cache.get(this.clientId)?.displayName as string,
                     guild: guild,
                     channels: newChannel,
@@ -938,7 +956,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         _newMember: GuildMember | PartialGuildMember,
     ): Promise<void> => {}
 
-    public guildCreateListener = async (guild: any): Promise<void> => {
+    public guildCreateListener = async (guild: Guild): Promise<void> => {
         detectGuildCreate(guild, this);
     }
 }

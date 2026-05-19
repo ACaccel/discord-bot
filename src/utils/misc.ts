@@ -1,5 +1,6 @@
 import axios from "axios";
-import { AttachmentBuilder, Guild } from "discord.js";
+import type { Guild } from "discord.js";
+import { AttachmentBuilder } from "discord.js";
 import schedule from 'node-schedule';
 import * as fs from 'fs/promises';
 import { createCanvas, loadImage } from 'canvas';

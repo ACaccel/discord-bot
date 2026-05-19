@@ -1,10 +1,11 @@
+import type {
+    ContextMenuCommandType,
+    UserContextMenuCommandInteraction} from 'discord.js';
 import {
     EmbedBuilder,
-    ApplicationCommandType,
-    ContextMenuCommandType,
-    UserContextMenuCommandInteraction,
+    ApplicationCommandType
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { logError } from '@core/logger';

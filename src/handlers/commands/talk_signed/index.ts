@@ -1,9 +1,10 @@
-import {
+import type {
     ChatInputCommandInteraction,
-    Guild,
+    Guild} from 'discord.js';
+import {
     MessageFlags,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { logError } from '@core/logger';
@@ -29,20 +30,20 @@ export default class talk_signed extends Command {
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         try {
-            let content = interaction.options.get("content")?.value as string;
+            const content = interaction.options.get("content")?.value as string;
             if (!content) {
                 await interaction.reply({ content: bot.translator?.t('replies:talk_signed.missing_args') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
             
             // check existance of channel and member
-            let guild = interaction.guild as Guild;
-            let channel = interaction.channel;
+            const guild = interaction.guild as Guild;
+            const channel = interaction.channel;
             if (!channel?.isSendable()) {
                 await interaction.reply({ content: bot.translator?.t('errors:command.channel_not_sendable') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
-            let guild_member = interaction.member && 'displayName' in interaction.member ? interaction.member : null;
+            const guild_member = interaction.member && 'displayName' in interaction.member ? interaction.member : null;
             if (!guild_member) {
                 await interaction.reply({ content: bot.translator?.t('replies:talk_signed.member_not_found') ?? '', flags: MessageFlags.Ephemeral });
                 return;

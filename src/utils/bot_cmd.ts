@@ -1,12 +1,15 @@
+import type {
+    Message
+} from 'discord.js';
 import { 
     ApplicationCommandType,
     ButtonStyle,
-    ChannelType,
-    Message
+    ChannelType
 } from 'discord.js';
 import { ActionRowBuilder, ButtonBuilder, ContextMenuCommandBuilder, SlashCommandBuilder } from '@discordjs/builders';
-import {
-    CommandConfig
+import type {
+    CommandConfig,
+    CommandOption,
 } from '@cmd';
 
 interface ButtonConfig {
@@ -61,14 +64,14 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
     ] as const;    
 
     const optionHandlers = {
-        user: (e: any) =>
+        user: (e: CommandOption) =>
             slashCommand.addUserOption(o =>
                 o.setName(e.name)
                  .setDescription(e.description)
                  .setRequired(e.required)
             ),
 
-        channel: (e: any) =>
+        channel: (e: CommandOption) =>
             slashCommand.addChannelOption(o =>
                 o.setName(e.name)
                  .setDescription(e.description)
@@ -76,7 +79,7 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
                  .addChannelTypes(...channelTypes)
             ),
 
-        string: (e: any) =>
+        string: (e: CommandOption) =>
             slashCommand.addStringOption(o => {
                 o.setName(e.name)
                  .setDescription(e.description)
@@ -88,7 +91,7 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
                 return o;
             }),
 
-        number: (e: any) =>
+        number: (e: CommandOption) =>
             slashCommand.addIntegerOption(o => {
                 o.setName(e.name)
                  .setDescription(e.description)
@@ -98,7 +101,7 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
                 return o;
             }),
 
-        float: (e: any) =>
+        float: (e: CommandOption) =>
             slashCommand.addNumberOption(o => {
                 o.setName(e.name)
                  .setDescription(e.description)
@@ -108,7 +111,7 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
                 return o;
             }),
 
-        attachment: (e: any) =>
+        attachment: (e: CommandOption) =>
             slashCommand.addAttachmentOption(o =>
                 o.setName(e.name)
                  .setDescription(e.description)
@@ -117,7 +120,7 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
     } as const;
 
     // required first, optional second
-    const allOptions: { type: keyof typeof optionHandlers; data: any }[] = [];
+    const allOptions: { type: keyof typeof optionHandlers; data: CommandOption }[] = [];
     for (const [type, options] of Object.entries(config.options)) {
         const handler = optionHandlers[type as keyof typeof optionHandlers];
         if (!handler) continue;

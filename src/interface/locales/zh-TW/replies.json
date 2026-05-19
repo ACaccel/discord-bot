@@ -277,6 +277,7 @@
   },
   "weather_forecast": {
     "failed": "無法取得天氣預報",
+    "unavailable": "天氣預報服務暫時無法使用 (未設定 ACCUWEATHER_KEY)",
     "header": "每小時天氣預報:\n",
     "forecast_time": "- 預測時間:{{value}}\n",
     "weather_status": "- 天氣狀況:{{value}}\n",

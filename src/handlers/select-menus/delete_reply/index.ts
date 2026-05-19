@@ -1,8 +1,9 @@
+import type {
+    StringSelectMenuInteraction} from 'discord.js';
 import {
-    StringSelectMenuInteraction,
     MessageFlags,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { SSMHandler } from '@select-menu';
 import { requireGuildRepos } from '../../require-guild-repos';
 

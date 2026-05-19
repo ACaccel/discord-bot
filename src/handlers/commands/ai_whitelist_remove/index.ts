@@ -1,5 +1,6 @@
-import { ChatInputCommandInteraction, MessageFlags } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { ChatInputCommandInteraction} from 'discord.js';
+import { MessageFlags } from 'discord.js';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { requireGuildRepos } from '../../require-guild-repos';

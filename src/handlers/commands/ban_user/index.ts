@@ -1,10 +1,11 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
-    Events,
     GuildMember,
-    Message,
+    Message} from 'discord.js';
+import {
+    Events
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { bot_cmd, misc } from '@utils';
 

@@ -1,5 +1,6 @@
-import { Client } from 'discord.js';
-import { BaseBot, Config } from '@bot';
+import type { Client } from 'discord.js';
+import type { Config } from '@bot';
+import { BaseBot } from '@bot';
 import {
     AutoReplyPlugin,
     TtsReplyPlugin,

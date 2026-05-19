@@ -5,8 +5,11 @@ import {
 import dotenv from "dotenv";
 import { Tomori } from './tomori';
 import config from './config.json';
+import { loadEnv } from '@core/config';
 
 dotenv.config({ path: './src/bot/tomori/.env' });
+
+const env = loadEnv();
 
 // discord client
 const client: Client = new Client({ 
@@ -34,9 +37,9 @@ const client: Client = new Client({
 });
 const tomori = new Tomori(
     client,
-    process.env.TOKEN as string,
-    process.env.MONGO_URI as string,
-    process.env.CLIENT_ID as string,
+    env.TOKEN,
+    env.MONGO_URI ?? '',
+    env.CLIENT_ID,
     config
 );
 tomori.run();

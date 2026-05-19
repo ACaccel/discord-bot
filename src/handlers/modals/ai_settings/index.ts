@@ -1,5 +1,6 @@
-import { ModalSubmitInteraction, MessageFlags } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { ModalSubmitInteraction} from 'discord.js';
+import { MessageFlags } from 'discord.js';
+import type { BaseBot } from '@bot';
 import { ModalHandler } from '@modal';
 
 import { type LLMProviderName } from '../../../infra/llm';

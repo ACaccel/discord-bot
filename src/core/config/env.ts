@@ -93,6 +93,7 @@ const envSchema = z
     ANTHROPIC_API_KEY: llmKeySchema,
     GEMINI_API_KEY: llmKeySchema,
     XAI_API_KEY: llmKeySchema,
+    ACCUWEATHER_KEY: z.string().min(1).optional(),
   })
   // Allow unknown env vars (Node, OS, shell tooling all add their own) but
   // only the typed keys above are returned to callers.
@@ -110,6 +111,8 @@ export type Env = Readonly<{
   ANTHROPIC_API_KEY?: string;
   GEMINI_API_KEY?: string;
   XAI_API_KEY?: string;
+  /** AccuWeather API key. Optional — only required for the weather_forecast slash command. */
+  ACCUWEATHER_KEY?: string;
 }>;
 
 /**
