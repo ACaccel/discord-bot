@@ -1,17 +1,47 @@
-import type { GuildMember, Channel } from 'discord.js';
+/**
+ * Giveaway reboot + scheduling internals.
+ *
+ * Audit ARCH-BLOCK3 (PR-G4): the public surface now takes a typed
+ * {@link GiveawayDeps} bundle instead of the whole `BaseBot`, so the
+ * plugin can resolve its dependencies through the IoC container
+ * (`ctx.resolve(...)`) rather than receiving a callback that closes
+ * over the composition root's `this`. Composition roots no longer
+ * deep-import this file.
+ *
+ * The legacy slash-command handlers still hold a `BaseBot` reference;
+ * they call {@link buildGiveawayDepsFromBot} to bridge into the new
+ * surface without changing the handler signature.
+ */
+import type { Client, GuildMember, Channel } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
 import type { Job } from 'node-schedule';
-import type { BaseBot } from '../../../bot';
+
+import type { GuildRegistry } from '../../../core/guild-registry';
 import { bindTranslator } from '../../../core/i18n';
-import { bot_cmd, JobManager } from '../../../utils';
+import type { Translator } from '../../../core/i18n';
+import { logError, type Logger } from '../../../core/logger';
+import type { Message } from 'discord.js';
 
-import { logError } from '@core/logger';
-export interface IGiveawayBot {
-    jobs: Map<string, Job>
-}
+import { JobManager } from '../../../utils/job_manager';
 
-export const isGiveawayBot = (bot: BaseBot) => {
-    return (bot as BaseBot & IGiveawayBot).jobs !== undefined;
+const msgReact = async (msg: Message, reactions: readonly string[]): Promise<void> => {
+    if (!msg || reactions.length === 0) return;
+    for (const reaction of reactions) {
+        try {
+            await msg.react(reaction);
+        } catch (error) {
+            console.error(`Failed to react with ${reaction} on message ${msg.id}:`, error);
+        }
+    }
+};
+
+export interface GiveawayDeps {
+    readonly client: Client;
+    readonly registry: GuildRegistry;
+    readonly jobMap: Map<string, Job>;
+    readonly logger: Logger;
+    readonly clientId: string;
+    readonly translator: Translator | undefined;
 }
 
 export const giveawayJobKey = (message_id: string) => `giveaway:${message_id}`;
@@ -26,11 +56,11 @@ export const giveawayAnnouncement = async (
     winner_num: number,
     end_time_date: Date,
     description: string,
-    bot: BaseBot,
+    deps: GiveawayDeps,
 ) => {
     if (!channel.isSendable()) return null;
 
-    const t = bindTranslator(bot.translator);
+    const t = bindTranslator(deps.translator);
 
     const embed = new EmbedBuilder()
         .setTitle(t('replies:giveaway.announce_title', { prize }))
@@ -38,7 +68,7 @@ export const giveawayAnnouncement = async (
             { name: t('replies:giveaway.announce_field_owner'), value: `<@${prize_owner_id}>` },
             { name: t('replies:giveaway.announce_field_winners'), value: winner_num.toString() },
             { name: t('replies:giveaway.announce_field_endtime'), value: end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }) },
-            { name: t('replies:giveaway.announce_field_description'), value: description || t('replies:common.empty_value') }
+            { name: t('replies:giveaway.announce_field_description'), value: description || t('replies:common.empty_value') },
         )
         .setColor("#F9F900")
         .setFooter({ text: t('replies:giveaway.announce_footer') });
@@ -46,38 +76,25 @@ export const giveawayAnnouncement = async (
     const message = await channel.send({ embeds: [embed] });
     if (!message) return null;
     else {
-        bot_cmd.msgReact(message, ['🎉']);
+        void msgReact(message, ['🎉']);
         return message.id;
     }
-}
+};
 
-export const findGiveaway = async (bot: BaseBot, guild_id: string, message_id: string) => {
-    if (!isGiveawayBot(bot)) return false;
-
-    const guild = bot.client.guilds.cache.get(guild_id);
-    if (!guild) {
-        return false;
-    }
-    const repos = bot.guildInfo[guild.id]?.repos;
-    if (!repos) {
-        return false;
-    }
+export const findGiveaway = async (deps: GiveawayDeps, guild_id: string, message_id: string) => {
+    const guild = deps.client.guilds.cache.get(guild_id);
+    if (!guild) return false;
+    const repos = deps.registry.getRepos(guild_id);
+    if (!repos) return false;
     const giveaway = await repos.giveaway.findByMessageId(message_id);
-    if (!giveaway) return false;
-    return true;
-}
+    return giveaway !== undefined && giveaway !== null;
+};
 
-export const scheduleGiveaway = async (bot: BaseBot, guild_id: string, message_id: string) => {
-    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveawayBot";
-
-    const guild = bot.client.guilds.cache.get(guild_id);
-    if (!guild) {
-        return "Guild not found";
-    }
-    const repos = bot.guildInfo[guild.id]?.repos;
-    if (!repos) {
-        return "Database not found";
-    }
+export const scheduleGiveaway = async (deps: GiveawayDeps, guild_id: string, message_id: string) => {
+    const guild = deps.client.guilds.cache.get(guild_id);
+    if (!guild) return "Guild not found";
+    const repos = deps.registry.getRepos(guild_id);
+    if (!repos) return "Database not found";
 
     const giveaway = await repos.giveaway.findByMessageId(message_id);
     if (!giveaway) return "Giveaway not found";
@@ -102,47 +119,37 @@ export const scheduleGiveaway = async (bot: BaseBot, guild_id: string, message_i
     }
     const participantsArray = participantsMembers;
 
-    // Select winners
     let winners: GuildMember[] = [];
     if (participantsArray.length > 0) {
         const shuffled = [...participantsArray].sort(() => 0.5 - Math.random());
         winners = shuffled.slice(0, Math.min(giveaway.winner_num, shuffled.length));
     }
 
-    // Send results
-    const t = bindTranslator(bot.translator);
+    const t = bindTranslator(deps.translator);
     const resultContent = winners.length > 0
         ? t('replies:giveaway.result_with_winners', {
             prize: giveaway.prize,
-            winners: winners.map(w => `<@${w.id}>`).join('\n'),
+            winners: winners.map((w) => `<@${w.id}>`).join('\n'),
             ownerId: giveaway.prize_owner_id,
         })
         : t('replies:giveaway.result_no_participants', { prize: giveaway.prize });
     await giveawayChannel.send({ content: resultContent });
 
     await repos.giveaway.deleteByMessageId(message_id);
-    new JobManager(bot.jobs).cancel(giveawayJobKey(message_id));
-
+    new JobManager(deps.jobMap).cancel(giveawayJobKey(message_id));
     return null;
-}
+};
 
-export const deleteGiveaway = async (bot: BaseBot & IGiveawayBot, guild_id: string, message_id: string) => {
-    if (!isGiveawayBot(bot)) return "Bot does not implement IGiveawayBot";
+export const deleteGiveaway = async (deps: GiveawayDeps, guild_id: string, message_id: string) => {
+    const guild = deps.client.guilds.cache.get(guild_id);
+    if (!guild) return "Guild not found";
+    const repos = deps.registry.getRepos(guild_id);
+    if (!repos) return "Database not found";
 
-    const guild = bot.client.guilds.cache.get(guild_id);
-    if (!guild) {
-        return "Guild not found";
-    }
-    const repos = bot.guildInfo[guild.id]?.repos;
-    if (!repos) {
-        return "Database not found";
-    }
-
-    new JobManager(bot.jobs).cancel(giveawayJobKey(message_id));
+    new JobManager(deps.jobMap).cancel(giveawayJobKey(message_id));
     await repos.giveaway.deleteByMessageId(message_id);
-
     return null;
-}
+};
 
 /**
  * Same exponential-backoff retry as `activity.rebootRetry`. Audit C-1
@@ -166,48 +173,43 @@ const rebootRetry = async <T>(op: () => Promise<T>): Promise<T> => {
     throw lastErr;
 };
 
-export const rebootGiveawayJobs = async (bot: BaseBot) => {
-    const jobManager = new JobManager(bot.jobs);
+export const rebootGiveawayJobs = async (deps: GiveawayDeps): Promise<void> => {
+    const jobManager = new JobManager(deps.jobMap);
     await Promise.all(
-        Object.values(bot.guildInfo).map(async (guild_info) => {
+        deps.registry.listGuildIds().map(async (guildId) => {
             try {
-                if (!guild_info.repos) return;
-                const giveaways = await rebootRetry(() => guild_info.repos!.giveaway.listAll());
+                const repos = deps.registry.getRepos(guildId);
+                if (!repos) return;
+                const giveaways = await rebootRetry(() => repos.giveaway.listAll());
                 for (const g of giveaways) {
-                    // Per-row try/catch so one transient Mongo blip on
-                    // a delete does not abort the remaining giveaways.
                     try {
                         const end_time = new Date(g.end_time);
                         if (end_time > new Date()) {
                             jobManager.schedule(giveawayJobKey(g.message_id), end_time, async () => {
-                                if (await findGiveaway(bot, guild_info.guild.id, g.message_id)) {
-                                    await scheduleGiveaway(bot, guild_info.guild.id, g.message_id);
+                                if (await findGiveaway(deps, guildId, g.message_id)) {
+                                    await scheduleGiveaway(deps, guildId, g.message_id);
                                 }
                             });
                         } else {
-                            await rebootRetry(() =>
-                                deleteGiveaway(bot, guild_info.guild.id, g.message_id),
-                            );
+                            await rebootRetry(() => deleteGiveaway(deps, guildId, g.message_id));
                         }
                     } catch (rowErr) {
-                        logError(bot.logger, bot.clientId, guild_info.guild.id, rowErr);
+                        logError(deps.logger, deps.clientId, guildId, rowErr);
                     }
                 }
             } catch (err) {
-                logError(bot.logger, bot.clientId, guild_info.guild.id, err);
-                const debugCh = guild_info.channels?.debug;
+                logError(deps.logger, deps.clientId, guildId, err);
+                const debugCh = deps.registry.getChannel(guildId, 'debug');
                 if (debugCh?.isSendable()) {
                     await debugCh
                         .send(
-                            `[ ops ] giveaway reboot listAll failed for guild ${guild_info.guild.id} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
+                            `[ ops ] giveaway reboot listAll failed for guild ${guildId} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
                         )
                         .catch((sendErr) =>
-                            logError(bot.logger, bot.clientId, guild_info.guild.id, sendErr),
+                            logError(deps.logger, deps.clientId, guildId, sendErr),
                         );
                 }
             }
         }),
     );
-
-    return null;
-}
+};

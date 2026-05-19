@@ -26,6 +26,6 @@ export default class giveaway_delete extends Command {
     }
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
-        await giveaway.handleGiveawayDelete(interaction, bot as BaseBot & giveaway.IGiveawayBot);
+        await giveaway.handleGiveawayDelete(interaction, bot);
     }
 }

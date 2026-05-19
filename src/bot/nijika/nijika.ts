@@ -9,13 +9,6 @@ import {
     createGuildEventsPlugin,
     createVoicePlugin,
 } from '@plugins';
-// Direct deep imports into the relocated feature internals — only
-// composition roots cross the plugin/internal layer line, and only
-// to thread the reboot closure into the plugin factories. The plugin
-// itself stays internal-blind so its module remains free of legacy
-// `@utils` / `@bot` dependencies in strict-mode typecheck.
-import { rebootActivityJobs } from '../../plugins/activity/internal';
-import { rebootGiveawayJobs } from '../../plugins/giveaway/internal';
 
 interface NijikaConfig extends Config {
     blocked_channels: string[];
@@ -33,15 +26,18 @@ export class Nijika extends BaseBot<NijikaConfig> {
         // `interactionEventListener` override: blocked_channels now
         // flows through the InteractionRouter via the
         // `channelLoggingBlockedChannels` hook below, and the dispatch
-        // logic is the default `createDispatchMiddleware`.
+        // logic is the default `createDispatchMiddleware`. PR-G4 dropped
+        // the `rebootJobs` callback config — plugins now resolve their
+        // deps through `ctx` so the composition root no longer
+        // deep-imports `plugins/*/internal`.
         this.use(AutoReplyPlugin);
         this.use(TtsReplyPlugin);
         this.use(createGuildEventsPlugin({
             blockedChannels: this.config.blocked_channels,
             clientId: this.clientId,
         }));
-        this.use(createGiveawayPlugin({ rebootJobs: () => rebootGiveawayJobs(this) }));
-        this.use(createActivityPlugin({ rebootJobs: () => rebootActivityJobs(this) }));
+        this.use(createGiveawayPlugin());
+        this.use(createActivityPlugin());
         this.use(createVoicePlugin());
     }
 

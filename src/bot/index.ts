@@ -272,6 +272,10 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // primitives (channel fetch, message archive) resolve through
         // here rather than holding a BaseBot reference.
         this.container.registerSingleton(TOKENS.DiscordClient, () => this.client);
+        // Audit ARCH-BLOCK3: expose the scheduled-job map so the
+        // activity + giveaway plugins can drive their reboot loops
+        // without holding a BaseBot reference.
+        this.container.registerSingleton(TOKENS.JobMap, () => this.jobs);
     }
 
     /**

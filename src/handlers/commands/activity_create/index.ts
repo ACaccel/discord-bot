@@ -36,6 +36,6 @@ export default class activity_create extends Command {
     }
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
-        await activity.handleActivityCreate(interaction, bot as BaseBot & activity.IActivityBot);
+        await activity.handleActivityCreate(interaction, bot);
     }
 }

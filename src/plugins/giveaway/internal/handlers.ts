@@ -1,25 +1,25 @@
-import type {
-    ChatInputCommandInteraction,
-} from 'discord.js';
+import type { ChatInputCommandInteraction } from 'discord.js';
+
 import type { BaseBot } from '../../../bot';
 import { bindTranslator } from '../../../core/i18n';
+import { logError } from '../../../core/logger';
 import { misc, JobManager } from '../../../utils';
-import type {
-    IGiveawayBot} from './giveaway';
 import {
-    giveawayAnnouncement,
+    deleteGiveaway,
     findGiveaway,
-    scheduleGiveaway,
+    giveawayAnnouncement,
     giveawayJobKey,
+    scheduleGiveaway,
 } from './giveaway';
+import { buildGiveawayDepsFromBot } from './deps-from-bot';
 
-import { logError } from '@core/logger';
 export const handleGiveawayCreate = async (
     interaction: ChatInputCommandInteraction,
-    bot: BaseBot & IGiveawayBot,
+    bot: BaseBot,
 ): Promise<void> => {
     await interaction.deferReply();
     const t = bindTranslator(bot.translator);
+    const deps = buildGiveawayDepsFromBot(bot);
     try {
         const duration = interaction.options.get("duration")?.value as string | null;
         const winner_num = interaction.options.get("winner_num")?.value as number | null;
@@ -37,7 +37,7 @@ export const handleGiveawayCreate = async (
             return;
         }
 
-        const channel_id = bot.guildInfo[guild.id].channels?.giveaway?.id;
+        const channel_id = deps.registry.getChannel(guild.id, 'giveaway')?.id;
         if (!channel_id) {
             await interaction.editReply({ content: t('replies:giveaway.channel_not_configured') });
             return;
@@ -49,13 +49,12 @@ export const handleGiveawayCreate = async (
             return;
         }
 
-        const repos = bot.guildInfo[guild.id]?.repos;
+        const repos = deps.registry.getRepos(guild.id);
         if (!repos) {
             await interaction.editReply({ content: t('errors:db.not_found') });
             return;
         }
 
-        // parse duration
         const durationMs = misc.parseDuration(duration);
         if (durationMs === null) {
             await interaction.editReply({ content: t('replies:giveaway.invalid_duration') });
@@ -66,7 +65,6 @@ export const handleGiveawayCreate = async (
         const end_time = current_time + durationMs;
         const end_time_date = new Date(end_time);
 
-        // create giveaway announcement
         const message_id = await giveawayAnnouncement(
             channel,
             prize,
@@ -74,14 +72,13 @@ export const handleGiveawayCreate = async (
             winner_num,
             end_time_date,
             description || t('replies:common.empty_value'),
-            bot,
+            deps,
         );
         if (!message_id) {
             await interaction.editReply({ content: t('replies:giveaway.create_announce_failed') });
             return;
         }
 
-        // save giveaway to database
         await repos.giveaway.create({
             winner_num,
             prize,
@@ -92,9 +89,12 @@ export const handleGiveawayCreate = async (
             message_id,
         });
 
-        // schedule job to find winner
-        if (await findGiveaway(bot, guild.id, message_id)) {
-            new JobManager(bot.jobs).schedule(giveawayJobKey(message_id), end_time_date, () => scheduleGiveaway(bot, guild.id, message_id));
+        if (await findGiveaway(deps, guild.id, message_id)) {
+            new JobManager(deps.jobMap).schedule(
+                giveawayJobKey(message_id),
+                end_time_date,
+                () => scheduleGiveaway(deps, guild.id, message_id),
+            );
         }
 
         await interaction.editReply({
@@ -110,10 +110,11 @@ export const handleGiveawayCreate = async (
 
 export const handleGiveawayDelete = async (
     interaction: ChatInputCommandInteraction,
-    bot: BaseBot & IGiveawayBot,
+    bot: BaseBot,
 ): Promise<void> => {
     await interaction.deferReply();
     const t = bindTranslator(bot.translator);
+    const deps = buildGiveawayDepsFromBot(bot);
     try {
         const message_id = interaction.options.get("message_id")?.value as string | null;
         if (!message_id) {
@@ -127,7 +128,7 @@ export const handleGiveawayDelete = async (
             return;
         }
 
-        const result = await import('./giveaway').then(m => m.deleteGiveaway(bot, guild.id, message_id));
+        const result = await deleteGiveaway(deps, guild.id, message_id);
         if (typeof result === 'string' && result !== null) {
             await interaction.editReply({
                 content: t('replies:giveaway.delete_failed_with_reason', { reason: result }),

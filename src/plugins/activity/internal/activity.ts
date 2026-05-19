@@ -1,17 +1,53 @@
-import type { GuildMember, Channel } from 'discord.js';
+/**
+ * Activity reboot + scheduling internals.
+ *
+ * Audit ARCH-BLOCK3 (PR-G4): the public surface now takes a typed
+ * {@link ActivityDeps} bundle instead of the whole `BaseBot`, so the
+ * plugin can resolve its dependencies through the IoC container
+ * (`ctx.resolve(...)`) rather than receiving a callback that closes
+ * over the composition root's `this`. Composition roots no longer
+ * deep-import this file.
+ *
+ * The legacy slash-command handlers still hold a `BaseBot` reference;
+ * they call {@link buildActivityDepsFromBot} to bridge into the new
+ * surface without changing the handler signature.
+ */
+import type { Client, GuildMember, Channel } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
 import type { Job } from 'node-schedule';
-import type { BaseBot } from '../../../bot';
+
+import type { GuildRegistry } from '../../../core/guild-registry';
 import { bindTranslator } from '../../../core/i18n';
-import { bot_cmd, JobManager } from '../../../utils';
+import type { Translator } from '../../../core/i18n';
+import { logError, type Logger } from '../../../core/logger';
+import type { Message } from 'discord.js';
 
-import { logError } from '@core/logger';
-export interface IActivityBot {
-    jobs: Map<string, Job>
-}
+import { JobManager } from '../../../utils/job_manager';
 
-export const isActivityBot = (bot: BaseBot) => {
-    return (bot as BaseBot & IActivityBot).jobs !== undefined;
+const msgReact = async (msg: Message, reactions: readonly string[]): Promise<void> => {
+    if (!msg || reactions.length === 0) return;
+    for (const reaction of reactions) {
+        try {
+            await msg.react(reaction);
+        } catch (error) {
+            console.error(`Failed to react with ${reaction} on message ${msg.id}:`, error);
+        }
+    }
+};
+
+/**
+ * Typed dependency bundle for every activity-plugin operation. Built
+ * once in `createActivityPlugin.onReady` from `ctx.resolve(...)`, or
+ * by {@link buildActivityDepsFromBot} when a slash-command handler
+ * holds the legacy `BaseBot` reference.
+ */
+export interface ActivityDeps {
+    readonly client: Client;
+    readonly registry: GuildRegistry;
+    readonly jobMap: Map<string, Job>;
+    readonly logger: Logger;
+    readonly clientId: string;
+    readonly translator: Translator | undefined;
 }
 
 export const activityJobKey = (activity_id: string) => `activity:${activity_id}`;
@@ -25,11 +61,11 @@ export const activityAnnouncement = async (
     title: string,
     description: string,
     end_time_date: Date,
-    bot: BaseBot,
+    deps: ActivityDeps,
 ) => {
     if (!channel.isSendable()) return null;
 
-    const t = bindTranslator(bot.translator);
+    const t = bindTranslator(deps.translator);
 
     const embed = new EmbedBuilder()
         .setTitle(t('replies:activity.announce_title', { title }))
@@ -44,38 +80,25 @@ export const activityAnnouncement = async (
     const message = await channel.send({ embeds: [embed] });
     if (!message) return null;
     else {
-        bot_cmd.msgReact(message, ['✅']);
+        void msgReact(message, ['✅']);
         return message.id;
     }
-}
+};
 
-export const findActivity = async (bot: BaseBot, guild_id: string, activity_id: string) => {
-    if (!isActivityBot(bot)) return false;
-
-    const guild = bot.client.guilds.cache.get(guild_id);
-    if (!guild) {
-        return false;
-    }
-    const repos = bot.guildInfo[guild.id]?.repos;
-    if (!repos) {
-        return false;
-    }
+export const findActivity = async (deps: ActivityDeps, guild_id: string, activity_id: string) => {
+    const guild = deps.client.guilds.cache.get(guild_id);
+    if (!guild) return false;
+    const repos = deps.registry.getRepos(guild_id);
+    if (!repos) return false;
     const activity = await repos.activity.findByActivityId(activity_id);
-    if (!activity) return false;
-    return true;
-}
+    return activity !== undefined && activity !== null;
+};
 
-export const scheduleActivity = async (bot: BaseBot, guild_id: string, activity_id: string) => {
-    if (!isActivityBot(bot)) return "Bot does not implement IActivityBot";
-
-    const guild = bot.client.guilds.cache.get(guild_id);
-    if (!guild) {
-        return "Guild not found";
-    }
-    const repos = bot.guildInfo[guild.id]?.repos;
-    if (!repos) {
-        return "Database not found";
-    }
+export const scheduleActivity = async (deps: ActivityDeps, guild_id: string, activity_id: string) => {
+    const guild = deps.client.guilds.cache.get(guild_id);
+    if (!guild) return "Guild not found";
+    const repos = deps.registry.getRepos(guild_id);
+    if (!repos) return "Database not found";
 
     const activity = await repos.activity.findByActivityId(activity_id);
     if (!activity) return "Activity not found";
@@ -98,44 +121,34 @@ export const scheduleActivity = async (bot: BaseBot, guild_id: string, activity_
             }
         }
     }
-    const participantsArray = participantsMembers.map(m => m.id);
+    const participantsArray = participantsMembers.map((m) => m.id);
 
-    // Update activity with participants
     await repos.activity.setParticipants(activity_id, participantsArray);
 
-    // Send results
-    const t = bindTranslator(bot.translator);
+    const t = bindTranslator(deps.translator);
     const resultContent = participantsArray.length > 0
         ? t('replies:activity.result_with_participants', {
             title: activity.title,
-            participants: participantsArray.map(id => `<@${id}>`).join('\n'),
+            participants: participantsArray.map((id) => `<@${id}>`).join('\n'),
             count: participantsArray.length,
         })
         : t('replies:activity.result_no_participants', { title: activity.title });
     await activityChannel.send({ content: resultContent });
 
-    new JobManager(bot.jobs).cancel(activityJobKey(activity_id));
-
+    new JobManager(deps.jobMap).cancel(activityJobKey(activity_id));
     return null;
-}
+};
 
-export const deleteActivity = async (bot: BaseBot & IActivityBot, guild_id: string, activity_id: string) => {
-    if (!isActivityBot(bot)) return "Bot does not implement IActivityBot";
+export const deleteActivity = async (deps: ActivityDeps, guild_id: string, activity_id: string) => {
+    const guild = deps.client.guilds.cache.get(guild_id);
+    if (!guild) return "Guild not found";
+    const repos = deps.registry.getRepos(guild_id);
+    if (!repos) return "Database not found";
 
-    const guild = bot.client.guilds.cache.get(guild_id);
-    if (!guild) {
-        return "Guild not found";
-    }
-    const repos = bot.guildInfo[guild.id]?.repos;
-    if (!repos) {
-        return "Database not found";
-    }
-
-    new JobManager(bot.jobs).cancel(activityJobKey(activity_id));
+    new JobManager(deps.jobMap).cancel(activityJobKey(activity_id));
     await repos.activity.deleteByActivityId(activity_id);
-
     return null;
-}
+};
 
 /**
  * Retry helper. Exponential backoff: 250ms → 500ms → 1000ms before
@@ -159,56 +172,43 @@ const rebootRetry = async <T>(op: () => Promise<T>): Promise<T> => {
     throw lastErr;
 };
 
-export const rebootActivityJobs = async (bot: BaseBot) => {
-    const jobManager = new JobManager(bot.jobs);
+export const rebootActivityJobs = async (deps: ActivityDeps): Promise<void> => {
+    const jobManager = new JobManager(deps.jobMap);
     await Promise.all(
-        Object.values(bot.guildInfo).map(async (guild_info) => {
+        deps.registry.listGuildIds().map(async (guildId) => {
             try {
-                if (!guild_info.repos) return;
-                const activities = await rebootRetry(() => guild_info.repos!.activity.listAll());
+                const repos = deps.registry.getRepos(guildId);
+                if (!repos) return;
+                const activities = await rebootRetry(() => repos.activity.listAll());
                 for (const a of activities) {
-                    // Per-row try/catch so a transient Mongo blip on a
-                    // single delete does not abort the rest of the
-                    // guild's scheduling pass (reviewer WARN: previous
-                    // shape left the remainder un-scheduled). Errors
-                    // are logged but not escalated — the listAll
-                    // exhaustion path below is the operator-visible
-                    // failure mode.
                     try {
                         const expired_at = new Date(a.expired_at);
                         if (expired_at > new Date()) {
                             jobManager.schedule(activityJobKey(a.activity_id), expired_at, async () => {
-                                if (await findActivity(bot, guild_info.guild.id, a.activity_id)) {
-                                    await scheduleActivity(bot, guild_info.guild.id, a.activity_id);
+                                if (await findActivity(deps, guildId, a.activity_id)) {
+                                    await scheduleActivity(deps, guildId, a.activity_id);
                                 }
                             });
                         } else {
-                            await rebootRetry(() =>
-                                deleteActivity(bot as BaseBot & IActivityBot, guild_info.guild.id, a.activity_id),
-                            );
+                            await rebootRetry(() => deleteActivity(deps, guildId, a.activity_id));
                         }
                     } catch (rowErr) {
-                        logError(bot.logger, bot.clientId, guild_info.guild.id, rowErr);
+                        logError(deps.logger, deps.clientId, guildId, rowErr);
                     }
                 }
             } catch (err) {
-                // listAll exhaustion: log + surface to operators via
-                // the debug channel so a sustained outage is visible,
-                // not just buried in the log file.
-                logError(bot.logger, bot.clientId, guild_info.guild.id, err);
-                const debugCh = guild_info.channels?.debug;
+                logError(deps.logger, deps.clientId, guildId, err);
+                const debugCh = deps.registry.getChannel(guildId, 'debug');
                 if (debugCh?.isSendable()) {
                     await debugCh
                         .send(
-                            `[ ops ] activity reboot listAll failed for guild ${guild_info.guild.id} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
+                            `[ ops ] activity reboot listAll failed for guild ${guildId} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
                         )
                         .catch((sendErr) =>
-                            logError(bot.logger, bot.clientId, guild_info.guild.id, sendErr),
+                            logError(deps.logger, deps.clientId, guildId, sendErr),
                         );
                 }
             }
         }),
     );
-
-    return null;
-}
+};

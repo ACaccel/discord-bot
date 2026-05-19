@@ -26,6 +26,6 @@ export default class activity_delete extends Command {
     }
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
-        await activity.handleActivityDelete(interaction, bot as BaseBot & activity.IActivityBot);
+        await activity.handleActivityDelete(interaction, bot);
     }
 }
