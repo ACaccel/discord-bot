@@ -1,1 +1,1 @@
-export { createGiveawayPlugin, type GiveawayPluginConfig } from './plugin';
+export { createGiveawayPlugin } from './plugin';

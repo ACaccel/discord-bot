@@ -1,1 +1,1 @@
-export { createActivityPlugin, type ActivityPluginConfig } from './plugin';
+export { createActivityPlugin } from './plugin';

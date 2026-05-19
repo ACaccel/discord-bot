@@ -1,26 +1,25 @@
-import type {
-    ChatInputCommandInteraction,
-} from 'discord.js';
+import type { ChatInputCommandInteraction } from 'discord.js';
+
 import type { BaseBot } from '../../../bot';
 import { bindTranslator } from '../../../core/i18n';
+import { logError } from '../../../core/logger';
 import { misc, JobManager } from '../../../utils';
-import type {
-    IActivityBot} from './activity';
 import {
     activityAnnouncement,
+    activityJobKey,
+    deleteActivity,
     findActivity,
     scheduleActivity,
-    deleteActivity,
-    activityJobKey,
 } from './activity';
+import { buildActivityDepsFromBot } from './deps-from-bot';
 
-import { logError } from '@core/logger';
 export const handleActivityCreate = async (
     interaction: ChatInputCommandInteraction,
-    bot: BaseBot & IActivityBot,
+    bot: BaseBot,
 ): Promise<void> => {
     await interaction.deferReply();
     const t = bindTranslator(bot.translator);
+    const deps = buildActivityDepsFromBot(bot);
     try {
         const title = interaction.options.get("title")?.value as string | null;
         const duration = interaction.options.get("duration")?.value as string | null;
@@ -43,13 +42,12 @@ export const handleActivityCreate = async (
             return;
         }
 
-        const repos = bot.guildInfo[guild.id]?.repos;
+        const repos = deps.registry.getRepos(guild.id);
         if (!repos) {
             await interaction.editReply({ content: t('errors:db.not_found') });
             return;
         }
 
-        // parse duration
         const durationMs = misc.parseDuration(duration);
         if (durationMs === null) {
             await interaction.editReply({ content: t('replies:activity.invalid_duration') });
@@ -60,22 +58,20 @@ export const handleActivityCreate = async (
         const end_time = current_time + durationMs;
         const end_time_date = new Date(end_time);
 
-        // create activity announcement
-        const activity_id = current_time.toString(); // use timestamp as activity id
+        const activity_id = current_time.toString();
         const message_id = await activityAnnouncement(
             activity_id,
             channel,
             title,
             description || t('replies:common.empty_value'),
             end_time_date,
-            bot,
+            deps,
         );
         if (!message_id) {
             await interaction.editReply({ content: t('replies:activity.create_announce_failed') });
             return;
         }
 
-        // save activity to database
         await repos.activity.create({
             activity_id,
             message_id,
@@ -86,9 +82,12 @@ export const handleActivityCreate = async (
             participants: [],
         });
 
-        // schedule job to close activity
-        if (await findActivity(bot, guild.id, activity_id)) {
-            new JobManager(bot.jobs).schedule(activityJobKey(activity_id), end_time_date, () => scheduleActivity(bot, guild.id, activity_id));
+        if (await findActivity(deps, guild.id, activity_id)) {
+            new JobManager(deps.jobMap).schedule(
+                activityJobKey(activity_id),
+                end_time_date,
+                () => scheduleActivity(deps, guild.id, activity_id),
+            );
         }
 
         await interaction.editReply({
@@ -105,10 +104,11 @@ export const handleActivityCreate = async (
 
 export const handleActivityDelete = async (
     interaction: ChatInputCommandInteraction,
-    bot: BaseBot & IActivityBot,
+    bot: BaseBot,
 ): Promise<void> => {
     await interaction.deferReply();
     const t = bindTranslator(bot.translator);
+    const deps = buildActivityDepsFromBot(bot);
     try {
         const activity_id = interaction.options.get("activity_id")?.value as string | null;
         if (!activity_id) {
@@ -122,7 +122,7 @@ export const handleActivityDelete = async (
             return;
         }
 
-        const result = await deleteActivity(bot, guild.id, activity_id);
+        const result = await deleteActivity(deps, guild.id, activity_id);
         if (typeof result === 'string' && result !== null) {
             await interaction.editReply({
                 content: t('replies:activity.delete_failed_with_reason', { reason: result }),

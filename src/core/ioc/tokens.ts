@@ -22,6 +22,7 @@
  * lifecycle introduces an interaction scope.
  */
 import type { Client } from 'discord.js';
+import type { Job } from 'node-schedule';
 
 import type { GuildId } from '../ids';
 import { token, type ServiceToken } from './container';
@@ -71,6 +72,12 @@ export interface Tokens {
    * is honoured everywhere outside `core/config`.
    */
   readonly Env: ServiceToken<Env>;
+  /**
+   * Bot-scoped scheduled-job map. The activity + giveaway plugins
+   * resolve this from `onReady` to drive their reboot loops without
+   * holding a BaseBot reference (audit ARCH-BLOCK3 / PR-G4).
+   */
+  readonly JobMap: ServiceToken<Map<string, Job>>;
 }
 
 export const TOKENS: Tokens = {
@@ -82,4 +89,5 @@ export const TOKENS: Tokens = {
   GuildRegistry: token<GuildRegistry>('GuildRegistry'),
   DiscordClient: token<Client>('DiscordClient'),
   Env: token<Env>('Env'),
+  JobMap: token<Map<string, Job>>('JobMap'),
 };

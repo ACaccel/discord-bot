@@ -44,6 +44,6 @@ export default class giveaway_create extends Command {
     }
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
-        await giveaway.handleGiveawayCreate(interaction, bot as BaseBot & giveaway.IGiveawayBot);
+        await giveaway.handleGiveawayCreate(interaction, bot);
     }
 }

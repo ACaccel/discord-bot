@@ -1,15 +1,35 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
 import { createGiveawayPlugin } from '../../../src/plugins/giveaway';
 import { createActivityPlugin } from '../../../src/plugins/activity';
 import { createLogger } from '../../../src/core/logger';
 import { systemClock } from '../../../src/core/time';
-import { createContainer } from '../../../src/core/ioc';
+import { createContainer, TOKENS } from '../../../src/core/ioc';
 import type { PluginRuntimeContext } from '../../../src/core/plugin';
 
 const silent = createLogger({ level: 'silent', pretty: false });
 
+// Audit ARCH-BLOCK3 (PR-G4): plugins no longer take a `rebootJobs`
+// callback config — they pull their deps from `ctx.resolve(...)` and
+// call rebootActivityJobs / rebootGiveawayJobs themselves. These tests
+// install no-op stubs for the resolved tokens and verify the plugin
+// onReady swallows internal failures so startup is not aborted.
+
 const buildCtx = (): PluginRuntimeContext => {
   const container = createContainer();
+  // listGuildIds returns [] so the reboot loop is a fast no-op; no
+  // need to stub repos / channels.
+  container.registerSingleton(TOKENS.GuildRegistry, () => ({
+    getRepos: () => undefined,
+    getChannel: () => undefined,
+    getRole: () => undefined,
+    listGuildIds: () => [],
+  }));
+  container.registerSingleton(
+    TOKENS.DiscordClient,
+    () => ({ user: { id: 'bot-1' }, guilds: { cache: new Map() } }) as never,
+  );
+  container.registerSingleton(TOKENS.JobMap, () => new Map());
   return {
     logger: silent,
     translator: { t: (k: string) => k } as PluginRuntimeContext['translator'],
@@ -18,50 +38,28 @@ const buildCtx = (): PluginRuntimeContext => {
   };
 };
 
-describe('createGiveawayPlugin / createActivityPlugin', () => {
+describe('createGiveawayPlugin / createActivityPlugin (PR-G4: self-owned reboot)', () => {
   it('giveaway plugin has the expected shape', () => {
-    const p = createGiveawayPlugin({ rebootJobs: async () => undefined });
+    const p = createGiveawayPlugin();
     expect(p.id).toBe('giveaway');
     expect(p.scope).toBe('bot');
     expect(p.onReady).toBeTypeOf('function');
   });
 
   it('activity plugin has the expected shape', () => {
-    const p = createActivityPlugin({ rebootJobs: async () => undefined });
+    const p = createActivityPlugin();
     expect(p.id).toBe('activity');
     expect(p.scope).toBe('bot');
     expect(p.onReady).toBeTypeOf('function');
   });
 
-  it('giveaway onReady invokes the reboot callback', async () => {
-    const rebootJobs = vi.fn(async () => undefined);
-    const p = createGiveawayPlugin({ rebootJobs });
-    await p.onReady?.(buildCtx());
-    expect(rebootJobs).toHaveBeenCalledTimes(1);
-  });
-
-  it('activity onReady invokes the reboot callback', async () => {
-    const rebootJobs = vi.fn(async () => undefined);
-    const p = createActivityPlugin({ rebootJobs });
-    await p.onReady?.(buildCtx());
-    expect(rebootJobs).toHaveBeenCalledTimes(1);
-  });
-
-  it('giveaway onReady swallows a rebootJobs throw so startup is not aborted', async () => {
-    const rebootJobs = vi.fn(async () => {
-      throw new Error('boom');
-    });
-    const p = createGiveawayPlugin({ rebootJobs });
+  it('giveaway onReady runs to completion with an empty registry', async () => {
+    const p = createGiveawayPlugin();
     await expect(p.onReady?.(buildCtx())).resolves.toBeUndefined();
-    expect(rebootJobs).toHaveBeenCalledTimes(1);
   });
 
-  it('activity onReady swallows a rebootJobs throw so startup is not aborted', async () => {
-    const rebootJobs = vi.fn(async () => {
-      throw new Error('boom');
-    });
-    const p = createActivityPlugin({ rebootJobs });
+  it('activity onReady runs to completion with an empty registry', async () => {
+    const p = createActivityPlugin();
     await expect(p.onReady?.(buildCtx())).resolves.toBeUndefined();
-    expect(rebootJobs).toHaveBeenCalledTimes(1);
   });
 });
