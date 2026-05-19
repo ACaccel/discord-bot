@@ -6,6 +6,7 @@ import {
     createActivityPlugin,
     createGiveawayPlugin,
     createGuildEventsPlugin,
+    createVoicePlugin,
 } from '@plugins';
 // Direct deep imports into the relocated feature internals — only
 // composition roots cross the plugin/internal layer line, and only
@@ -40,6 +41,7 @@ export class Nijika extends BaseBot<NijikaConfig> {
         }));
         this.use(createGiveawayPlugin({ rebootJobs: () => rebootGiveawayJobs(this) }));
         this.use(createActivityPlugin({ rebootJobs: () => rebootActivityJobs(this) }));
+        this.use(createVoicePlugin());
     }
 
     protected override channelLoggingBlockedChannels(): readonly string[] {
