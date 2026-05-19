@@ -1,4 +1,4 @@
-import { Job } from 'node-schedule';
+import type { Job } from 'node-schedule';
 import schedule from 'node-schedule';
 
 export class JobManager {

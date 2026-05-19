@@ -1,7 +1,7 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 export default class bubble_wrap extends Command {
@@ -25,6 +25,7 @@ export default class bubble_wrap extends Command {
     }
     private getVisualWidth(char: string): number {
     
+        // eslint-disable-next-line no-control-regex
         return /[^\x00-\xff]/.test(char) ? 2 : 1;
     }
 
@@ -38,7 +39,7 @@ export default class bubble_wrap extends Command {
         }
 
         // random permutation of places
-        let places = Array.from({ length: side_len * side_len }, (_, i) => i);
+        const places = Array.from({ length: side_len * side_len }, (_, i) => i);
         for (let i = places.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [places[i], places[j]] = [places[j], places[i]];

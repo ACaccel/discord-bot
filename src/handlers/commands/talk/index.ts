@@ -1,9 +1,10 @@
-import {
+import type {
     ChatInputCommandInteraction,
-    Guild,
+    Guild} from 'discord.js';
+import {
     MessageFlags,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { logError } from '@core/logger';
@@ -37,16 +38,16 @@ export default class talk extends Command {
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         try {
-            let ch = interaction.options.get("channel")?.value as string;
-            let content = interaction.options.get("content")?.value as string;
+            const ch = interaction.options.get("channel")?.value as string;
+            const content = interaction.options.get("content")?.value as string;
             if (!ch || !content) {
                 await interaction.reply({ content: bot.translator?.t('replies:talk.missing_args') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
             
             // check existance of channel
-            let guild = interaction.guild as Guild;
-            let channel = guild.channels.cache.get(ch);
+            const guild = interaction.guild as Guild;
+            const channel = guild.channels.cache.get(ch);
             if (!channel?.isSendable()) {
                 await interaction.reply({ content: bot.translator?.t('errors:command.channel_not_sendable') ?? '', flags: MessageFlags.Ephemeral });
                 return;

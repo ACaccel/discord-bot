@@ -1,10 +1,11 @@
-import { Client } from 'discord.js';
-import { BaseBot, Config } from '@bot';
+import type { Client } from 'discord.js';
+import type { Config } from '@bot';
+import { BaseBot } from '@bot';
 import { AutoReplyPlugin, createActivityPlugin, createGiveawayPlugin, createVoicePlugin } from '@plugins';
 import { rebootActivityJobs } from '../../plugins/activity/internal';
 import { rebootGiveawayJobs } from '../../plugins/giveaway/internal';
 
-interface TomoriConfig extends Config {}
+type TomoriConfig = Config;
 
 export class Tomori extends BaseBot<TomoriConfig> {
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: TomoriConfig) {

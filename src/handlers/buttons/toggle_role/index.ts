@@ -1,10 +1,11 @@
-import { 
+import type { 
     ButtonInteraction,
     Guild,
-    GuildMember,
+    GuildMember} from 'discord.js';
+import {
     MessageFlags,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { ButtonHandler } from '@button';
 
 export default class toggle_role extends ButtonHandler {

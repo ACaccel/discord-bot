@@ -1,6 +1,7 @@
-import { GuildMember, EmbedBuilder, Channel } from 'discord.js';
-import { Job } from 'node-schedule';
-import { BaseBot } from '../../../bot';
+import type { GuildMember, Channel } from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
+import type { Job } from 'node-schedule';
+import type { BaseBot } from '../../../bot';
 import { bindTranslator } from '../../../core/i18n';
 import { bot_cmd, JobManager } from '../../../utils';
 

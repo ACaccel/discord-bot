@@ -1,15 +1,16 @@
-import {
+import type {
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '../../../bot';
+import type { BaseBot } from '../../../bot';
 import { bindTranslator } from '../../../core/i18n';
 import { misc, JobManager } from '../../../utils';
+import type {
+    IActivityBot} from './activity';
 import {
     activityAnnouncement,
     findActivity,
     scheduleActivity,
     deleteActivity,
-    IActivityBot,
     activityJobKey,
 } from './activity';
 

@@ -1,5 +1,6 @@
+import type {
+    ChatInputCommandInteraction} from 'discord.js';
 import {
-    ChatInputCommandInteraction,
     LabelBuilder,
     ModalBuilder,
     StringSelectMenuBuilder,
@@ -8,7 +9,7 @@ import {
     TextInputStyle,
     MessageFlags,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { type LLMProviderName, listProviderModels } from '../../../infra/llm';

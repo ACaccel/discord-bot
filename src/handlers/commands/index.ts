@@ -1,13 +1,14 @@
-import {
+import type {
     ApplicationCommandDataResolvable,
     ChatInputCommandInteraction,
     ContextMenuCommandInteraction,
-    ContextMenuCommandType,
+    ContextMenuCommandType} from 'discord.js';
+import {
     REST,
     Routes,
     RateLimitData,
 } from 'discord.js';
-import { BaseBot } from "@bot";
+import type { BaseBot } from "@bot";
 import { bot_cmd } from "@utils";
 import { ops } from "../../core/logger";
 import { HandlerFactory } from "handlers";
@@ -27,7 +28,7 @@ export interface CommandConfig {
     };
 }
 
-interface CommandOption {
+export interface CommandOption {
     name: string;
     description: string;
     required: boolean;

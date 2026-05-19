@@ -1,6 +1,6 @@
-import { MessageReaction, User } from "discord.js";
+import type { MessageReaction, User } from "discord.js";
 import { ReactionHandler } from "..";
-import { BaseBot } from "@bot";
+import type { BaseBot } from "@bot";
 
 export default class roll_call extends ReactionHandler {
     public override async executeAdded(reaction: MessageReaction, user: User, bot: BaseBot): Promise<void> {

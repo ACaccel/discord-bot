@@ -1,8 +1,8 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
 import axios from 'axios';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { logError } from '@core/logger';
@@ -19,7 +19,12 @@ export default class weather_forecast extends Command {
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply();
         try {
-            var api_route = `https://dataservice.accuweather.com/forecasts/v1/hourly/1hour/315078?apikey=${process.env.ACCUWEATHER_KEY}&language=zh-tw&details=true`;
+            const apiKey = bot.env?.ACCUWEATHER_KEY;
+            if (!apiKey) {
+                await interaction.editReply({ content: bot.translator?.t('replies:weather_forecast.unavailable') ?? '' });
+                return;
+            }
+            const api_route = `https://dataservice.accuweather.com/forecasts/v1/hourly/1hour/315078?apikey=${apiKey}&language=zh-tw&details=true`;
             const response = await axios.get(api_route);
             const weatherForecast = response.data[0];
             const temperatureCelsius = (weatherForecast.Temperature.Value - 32) * 5 / 9; // Convert Fahrenheit to Celsius

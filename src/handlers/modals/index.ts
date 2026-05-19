@@ -1,7 +1,7 @@
-import {
+import type {
     ModalSubmitInteraction,
 } from 'discord.js';
-import { BaseBot } from "@bot";
+import type { BaseBot } from "@bot";
 
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";

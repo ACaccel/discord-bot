@@ -1,11 +1,12 @@
+import type {
+    ChatInputCommandInteraction,
+    Guild} from "discord.js";
 import {
     AttachmentBuilder,
-    ChatInputCommandInteraction,
     ChannelType,
-    Guild,
     MessageFlags,
 } from "discord.js";
-import { BaseBot } from "@bot";
+import type { BaseBot } from "@bot";
 import { Command } from "@cmd";
 
 import type { ChannelId } from "../../../core/ids";
@@ -273,7 +274,7 @@ export default class db_list_message extends Command {
             if (print === "yes") {
                 // 直接發成訊息到「slash 使用的頻道」，避免超過 2000 字限制，切塊發送
                 const outChannel = interaction.channel;
-                if (!outChannel || typeof (outChannel as any).send !== "function") {
+                if (!outChannel || !outChannel.isSendable()) {
                     await interaction.editReply({
                         content: bot.translator?.t('replies:db_list_message.no_output_channel') ?? '',
                     });
@@ -303,7 +304,7 @@ export default class db_list_message extends Command {
                 });
 
                 for (const chunk of chunks) {
-                    await (outChannel as any).send({
+                    await outChannel.send({
                         content: chunk,
                         flags: MessageFlags.SuppressEmbeds,
                     });

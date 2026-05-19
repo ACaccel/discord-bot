@@ -1,7 +1,7 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { logError } from '@core/logger';
@@ -116,11 +116,11 @@ export default class emoji_frequency extends Command {
                     }
                 });
     
-                const msgReactions: any[] = message.reactions || [];
+                const msgReactions = message.reactions ?? [];
                 msgReactions.forEach((reaction) => {
                     const emojiText = `<${reaction.animated ? "a:" : ":"}${reaction.name}:${reaction.id}>`;
                     if (reactionEmoji.has(emojiText)) {
-                    reactionEmoji.set(emojiText, (reactionEmoji.get(emojiText) || 0) + reaction.count);
+                    reactionEmoji.set(emojiText, (reactionEmoji.get(emojiText) || 0) + (reaction.count ?? 0));
                     }
                 });
                 });

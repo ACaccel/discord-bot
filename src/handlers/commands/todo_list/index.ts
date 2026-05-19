@@ -1,7 +1,7 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { requireGuildRepos } from '../../require-guild-repos';
@@ -55,7 +55,7 @@ export default class todo_list extends Command {
             if (repos === null) return;
             const todos = repos.todo;
 
-            if (action == "add") {
+            if (action === "add") {
                 const existPair = await todos.findByContent(content);
                 if (existPair.length === 0) {
                     await todos.create(content);
@@ -63,7 +63,7 @@ export default class todo_list extends Command {
                 } else {
                     await interaction.editReply({ content: bot.translator?.t('replies:todo_list.already_exists', { content }) ?? '' });
                 }
-            } else if (action == "delete") {
+            } else if (action === "delete") {
                 // content is index
                 const todoList = await todos.listAll();
                 if (!parseInt(content)) {
@@ -77,7 +77,7 @@ export default class todo_list extends Command {
                     await todos.deleteByContent(deleted_content);
                     await interaction.editReply({ content: bot.translator?.t('replies:todo_list.deleted', { content: deleted_content }) ?? '' });
                 }
-            } else if (action == "list") {
+            } else if (action === "list") {
                 const todoList = await todos.listAll();
                 let content = bot.translator?.t('replies:todo_list.header') ?? '';
                 todoList.map((e, i) => {

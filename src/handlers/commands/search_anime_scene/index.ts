@@ -1,9 +1,10 @@
-import { 
-    ChatInputCommandInteraction,
+import type { 
+    ChatInputCommandInteraction} from 'discord.js';
+import {
     EmbedBuilder,
 } from 'discord.js';
 import axios from 'axios';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
 import { logError } from '@core/logger';
@@ -56,7 +57,7 @@ export default class search_anime_scene extends Command {
                         video: string;
                         image: string;
                     }
-                    let embedarr: EmbedBuilder[] = [];
+                    const embedarr: EmbedBuilder[] = [];
                     const result = response.data.result as IResult[];
                     const num_results = interaction.options.get("display_num")?.value ?
                         interaction.options.get("display_num")?.value as number > result.length ? 

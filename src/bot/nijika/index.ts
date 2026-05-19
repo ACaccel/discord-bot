@@ -10,7 +10,10 @@ import { Nijika } from './nijika';
 import config from './config.json';
 
 import { logError, logSystem } from '@core/logger';
+import { loadEnv } from '@core/config';
 dotenv.config({ path: './src/bot/nijika/.env' });
+
+const env = loadEnv();
 
 // discord client
 const client: Client = new Client({ 
@@ -38,9 +41,9 @@ const client: Client = new Client({
 });
 const nijika = new Nijika(
     client,
-    process.env.TOKEN as string,
-    process.env.MONGO_URI as string,
-    process.env.CLIENT_ID as string,
+    env.TOKEN,
+    env.MONGO_URI ?? '',
+    env.CLIENT_ID,
     config
 );
 nijika.run();
@@ -89,6 +92,6 @@ r.post('/earthquake', (_, res) => {
     res.status(200).send('OK');
 })
 
-app.listen(process.env.PORT, () => {
-    logSystem(nijika.logger, nijika.clientId, `discord bot server is running on port ${process.env.PORT}`)
+app.listen(env.PORT, () => {
+    logSystem(nijika.logger, nijika.clientId, `discord bot server is running on port ${env.PORT}`)
 });

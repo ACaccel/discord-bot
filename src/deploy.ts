@@ -20,13 +20,15 @@
  *   yarn deploy -t nijika --dev-guild ID  # guild-side fast iteration
  *   yarn deploy -t nijika --cleanup-guild-commands
  */
-import { REST, Routes, ApplicationCommandDataResolvable } from "discord.js";
+import type { ApplicationCommandDataResolvable } from "discord.js";
+import { REST, Routes } from "discord.js";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 
 import { createCommand } from "@cmd";
 import { bot_cmd } from "@utils";
+import { loadEnv } from '@core/config';
 
 type DeployArgs = {
     bot?: string;
@@ -73,12 +75,9 @@ function loadBotConfig(botName: string): { token: string; clientId: string; comm
     const { configPath, envPath } = resolveBotPaths(botName);
 
     dotenv.config({ path: envPath });
-    const token = process.env.TOKEN;
-    const clientId = process.env.CLIENT_ID;
-
-    if (!token || !clientId) {
-        throw new Error(`Missing TOKEN or CLIENT_ID in ${envPath}`);
-    }
+    const env = loadEnv({ exitOnFailure: false, requireDb: false });
+    const token = env.TOKEN;
+    const clientId = env.CLIENT_ID;
 
     const raw = fs.readFileSync(configPath, "utf8");
     const cfg = JSON.parse(raw) as BotConfig;
