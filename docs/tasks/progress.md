@@ -27,14 +27,14 @@ proposal §5 宣稱已落地的 REQ 不再列為任務。
 
 - [ ] [C1 — Core Infrastructure](C1-core-infrastructure.md) — D4 候選承接點評估（條件性）
 - [x] [C2 — IoC Container](C2-ioc-container.md) — 無收斂任務
-- [ ] [C3 — Plugin Runtime](C3-plugin-runtime.md) — D1、D6
+- [x] [C3 — Plugin Runtime](C3-plugin-runtime.md) — D1（介面）、D6 ✅
 - [ ] [C4 — Persistence](C4-persistence.md) — G-2（repository 邊界 `Result` 一致性）
 - [ ] [C5 — Infra Adapters](C5-infra-adapters.md) — D5
 - [ ] [C6 — Handlers](C6-handlers.md) — D5、D7、D9
 - [ ] [C7 — i18n Catalog](C7-i18n-catalog.md) — D7、D9
-- [ ] [C8 — Plugins](C8-plugins.md) — D1、D2、D3、D4、G-1
+- [ ] [C8 — Plugins](C8-plugins.md) — D2 ✅、G-1 ✅；D1、D3、D4 待辦
 - [ ] [C9 — Codegen & Scripts](C9-codegen-scripts.md) — D4 候選承接點評估（條件性）
-- [ ] [C10 — Quality Gates](C10-quality-gates.md) — D3、D8
+- [ ] [C10 — Quality Gates](C10-quality-gates.md) — D8 ✅；D3 待辦（依賴 C8 D3）
 - [ ] [C11 — Bot Composition Roots](C11-bot-composition-roots.md) — D1、D2、D4、D5
 
 > C2、C4、C9 的設計檔 §7 判定「無實質偏差」。C2 無收斂任務（任務檔僅作存檔
