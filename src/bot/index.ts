@@ -58,6 +58,7 @@ import { systemClock, type Clock } from '../core/time';
 import {
     InteractionRouter,
     PluginHost,
+    type GuildOnboardingPort,
     type InteractionContext,
     type Plugin,
 } from '../core/plugin';
@@ -76,7 +77,7 @@ import { registerModals } from '@modal';
 import type { SSMHandler } from '@select-menu';
 import { registerSSMs } from '@select-menu';
 
-import { detectGuildCreate } from "@event";
+import { BaseBotGuildOnboardingPort } from './guild-onboarding';
 import type { ReactionHandler} from "@reaction";
 import { executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
 
@@ -108,33 +109,6 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public clientId: string;
     public config: TConfig;
     public guildInfo: Record<string, GuildInfo>;
-    /**
-     * Read-only view of guilds whose MongoDB initialisation has failed
-     * (gap D5).
-     *
-     * The disabled state itself is owned by the {@link ConnectionManager}
-     * — it classifies transient vs persistent failures, retries the
-     * former, and stamps a stable `traceId` on the latter. `BaseBot` is
-     * now purely a *query side*: this getter projects the manager's
-     * disabled set into the legacy `Map`-shaped view that
-     * `requireGuildRepos` consumes (`.get(guildId)?.traceId`).
-     *
-     * Each entry carries the same `traceId` written to the structured
-     * boot log, so a support ticket ("got error xxxxxx") correlates to
-     * the originating connection failure by `grep traceId=<id>`.
-     */
-    public get disabledGuilds(): ReadonlyMap<string, { error: Error; traceId: string }> {
-        const cm = this.container.tryResolve<ConnectionManager>(TOKENS.ConnectionManager);
-        const view = new Map<string, { error: Error; traceId: string }>();
-        if (cm === undefined) return view;
-        for (const guildId of Object.keys(this.guildInfo)) {
-            const state = cm.isDisabled(asGuildId(guildId));
-            if (state !== undefined) {
-                view.set(guildId, { error: state.error, traceId: state.traceId });
-            }
-        }
-        return view;
-    }
 
     /**
      * Typed accessor for the per-bot {@link ConnectionManager} (gap D5,
@@ -145,8 +119,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * `requireGuildRepos`) must not import the IoC container — the
      * eslint `no-restricted-imports` rule blocks `@core/ioc` outside
      * composition roots — so the disabled-guild query reaches the
-     * manager through this getter instead of the legacy
-     * {@link disabledGuilds} projection.
+     * `ConnectionManager` (which owns transient/persistent failure
+     * classification and the disabled set) through this getter.
      *
      * Returns `undefined` only in the pre-`run()` window or when the
      * bot was constructed without a `MONGO_URI`; any handler-context
@@ -312,6 +286,16 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // activity + giveaway plugins can drive their reboot loops
         // without holding a BaseBot reference.
         this.container.registerSingleton(TOKENS.JobMap, () => this.jobs);
+        // Gap D1: register the guild-onboarding port so the
+        // `guild-events` plugin can onboard newly joined guilds from
+        // its `guildCreate` subscription without reaching into
+        // `BaseBot` internals. The port is a thin Adapter over this
+        // bot; `guildCreateListener` also dispatches through it so the
+        // onboarding path has a single implementation.
+        this.container.registerSingleton(
+            TOKENS.GuildOnboardingPort,
+            () => new BaseBotGuildOnboardingPort(this),
+        );
     }
 
     /**
@@ -803,10 +787,12 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                     await this.connectOneGuild(guild_id);
                     logSystem(this.logger, this.clientId, ops.guildDb.connectSuccess(guild_id, guild.guild.name));
                 } catch {
-                    // connectOneGuild already populated `disabledGuilds`
-                    // and logged with traceId; swallow here so one bad
-                    // guild does not abort the fan-out. The disabled state
-                    // is the durable record handlers consult.
+                    // connectOneGuild already logged with the
+                    // ConnectionManager's traceId; the manager owns the
+                    // disabled-guild record. Swallow here so one bad
+                    // guild does not abort the fan-out — the manager's
+                    // disabled set is the durable record handlers
+                    // consult via `bot.connectionManager.isDisabled`.
                 }
             }));
         } catch (err) {
@@ -995,6 +981,14 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     ): Promise<void> => {}
 
     public guildCreateListener = async (guild: Guild): Promise<void> => {
-        detectGuildCreate(guild, this);
+        // Gap D1: onboard the new guild through the typed port instead
+        // of the legacy `detectGuildCreate` free function. The port is
+        // the single onboarding implementation; the `guild-events`
+        // plugin (C8 D1) will additionally drive it from its own
+        // `guildCreate` subscription.
+        const port = this.container.resolve<GuildOnboardingPort>(
+            TOKENS.GuildOnboardingPort,
+        );
+        await port.onboardGuild(guild.id);
     }
 }

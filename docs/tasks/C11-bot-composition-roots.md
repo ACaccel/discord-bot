@@ -14,10 +14,10 @@
 > port 介面定義見 [C3](C3-plugin-runtime.md) D1，`guild-events` plugin 消費見
 > [C8](C8-plugins.md) D1。此任務依賴 C3 D1 介面就緒。
 
-- [ ] `BaseBot` 將 `connectOneGuild` 與 command 註冊邏輯收斂為 guild-onboarding
+- [x] `BaseBot` 將 `connectOneGuild` 與 command 註冊邏輯收斂為 guild-onboarding
       port 的實作
-- [ ] 把 port 實作經容器註冊為 `TOKENS` 之一（供 plugin `ctx.resolve` 取得）
-- [ ] 補拓撲 / 生命週期測試，覆蓋經 port 的 `guildCreate` 初始化路徑
+- [x] 把 port 實作經容器註冊為 `TOKENS` 之一（供 plugin `ctx.resolve` 取得）
+- [x] 補拓撲 / 生命週期測試，覆蓋經 port 的 `guildCreate` 初始化路徑
 
 **驗收**：`BaseBot` 提供 port 實作；`guildCreate` 初始化不再依賴穿透
 `BaseBot` 內部結構。
@@ -28,8 +28,8 @@
 
 > `earthquake` plugin 實作見 [C8](C8-plugins.md) D2。此任務依賴 C8 D2 plugin 就緒。
 
-- [ ] `nijika` 改以 `this.use(createEarthquakePlugin(...))` 組裝
-- [ ] 移除 `src/bot/nijika/index.ts` 的 inline `app.listen()` 與
+- [x] `nijika` 改以 `this.use(createEarthquakePlugin(...))` 組裝
+- [x] 移除 `src/bot/nijika/index.ts` 的 inline `app.listen()` 與
       `r.post('/discord/earthquake', ...)` 路由
 
 **驗收**：`nijika/index.ts` 無 inline 地震路由；地震速報經 earthquake plugin
@@ -55,10 +55,10 @@
 > `ConnectionManager` 的 retry / `isDisabled` 主責見 [C5](C5-infra-adapters.md) D5。
 > 此任務依賴 C5 D5 的 `isDisabled(guildId)` 介面就緒。
 
-- [ ] `BaseBot.connectGuildDB` 移除自有的 `disabledGuilds` map 與 boot 時
+- [x] `BaseBot.connectGuildDB` 移除自有的 `disabledGuilds` map 與 boot 時
       catch-記錄邏輯
-- [ ] 改查 `ConnectionManager.isDisabled(...)` 作為 disabled 狀態來源
-- [ ] 確認 `BaseBot` 不再自持 `disabledGuilds`；C6 `requireGuildRepos` 改讀的
+- [x] 改查 `ConnectionManager.isDisabled(...)` 作為 disabled 狀態來源
+- [x] 確認 `BaseBot` 不再自持 `disabledGuilds`；C6 `requireGuildRepos` 改讀的
       來源（見 C6 D5）一致
 
 **驗收**：`BaseBot` 不再自持 `disabledGuilds`；disabled 狀態統一由

@@ -44,7 +44,10 @@
     "src/plugins/index.ts",
     "src/plugins/*/index.ts",
     "src/handlers/*/index.ts",
-    "test/fixtures/discord/*.ts"
+    "test/fixtures/discord/*.ts",
+    "src/events/earthquake.ts",
+    "src/events/guild_event.ts",
+    "src/events/index.ts"
   ],
   "rules": {
     "files": "error",

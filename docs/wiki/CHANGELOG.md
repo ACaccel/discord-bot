@@ -5,6 +5,33 @@
 
 ---
 
+## 2026-05-21 — C11 D1/D2/D5 落地（bot composition root 缺口收斂）
+
+- **元件**：C11 Bot Composition Roots
+- **缺口**：D1（C11 切片）、D2（C11 切片）、D5（C11 切片）
+- **變更**：
+  - **D1** — 新增 `src/bot/guild-onboarding.ts`：`BaseBotGuildOnboardingPort`
+    以 Adapter 模式實作 `core/plugin` 的 `GuildOnboardingPort`，收斂新加入
+    guild 的 `guildInfo` slot 初始化、`connectOneGuild` DB 連線、command
+    註冊。`BaseBot` 建構子將其註冊為 `TOKENS.GuildOnboardingPort`
+    singleton；`guildCreateListener` 改經 port 分流，不再呼叫 legacy
+    `detectGuildCreate`。
+  - **D2** — `nijika` 改以 `createEarthquakePlugin({ port })` 組裝地震速報；
+    `src/bot/nijika/index.ts` 移除 inline `express()` server、`app.listen()`
+    與 `r.post('/discord/earthquake', ...)` 路由。`Nijika` 建構子新增
+    `webhookPort` 參數，由 `index.ts` 以 `loadEnv({ requirePort: true })`
+    取得的 `Env.PORT` 傳入。
+  - **D5** — 移除 `BaseBot.disabledGuilds` 唯讀 getter（C6 切片完成後已無
+    消費端）；disabled 狀態統一由 `ConnectionManager` 提供，handler 端經
+    保留的 `BaseBot.connectionManager` getter 查詢。
+  - knip 設定將 `src/events/{earthquake,guild_event,index}.ts` 暫列 `ignore`：
+    D1/D2 吸收其行為後該目錄已成孤兒，待 D3（C8/C10）刪除目錄與 `@event`
+    alias 時一併移除此 ignore。
+- **影響**：行為等價。`guildCreateListener` 由 fire-and-forget 改為 `await`
+  port，DB 連線失敗改為經 `listen()` 的 `.catch(logError)` 落入結構化日誌
+  （原為浮動 promise），錯誤處理更穩健、對使用者行為無變。D4 子任務未處理
+  （依賴 C8 D4，延後）。
+
 ## 2026-05-21 — C6 D5/D7/D9 落地（handler 缺口收斂）
 
 - **元件**：C6 Handlers

@@ -1,22 +1,23 @@
-import { 
-    Client, 
-    GatewayIntentBits
+import {
+    Client,
+    GatewayIntentBits,
 } from 'discord.js';
-import dotenv from "dotenv";
-import express from 'express';
+import dotenv from 'dotenv';
 
-import { earthquake_warning } from '@event';
 import { Nijika } from './nijika';
 import config from './config.json';
 
-import { logError, logSystem } from '@core/logger';
 import { loadEnv } from '@core/config';
+
 dotenv.config({ path: './src/bot/nijika/.env' });
 
-const env = loadEnv();
+// `requirePort` makes env validation fail fast when `PORT` is absent —
+// nijika cannot run without it because the earthquake webhook plugin
+// needs a listening port.
+const env = loadEnv({ requirePort: true });
 
 // discord client
-const client: Client = new Client({ 
+const client: Client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
@@ -36,62 +37,22 @@ const client: Client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildScheduledEvents,
         GatewayIntentBits.AutoModerationConfiguration,
-        GatewayIntentBits.AutoModerationExecution
-    ] 
+        GatewayIntentBits.AutoModerationExecution,
+    ],
 });
+
+// `requirePort` above guarantees `env.PORT` is defined; the assertion
+// documents that invariant for the type checker.
 const nijika = new Nijika(
     client,
     env.TOKEN,
     env.MONGO_URI ?? '',
     env.CLIENT_ID,
-    config
+    config,
+    env.PORT as number,
 );
-nijika.run();
 
-// bot server
-const app = express();
-app.use(express.json());
-const r = express.Router();
-app.use('/discord', r)
-
-r.get('/', (_, res) => {
-    res.status(200).send('Hello World!');
-})
-
-r.post('/earthquake', (_, res) => {
-    logSystem(nijika.logger, nijika.clientId, 'Earthquake alert webhook received; broadcasting.');
-    // Webhook responds 200 immediately; the per-guild broadcast runs
-    // detached. The detached promise must NOT use `forEach(async)` —
-    // that drops every per-guild rejection on the floor. Wrap in a
-    // single async IIFE so failures inside any guild's send funnel into
-    // the structured logger (with the guild id) instead of becoming
-    // unhandledRejection. The outer try/catch is defence-in-depth: the
-    // per-guild map already catches its own errors, but a future await
-    // added BEFORE the .map() would otherwise reopen the
-    // unhandledRejection hole this code closes.
-    void (async () => {
-        try {
-            await Promise.all(
-                Object.entries(nijika.guildInfo).map(async ([guild_id, guild_info]) => {
-                    try {
-                        if (!guild_info.channels?.earthquake || !guild_info.roles?.earthquake) return;
-                        await earthquake_warning(
-                            guild_info.channels.earthquake,
-                            guild_info.roles.earthquake.id,
-                            nijika.translator,
-                        );
-                    } catch (err) {
-                        logError(nijika.logger, nijika.clientId, guild_id, err);
-                    }
-                }),
-            );
-        } catch (err) {
-            logError(nijika.logger, nijika.clientId, null, err);
-        }
-    })();
-    res.status(200).send('OK');
-})
-
-app.listen(env.PORT, () => {
-    logSystem(nijika.logger, nijika.clientId, `discord bot server is running on port ${env.PORT}`)
-});
+// Gap D2: the earthquake webhook server is no longer started inline
+// here — it is owned by the `earthquake` plugin's `start` hook (see
+// `Nijika`'s composition in `nijika.ts`).
+void nijika.run();
