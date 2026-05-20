@@ -75,6 +75,27 @@ A handful of legacy directories (`src/handlers/`, `src/plugins/`,
 the migrated layers. New code outside those legacy directories should
 land strict-compliant.
 
+### Required status checks
+
+Merging a PR into `refactor/architecture-overhaul` is gated by branch
+protection — all ten CI jobs must report success before the PR can
+merge:
+
+`lint`, `typecheck`, `typecheck-emit`, `test-unit`, `test-coverage`,
+`test-int`, `test-contract`, `knip`, `security`, and `analyze` (CodeQL).
+
+No human review is required on this integration branch; the status
+checks are the gate. This keeps the autonomous gap-remediation
+engineering (the `engineering-orchestrator` agent) able to open and
+merge PRs without a person in the loop, while still blocking any red
+gate. `yarn smoke` is a manual pre-deploy probe and is intentionally
+not a required check.
+
+Note: the `main` branch protection still lists two stale check
+contexts (`test-integration`, `audit`) that predate a CI job rename
+(now `test-int` and `security`); they must be corrected before work
+targets `main` again.
+
 ## Architectural rules
 
 The full list is in [`docs/high-level-design.md`](docs/high-level-design.md).

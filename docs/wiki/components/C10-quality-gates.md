@@ -8,8 +8,16 @@
 
 ## 現況
 
-待辦：D3 — `src/events/` 刪除後從 CJK scanner `SCOPED_DIRECTORIES` 移除之；D8 — strict tsconfig 涵蓋全 `src`。
+`refactor/architecture-overhaul` 已設 branch protection：全部 10 個 CI job
+（`lint`、`typecheck`、`typecheck-emit`、`test-unit`、`test-coverage`、
+`test-int`、`test-contract`、`knip`、`security`、`analyze`）為 required
+status check；`strict: false`、不要求人工 review。詳見設計檔 §2.8。
+
+待辦：D3 — `src/events/` 刪除後從 CJK scanner `SCOPED_DIRECTORIES` 移除之；
+D8 — strict tsconfig 涵蓋全 `src`。
 
 ## 近期變更
 
+- 2026-05-21 — `refactor/architecture-overhaul` 加上 branch protection，
+  10 個 CI job 設為 required status check（工程基礎建設）。
 - 2026-05-21 — 建立元件 wiki 頁（工程基礎建設）。

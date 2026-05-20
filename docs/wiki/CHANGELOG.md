@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-05-21 — 設定 required status check
+
+- **元件**：C10 Quality Gates
+- **缺口**：—
+- **變更**：為 `refactor/architecture-overhaul` 加上 branch protection，把全部
+  10 個 CI job 設為 required status check（`strict: false`、不要求人工 review）。
+  `CONTRIBUTING.md`「Quality gates」與 `docs/design/C10-quality-gates.md` §2.8
+  記載此政策；並指出 `main` 的 protection 仍有過時 check 名稱待修正。
+- **影響**：行為等價（無 `src/` 變更）。此後進 `refactor/architecture-overhaul`
+  的 PR 須 10 個 CI 閘門全綠才能合併。
+
 ## 2026-05-21 — 補齊 session 銜接入口
 
 - **元件**：工程基礎建設（非 C1–C11 任一）
