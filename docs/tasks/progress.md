@@ -26,7 +26,7 @@ proposal §5 宣稱已落地的 REQ 不再列為任務。
 ## 2. 元件完成度
 
 - [ ] [C1 — Core Infrastructure](C1-core-infrastructure.md) — D4 候選承接點評估（條件性）
-- [ ] [C2 — IoC Container](C2-ioc-container.md) — 無收斂任務
+- [x] [C2 — IoC Container](C2-ioc-container.md) — 無收斂任務
 - [ ] [C3 — Plugin Runtime](C3-plugin-runtime.md) — D1、D6
 - [ ] [C4 — Persistence](C4-persistence.md) — G-2（repository 邊界 `Result` 一致性）
 - [ ] [C5 — Infra Adapters](C5-infra-adapters.md) — D5

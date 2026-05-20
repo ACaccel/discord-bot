@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-05-21 — C3 D1 介面 + D6 落地
+
+- **元件**：C3 Plugin Runtime
+- **缺口**：D1（介面）、D6
+- **變更**：新增 `src/core/plugin/guild-onboarding-port.ts`（`GuildOnboardingPort`
+  介面）與 `TOKENS.GuildOnboardingPort`；抽出 `host/lifecycle.ts` 的
+  `PluginLifecycleRunner`（經窄介面 `LifecycleHost` 注入）；`cascadeDisable`
+  移入 `host/topology.ts` 成為純函式；`host.ts` 生命週期方法改為薄委派。
+- **影響**：行為等價——生命週期執行語意不變，僅結構重組。
+
 ## 2026-05-21 — 補上 auto-merge reconciliation 規則
 
 - **元件**：C10 Quality Gates / 工程團隊
