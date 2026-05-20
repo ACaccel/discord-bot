@@ -35,7 +35,7 @@ export const executeButton = async (interaction: ButtonInteraction, bot: BaseBot
     }
 
     // customId format: <button_type>|<button_value>
-    const button_type = interaction.customId.split('|')[0];
+    const button_type = interaction.customId.split('|')[0] ?? '';
     const handler = bot.buttonHandler.get(button_type);
     if (handler) {
         await handler.execute(interaction, bot);

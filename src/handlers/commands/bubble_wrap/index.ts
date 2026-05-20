@@ -30,37 +30,39 @@ export default class bubble_wrap extends Command {
     }
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
-        const inner_str = interaction.options.get("str")?.value as string;
+        const inner_str = (interaction.options.get("str")?.value as string | undefined) ?? '';
         const side_len = 7;
-        const total_cells = side_len * side_len;
         if (inner_str.length > side_len * side_len) {
             await interaction.reply({ content: bot.translator?.t('replies:bubble_wrap.too_long') ?? '' });
             return;
         }
 
         // random permutation of places
-        const places = Array.from({ length: side_len * side_len }, (_, i) => i);
+        const places: number[] = Array.from({ length: side_len * side_len }, (_, i) => i);
         for (let i = places.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [places[i], places[j]] = [places[j], places[i]];
+            // Indices i and j are within bounds by loop construction.
+            const tmp = places[i] as number;
+            places[i] = places[j] as number;
+            places[j] = tmp;
         }
 
         // fill the board with the inner_str
-        const board = Array(side_len * side_len).fill("||<:blank:1082500408838205540>||");
-        
+        const board: string[] = Array(side_len * side_len).fill("||<:blank:1082500408838205540>||");
+
         for (let i = 0; i < inner_str.length; i++) {
-            const char = inner_str[i];
-            
-            //modify width 
-        
+            const char = inner_str[i] as string;
+
+            //modify width
+
             let displayChar = char;
             if (this.getVisualWidth(char) === 1) {
-                displayChar = `  ${char}  `; 
+                displayChar = `  ${char}  `;
             }else{
                 displayChar = ` ${char} `;
             }
-            
-            board[places[i]] = "||" + displayChar + "||";
+
+            board[places[i] as number] = "||" + displayChar + "||";
         }
 
         // create the string representation of the board

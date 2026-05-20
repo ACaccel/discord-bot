@@ -101,7 +101,7 @@ export default class roll_call extends Command {
                     return;
                 }
         
-                const userIds = Array.from(users.matchAll(/<@(\d+)>/g)).map(match => match[1]);
+                const userIds = Array.from(users.matchAll(/<@(\d+)>/g)).map(match => match[1] as string);
                 for (const userId of userIds) {
                     const user = interaction.guild?.members.cache.get(userId);
                     if (!user) {

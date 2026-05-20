@@ -40,7 +40,7 @@ export default class update_role extends Command {
             }
 
             const leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
-            const guild = bot.guildInfo[interaction.guild?.id as string].guild;
+            const guild = bot.guildInfo[interaction.guild?.id as string]!.guild;
             const channel = interaction.channel;
             if (!channel?.isSendable()) return;
             // let alive_role = guild.roles.cache.find(role => role.name === "活人");
@@ -61,8 +61,8 @@ export default class update_role extends Command {
                 // find corresponding role
                 let roleToAssign = "";
                 for (const roleLevel in botConfig.level_roles) {
-                    if (level >= parseInt(roleLevel.split('_')[1])) {
-                        roleToAssign = botConfig.level_roles[roleLevel];
+                    if (level >= parseInt(roleLevel.split('_')[1] ?? '0')) {
+                        roleToAssign = botConfig.level_roles[roleLevel] ?? '';
                     } else {
                         break;
                     }
@@ -78,7 +78,7 @@ export default class update_role extends Command {
                     
                     if (guildMember.roles.cache.has(removedRole.id) && removedRole.name !== roleToAssign) {
                         await guildMember.roles.remove(removedRole);
-                        await channel.send(bot.translator?.t('replies:update_role.removed', { name: guildMember.user.displayName, role: botConfig.level_roles[roleLevel] }) ?? '');
+                        await channel.send(bot.translator?.t('replies:update_role.removed', { name: guildMember.user.displayName, role: botConfig.level_roles[roleLevel] ?? '' }) ?? '');
                     }
                 }
                 if (addedRole && !hasRoleToAssign) {

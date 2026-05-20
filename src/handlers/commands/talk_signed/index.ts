@@ -1,6 +1,5 @@
 import type {
-    ChatInputCommandInteraction,
-    Guild} from 'discord.js';
+    ChatInputCommandInteraction} from 'discord.js';
 import {
     MessageFlags,
 } from 'discord.js';
@@ -37,7 +36,6 @@ export default class talk_signed extends Command {
             }
             
             // check existance of channel and member
-            const guild = interaction.guild as Guild;
             const channel = interaction.channel;
             if (!channel?.isSendable()) {
                 await interaction.reply({ content: bot.translator?.t('errors:command.channel_not_sendable') ?? '', flags: MessageFlags.Ephemeral });

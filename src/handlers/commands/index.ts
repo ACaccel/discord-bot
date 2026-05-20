@@ -3,11 +3,6 @@ import type {
     ChatInputCommandInteraction,
     ContextMenuCommandInteraction,
     ContextMenuCommandType} from 'discord.js';
-import {
-    REST,
-    Routes,
-    RateLimitData,
-} from 'discord.js';
 import type { BaseBot } from "@bot";
 import { bot_cmd } from "@utils";
 import { ops } from "../../core/logger";

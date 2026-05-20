@@ -25,11 +25,11 @@
 
 ## D8 — strict tsconfig 涵蓋全 `src`（P1）
 
-- [ ] 逐步把 `src/infra/discord/**`、`src/plugins/**`、`src/handlers/**`、
+- [x] 逐步把 `src/infra/discord/**`、`src/plugins/**`、`src/handlers/**`、
       `src/bot/**` 加入 `tsconfig.strict.json` 的 `include`
-- [ ] 每納入一個子樹，掃除 `any` escape，改 `unknown` + narrowing；intentional
+- [x] 每納入一個子樹，掃除 `any` escape，改 `unknown` + narrowing；intentional
       處加註記
-- [ ] `yarn typecheck` 確認全綠
+- [x] `yarn typecheck` 確認全綠
 
 **驗收**：`tsconfig.strict.json` 的 `include` 涵蓋全 `src`；`any` / `as any`
 降至個位數（intentional 處加註記）。

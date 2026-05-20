@@ -139,7 +139,7 @@ export default class inspect_member_ids extends Command {
             const t: TFn = (key, params) => bot.translator?.t(key, params) ?? '';
 
             for (let i = 0; i < ids.length; i++) {
-                const id = ids[i];
+                const id = ids[i] as string;
                 const member = await guild.members.fetch(id).catch(() => null);
                 const fetchedUser = member?.user || await bot.client.users.fetch(id).catch(() => null);
                 const user = fetchedUser ? await fetchedUser.fetch(true).catch(() => fetchedUser) : null;

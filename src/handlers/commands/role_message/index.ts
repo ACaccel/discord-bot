@@ -49,7 +49,7 @@ export default class role_message extends Command {
                 return;
             }
             // Extract role IDs from mentions
-            const roleIds = Array.from(roles.matchAll(/<@&(\d+)>/g)).map(match => match[1]);
+            const roleIds = Array.from(roles.matchAll(/<@&(\d+)>/g)).map(match => match[1] as string);
             const validRoles: Role[] = [];
             for (const roleId of roleIds) {
                 const role = guild.roles.cache.get(roleId);

@@ -73,7 +73,8 @@ export default class todo_list extends Command {
                 if (parseInt(content) > todoList.length) {
                     await interaction.editReply({ content: bot.translator?.t('replies:todo_list.not_found', { content }) ?? '' });
                 } else {
-                    const deleted_content = todoList[parseInt(content) - 1].content;
+                    // Index is in bounds: the `> todoList.length` guard above rejects out-of-range input.
+                    const deleted_content = todoList[parseInt(content) - 1]!.content;
                     await todos.deleteByContent(deleted_content);
                     await interaction.editReply({ content: bot.translator?.t('replies:todo_list.deleted', { content: deleted_content }) ?? '' });
                 }

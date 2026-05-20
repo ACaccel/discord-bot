@@ -42,7 +42,7 @@ export default class level_detail extends Command {
                 let content = "";
                 const leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
     
-                leaderboard.slice(left - 1, right).forEach((e, i) => {
+                leaderboard.slice(left - 1, right).forEach((e) => {
                     const averageXp = (e.xp.totalXp / e.messageCount).toPrecision(6);
                     content += `> **${e.rank} - ${e.username}﹝Level ${e.level}﹞**\n`;
                     content += bot.translator?.t('replies:level_detail.message_count', { count: e.messageCount }) ?? '';

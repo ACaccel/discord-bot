@@ -9,8 +9,8 @@ import { requireGuildRepos } from '../../require-guild-repos';
 
 export default class delete_reply extends SSMHandler {
     public override async execute(interaction: StringSelectMenuInteraction, bot: BaseBot): Promise<void> {
-        const key = interaction.customId.split('|')[1];
-        const value = interaction.values[0];
+        const key = interaction.customId.split('|')[1] ?? '';
+        const value = interaction.values[0] ?? '';
 
         const repos = await requireGuildRepos(bot, interaction);
         if (repos === null) return;

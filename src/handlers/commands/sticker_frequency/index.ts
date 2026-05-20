@@ -117,7 +117,7 @@ export default class sticker_frequency extends Command {
             // create a preview image
             const canvasContent: misc.CanvasContent[] = [];
             for (let i = 0; i < sortedStickers.length; i++) {
-                const [stickerName, count] = sortedStickers[i];
+                const [stickerName, count] = sortedStickers[i] as [string, number];
                 const sticker = guild.stickers.cache.find(s => s.name === stickerName);
                 if (sticker) {
                     canvasContent.push({

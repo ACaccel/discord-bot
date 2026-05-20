@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-05-21 — C10 D8 落地（strict tsconfig 涵蓋全 src）
+
+- **元件**：C10 Quality Gates
+- **缺口**：D8
+- **變更**：`tsconfig.strict.json` 的 `include` 改為 `src/**/*`，並補入 path
+  alias。掃除 `src/handlers/` 在 strict 模式下的 `noUncheckedIndexedAccess` /
+  `noUnusedParameters` / 未使用 import 違規。
+- **影響**：行為等價——handler 邏輯不變，僅補 narrowing 與移除死碼。
+
 ## 2026-05-21 — C8 D2（earthquake plugin）+ G-1 落地
 
 - **元件**：C8 Plugins

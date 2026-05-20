@@ -92,7 +92,7 @@ export default class list_guild_members extends Command {
 
             const firstEmbed = new EmbedBuilder()
                 .setTitle(title)
-                .setDescription(chunks[0])
+                .setDescription(chunks[0] ?? null)
                 .setColor(0x5865F2)
                 .setFooter({ text: t('replies:list_guild_members.footer', { totalText, current: 1, total: chunks.length }) });
 
@@ -101,7 +101,7 @@ export default class list_guild_members extends Command {
             for (let i = 1; i < chunks.length; i++) {
                 const pageEmbed = new EmbedBuilder()
                     .setTitle(title)
-                    .setDescription(chunks[i])
+                    .setDescription(chunks[i] ?? null)
                     .setColor(0x5865F2)
                     .setFooter({ text: t('replies:list_guild_members.footer', { totalText, current: i + 1, total: chunks.length }) });
 

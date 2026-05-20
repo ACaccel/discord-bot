@@ -147,7 +147,7 @@ export default class emoji_frequency extends Command {
                 : t('replies:emoji_frequency.kind_static');
             let content = t('replies:emoji_frequency.header', { months: last_n_months, direction, top: top_n, kind });
             for (let i = 0; i < sortedEmojis.length; i++) {
-                const [emoji, _] = sortedEmojis[i];
+                const [emoji] = sortedEmojis[i] as [string, number];
                 content += t('replies:emoji_frequency.line', {
                     rank: i + 1,
                     emoji,

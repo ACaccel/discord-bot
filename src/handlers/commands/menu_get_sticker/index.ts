@@ -51,8 +51,8 @@ export default class menu_get_sticker extends Command {
 
             if (emojiMatch) {
                 const isAnimated = content.startsWith("<a:");
-                const emojiName = emojiMatch[1];
-                const emojiId = emojiMatch[2];
+                const emojiName = emojiMatch[1] as string;
+                const emojiId = emojiMatch[2] as string;
                 const emojiUrl = isAnimated 
                     ? `https://cdn.discordapp.com/emojis/${emojiId}.gif`
                     : `https://cdn.discordapp.com/emojis/${emojiId}.png`;
