@@ -23,7 +23,10 @@ export default class ai_status extends Command {
         if (repos === null) return;
 
         try {
-            const doc = await repos.userApiSetting.findByUserId(userId);
+            // G-2: an `err` is re-thrown into the surrounding catch.
+            const docResult = await repos.userApiSetting.findByUserId(userId);
+            if (!docResult.ok) throw docResult.error;
+            const doc = docResult.value;
 
             if (!doc) {
                 await interaction.editReply({ content: bot.translator?.t('errors:ai.not_whitelisted') ?? '' });

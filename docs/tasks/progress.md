@@ -28,7 +28,7 @@ proposal §5 宣稱已落地的 REQ 不再列為任務。
 - [ ] [C1 — Core Infrastructure](C1-core-infrastructure.md) — D4 候選承接點評估（條件性）
 - [x] [C2 — IoC Container](C2-ioc-container.md) — 無收斂任務
 - [x] [C3 — Plugin Runtime](C3-plugin-runtime.md) — D1（介面）、D6 ✅
-- [ ] [C4 — Persistence](C4-persistence.md) — G-2（repository 邊界 `Result` 一致性）
+- [x] [C4 — Persistence](C4-persistence.md) — G-2（repository 邊界 `Result` 一致性）✅
 - [ ] [C5 — Infra Adapters](C5-infra-adapters.md) — D5
 - [ ] [C6 — Handlers](C6-handlers.md) — D5、D7、D9
 - [x] [C7 — i18n Catalog](C7-i18n-catalog.md) — D7 ✅、D9 ✅
@@ -57,7 +57,7 @@ proposal §5 宣稱已落地的 REQ 不再列為任務。
 | D8   | strict tsconfig 未涵蓋 `src/bot`、`src/handlers`  | P1     | C10                                                   | OPEN                  |
 | D9   | handler 不直接 catch `DomainError`                | P2     | C6（helper）、C7（文案語氣）                          | DECIDED 方案 B        |
 | G-1  | giveaway/activity `msgReact` 用 `console.error`   | P3     | C8                                                    | OPEN                  |
-| G-2  | repository 邊界 `Result` 一致性（任務劃分時新增） | P2     | C4（主）、C5（error-translator 落點協調）             | DECIDED 方案 Y        |
+| G-2  | repository 邊界 `Result` 一致性（任務劃分時新增） | P2     | C4（主）、C5（error-translator 落點協調）             | DONE 方案 Y           |
 
 ---
 

@@ -33,7 +33,10 @@ export default class list_reply extends Command {
             const keyword = interaction.options.get("keyword")?.value as string;
             const repos = await requireGuildRepos(bot, interaction);
             if (repos === null) return;
-            const replyList = await repos.reply.findByInput(keyword);
+            // G-2: an `err` is re-thrown into the surrounding catch.
+            const replyListResult = await repos.reply.findByInput(keyword);
+            if (!replyListResult.ok) throw replyListResult.error;
+            const replyList = replyListResult.value;
             if (replyList.length === 0) {
                 await interaction.editReply({ content: bot.translator?.t('replies:list_reply.not_found', { keyword }) ?? '' });
             } else {

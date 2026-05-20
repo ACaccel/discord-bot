@@ -109,8 +109,12 @@ export const findActivity = async (deps: ActivityDeps, guild_id: string, activit
   if (!guild) return false;
   const repos = deps.registry.getRepos(guild_id);
   if (!repos) return false;
-  const activity = await repos.activity.findByActivityId(activity_id);
-  return activity !== undefined && activity !== null;
+  // G-2: repo methods return Result<T, DatabaseError>. An `err` is
+  // re-thrown so the caller's surrounding catch handles it exactly as
+  // the pre-G-2 raw-error propagation did.
+  const result = await repos.activity.findByActivityId(activity_id);
+  if (!result.ok) throw result.error;
+  return result.value !== undefined && result.value !== null;
 };
 
 export const scheduleActivity = async (
@@ -123,7 +127,10 @@ export const scheduleActivity = async (
   const repos = deps.registry.getRepos(guild_id);
   if (!repos) return 'Database not found';
 
-  const activity = await repos.activity.findByActivityId(activity_id);
+  // G-2: an `err` is re-thrown for the caller's surrounding catch.
+  const activityResult = await repos.activity.findByActivityId(activity_id);
+  if (!activityResult.ok) throw activityResult.error;
+  const activity = activityResult.value;
   if (!activity) return 'Activity not found';
   const activityChannel = guild.channels.cache.get(activity.channel_id);
   if (!activityChannel?.isSendable()) return 'Activity channel not found';
@@ -146,7 +153,8 @@ export const scheduleActivity = async (
   }
   const participantsArray = participantsMembers.map((m) => m.id);
 
-  await repos.activity.setParticipants(activity_id, participantsArray);
+  const setResult = await repos.activity.setParticipants(activity_id, participantsArray);
+  if (!setResult.ok) throw setResult.error;
 
   const t = bindTranslator(deps.translator);
   const resultContent =
@@ -170,7 +178,9 @@ export const deleteActivity = async (deps: ActivityDeps, guild_id: string, activ
   if (!repos) return 'Database not found';
 
   new JobManager(deps.jobMap).cancel(activityJobKey(activity_id));
-  await repos.activity.deleteByActivityId(activity_id);
+  // G-2: an `err` is re-thrown for the caller's surrounding catch.
+  const deleteResult = await repos.activity.deleteByActivityId(activity_id);
+  if (!deleteResult.ok) throw deleteResult.error;
   return null;
 };
 
@@ -203,7 +213,14 @@ export const rebootActivityJobs = async (deps: ActivityDeps): Promise<void> => {
       try {
         const repos = deps.registry.getRepos(guildId);
         if (!repos) return;
-        const activities = await rebootRetry(() => repos.activity.listAll());
+        // G-2: listAll returns Result<T, DatabaseError>. Throw the `err`
+        // inside the retried op so `rebootRetry`'s backoff still treats a
+        // transient DB failure as retryable, exactly as before G-2.
+        const activities = await rebootRetry(async () => {
+          const result = await repos.activity.listAll();
+          if (!result.ok) throw result.error;
+          return result.value;
+        });
         for (const a of activities) {
           try {
             const expired_at = new Date(a.expired_at);

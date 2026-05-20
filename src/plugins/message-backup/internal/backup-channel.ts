@@ -62,9 +62,15 @@ export const backupChannel = async (
   };
 
   try {
-    let fetchRecord = await repos.fetch.findByChannelId(ch.id);
+    // G-2: repo methods return Result<T, DatabaseError>. An `err` is
+    // re-thrown so the channel-level catch records it on `stats.error`.
+    const fetchRecordResult = await repos.fetch.findByChannelId(ch.id);
+    if (!fetchRecordResult.ok) throw fetchRecordResult.error;
+    let fetchRecord = fetchRecordResult.value;
     if (fetchRecord === undefined) {
-      fetchRecord = await repos.fetch.create(ch.name ?? '', ch.id, '');
+      const createResult = await repos.fetch.create(ch.name ?? '', ch.id, '');
+      if (!createResult.ok) throw createResult.error;
+      fetchRecord = createResult.value;
     }
     const lastMessageID = fetchRecord.lastMessageID ?? '';
     let latestMessageId: string | undefined;
@@ -131,7 +137,12 @@ export const backupChannel = async (
     }
 
     if (latestMessageId !== undefined) {
-      await repos.fetch.upsertLastMessageID(ch.name ?? '', ch.id, latestMessageId);
+      const upsertResult = await repos.fetch.upsertLastMessageID(
+        ch.name ?? '',
+        ch.id,
+        latestMessageId,
+      );
+      if (!upsertResult.ok) throw upsertResult.error;
     }
     stats.startMsgId = globalOldest?.id;
     stats.startMsgContent = globalOldest?.content;

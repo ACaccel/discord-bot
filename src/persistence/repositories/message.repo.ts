@@ -11,18 +11,25 @@
  * the raw stored shape; rebranding the embedded id fields is a Phase 4
  * concern when domain-doc types land alongside the plugin layer.
  *
- * **Error wrapping (Phase 3)**: mongoose errors are translated into
- * typed `DatabaseError` instances by the shared `databaseErrorFrom`
- * translator in `infra/mongo/error-translator.ts`. Callers see typed
- * errors with stable sub-codes (`DATABASE_DUPLICATE_KEY`,
- * `DATABASE_TIMEOUT`, ...), the original mongoose error preserved on
- * `cause`, and a `context.operation` field naming the failing repo
- * method. Programmer errors (TypeError from input validation) still
- * bubble unwrapped — they are not a domain failure mode.
+ * **Error boundary (gap G-2)**: every method returns
+ * `Result<T, DatabaseError>`. A mongoose failure is translated by the
+ * shared `databaseErrorFrom` translator (`persistence/error-translator`)
+ * and returned as `err(DatabaseError)` — the typed error carries a
+ * stable sub-code (`DATABASE_DUPLICATE_KEY`, `DATABASE_TIMEOUT`, ...),
+ * the original mongoose error on `cause`, and a `context.operation`
+ * naming the failing repo method. Two distinct exits coexist:
+ *   - `err(DatabaseError)` — a domain failure (the DB query failed).
+ *   - a thrown `TypeError` — a programmer error (contract violation
+ *     such as a non-positive `limit`). Contract violations are not a
+ *     domain failure mode, so they bubble unwrapped and never enter a
+ *     `Result`.
+ * A "not found" lookup is a success: `ok(undefined)`, not `err`.
  */
 import type { ChannelId } from '../../core/ids';
+import { err, ok, type Result } from '../../core/result';
+import type { DatabaseError } from '../../core/errors/external-service-error';
 import type { GuildConnection } from '../../infra/mongo/connection-manager';
-import { databaseErrorFrom } from '../../infra/mongo/error-translator';
+import { databaseErrorFrom } from '../error-translator';
 import type { MessageDoc } from '../schemas/message.schema';
 
 export interface InsertResult {
@@ -34,36 +41,46 @@ export interface InsertResult {
 
 export interface MessageRepo {
   /** Total document count for this guild. Used by msg-archive metrics. */
-  countAll(): Promise<number>;
+  countAll(): Promise<Result<number, DatabaseError>>;
 
   /**
    * Recent messages from a single channel, newest first. `limit` clamps
-   * the result; pass a positive integer.
+   * the result; pass a positive integer (a non-positive or non-integer
+   * `limit` is a programmer error and throws `TypeError`).
    */
-  findRecentByChannel(channelId: ChannelId, limit: number): Promise<readonly MessageDoc[]>;
+  findRecentByChannel(
+    channelId: ChannelId,
+    limit: number,
+  ): Promise<Result<readonly MessageDoc[], DatabaseError>>;
 
   /**
-   * Look up a single message by its Discord id. Returns `undefined` when
-   * not stored — `noUncheckedIndexedAccess` makes undefined the
-   * project-wide "absent" return shape.
+   * Look up a single message by its Discord id. A missing message is a
+   * success — `ok(undefined)`, with `undefined` the project-wide
+   * "absent" shape under `noUncheckedIndexedAccess`.
    */
-  findByMessageId(messageId: string): Promise<MessageDoc | undefined>;
+  findByMessageId(messageId: string): Promise<Result<MessageDoc | undefined, DatabaseError>>;
 
   /**
    * Bulk insert with duplicate-key tolerance — the underlying call is
    * `insertMany(docs, { ordered: false })` so a duplicate `messageId`
-   * does not abort the batch. Returns counts so callers can advance
-   * progress markers without re-counting.
+   * does not abort the batch. A `BulkWriteError` carrying `insertedDocs`
+   * is the expected partial-success path and resolves to `ok`; any
+   * other Mongo error resolves to `err`.
    */
-  insertManyIgnoringDuplicates(docs: readonly MessageDoc[]): Promise<InsertResult>;
+  insertManyIgnoringDuplicates(
+    docs: readonly MessageDoc[],
+  ): Promise<Result<InsertResult, DatabaseError>>;
 
   /**
    * Messages whose `timestamp` falls within `[startMs, endMs)`, across
    * every channel in this guild. Used by the sticker/emoji-frequency
    * metrics commands that walk a month at a time. `startMs` / `endMs`
-   * are millisecond epochs.
+   * are millisecond epochs; an invalid window throws `TypeError`.
    */
-  findByTimestampRange(startMs: number, endMs: number): Promise<readonly MessageDoc[]>;
+  findByTimestampRange(
+    startMs: number,
+    endMs: number,
+  ): Promise<Result<readonly MessageDoc[], DatabaseError>>;
 
   /**
    * Messages from a single channel whose `timestamp` falls within
@@ -74,7 +91,7 @@ export interface MessageRepo {
     channelId: ChannelId,
     startMs: number,
     endMs: number,
-  ): Promise<readonly MessageDoc[]>;
+  ): Promise<Result<readonly MessageDoc[], DatabaseError>>;
 
   /**
    * Subset of `messageIds` that are already stored in this guild's
@@ -85,27 +102,30 @@ export interface MessageRepo {
    * known (the steady-state condition for an incremental backup).
    * Returns a Set so callers can do `O(1)` membership checks.
    */
-  findExistingMessageIds(messageIds: readonly string[]): Promise<ReadonlySet<string>>;
+  findExistingMessageIds(
+    messageIds: readonly string[],
+  ): Promise<Result<ReadonlySet<string>, DatabaseError>>;
 }
 
 /** Mongoose-backed implementation. */
 export class MongoMessageRepo implements MessageRepo {
   constructor(private readonly conn: GuildConnection) {}
 
-  public async countAll(): Promise<number> {
+  public async countAll(): Promise<Result<number, DatabaseError>> {
     try {
-      return await this.conn.models.Message.countDocuments({}).exec();
-    } catch (err: unknown) {
-      throw databaseErrorFrom(err, { operation: 'MongoMessageRepo.countAll' });
+      return ok(await this.conn.models.Message.countDocuments({}).exec());
+    } catch (rawErr: unknown) {
+      return err(databaseErrorFrom(rawErr, { operation: 'MongoMessageRepo.countAll' }));
     }
   }
 
   public async findRecentByChannel(
     channelId: ChannelId,
     limit: number,
-  ): Promise<readonly MessageDoc[]> {
+  ): Promise<Result<readonly MessageDoc[], DatabaseError>> {
     if (!Number.isInteger(limit) || limit <= 0) {
-      // Programmer error — not a domain failure mode. Bubble unwrapped.
+      // Programmer error — not a domain failure mode. Bubble unwrapped,
+      // never wrap into a Result.
       throw new TypeError(
         `MongoMessageRepo.findRecentByChannel: limit must be a positive integer, got ${limit}`,
       );
@@ -118,65 +138,75 @@ export class MongoMessageRepo implements MessageRepo {
         .limit(limit)
         .lean<MessageDoc[]>()
         .exec();
-      return docs;
-    } catch (err: unknown) {
-      throw databaseErrorFrom(err, {
-        operation: 'MongoMessageRepo.findRecentByChannel',
-        input: { channelId: String(channelId), limit },
-      });
+      return ok(docs);
+    } catch (rawErr: unknown) {
+      return err(
+        databaseErrorFrom(rawErr, {
+          operation: 'MongoMessageRepo.findRecentByChannel',
+          input: { channelId: String(channelId), limit },
+        }),
+      );
     }
   }
 
-  public async findByMessageId(messageId: string): Promise<MessageDoc | undefined> {
+  public async findByMessageId(
+    messageId: string,
+  ): Promise<Result<MessageDoc | undefined, DatabaseError>> {
     try {
       const doc = await this.conn.models.Message.findOne({ messageId }).lean<MessageDoc>().exec();
-      return doc ?? undefined;
-    } catch (err: unknown) {
-      throw databaseErrorFrom(err, {
-        operation: 'MongoMessageRepo.findByMessageId',
-        input: { messageId },
-      });
+      return ok(doc ?? undefined);
+    } catch (rawErr: unknown) {
+      return err(
+        databaseErrorFrom(rawErr, {
+          operation: 'MongoMessageRepo.findByMessageId',
+          input: { messageId },
+        }),
+      );
     }
   }
 
-  public async insertManyIgnoringDuplicates(docs: readonly MessageDoc[]): Promise<InsertResult> {
+  public async insertManyIgnoringDuplicates(
+    docs: readonly MessageDoc[],
+  ): Promise<Result<InsertResult, DatabaseError>> {
     if (docs.length === 0) {
-      return { inserted: 0, duplicates: 0 };
+      return ok({ inserted: 0, duplicates: 0 });
     }
     try {
       const inserted = await this.conn.models.Message.insertMany([...docs], {
         ordered: false,
       });
-      return { inserted: inserted.length, duplicates: docs.length - inserted.length };
-    } catch (err: unknown) {
+      return ok({ inserted: inserted.length, duplicates: docs.length - inserted.length });
+    } catch (rawErr: unknown) {
       // Mongoose throws BulkWriteError on duplicate-key conflicts; the
       // partial-success count is on `err.insertedDocs`. That is the
-      // *expected* path for this method's contract — return success
+      // *expected* path for this method's contract — resolve to `ok`
       // with the partial count rather than translating to DatabaseError.
-      // Any other error shape is genuinely abnormal and is wrapped.
+      // Any other error shape is genuinely abnormal and resolves to `err`.
       if (
-        typeof err === 'object' &&
-        err !== null &&
-        'insertedDocs' in err &&
-        Array.isArray((err as { insertedDocs: unknown }).insertedDocs)
+        typeof rawErr === 'object' &&
+        rawErr !== null &&
+        'insertedDocs' in rawErr &&
+        Array.isArray((rawErr as { insertedDocs: unknown }).insertedDocs)
       ) {
-        const insertedDocs = (err as { insertedDocs: readonly unknown[] }).insertedDocs;
-        return {
+        const insertedDocs = (rawErr as { insertedDocs: readonly unknown[] }).insertedDocs;
+        return ok({
           inserted: insertedDocs.length,
           duplicates: docs.length - insertedDocs.length,
-        };
+        });
       }
-      throw databaseErrorFrom(err, {
-        operation: 'MongoMessageRepo.insertManyIgnoringDuplicates',
-        input: { batchSize: docs.length },
-      });
+      return err(
+        databaseErrorFrom(rawErr, {
+          operation: 'MongoMessageRepo.insertManyIgnoringDuplicates',
+          input: { batchSize: docs.length },
+        }),
+      );
     }
   }
 
   public async findByTimestampRange(
     startMs: number,
     endMs: number,
-  ): Promise<readonly MessageDoc[]> {
+  ): Promise<Result<readonly MessageDoc[], DatabaseError>> {
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) {
       throw new TypeError(
         `MongoMessageRepo.findByTimestampRange: invalid window [${startMs}, ${endMs})`,
@@ -196,17 +226,21 @@ export class MongoMessageRepo implements MessageRepo {
       })
         .lean<MessageDoc[]>()
         .exec();
-      return docs;
-    } catch (err: unknown) {
-      throw databaseErrorFrom(err, {
-        operation: 'MongoMessageRepo.findByTimestampRange',
-        input: { startMs, endMs },
-      });
+      return ok(docs);
+    } catch (rawErr: unknown) {
+      return err(
+        databaseErrorFrom(rawErr, {
+          operation: 'MongoMessageRepo.findByTimestampRange',
+          input: { startMs, endMs },
+        }),
+      );
     }
   }
 
-  public async findExistingMessageIds(messageIds: readonly string[]): Promise<ReadonlySet<string>> {
-    if (messageIds.length === 0) return new Set<string>();
+  public async findExistingMessageIds(
+    messageIds: readonly string[],
+  ): Promise<Result<ReadonlySet<string>, DatabaseError>> {
+    if (messageIds.length === 0) return ok(new Set<string>());
     try {
       const docs = await this.conn.models.Message.find(
         { messageId: { $in: [...messageIds] } },
@@ -214,12 +248,14 @@ export class MongoMessageRepo implements MessageRepo {
       )
         .lean<Array<{ messageId: string }>>()
         .exec();
-      return new Set(docs.map((d) => d.messageId));
-    } catch (err: unknown) {
-      throw databaseErrorFrom(err, {
-        operation: 'MongoMessageRepo.findExistingMessageIds',
-        input: { count: messageIds.length },
-      });
+      return ok(new Set(docs.map((d) => d.messageId)));
+    } catch (rawErr: unknown) {
+      return err(
+        databaseErrorFrom(rawErr, {
+          operation: 'MongoMessageRepo.findExistingMessageIds',
+          input: { count: messageIds.length },
+        }),
+      );
     }
   }
 
@@ -227,7 +263,7 @@ export class MongoMessageRepo implements MessageRepo {
     channelId: ChannelId,
     startMs: number,
     endMs: number,
-  ): Promise<readonly MessageDoc[]> {
+  ): Promise<Result<readonly MessageDoc[], DatabaseError>> {
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) {
       throw new TypeError(
         `MongoMessageRepo.findByChannelAndTimestampRange: invalid window [${startMs}, ${endMs})`,
@@ -246,12 +282,14 @@ export class MongoMessageRepo implements MessageRepo {
         .sort({ timestamp: 1 })
         .lean<MessageDoc[]>()
         .exec();
-      return docs;
-    } catch (err: unknown) {
-      throw databaseErrorFrom(err, {
-        operation: 'MongoMessageRepo.findByChannelAndTimestampRange',
-        input: { channelId: String(channelId), startMs, endMs },
-      });
+      return ok(docs);
+    } catch (rawErr: unknown) {
+      return err(
+        databaseErrorFrom(rawErr, {
+          operation: 'MongoMessageRepo.findByChannelAndTimestampRange',
+          input: { channelId: String(channelId), startMs, endMs },
+        }),
+      );
     }
   }
 }

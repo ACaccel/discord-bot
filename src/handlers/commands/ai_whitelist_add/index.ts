@@ -39,18 +39,22 @@ export default class ai_whitelist_add extends Command {
         if (repos === null) return;
 
         try {
-            const existing = await repos.userApiSetting.findByUserId(target.id);
-            if (existing) {
+            // G-2: repo methods return Result<T, DatabaseError>; an
+            // `err` is re-thrown into the surrounding catch.
+            const existingResult = await repos.userApiSetting.findByUserId(target.id);
+            if (!existingResult.ok) throw existingResult.error;
+            if (existingResult.value) {
                 await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.already_in', { user: target.displayName }) ?? '' });
                 return;
             }
-            await repos.userApiSetting.create(target.id, {
+            const createResult = await repos.userApiSetting.create(target.id, {
                 provider: 'openai',
                 model: DEFAULT_MODELS['openai'],
                 temperature: 1.0,
                 system_prompt: '',
                 web_search: false,
             });
+            if (!createResult.ok) throw createResult.error;
             await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.added', { user: target.displayName }) ?? '' });
         } catch (err) {
             logError(bot.logger, bot.clientId, interaction.guildId, err);

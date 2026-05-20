@@ -190,11 +190,14 @@ export default class db_list_message extends Command {
 
             const { startMs, endMs } = range;
 
-            const messages = (await repos.message.findByChannelAndTimestampRange(
+            // G-2: an `err` is re-thrown into the surrounding catch.
+            const messagesResult = await repos.message.findByChannelAndTimestampRange(
                 channel.id as ChannelId,
                 startMs,
                 endMs,
-            )) as unknown as DbMessage[];
+            );
+            if (!messagesResult.ok) throw messagesResult.error;
+            const messages = messagesResult.value as unknown as DbMessage[];
 
             if (messages.length === 0) {
                 const scopeText = hour === null || hour === undefined

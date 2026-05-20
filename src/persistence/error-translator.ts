@@ -2,10 +2,12 @@
  * Translate raw mongoose / MongoDB driver errors into typed
  * {@link DatabaseError} instances.
  *
- * Lives in `infra/mongo` (not `core/errors`) so that `core/` stays
- * free of mongoose imports — the boundary is upheld at the type
- * level by the layer contract and at the import-graph level by
- * convention.
+ * Lives in `persistence/` (not `core/errors`, and no longer in
+ * `infra/mongo`) so that `core/` stays free of mongoose imports and
+ * the seven repositories can reach the translator without an upward
+ * import into `infra/mongo` (gap G-2). The translation here is pure
+ * string-shape inspection and carries no mongoose import itself; the
+ * boundary is upheld at the type level by the layer contract.
  *
  * Sub-code mapping:
  *   - `DATABASE_DUPLICATE_KEY` — MongoServerError code 11000.
@@ -21,8 +23,8 @@
  * mongoose version bumps don't require a coordinated upgrade — we
  * inspect `name` + `code` + `message` rather than `instanceof`.
  */
-import { DatabaseError, type DatabaseErrorCode } from '../../core/errors/external-service-error';
-import type { ErrorContext } from '../../core/errors/error-context';
+import { DatabaseError, type DatabaseErrorCode } from '../core/errors/external-service-error';
+import type { ErrorContext } from '../core/errors/error-context';
 
 interface MongoLikeError {
   readonly name?: string;

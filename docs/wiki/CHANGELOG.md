@@ -5,6 +5,25 @@
 
 ---
 
+## 2026-05-21 — C4 G-2 落地（repository 邊界 `Result` 一致性）
+
+- **元件**：C4 Persistence
+- **缺口**：G-2
+- **變更**：七個 repository 邊界（activity / fetch / giveaway / message /
+  reply / todo / user-api-setting）統一改回 `Result<T, DatabaseError>`：
+  介面方法簽章與 `MongoXRepo` 實作以 try/catch 包裹 mongoose 呼叫,錯誤經
+  `databaseErrorFrom` 包成 `err(DatabaseError)`,成功回 `ok(...)`,查無資料
+  為 `ok(undefined)`。mongoose error-translator 自
+  `src/infra/mongo/error-translator.ts` 搬至
+  `src/persistence/error-translator.ts`,使七個 repo 無須反向 import
+  `infra/mongo`。所有 repo callsite（handler / plugin 委派邏輯）改以
+  `result.ok` 判斷,`err` 重擲入既有 catch。各 repo integration test 補
+  `err(DatabaseError)` 路徑覆蓋,error-translator 單元測試移至
+  `test/unit/persistence/`。HLD §7.2、C4 設計檔 §7 與實作對齊。
+- **影響**：repository 公開介面簽章變更（回傳型別包上 `Result`）;程式員
+  錯誤仍走 `TypeError`,不進 `Result`。四個 bot 對外行為等價——`err` 在
+  callsite 重擲後走原本的 log + 失敗回覆路徑。
+
 ## 2026-05-21 — C7 D7 + D9 落地（雙語系 i18n catalog）
 
 - **元件**：C7 i18n Catalog

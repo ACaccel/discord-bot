@@ -38,8 +38,10 @@ export default class ai_whitelist_remove extends Command {
         if (repos === null) return;
 
         try {
-            const removed = await repos.userApiSetting.deleteByUserId(target.id);
-            if (!removed) {
+            // G-2: an `err` is re-thrown into the surrounding catch.
+            const removedResult = await repos.userApiSetting.deleteByUserId(target.id);
+            if (!removedResult.ok) throw removedResult.error;
+            if (!removedResult.value) {
                 await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.not_in', { user: target.displayName }) ?? '' });
                 return;
             }

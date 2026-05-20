@@ -22,7 +22,10 @@ export default class ai_whitelist_list extends Command {
         if (repos === null) return;
 
         try {
-            const docs = await repos.userApiSetting.listAll();
+            // G-2: an `err` is re-thrown into the surrounding catch.
+            const docsResult = await repos.userApiSetting.listAll();
+            if (!docsResult.ok) throw docsResult.error;
+            const docs = docsResult.value;
             if (docs.length === 0) {
                 await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.empty') ?? '' });
                 return;

@@ -192,10 +192,12 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
         const repos = registry.getRepos(message.guildId);
         if (repos === undefined) return;
 
-        const userDoc = (await repos.userApiSetting.findByUserId(message.author.id)) as
-          | UserApiDoc
-          | null
-          | undefined;
+        // G-2: findByUserId returns Result<UserApiSettingDoc | undefined,
+        // DatabaseError>. An `err` is re-thrown so it propagates to the
+        // dispatcher's catch exactly as a raw mongoose error did before.
+        const userDocResult = await repos.userApiSetting.findByUserId(message.author.id);
+        if (!userDocResult.ok) throw userDocResult.error;
+        const userDoc = userDocResult.value as UserApiDoc | undefined;
         if (userDoc === undefined || userDoc === null) return; // not whitelisted
 
         const logger = ctx.resolve(TOKENS.Logger);

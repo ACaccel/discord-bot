@@ -97,11 +97,14 @@ export default class emoji_frequency extends Command {
                 const monthEnd = new Date();
                 monthEnd.setMonth(monthEnd.getMonth() - monthOffset);
                 
-                const messages = await repos.message.findByTimestampRange(
+                // G-2: an `err` is re-thrown into the surrounding catch.
+                const messagesResult = await repos.message.findByTimestampRange(
                     monthStart.getTime(),
                     monthEnd.getTime(),
                 );
-                
+                if (!messagesResult.ok) throw messagesResult.error;
+                const messages = messagesResult.value;
+
                 messages.forEach((message) => {
                 // `content` is `required: false` on the schema → optional at the
                 // typed-model layer Phase 1 introduced. Older revisions of this

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DatabaseError } from '../../../../src/core/errors';
+import { DatabaseError } from '../../../src/core/errors';
 import {
   databaseErrorFrom,
   __classifyMongoErrorForTests as classify,
-} from '../../../../src/infra/mongo/error-translator';
+} from '../../../src/persistence/error-translator';
 
 describe('classifyMongoError', () => {
   it('maps the well-known duplicate-key code 11000', () => {

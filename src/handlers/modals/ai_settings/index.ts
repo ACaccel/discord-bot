@@ -46,18 +46,22 @@ export default class ai_settings_modal extends ModalHandler {
         }
 
         try {
-            const doc = await repos.userApiSetting.findByUserId(userId);
-            if (!doc) {
+            // G-2: repo methods return Result<T, DatabaseError>; an
+            // `err` is re-thrown into the surrounding catch.
+            const docResult = await repos.userApiSetting.findByUserId(userId);
+            if (!docResult.ok) throw docResult.error;
+            if (!docResult.value) {
                 await interaction.reply({ content: bot.translator?.t('errors:ai.not_whitelisted') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
-            await repos.userApiSetting.update(userId, {
+            const updateResult = await repos.userApiSetting.update(userId, {
                 provider,
                 model,
                 temperature,
                 web_search: webSearchValue === 'on',
                 system_prompt: systemPrompt,
             });
+            if (!updateResult.ok) throw updateResult.error;
         } catch (err) {
             logError(bot.logger, bot.clientId, interaction.guildId, err);
             await interaction.reply({ content: bot.translator?.t('errors:db.operation_failed') ?? '', flags: MessageFlags.Ephemeral });

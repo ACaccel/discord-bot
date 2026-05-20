@@ -40,10 +40,17 @@ export default class add_reply extends Command {
 
             const repos = await requireGuildRepos(bot, interaction);
             if (repos === null) return;
-            const existPair = await repos.reply.findExactPair(input, reply);
+            // G-2: repo methods return Result<T, DatabaseError>. An `err`
+            // is re-thrown so the surrounding catch runs the unchanged
+            // log + failure-reply path — behaviour-equivalent to the
+            // pre-G-2 raw-mongoose-error propagation.
+            const existPairResult = await repos.reply.findExactPair(input, reply);
+            if (!existPairResult.ok) throw existPairResult.error;
+            const existPair = existPairResult.value;
 
             if (existPair.length === 0) {
-                await repos.reply.create(input, reply);
+                const createResult = await repos.reply.create(input, reply);
+                if (!createResult.ok) throw createResult.error;
                 await interaction.editReply({ content: bot.translator?.t('replies:add_reply.added', { input, reply }) ?? '' });
             } else {
                 await interaction.editReply({ content: bot.translator?.t('replies:add_reply.already_exists', { input, reply }) ?? '' });

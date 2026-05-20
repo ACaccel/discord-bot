@@ -55,17 +55,23 @@ export default class todo_list extends Command {
             if (repos === null) return;
             const todos = repos.todo;
 
+            // G-2: repo methods return Result<T, DatabaseError>. An
+            // `err` is re-thrown into the surrounding catch.
             if (action === "add") {
-                const existPair = await todos.findByContent(content);
-                if (existPair.length === 0) {
-                    await todos.create(content);
+                const existPairResult = await todos.findByContent(content);
+                if (!existPairResult.ok) throw existPairResult.error;
+                if (existPairResult.value.length === 0) {
+                    const createResult = await todos.create(content);
+                    if (!createResult.ok) throw createResult.error;
                     await interaction.editReply({ content: bot.translator?.t('replies:todo_list.added', { content }) ?? '' });
                 } else {
                     await interaction.editReply({ content: bot.translator?.t('replies:todo_list.already_exists', { content }) ?? '' });
                 }
             } else if (action === "delete") {
                 // content is index
-                const todoList = await todos.listAll();
+                const todoListResult = await todos.listAll();
+                if (!todoListResult.ok) throw todoListResult.error;
+                const todoList = todoListResult.value;
                 if (!parseInt(content)) {
                     await interaction.editReply({ content: bot.translator?.t('replies:todo_list.expect_number') ?? '' });
                     return;
@@ -75,11 +81,14 @@ export default class todo_list extends Command {
                 } else {
                     // Index is in bounds: the `> todoList.length` guard above rejects out-of-range input.
                     const deleted_content = todoList[parseInt(content) - 1]!.content;
-                    await todos.deleteByContent(deleted_content);
+                    const deleteResult = await todos.deleteByContent(deleted_content);
+                    if (!deleteResult.ok) throw deleteResult.error;
                     await interaction.editReply({ content: bot.translator?.t('replies:todo_list.deleted', { content: deleted_content }) ?? '' });
                 }
             } else if (action === "list") {
-                const todoList = await todos.listAll();
+                const todoListResult = await todos.listAll();
+                if (!todoListResult.ok) throw todoListResult.error;
+                const todoList = todoListResult.value;
                 let content = bot.translator?.t('replies:todo_list.header') ?? '';
                 todoList.map((e, i) => {
                     content += `> ${i + 1}. ${e.content}\n`;

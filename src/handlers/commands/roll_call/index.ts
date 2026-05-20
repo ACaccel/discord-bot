@@ -60,7 +60,10 @@ export default class roll_call extends Command {
                     return;
                 }
 
-                const activity = await repos.activity.findByActivityId(activity_id);
+                // G-2: an `err` is re-thrown into the surrounding catch.
+                const activityResult = await repos.activity.findByActivityId(activity_id);
+                if (!activityResult.ok) throw activityResult.error;
+                const activity = activityResult.value;
                 if (!activity) {
                     await interaction.reply({ content: bot.translator?.t('replies:roll_call.activity_not_found', { id: activity_id }) ?? '', flags: MessageFlags.Ephemeral });
                     return;
@@ -84,8 +87,9 @@ export default class roll_call extends Command {
                 // on the same activity_id, the first wins and the second
                 // sees `deleted === false`; bail before re-posting the
                 // announcement so the channel does not see duplicates.
-                const deleted = await repos.activity.deleteByActivityId(activity_id);
-                if (!deleted) {
+                const deletedResult = await repos.activity.deleteByActivityId(activity_id);
+                if (!deletedResult.ok) throw deletedResult.error;
+                if (!deletedResult.value) {
                     await interaction.reply({
                         content:
                             bot.translator?.t('replies:roll_call.activity_already_consumed', {

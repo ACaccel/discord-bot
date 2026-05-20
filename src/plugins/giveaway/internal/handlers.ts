@@ -79,7 +79,9 @@ export const handleGiveawayCreate = async (
             return;
         }
 
-        await repos.giveaway.create({
+        // G-2: create returns Result<GiveawayDoc, DatabaseError>. An
+        // `err` is re-thrown into the surrounding catch.
+        const createResult = await repos.giveaway.create({
             winner_num,
             prize,
             end_time,
@@ -88,6 +90,7 @@ export const handleGiveawayCreate = async (
             participants: [],
             message_id,
         });
+        if (!createResult.ok) throw createResult.error;
 
         if (await findGiveaway(deps, guild.id, message_id)) {
             new JobManager(deps.jobMap).schedule(

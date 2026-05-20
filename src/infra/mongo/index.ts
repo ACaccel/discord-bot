@@ -6,4 +6,3 @@ export {
   type GuildConnection,
   type Models,
 } from './connection-manager';
-export { databaseErrorFrom } from './error-translator';

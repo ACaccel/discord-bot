@@ -105,8 +105,12 @@ export const findGiveaway = async (deps: GiveawayDeps, guild_id: string, message
   if (!guild) return false;
   const repos = deps.registry.getRepos(guild_id);
   if (!repos) return false;
-  const giveaway = await repos.giveaway.findByMessageId(message_id);
-  return giveaway !== undefined && giveaway !== null;
+  // G-2: repo methods return Result<T, DatabaseError>. An `err` is
+  // re-thrown so the caller's surrounding catch handles it exactly as
+  // the pre-G-2 raw-error propagation did.
+  const result = await repos.giveaway.findByMessageId(message_id);
+  if (!result.ok) throw result.error;
+  return result.value !== undefined && result.value !== null;
 };
 
 export const scheduleGiveaway = async (
@@ -119,7 +123,10 @@ export const scheduleGiveaway = async (
   const repos = deps.registry.getRepos(guild_id);
   if (!repos) return 'Database not found';
 
-  const giveaway = await repos.giveaway.findByMessageId(message_id);
+  // G-2: an `err` is re-thrown for the caller's surrounding catch.
+  const giveawayResult = await repos.giveaway.findByMessageId(message_id);
+  if (!giveawayResult.ok) throw giveawayResult.error;
+  const giveaway = giveawayResult.value;
   if (!giveaway) return 'Giveaway not found';
   const giveawayChannel = guild.channels.cache.get(giveaway.channel_id);
   if (!giveawayChannel?.isSendable()) return 'Giveaway channel not found';
@@ -159,7 +166,8 @@ export const scheduleGiveaway = async (
       : t('replies:giveaway.result_no_participants', { prize: giveaway.prize });
   await giveawayChannel.send({ content: resultContent });
 
-  await repos.giveaway.deleteByMessageId(message_id);
+  const deleteResult = await repos.giveaway.deleteByMessageId(message_id);
+  if (!deleteResult.ok) throw deleteResult.error;
   new JobManager(deps.jobMap).cancel(giveawayJobKey(message_id));
   return null;
 };
@@ -171,7 +179,9 @@ export const deleteGiveaway = async (deps: GiveawayDeps, guild_id: string, messa
   if (!repos) return 'Database not found';
 
   new JobManager(deps.jobMap).cancel(giveawayJobKey(message_id));
-  await repos.giveaway.deleteByMessageId(message_id);
+  // G-2: an `err` is re-thrown for the caller's surrounding catch.
+  const deleteResult = await repos.giveaway.deleteByMessageId(message_id);
+  if (!deleteResult.ok) throw deleteResult.error;
   return null;
 };
 
@@ -204,7 +214,14 @@ export const rebootGiveawayJobs = async (deps: GiveawayDeps): Promise<void> => {
       try {
         const repos = deps.registry.getRepos(guildId);
         if (!repos) return;
-        const giveaways = await rebootRetry(() => repos.giveaway.listAll());
+        // G-2: listAll returns Result<T, DatabaseError>. Throw the `err`
+        // inside the retried op so `rebootRetry`'s backoff still treats a
+        // transient DB failure as retryable, exactly as before G-2.
+        const giveaways = await rebootRetry(async () => {
+          const result = await repos.giveaway.listAll();
+          if (!result.ok) throw result.error;
+          return result.value;
+        });
         for (const g of giveaways) {
           try {
             const end_time = new Date(g.end_time);

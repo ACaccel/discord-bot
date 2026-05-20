@@ -72,7 +72,9 @@ export const handleActivityCreate = async (
             return;
         }
 
-        await repos.activity.create({
+        // G-2: create returns Result<ActivityDoc, DatabaseError>. An
+        // `err` is re-thrown into the surrounding catch.
+        const createResult = await repos.activity.create({
             activity_id,
             message_id,
             title,
@@ -81,6 +83,7 @@ export const handleActivityCreate = async (
             channel_id: channel.id,
             participants: [],
         });
+        if (!createResult.ok) throw createResult.error;
 
         if (await findActivity(deps, guild.id, activity_id)) {
             new JobManager(deps.jobMap).schedule(

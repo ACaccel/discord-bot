@@ -49,7 +49,12 @@ export const saveBatch = async (
     if (newestId === undefined || BigInt(msg.id) > BigInt(newestId)) newestId = msg.id;
   }
 
-  const existingSet = await messageRepo.findExistingMessageIds(ids);
+  // G-2: repo methods return Result<T, DatabaseError>. An `err` is
+  // re-thrown so `backupChannel`'s catch records it on `stats.error` —
+  // behaviour-equivalent to the pre-G-2 raw-error propagation.
+  const existingResult = await messageRepo.findExistingMessageIds(ids);
+  if (!existingResult.ok) throw existingResult.error;
+  const existingSet = existingResult.value;
 
   let skippedBots = 0;
   let skippedDuplicates = 0;
@@ -102,11 +107,14 @@ export const saveBatch = async (
     return { inserted: 0, skippedBots, skippedDuplicates, oldestId, newestId, oldestMsg, newestMsg };
   }
 
-  // `insertManyIgnoringDuplicates` already converts BulkWriteError on
-  // duplicate-key into a partial-success count (see message.repo.ts);
-  // no try/catch needed here.
-  const { inserted } = await messageRepo.insertManyIgnoringDuplicates(
+  // `insertManyIgnoringDuplicates` already absorbs a duplicate-key
+  // BulkWriteError into a partial-success count (see message.repo.ts);
+  // only a genuine Mongo failure resolves to `err`, which is re-thrown
+  // for `backupChannel`'s catch.
+  const insertResult = await messageRepo.insertManyIgnoringDuplicates(
     toInsert as unknown as readonly MessageDoc[],
   );
+  if (!insertResult.ok) throw insertResult.error;
+  const { inserted } = insertResult.value;
   return { inserted, skippedBots, skippedDuplicates, oldestId, newestId, oldestMsg, newestMsg };
 };
