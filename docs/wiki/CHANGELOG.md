@@ -5,6 +5,36 @@
 
 ---
 
+## 2026-05-21 — D4 落地（`src/utils/` 過渡層退場）
+
+- **元件**：C1 Core Infrastructure、C6 Handlers、C8 Plugins、C9 Codegen & Scripts、C11 Bot Composition Roots
+- **缺口**：D4
+- **變更**：
+  - C1 — 新增 `src/core/scheduling/`（`job-manager.ts`、`duration.ts`、barrel
+    `index.ts`），承接原 `src/utils/job_manager.ts` 的 `JobManager` 與
+    `src/utils/misc.ts` 的 `parseDuration`；兩者僅依賴 `node-schedule`，符合
+    `core/` 層約束。新增單元測試，scheduling 子模組行/函式/敘述/分支覆蓋皆 100%。
+  - C6 — `buildCommandJsonBody` 移入 `src/handlers/commands/command-builder.ts`
+    （經 `@cmd` barrel 再匯出）；`buildButtonRows` / `msgReact` / `scheduleJob` /
+    `listInOneImage` / `CanvasContent` / `CanvasOptions` 移入
+    `src/handlers/commands/discord-helpers.ts`。`msgReact` 改用注入的結構化
+    `Logger`，不再有 raw `console.error`。
+  - C8 — giveaway / activity 的 `internal/` 改 import `@core/scheduling`，
+    不再 import `utils/*`；knip 死碼（`tts_api` / `listChannels` / `deleteJob` /
+    `getRandomInterval`）刪除。
+  - C9 — 評估 `bot_cmd.ts` 承接點：因 `buildCommandJsonBody` 由 runtime command
+    註冊路徑消費且輸入型別屬 handler 契約，裁定歸 C6，不遷入 `scripts/`。
+  - C11 — 刪除 `src/utils/` 目錄；移除 `tsconfig.json` / `tsconfig.strict.json` /
+    `knip.json` / `vitest.config.ts` / `vitest.workspace.ts` 的 `@utils` 對映；
+    更新 `CLAUDE.md` 目錄說明與 alias 表（移除過時的「`utils/` 僅 `logger.ts`
+    strict」敘述與已退場的 `events/` / `@event` 條目）。
+- **行為等價**：純結構性搬遷，四個 bot 對外行為不變；`msgReact` 失敗路徑由
+  raw `console` 改為結構化 log，屬 operator 通道改善，user 行為不變。
+- **閘門**：typecheck / typecheck:emit / lint / format:check / handlers:gen:check /
+  knip / test / test:coverage / test:i18n 全綠。
+
+---
+
 ## 2026-05-21 — C10 D3 落地（CJK scanner 範圍收斂）
 
 - **元件**：C10 Quality Gates

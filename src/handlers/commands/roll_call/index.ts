@@ -6,7 +6,7 @@ import {
 } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { bot_cmd } from '@utils';
+import { msgReact } from '../discord-helpers';
 
 import { replyForError } from '../../reply-for-error';
 export default class roll_call extends Command {
@@ -127,7 +127,7 @@ export default class roll_call extends Command {
             const ch = interaction.channel;
             if (!ch?.isSendable()) return;
             const msg = await ch.send({ content: announcement });
-            bot_cmd.msgReact(msg, ["<:slowpoke_wave_lr:1178718404102848573>"])
+            void msgReact(msg, ["<:slowpoke_wave_lr:1178718404102848573>"], bot.logger, bot.clientId)
             await interaction.reply({ content: bot.translator?.t('replies:roll_call.sent') ?? '', flags: MessageFlags.Ephemeral })
         } catch (error) {
             await replyForError(interaction, bot, error, 'replies:roll_call.failed', interaction.guild?.id);

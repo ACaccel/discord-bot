@@ -38,11 +38,6 @@ import { TOKENS } from '../../core/ioc';
 import type { GuildRegistry } from '../../core/guild-registry';
 import type { Plugin } from '../../core/plugin';
 import type { GuildOnboardingPort } from '../../core/plugin';
-// Import directly from the leaf module (not the barrel) so the strict
-// typecheck does not transitively pull the legacy `utils/misc.ts` and
-// `utils/bot_cmd.ts` files, which still use `@bot` / `@cmd` path
-// aliases not present in `tsconfig.strict.json`. `utils/logger.ts`
-// itself was rewritten as a strict-clean shim in Phase 3.
 import { logError, logGuildEvent, logSystem, type Logger } from '../../core/logger';
 import { archiveDeletedAttachment } from '../../infra/discord';
 

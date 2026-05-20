@@ -62,13 +62,16 @@
 
 - [x] 盤點 `bot_cmd.ts`、`job_manager.ts`、`misc.ts` 的所有 callsite（步驟 1，
       C1 / C9 的承接評估依賴此盤點結果）— 盤點結果見下方「D4 callsite 盤點」
-- [ ] 依 C1 D4 評估結論，`JobManager` 遷入 `core/` 或 plugin `internal/`；
-      giveaway / activity 的 `internal/` 改 import 新位置，不再 import
+- [x] 依 C1 D4 評估結論，`JobManager` 遷入 `core/scheduling/`；
+      giveaway / activity 的 `internal/` 改 import `@core/scheduling`，不再 import
       `../../../utils/job_manager`
-- [ ] giveaway / activity 的 `internal/` 不再 import `utils/misc`
-- [ ] `misc.ts` 逐函式歸入消費端元件
-- [ ] 依 C9 D4 評估結論遷出 `bot_cmd.ts`
-- [ ] 刪除 `src/utils/` 目錄
+- [x] giveaway / activity 的 `internal/` 不再 import `utils/misc`
+- [x] `misc.ts` 逐函式歸入消費端元件（`parseDuration` → `core/scheduling/`；
+      `scheduleJob` / `listInOneImage` / `CanvasContent` / `CanvasOptions` →
+      `handlers/commands/discord-helpers.ts`；`tts_api` / `listChannels` /
+      `deleteJob` / `getRandomInterval` 為 knip 死碼，刪除）
+- [x] 依 C9 D4 評估結論遷出 `bot_cmd.ts`（裁定歸 C6 handlers）
+- [x] 刪除 `src/utils/` 目錄
 
 **驗收**：`src/utils/` 不存在；giveaway / activity 不再 import `utils/*`。
 

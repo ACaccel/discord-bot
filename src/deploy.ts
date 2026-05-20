@@ -26,8 +26,7 @@ import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 
-import { createCommand, localizeCommandConfig } from "@cmd";
-import { bot_cmd } from "@utils";
+import { buildCommandJsonBody, createCommand, localizeCommandConfig } from "@cmd";
 import { loadEnv } from '@core/config';
 import { createDefaultTranslator, type Translator } from '@core/i18n';
 
@@ -106,7 +105,7 @@ function buildCommandsFromConfig(
         // Gap D7: command / option descriptions are i18n keys resolved
         // here against the `commands` catalog so the deployed JSON keeps
         // its localised text.
-        out.push(bot_cmd.buildCommandJsonBody(localizeCommandConfig(instance.config, translator)));
+        out.push(buildCommandJsonBody(localizeCommandConfig(instance.config, translator)));
     }
 
     return out;

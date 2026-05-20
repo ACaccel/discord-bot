@@ -7,7 +7,7 @@ import {
 } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { bot_cmd, misc } from '@utils';
+import { msgReact, scheduleJob } from '../discord-helpers';
 
 import { logError } from '@core/logger';
 import { replyForError } from '../../reply-for-error';
@@ -65,7 +65,7 @@ export default class ban_user extends Command {
             const ch = interaction.channel;
             if (!ch?.isSendable()) return;
             const judge_msg = await ch.send({ content: ban_msg });
-            await bot_cmd.msgReact(judge_msg, ["👍"]);
+            await msgReact(judge_msg, ["👍"], bot.logger, bot.clientId);
     
             // judgement time (todo: save to db like giveaway)
             const current_time = Date.now();
@@ -114,7 +114,7 @@ export default class ban_user extends Command {
                     await judge_msg.reply(bot.translator?.t('replies:ban_user.vote_failed', { count: judge_count, threshold: BAN_THRESHOLD }) ?? '');
                 }
             }
-            misc.scheduleJob(end_time_date, () => ban_judgement());
+            scheduleJob(end_time_date, () => ban_judgement());
         } catch (error) {
             await replyForError(interaction, bot, error, 'replies:ban_user.failed', interaction.guild?.id);
         }

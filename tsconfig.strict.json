@@ -15,7 +15,6 @@
       "@select-menu": ["src/handlers/select-menus/index"],
       "@modal": ["src/handlers/modals/index"],
       "@reaction": ["src/handlers/reactions/index"],
-      "@utils": ["src/utils/index"],
       "@core/*": ["src/core/*"],
       "@plugins": ["src/plugins/index"],
       // The handler `index.ts` files import `HandlerFactory` via the

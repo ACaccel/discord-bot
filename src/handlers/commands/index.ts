@@ -4,7 +4,6 @@ import type {
     ContextMenuCommandInteraction,
 } from 'discord.js';
 import type { BaseBot } from "@bot";
-import { bot_cmd } from "@utils";
 import { ops } from "../../core/logger";
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
@@ -24,6 +23,9 @@ export {
 } from './command';
 import { Command, localizeCommandConfig } from './command';
 
+import { buildCommandJsonBody } from './command-builder';
+export { buildCommandJsonBody } from './command-builder';
+
 export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: BaseBot) => {
     const rest_commands: ApplicationCommandDataResolvable[] = Array.from(commandHandlers.values())
         .filter((cmd: Command) => {
@@ -34,7 +36,7 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
             return true;
         })
         .map((cmd: Command) =>
-            bot_cmd.buildCommandJsonBody(localizeCommandConfig(cmd.config, bot.translator)),
+            buildCommandJsonBody(localizeCommandConfig(cmd.config, bot.translator)),
         );
     return rest_commands;
 }

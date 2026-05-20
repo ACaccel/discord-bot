@@ -15,7 +15,6 @@
       "@select-menu": ["handlers/select-menus/index"],
       "@modal": ["handlers/modals/index"],
       "@reaction": ["handlers/reactions/index"],
-      "@utils": ["utils/index"],
       "@core/*": ["core/*"],
       "@plugins": ["plugins/index"]
     },

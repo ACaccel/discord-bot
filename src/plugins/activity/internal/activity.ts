@@ -22,7 +22,7 @@ import type { Translator } from '../../../core/i18n';
 import { logError, type Logger } from '../../../core/logger';
 import type { Message } from 'discord.js';
 
-import { JobManager } from '../../../utils/job_manager';
+import { JobManager } from '@core/scheduling';
 
 const msgReact = async (
   logger: Logger,

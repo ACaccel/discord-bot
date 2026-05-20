@@ -28,8 +28,8 @@
  *     `replies:konata.presence_text`). `src/bot/index.ts` BaseBot only
  *     emits ops-log lines that are deliberately English; if a future
  *     change reintroduces CJK there, the scanner catches it.
- *   - `src/utils/` and `src/features/` carry domain code that is not
- *     yet a user-facing boundary; left alone for now.
+ *   - `src/utils/` and `src/features/` were transitional trees removed
+ *     during gap-remediation (gaps D4 / earlier audits); no longer scoped.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';

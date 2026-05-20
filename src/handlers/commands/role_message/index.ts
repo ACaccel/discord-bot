@@ -5,7 +5,7 @@ import type {
 } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { bot_cmd } from '@utils';
+import { buildButtonRows } from '../discord-helpers';
 
 import { replyForError } from '../../reply-for-error';
 export default class role_message extends Command {
@@ -65,7 +65,7 @@ export default class role_message extends Command {
                 customId: `toggle_role|${role.id}`,
                 label: role.name
             }))
-            const rows = bot_cmd.buildButtonRows(button_config);
+            const rows = buildButtonRows(button_config);
     
             await interaction.editReply({
                 content: bot.translator?.t('replies:role_message.prompt') ?? '',

@@ -1,13 +1,10 @@
 /**
  * TTS API client.
  *
- * Phase 4b-2 ports `utils/misc.ts#tts_api` into a strict-clean module
- * co-located with the plugin so the strict typecheck does not have to
- * follow the legacy `utils/misc.ts` cascade (which still uses `@bot` /
- * `@utils` path aliases and pre-Phase-1 typing). The function is the
- * sole user of `tts_api` after PR 2 — `src/events/message_reply.ts`
- * still imports the legacy copy from `utils/misc.ts`, but that file is
- * itself dead after PR 2 strips BaseBot's legacy listener bodies.
+ * Phase 4b-2 ported the original `tts_api` helper into this
+ * strict-clean module co-located with the plugin. The legacy
+ * `src/utils/` grab-bag that once held the duplicate copy was removed
+ * during gap-remediation (gap D4); this is now the sole implementation.
  *
  * Behaviour preserved verbatim: 40-char limit, translate-to-Japanese
  * via Google Translate's web endpoint, post to local TTS service, read

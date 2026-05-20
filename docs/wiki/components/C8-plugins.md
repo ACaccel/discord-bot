@@ -21,13 +21,18 @@
   `@event` path 對映與三條 `src/events/*` knip ignore。全 repo `@event` 為 0。
 - G-1 已落地：giveaway / activity 的 `msgReact` 改用注入的結構化 `Logger`，
   `src/plugins/` 不再有 raw `console.*`。
-- D4 部分進行中：完成 `src/utils/{bot_cmd,job_manager,misc}` callsite 盤點；
-  `JobManager` 與 `misc` 的最終承接位置依賴 C1 / C9 評估，尚未遷移。
+- D4 已落地：`src/utils/` 整個退場。giveaway / activity 的 `internal/` 改 import
+  `@core/scheduling` 取得 `JobManager` / `parseDuration`，不再依賴 `utils/*`；
+  `JobManager` / `parseDuration` 遷入 `core/scheduling/`，`bot_cmd.ts` /
+  `misc.ts` 的 handler 專用函式遷入 `src/handlers/commands/`，knip 死碼
+  （`tts_api` / `listChannels` / `deleteJob` / `getRandomInterval`）刪除。
 
 ## 近期變更
 
+- 2026-05-21 — D4 落地：`src/utils/` 目錄刪除；plugin internal 改用
+  `@core/scheduling`，承接點分屬 C1（`core/scheduling/`）與 C6（handler 工具）。
 - 2026-05-21 — D1 + D3 落地：`guild-events` 訂閱 `guildCreate` 並經
   guild-onboarding port 初始化新 guild；刪除整個 `src/events/` 過渡層與
-  `@event` alias。D4 完成 callsite 盤點（待 C1 / C9 承接評估）。
+  `@event` alias。
 - 2026-05-21 — D2 + G-1 落地：新增 earthquake plugin；`msgReact` 去 `console.error`。
 - 2026-05-21 — 建立元件 wiki 頁（工程基礎建設）。

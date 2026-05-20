@@ -22,13 +22,15 @@ C1 設計檔 §7 判定「無實質偏差」，本身無目標設計未落地處
 > 主責缺口在 [C8 — Plugins](C8-plugins.md) 的 D4；本節僅處理 `core/` 作為承接點
 > 的評估與遷入。此任務依賴 C8 D4 步驟 1（callsite 盤點）先完成。
 
-- [ ] 待 C8 完成 D4 callsite 盤點後，確認 `src/utils/job_manager.ts` 的 `JobManager`
-      是否無 Discord / Mongoose 相依
-- [ ] 若無相依：於 `src/core/` 新增承接子模組（如 `core/scheduling/`）並遷入
-      `JobManager`，維持邊界規則「`core/` 不 import `src/` 其他上層模組」
-- [ ] 遷入後補 `JobManager` 單元測試，達 C10 對 `src/core/**` 的高覆蓋門檻
-      （lines/functions/statements 90、branches 89）
-- [ ] 若評估為有相依：記錄結論，交還 C8 改置於 plugin `internal/`，本節標記不適用
+- [x] 待 C8 完成 D4 callsite 盤點後，確認 `src/utils/job_manager.ts` 的 `JobManager`
+      是否無 Discord / Mongoose 相依 — 確認無相依，僅依賴 `node-schedule`
+- [x] 若無相依：於 `src/core/` 新增承接子模組 `core/scheduling/` 並遷入
+      `JobManager`（及 `misc.ts` 的 `parseDuration`），維持邊界規則
+      「`core/` 不 import `src/` 其他上層模組」
+- [x] 遷入後補 `JobManager` 單元測試，達 C10 對 `src/core/**` 的高覆蓋門檻
+      （`core/scheduling/` 行 / 函式 / 敘述 / 分支覆蓋皆 100%）
+- [x] 若評估為有相依：記錄結論，交還 C8 改置於 plugin `internal/`，本節標記不適用
+      — 不適用（評估結論為無相依，落於 `core/`）
 
 **驗收**：`JobManager` 承接位置經評估裁定；若落於 `core/` 則該子模組通過 core 覆蓋門檻。
 

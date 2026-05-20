@@ -8,7 +8,7 @@ Discord interaction 進入點,一資料夾對應一 command/button/modal/select-
 
 ## 現況
 
-D5、D7、D9 已收斂:
+D5、D7、D9 已收斂,並於 D4(`src/utils/` 退場)承接 handler 側工具:
 
 - **D5（C6 切片）** — `requireGuildRepos` 的 disabled-guild 守衛改讀
   `bot.connectionManager?.isDisabled(...)`,不再經 `BaseBot.disabledGuilds`
@@ -31,6 +31,12 @@ error, fallbackKey, guildId?)`:operator 通道恆記結構化 log(完整錯誤 +
   `DomainError` 回退 per-feature 的 `replies:<feature>.failed` 並附 `traceId`。
   各 handler catch 改為單一 `replyForError(...)` 呼叫(`random_restaurant`
   保留其時段相關的專屬回退 UX)。
+- **D4(C6 切片)** — `src/utils/` 退場後,handler 專用工具承接於
+  `src/handlers/commands/`:`buildCommandJsonBody` 移入 `command-builder.ts`
+  (經 `@cmd` barrel 再匯出,供 `deploy.ts` 與 runtime command 註冊共用);
+  `buildButtonRows` / `msgReact` / `scheduleJob` / `listInOneImage` /
+  `CanvasContent` / `CanvasOptions` 移入 `discord-helpers.ts`。`msgReact`
+  改用注入的結構化 `Logger`,不再有 raw `console`。
 
 ## 公開介面
 
@@ -42,9 +48,15 @@ error, fallbackKey, guildId?)`:operator 通道恆記結構化 log(完整錯誤 +
 - `Command` / `CommandConfig` / `CommandOption` / `CommandChoice` /
   `LocalizedCommandConfig` / `localizeCommandConfig` —
   `src/handlers/commands/command.ts`(由 `@cmd` barrel 再匯出)。
+- `buildCommandJsonBody(config)` — `src/handlers/commands/command-builder.ts`
+  (由 `@cmd` barrel 再匯出)。
+- `buildButtonRows` / `msgReact` / `scheduleJob` / `listInOneImage` /
+  `CanvasContent` / `CanvasOptions` — `src/handlers/commands/discord-helpers.ts`。
 
 ## 近期變更
 
+- 2026-05-21 — D4(C6 切片):`src/utils/bot_cmd.ts` / `misc.ts` 的 handler 專用
+  函式承接於 `command-builder.ts` 與 `discord-helpers.ts`(gap D4)。
 - 2026-05-21 — D5/D7/D9 收斂:`requireGuildRepos` 改讀 `ConnectionManager`;
   指令 metadata 去 CJK literal + `localizeCommandConfig`;新增 `replyForError`
   錯誤邊界 helper。指令 metadata/型別自 `commands/index.ts` 抽至

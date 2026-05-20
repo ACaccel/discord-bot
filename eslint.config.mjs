@@ -93,7 +93,6 @@ export default tseslint.config(
       'src/persistence/**/*.ts',
       'src/infra/**/*.ts',
       'src/handlers/**/*.ts',
-      'src/utils/**/*.ts',
     ],
     rules: {
       'no-restricted-imports': [

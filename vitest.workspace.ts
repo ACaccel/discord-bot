@@ -21,7 +21,7 @@ import path from 'path';
 /**
  * Path aliases mirrored from `tsconfig.json` so handler-layer unit
  * tests can import the handler barrels (which carry `@bot` / `@cmd` /
- * `@utils` / `handlers` imports).
+ * `handlers` imports).
  */
 const aliases = {
   '@core': path.resolve(__dirname, 'src/core'),
@@ -31,7 +31,6 @@ const aliases = {
   '@select-menu': path.resolve(__dirname, 'src/handlers/select-menus/index'),
   '@modal': path.resolve(__dirname, 'src/handlers/modals/index'),
   '@reaction': path.resolve(__dirname, 'src/handlers/reactions/index'),
-  '@utils': path.resolve(__dirname, 'src/utils/index'),
   '@plugins': path.resolve(__dirname, 'src/plugins/index'),
   handlers: path.resolve(__dirname, 'src/handlers/index'),
 };

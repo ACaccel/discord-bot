@@ -3,7 +3,7 @@ import type {
 } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { misc } from '@utils';
+import { listInOneImage, type CanvasContent } from '../discord-helpers';
 
 import { replyForError } from '../../reply-for-error';
 export default class sticker_frequency extends Command {
@@ -108,7 +108,7 @@ export default class sticker_frequency extends Command {
             });
 
             // create a preview image
-            const canvasContent: misc.CanvasContent[] = [];
+            const canvasContent: CanvasContent[] = [];
             for (let i = 0; i < sortedStickers.length; i++) {
                 const [stickerName, count] = sortedStickers[i] as [string, number];
                 const sticker = guild.stickers.cache.find(s => s.name === stickerName);
@@ -119,7 +119,7 @@ export default class sticker_frequency extends Command {
                     });
                 }
             }
-            const attachment = await misc.listInOneImage(canvasContent);
+            const attachment = await listInOneImage(canvasContent);
     
             await interaction.editReply({ content: content, files: attachment ? [attachment] : [] });
         } catch (error) {

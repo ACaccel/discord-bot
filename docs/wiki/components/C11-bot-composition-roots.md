@@ -17,9 +17,14 @@
 - `BaseBot` 已移除 `disabledGuilds` 唯讀 getter；disabled 狀態統一由
   `ConnectionManager` 提供，handler 端經 `BaseBot.connectionManager` getter
   查詢（D5）。
-- 待辦：D4 — 移除 `@utils` alias / 更新 CLAUDE.md（依賴 C8 D4，延後）。
+- D4 已落地：`src/utils/` 退場後，移除 `tsconfig.json` / `tsconfig.strict.json` /
+  `knip.json` / `vitest` 的 `@utils` path 對映；`CLAUDE.md` 目錄說明與 alias 表
+  更新為現況（移除過時的「`utils/` 僅 `logger.ts` strict」敘述）。
 
 ## 近期變更
+
+- 2026-05-21 — D4：移除 `@utils` alias 與 `vitest` 對映，更新 CLAUDE.md 目錄
+  說明與 alias 表 (gap D4)
 
 - 2026-05-21 — D1：新增 `src/bot/guild-onboarding.ts`（`BaseBotGuildOnboardingPort`），
   註冊 `TOKENS.GuildOnboardingPort`，`guildCreateListener` 改用 port (gap D1)

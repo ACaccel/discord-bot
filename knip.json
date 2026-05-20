@@ -20,7 +20,6 @@
     "@select-menu": ["src/handlers/select-menus/index.ts"],
     "@modal": ["src/handlers/modals/index.ts"],
     "@reaction": ["src/handlers/reactions/index.ts"],
-    "@utils": ["src/utils/index.ts"],
     "@core/*": ["src/core/*"],
     "@plugins": ["src/plugins/index.ts"]
   },

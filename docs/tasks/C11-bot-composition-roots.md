@@ -42,8 +42,9 @@
 > `src/utils/` 收斂主責見 [C8](C8-plugins.md) D4。此任務依賴 C8 D4 — `src/utils/`
 > 須先清空並刪除。
 
-- [ ] 刪除 `tsconfig.json` 的 `@utils` path alias
-- [ ] 更新 `CLAUDE.md` 目錄說明：移除過時的「`utils/` 僅 `logger.ts` strict」
+- [x] 刪除 `tsconfig.json` 的 `@utils` path alias（並同步移除
+      `tsconfig.strict.json` / `knip.json` / `vitest` 的對映）
+- [x] 更新 `CLAUDE.md` 目錄說明：移除過時的「`utils/` 僅 `logger.ts` strict」
       敘述，使與現況一致
 
 **驗收**：`@utils` alias 不存在；CLAUDE.md 目錄說明與現況一致。
