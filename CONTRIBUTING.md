@@ -91,6 +91,13 @@ merge PRs without a person in the loop, while still blocking any red
 gate. `yarn smoke` is a manual pre-deploy probe and is intentionally
 not a required check.
 
+**Auto-merge is the default merge method.** The repository has GitHub
+auto-merge enabled; land a PR with `gh pr merge <n> --auto --merge` and
+GitHub completes the merge automatically once all ten required checks
+pass. Auto-merge cannot bypass branch protection — it only releases the
+merge after the gate is green. A PR that should not merge unattended is
+simply not opted into auto-merge (review it, then merge by hand).
+
 Note: the `main` branch protection still lists two stale check
 contexts (`test-integration`, `audit`) that predate a CI job rename
 (now `test-int` and `security`); they must be corrected before work

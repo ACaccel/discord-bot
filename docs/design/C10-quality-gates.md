@@ -84,6 +84,12 @@ required checks 為全部 **10 個 CI job**：`lint`、`typecheck`、`typecheck-
 流程不需人工介入，同時任一 CI 閘門紅燈仍擋下合併。`yarn smoke` 需真實連線
 憑證，為手動 pre-deploy 探針，刻意不列入 required check。
 
+repo 已啟用 GitHub **auto-merge**，並以其為**預設合併方式**：PR 以
+`gh pr merge <n> --auto --merge` 排入 auto-merge，10 個 required check 全綠後
+由 GitHub 自動完成合併。auto-merge **不繞過** branch protection——它只在閘門
+轉綠後才放行合併；不應無人盯著就合併的 PR，不 opt-in auto-merge 即可。此設計
+使 `engineering-orchestrator` 派完 PR 後即可繼續下個元件，不需自行輪詢等候。
+
 > 注：`main` 分支的 protection 目前仍列兩個過時的 check context
 > （`test-integration`、`audit`），其為 CI job 改名前的舊名（現為 `test-int`、
 > `security`）；待工程再以 `main` 為目標時須一併修正。

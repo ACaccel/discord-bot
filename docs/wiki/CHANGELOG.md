@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-05-21 — 啟用 auto-merge 為預設合併方式
+
+- **元件**：C10 Quality Gates
+- **缺口**：—
+- **變更**：repo 啟用 GitHub auto-merge；定 `gh pr merge --auto --merge` 為
+  預設合併方式。`CONTRIBUTING.md`、`docs/design/C10-quality-gates.md` §2.8、
+  `engineering-orchestrator` agent 一併記載。
+- **影響**：行為等價（無 `src/` 變更）。PR 排入 auto-merge 後，10 個 required
+  check 全綠即由 GitHub 自動合併；auto-merge 不繞過 branch protection。
+
 ## 2026-05-21 — 設定 required status check
 
 - **元件**：C10 Quality Gates
