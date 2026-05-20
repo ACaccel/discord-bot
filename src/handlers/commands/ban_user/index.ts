@@ -10,27 +10,22 @@ import { Command } from '@cmd';
 import { bot_cmd, misc } from '@utils';
 
 import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class ban_user extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "ban_user",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "暫時禁言使用者(ban_threshold: 5 votes, judge_time: 1 min)",
             options: {
                 user: [
                     {
                         name: "user",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "被禁言的使用者",
                         required: true
                     }
                 ],
                 number: [
                     {
                         name: "duration",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "禁言時限 (單位: 分鐘, max: 5)",
                         required: false
                     }
                 ]
@@ -121,8 +116,7 @@ export default class ban_user extends Command {
             }
             misc.scheduleJob(end_time_date, () => ban_judgement());
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:ban_user.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:ban_user.failed', interaction.guild?.id);
         }
     }
 }

@@ -7,20 +7,16 @@ import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { bot_cmd } from '@utils';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class role_message extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "role_message",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "發送身份組領取訊息",
             options: {
                 string: [
                     {
                         name: "roles",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "可領取身份組id (ex: @身份組1 @身份組2...)",
                         required: true
                     }
                 ]
@@ -76,8 +72,7 @@ export default class role_message extends Command {
                 components: rows
             });
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:role_message.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:role_message.failed', interaction.guild?.id);
         }
     }
 }

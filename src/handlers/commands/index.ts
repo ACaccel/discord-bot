@@ -2,56 +2,27 @@ import type {
     ApplicationCommandDataResolvable,
     ChatInputCommandInteraction,
     ContextMenuCommandInteraction,
-    ContextMenuCommandType} from 'discord.js';
+} from 'discord.js';
 import type { BaseBot } from "@bot";
 import { bot_cmd } from "@utils";
 import { ops } from "../../core/logger";
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
 
-export interface CommandConfig {
-    name: string;   // command name for handler lookup and display
-    description: string;
-    type?: ContextMenuCommandType;   // for context menu commands, default is Chat Input
-    options?: {
-        string?: CommandOption[];
-        number?: CommandOption[];
-        float?: CommandOption[];
-        user?: CommandOption[];
-        channel?: CommandOption[];
-        attachment?: CommandOption[];
-    };
-}
-
-export interface CommandOption {
-    name: string;
-    description: string;
-    required: boolean;
-    choices?: CommandChoice[];
-    /** Minimum numeric value (only applies to `number` and `float` options). */
-    min?: number;
-    /** Maximum numeric value (only applies to `number` and `float` options). */
-    max?: number;
-}
-
-interface CommandChoice {
-    name: string;
-    value: string;
-}
-
-export abstract class Command {
-    public config: CommandConfig;
-
-    public constructor() {
-        this.config = { name: "", description: "" };
-    }
-
-    public setConfig(config: CommandConfig): void {
-        this.config = config;
-    }
-
-    public abstract execute(interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot): Promise<void>;
-}
+// Command metadata contract + i18n resolution live in `./command` so
+// this barrel (which pulls in the generated handler registry) is not a
+// dependency of every handler module.
+export {
+    Command,
+    localizeCommandConfig,
+    type CommandConfig,
+    type CommandOption,
+    type CommandChoice,
+    type LocalizedCommandConfig,
+    type LocalizedCommandOption,
+    type LocalizedCommandChoice,
+} from './command';
+import { Command, localizeCommandConfig } from './command';
 
 export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: BaseBot) => {
     const rest_commands: ApplicationCommandDataResolvable[] = Array.from(commandHandlers.values())
@@ -62,7 +33,9 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
             }
             return true;
         })
-        .map((cmd: Command) => bot_cmd.buildCommandJsonBody(cmd.config));
+        .map((cmd: Command) =>
+            bot_cmd.buildCommandJsonBody(localizeCommandConfig(cmd.config, bot.translator)),
+        );
     return rest_commands;
 }
 
@@ -87,7 +60,17 @@ export const registerCommands = async (bot: BaseBot) => {
         bot.config.commands.forEach((name) => {
             const newCommand = createCommand(name);
             if (newCommand) {
-                bot.commandHandlers.set(newCommand.config.name, newCommand);    // use config name rather than class name as the key
+                // Key by the *localised* command name so the map key
+                // matches the name Discord registers and echoes back as
+                // `interaction.commandName`. For chat-input commands the
+                // localised name equals `config.name` (a lowercase-ASCII
+                // id); for context-menu commands it is the catalog
+                // display name (gap D7).
+                const registeredName = localizeCommandConfig(
+                    newCommand.config,
+                    bot.translator,
+                ).name;
+                bot.commandHandlers.set(registeredName, newCommand);
             }
         });
         

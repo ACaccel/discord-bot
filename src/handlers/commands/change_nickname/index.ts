@@ -4,20 +4,16 @@ import type {
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class change_nickname extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "change_nickname",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "更改bot暱稱",
             options: {
                 string: [
                     {
                         name: "nickname",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "新暱稱",
                         required: true
                     }
                 ]
@@ -44,8 +40,7 @@ export default class change_nickname extends Command {
     
             await interaction.editReply({ content: bot.translator?.t('replies:change_nickname.changed', { newName }) ?? '' });
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:change_nickname.failed') ?? ''});
+            await replyForError(interaction, bot, error, 'replies:change_nickname.failed', interaction.guild?.id);
         }
     }
 }

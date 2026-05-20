@@ -6,33 +6,24 @@ import { Command } from '@cmd';
 
 import { requireGuildRepos } from '../../require-guild-repos';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class todo_list extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "todo_list",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "待辦事項",
             options: {
                 string: [
                     {
                         name: "action",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "新增或刪除",
                         required: true,
                         choices: [
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "新增 (+ content: 內容)", value: "add" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "刪除 (+ content: 編號)", value: "delete" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "查看", value: "list" }
+                            { value: "add" },
+                            { value: "delete" },
+                            { value: "list" }
                         ]
                     },{
                         name: "content",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "內容 (optional)",
                         required: false
                     }
                 ]
@@ -96,8 +87,7 @@ export default class todo_list extends Command {
                 await interaction.editReply({ content });
             }
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:todo_list.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:todo_list.failed', interaction.guild?.id);
         }
     }
 }

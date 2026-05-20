@@ -6,20 +6,16 @@ import {
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class talk_signed extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "talk_signed",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "讓機器人說話(署名)",
             options: {
                 string: [
                     {
                         name: "content",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "就是內容",
                         required: true
                     }
                 ]
@@ -57,8 +53,7 @@ export default class talk_signed extends Command {
                 await channel.send(`${guild_member.displayName}(${interaction.user.username}): ${content}`);
             }
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: bot.translator?.t('replies:talk_signed.send_failed') ?? '', flags: MessageFlags.Ephemeral });
+            await replyForError(interaction, bot, error, 'replies:talk_signed.failed', interaction.guild?.id);
         }
     }
 }

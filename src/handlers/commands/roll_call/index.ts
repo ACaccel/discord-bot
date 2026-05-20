@@ -8,26 +8,20 @@ import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { bot_cmd } from '@utils';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class roll_call extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "roll_call",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "點名",
             options: {
                 string: [
                     {
                         name: "users",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "被點名者 (ex: @user1 @user2...)",
                         required: false
                     },
                     {
                         name: "activity_id",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "活動ID (用於連動活動參與者點名)",
                         required: false
                     }
                 ]
@@ -136,8 +130,7 @@ export default class roll_call extends Command {
             bot_cmd.msgReact(msg, ["<:slowpoke_wave_lr:1178718404102848573>"])
             await interaction.reply({ content: bot.translator?.t('replies:roll_call.sent') ?? '', flags: MessageFlags.Ephemeral })
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: bot.translator?.t('replies:roll_call.failed') ?? '', flags: MessageFlags.Ephemeral });
+            await replyForError(interaction, bot, error, 'replies:roll_call.failed', interaction.guild?.id);
         }
     }
 }

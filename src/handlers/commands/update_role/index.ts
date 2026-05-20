@@ -5,7 +5,7 @@ import Mee6LevelsApi from 'mee6-levels-api';
 import type { BaseBot, Config } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 // import { Nijika } from 'bot/nijika/nijika';
 
 interface UpdateRoleConfig extends Config {
@@ -18,8 +18,6 @@ export default class update_role extends Command {
         super();
         this.setConfig({
             name: "update_role",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "更新Mee6等級身分組"
         });
     }
 
@@ -88,8 +86,7 @@ export default class update_role extends Command {
             }));
             await interaction.editReply({ content: bot.translator?.t('replies:update_role.done') ?? '' });
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:update_role.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:update_role.failed', interaction.guild?.id);
         }
     }
 }

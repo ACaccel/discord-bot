@@ -1,0 +1,157 @@
+/**
+ * Handler-boundary error reply helper (gap D9, decided plan B).
+ *
+ * Every handler's `catch` block routes a failure down two independent
+ * channels:
+ *
+ *   1. **Operator channel** — a structured log line carrying the full
+ *      error (stack, `cause`, `context.operation`) plus the `traceId`.
+ *      This always fires, regardless of the error's type.
+ *   2. **User channel** — a single localised `editReply` / `reply`:
+ *      - the error is a {@link DomainError} → use its taxonomy-driven
+ *        `messageKey` + `messageParams`; the bot-personality tone for
+ *        these lives in the `errors.json` catalog copy.
+ *      - the error is **not** a `DomainError` (an unexpected bug, an
+ *        unwrapped infra failure) → fall back to the command's own
+ *        toned `replies:<feature>.failed` copy, interpolating a
+ *        `traceId` so an operator can correlate the user's screenshot
+ *        with the structured log line.
+ *
+ * Folding both channels into one boundary helper is deliberate: it is
+ * the only way to *guarantee* the `traceId` shown to the user is the
+ * same one written to the operator log. A two-call shape
+ * (`logError(...)` then a separate reply) would let the two ids drift.
+ *
+ * The helper swallows expired-interaction Discord errors (codes
+ * `10062` / `40060`) the same way {@link requireGuildRepos}'s
+ * `replyOrEdit` does — a dead interaction cannot be replied to and
+ * re-throwing would only walk into the dispatcher's outer catch.
+ */
+import type { ContextMenuCommandInteraction, RepliableInteraction } from 'discord.js';
+import { DiscordAPIError, MessageFlags } from 'discord.js';
+
+import { DomainError } from '../core/errors';
+import type { Translator } from '../core/i18n';
+import { logError, logSystem, ops, type Logger } from '../core/logger';
+
+/**
+ * Same widening rationale as `reply-translated.ts`: `executeCommand`
+ * is typed against the abstract `ContextMenuCommandInteraction` base,
+ * which is wider than the concrete subclasses `RepliableInteraction`
+ * lists. Every value at runtime carries `.reply` / `.editReply`.
+ */
+type HandlerInteraction = RepliableInteraction | ContextMenuCommandInteraction;
+
+/**
+ * Discord error codes that mean the interaction is already dead — the
+ * same set `require-guild-repos.ts` guards against. Re-replying just
+ * rejection-spams, so we log once and swallow.
+ */
+const EXPIRED_INTERACTION_CODES: ReadonlySet<number> = new Set([10062, 40060]);
+
+/**
+ * Short, stable correlation id minted for the non-`DomainError`
+ * fallback path. Six lowercase base-36 chars is enough entropy for a
+ * support-ticket lookup and stays readable inside a user-facing
+ * message. Matches the shape `ConnectionManager` mints for disabled
+ * guilds so operators see one consistent id format.
+ */
+const generateTraceId = (): string => Math.random().toString(36).slice(2, 8).padStart(6, '0');
+
+/** Reply or edit depending on the interaction's acknowledged state. */
+const sendUserChannel = async (
+  bot: { logger: Logger | undefined; clientId: string },
+  interaction: HandlerInteraction,
+  content: string,
+): Promise<void> => {
+  if (content.length === 0) return;
+  try {
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ content });
+      return;
+    }
+    await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+  } catch (err) {
+    if (err instanceof DiscordAPIError && EXPIRED_INTERACTION_CODES.has(Number(err.code))) {
+      logSystem(bot.logger, bot.clientId, ops.router.replySkipped(err.code));
+      return;
+    }
+    throw err;
+  }
+};
+
+/**
+ * Resolve the user-facing message for `error` (gap D9 plan B).
+ *
+ * Exported for unit tests that want to assert the channel selection
+ * without driving a Discord interaction fixture.
+ *
+ * A `DomainError` resolves taxonomy-driven via its `messageKey`. As a
+ * defensive measure the helper detects an unresolved key — i18next
+ * echoes the key verbatim on a catalog miss — and degrades to the
+ * per-feature `replies:<feature>.failed` copy instead of surfacing a
+ * raw `errors:*` key to the user. This keeps the boundary robust if a
+ * `DomainError` ever carries a `messageKey` with no catalog entry.
+ *
+ * @param translator bot translator; `undefined` only in the pre-`run()`
+ *   window, in which case the resolved string is empty.
+ * @param error the caught value (a `DomainError`, a native `Error`, or
+ *   any thrown value).
+ * @param fallbackKey the command's `replies:<feature>.failed` key.
+ * @param traceId correlation id, interpolated into the fallback copy.
+ */
+export const resolveErrorReply = (
+  translator: Translator | undefined,
+  error: unknown,
+  fallbackKey: string,
+  traceId: string,
+): string => {
+  if (translator === undefined) return '';
+  if (error instanceof DomainError) {
+    const resolved = translator.t(error.messageKey, error.messageParams);
+    // i18next returns the key unchanged on a catalog miss. Fall back to
+    // the toned per-feature copy rather than show a raw key.
+    if (resolved !== error.messageKey && resolved.length > 0) {
+      return resolved;
+    }
+    return translator.t(fallbackKey, { traceId });
+  }
+  return translator.t(fallbackKey, { traceId });
+};
+
+/** Context the boundary helper needs from the `BaseBot` instance. */
+export interface ErrorReplyBot {
+  readonly logger: Logger | undefined;
+  readonly clientId: string;
+  readonly translator: Translator | undefined;
+}
+
+/**
+ * Handle a handler-boundary error: write the operator log and send the
+ * user-facing reply, both stamped with the same `traceId`.
+ *
+ * @param interaction the interaction whose handler threw.
+ * @param bot the running bot (logger / clientId / translator).
+ * @param error the caught value.
+ * @param fallbackKey the command's `replies:<feature>.failed` key, used
+ *   only when `error` is not a `DomainError`.
+ * @param guildId optional guild id for the structured log scope.
+ */
+export const replyForError = async (
+  interaction: HandlerInteraction,
+  bot: ErrorReplyBot,
+  error: unknown,
+  fallbackKey: string,
+  guildId?: string | null,
+): Promise<void> => {
+  const traceId = generateTraceId();
+  // Operator channel: always log the full error. The `traceId` is
+  // attached so the line correlates with the user-facing fallback
+  // message; for a `DomainError` the id is unused by the user channel
+  // but still recorded for completeness.
+  logError(bot.logger, bot.clientId, guildId ?? null, error);
+  logSystem(bot.logger, bot.clientId, ops.router.handlerError(traceId));
+  // User channel.
+  const content = resolveErrorReply(bot.translator, error, fallbackKey, traceId);
+  await sendUserChannel(bot, interaction, content);
+};

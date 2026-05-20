@@ -6,20 +6,16 @@ import {
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class bug_report extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "bug_report",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "回報問題",
             options: {
                 string: [
                     {
                         name: "content",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "問題描述",
                         required: true
                     }
                 ]
@@ -48,8 +44,7 @@ export default class bug_report extends Command {
                 throw new Error("Admin not found");
             }
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: bot.translator?.t('replies:bug_report.failed') ?? '', flags: MessageFlags.Ephemeral });
+            await replyForError(interaction, bot, error, 'replies:bug_report.failed', interaction.guild?.id);
         }
     }
 }

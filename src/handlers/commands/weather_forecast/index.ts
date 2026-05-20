@@ -5,14 +5,12 @@ import axios from 'axios';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class weather_forecast extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "weather_forecast",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "天氣預報(台北)"
         });
     }
 
@@ -43,8 +41,7 @@ export default class weather_forecast extends Command {
             const formattedContentWithBackticks = formattedContent;
             await interaction.editReply({ content: formattedContentWithBackticks });
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:weather_forecast.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:weather_forecast.failed', interaction.guild?.id);
         }
     }
 }

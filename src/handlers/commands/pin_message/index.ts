@@ -3,34 +3,25 @@ import { ChannelType } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 // deprecated, discord has added native pin permission
 export default class pin_message extends Command {
   constructor() {
     super();
     this.setConfig({
-      // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations / description_localizations.
       name: 'pin_message',
-      // i18n-ignore: command-builder metadata; localised in PR 6-3.
-      description: '釘選訊息',
       options: {
         string: [
           {
             name: 'action',
-            // i18n-ignore: command-builder metadata; localised in PR 6-3.
-            description: '釘選或取消釘選',
             required: true,
             choices: [
-              // i18n-ignore: command-choice metadata; localised in PR 6-3.
-              { name: '釘選', value: 'pin' },
-              // i18n-ignore: command-choice metadata; localised in PR 6-3.
-              { name: '取消釘選', value: 'unpin' },
+              { value: 'pin' },
+              { value: 'unpin' },
             ],
           },
           {
             name: 'message_link',
-            // i18n-ignore: command-builder metadata; localised in PR 6-3.
-            description: '要釘選的訊息連結',
             required: true,
           },
         ],
@@ -77,8 +68,7 @@ export default class pin_message extends Command {
         });
       }
     } catch (error) {
-      logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-      await interaction.editReply({ content: t?.t('replies:pin_message.operation_failed') });
+        await replyForError(interaction, bot, error, 'replies:pin_message.failed', interaction.guild?.id);
     }
   }
 }

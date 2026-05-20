@@ -8,6 +8,7 @@ import type {
 import { DiscordAPIError, MessageFlags } from 'discord.js';
 import type { BaseBot } from '@bot';
 
+import { asGuildId } from '../core/ids';
 import { ops } from '../core/logger';
 import type { Repos } from '../persistence/repositories';
 
@@ -75,10 +76,10 @@ const replyOrEdit = async (
  * if (repos === null) return;
  * ```
  *
- * The helper is the only place that knows about
- * {@link BaseBot.disabledGuilds}; handlers stay ignorant of the
- * transient/persistent split and only see the resolved `Repos` (or
- * an already-sent reply).
+ * The helper is the only place that knows about the
+ * {@link BaseBot.connectionManager}'s disabled-guild set; handlers
+ * stay ignorant of the transient/persistent split and only see the
+ * resolved `Repos` (or an already-sent reply).
  */
 export const requireGuildRepos = async (
     bot: BaseBot,
@@ -94,12 +95,16 @@ export const requireGuildRepos = async (
         return null;
     }
 
-    const disabled = bot.disabledGuilds.get(guildId);
+    // Gap D5 (C6 slice): read the disabled state straight from the
+    // ConnectionManager rather than the legacy `BaseBot.disabledGuilds`
+    // projection. The manager owns retry / transient-vs-persistent
+    // classification and stamps the `traceId`, so `isDisabled` is the
+    // single source of truth — the `traceId` surfaced here is exactly
+    // the one written to the structured boot log, letting operators
+    // correlate a support ticket ("got error xxxxxx") with the
+    // originating connection failure via `grep traceId=<id>`.
+    const disabled = bot.connectionManager?.isDisabled(asGuildId(guildId));
     if (disabled !== undefined) {
-        // The traceId was stamped at boot when `connectOneGuild` failed
-        // for this guild, and is in the systemLogger line. Surfacing
-        // the same id here lets operators correlate a support ticket
-        // ("got error xxxxxx") with the originating boot failure.
         await replyOrEdit(
             bot,
             interaction,

@@ -4,50 +4,36 @@ import type {
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class emoji_frequency extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "emoji_frequency",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "統計表情符號使用頻率",
             options: {
                 string: [
                     {
                         name: "frequency",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "頻率順序 (optional)",
                         required: false,
                         choices: [
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "前n低頻率", value: "asc" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "前n高頻率", value: "desc" }
+                            { value: "asc" },
+                            { value: "desc" }
                         ]
                     },{
                         name: "type",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "動態或靜態 (optional)",
                         required: false,
                         choices: [
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "動態", value: "animated" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "靜態", value: "static" }
+                            { value: "animated" },
+                            { value: "static" }
                         ]
                     }
                 ],
                 number: [
                     {
                         name: "top_n",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "前n名 (optional, max: 30)",
                         required: false
                     },{
                         name: "last_n_months",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "搜尋過去n個月 (optional, max: 24)",
                         required: false
                     }
                 ]
@@ -170,8 +156,7 @@ export default class emoji_frequency extends Command {
                 await interaction.editReply({ content: bot.translator?.t('replies:emoji_frequency.done') ?? '' });
             }
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:emoji_frequency.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:emoji_frequency.failed', interaction.guild?.id);
         }
     }
 }

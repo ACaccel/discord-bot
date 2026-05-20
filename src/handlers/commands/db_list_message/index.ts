@@ -12,7 +12,7 @@ import { Command } from "@cmd";
 import type { ChannelId } from "../../../core/ids";
 import type { MessageDoc } from "../../../persistence/schemas/message.schema";
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 // Audit C-1 reviewer follow-up: the local DbMessage shape was a hand-
 // maintained copy of the persistence schema. Aliasing it to the typed
 // `MessageDoc` keeps the handler reactive to schema changes — a future
@@ -103,42 +103,30 @@ export default class db_list_message extends Command {
         super();
         this.setConfig({
             name: "db_list_message",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "列出特定頻道、特定日期、特定時段(hour)的訊息紀錄",
             options: {
                 channel: [
                     {
                         name: "channel",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "要查詢的頻道/討論串",
                         required: true,
                     },
                 ],
                 string: [
                     {
                         name: "date",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "日期 (YYYY-MM-DD)",
                         required: true,
                     },
                     {
                         name: "print",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "是否直接發成訊息 (yes: 直接發訊息, no: 文字檔, 預設 no)",
                         required: false,
                         choices: [
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "文字檔 (預設)", value: "no" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "訊息", value: "yes" },
+                            { value: "no" },
+                            { value: "yes" },
                         ],
                     }
                 ],
                 number: [
                     {
                         name: "hour",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "時段 (0-23)",
                         required: false,
                     },
                 ],
@@ -327,8 +315,7 @@ export default class db_list_message extends Command {
                 });
             }
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:db_list_message.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:db_list_message.failed', interaction.guild?.id);
         }
     }
 }

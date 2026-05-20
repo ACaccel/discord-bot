@@ -8,15 +8,14 @@ import {
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class menu_get_sticker extends Command {
     constructor() {
         super();
         this.setConfig({
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            name: "取得表符/貼圖連結",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "取得訊息中的表符/貼圖連結 (單一表符或貼圖)",
+            // Stable ASCII id; the user-facing Discord name is resolved
+            // from `commands:menu_get_sticker.name` (gap D7).
+            name: "menu_get_sticker",
             type: ApplicationCommandType.Message as ContextMenuCommandType,
         });
     }
@@ -72,8 +71,7 @@ export default class menu_get_sticker extends Command {
             // No stickers or emoji found
             await interaction.editReply({ content: bot.translator?.t('replies:menu_get_sticker.not_found') ?? '' });
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:menu_get_sticker.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:menu_get_sticker.failed', interaction.guild?.id);
         }
     }
 }

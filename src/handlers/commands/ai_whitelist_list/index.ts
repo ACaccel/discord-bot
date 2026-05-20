@@ -5,14 +5,12 @@ import { Command } from '@cmd';
 
 import { requireGuildRepos } from '../../require-guild-repos';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class ai_whitelist_list extends Command {
     constructor() {
         super();
         this.setConfig({
             name: 'ai_whitelist_list',
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: '列出目前 AI 白名單的所有用戶',
         });
     }
 
@@ -54,8 +52,7 @@ export default class ai_whitelist_list extends Command {
                 await interaction.followUp({ content: pages[i]!, flags: MessageFlags.Ephemeral });
             }
         } catch (err) {
-            logError(bot.logger, bot.clientId, interaction.guildId, err);
-            await interaction.editReply({ content: bot.translator?.t('errors:db.operation_failed') ?? '' });
+            await replyForError(interaction, bot, err, 'replies:ai_whitelist.failed', interaction.guildId);
         }
     }
 }

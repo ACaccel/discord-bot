@@ -5,104 +5,50 @@ import axios from 'axios';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
+import restaurant_types from './restaurant-types.json';
+
 import { logError } from '@core/logger';
 export default class random_restaurant extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "random_restaurant",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "隨機餐廳抽取器 (台北/部分新北地區)",
             options: {
                 string: [
                     {
                         name: "type",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "餐廳種類",
                         required: false,
-                        choices: [
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "壽司", value: "壽司" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "美式", value: "美式" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "中式", value: "中式" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "日式", value: "日式" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "韓式", value: "韓式" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "義式", value: "義式" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "泰式", value: "泰式" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "拉麵", value: "拉麵" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "燒烤", value: "燒烤" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "咖啡", value: "咖啡" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "早餐", value: "早餐" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "早午餐", value: "早午餐" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "自助餐", value: "自助餐" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "吃到飽", value: "吃到飽" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "貓咖", value: "貓咖" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "酒吧", value: "酒吧" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "甜點店", value: "甜點店" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "速食", value: "速食" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "法式", value: "法式" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "印度", value: "印度" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "印尼", value: "印尼" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "地中海", value: "地中海" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "披薩", value: "披薩" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "海鮮", value: "海鮮" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "牛排", value: "牛排" }
-                        ]
+                        // Gap D7: restaurant-type choices live in the
+                        // colocated `restaurant-types.json` data file so the
+                        // CJK choice strings stay out of this `.ts` source.
+                        // `name` and `value` are kept identical because the
+                        // food API matches the request `type` parameter against
+                        // these exact strings.
+                        choices: restaurant_types.map((type) => ({
+                            name: type,
+                            value: type,
+                        }))
                     },
                     {
                         name: "name_keyword",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "餐廳名稱關鍵字",
                         required: false
                     },
                     {
                         name: "address_keyword",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "餐廳地址關鍵字",
                         required: false
                     }
                 ],
                 number: [
                     {
                         name: "budget",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "預算（整數）",
                         required: false
                     },
                     {
                         name: "min_rating",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "最低評分",
                         required: false
                     },
                     {
                         name: "max_rating",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "最高評分",
                         required: false
                     }
                 ]

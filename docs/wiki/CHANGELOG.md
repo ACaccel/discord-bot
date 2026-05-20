@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-05-21 — C6 D5/D7/D9 落地（handler 缺口收斂）
+
+- **元件**：C6 Handlers
+- **缺口**：D5（C6 切片）、D7（方案 A）、D9（方案 B）
+- **變更**：
+  - **D5** — `requireGuildRepos` 的 disabled-guild 守衛改讀
+    `bot.connectionManager?.isDisabled(...)`,不再經 `BaseBot.disabledGuilds`
+    getter;`traceId` 直接取自 `ConnectionManager`。`BaseBot` 新增唯讀
+    `connectionManager` getter(對齊 `translator`/`logger`/`env` 模式,使
+    handler 層免於 import IoC 容器)。
+  - **D7** — 指令 metadata 去 CJK literal。`CommandConfig` /
+    `CommandOption` 的 `description` 改為選填,由新 helper
+    `localizeCommandConfig(config, translator)` 從 `commands` 命名空間
+    catalog 解析(key 依命令/選項名稱推導),回傳 `LocalizedCommandConfig`;
+    `buildCommandJsonBody` 改收 `LocalizedCommandConfig`;`getCommandJsonBody`
+    / `deploy.ts` / `help` 於 build 時解析。context-menu 指令顯示名稱由
+    `commands:<id>.name` 解析(`config.name` 改存 ASCII id,`registerCommands`
+    以 localized 名稱作 `commandHandlers` key)。`change_avatar` /
+    `random_restaurant` 的 CJK-valued choices 移至 colocated JSON 資料檔;
+    其餘 ASCII-valued choices 的 CJK 顯示名稱補入 `commands.json` 的
+    `choices` key(`zh-TW` + `en` 雙語)。`src/handlers/` 指令 metadata
+    已無 `// i18n-ignore`。指令 metadata/型別自 `commands/index.ts` 抽至
+    新檔 `commands/command.ts`(切斷對 generated registry 的依賴鏈)。
+  - **D9** — 新增 handler 邊界 helper `replyForError` /
+    `resolveErrorReply`（`src/handlers/reply-for-error.ts`):operator
+    通道恆記結構化 log + `traceId`(新增 `ops.router.handlerError`);
+    user 通道對 `DomainError` 依 `messageKey` 回覆、對非 `DomainError`
+    回退 `replies:<feature>.failed` 並附 `traceId`。31 個指令 handler +
+    `modals/ai_settings` 的 catch 改為 `replyForError(...)`
+    (`random_restaurant` 保留專屬時段回退 UX)。
+  - **測試** — 新增 `test/unit/handlers/` 三個 unit 套件(`replyForError`
+    雙通道、`localizeCommandConfig`、`requireGuildRepos` D5);`vitest`
+    workspace 補齊 handler 路徑 alias 使 handler 層可單元測試。
+- **影響**：handler 對 `DomainError` 改依 taxonomy 回覆、非 `DomainError`
+  之 `.failed` 回退附錯誤代碼(D9 明文允許的行為變更);其餘對外行為等價
+  —— 部署的指令 JSON 字串與重構前一致。
+
 ## 2026-05-21 — C5 D5 落地（`ConnectionManager` retry / 降級分類）
 
 - **元件**：C5 Infra Adapters

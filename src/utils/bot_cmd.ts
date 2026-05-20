@@ -8,8 +8,8 @@ import {
 } from 'discord.js';
 import { ActionRowBuilder, ButtonBuilder, ContextMenuCommandBuilder, SlashCommandBuilder } from '@discordjs/builders';
 import type {
-    CommandConfig,
-    CommandOption,
+    LocalizedCommandConfig,
+    LocalizedCommandOption,
 } from '@cmd';
 
 interface ButtonConfig {
@@ -34,7 +34,7 @@ export const buildButtonRows = (button_config: ButtonConfig[]) => {
     return rows;
 }
 
-export const buildCommandJsonBody = (config: CommandConfig) => {
+export const buildCommandJsonBody = (config: LocalizedCommandConfig) => {
     // Context menu
     if (
         config.type === ApplicationCommandType.User ||
@@ -64,14 +64,14 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
     ] as const;    
 
     const optionHandlers = {
-        user: (e: CommandOption) =>
+        user: (e: LocalizedCommandOption) =>
             slashCommand.addUserOption(o =>
                 o.setName(e.name)
                  .setDescription(e.description)
                  .setRequired(e.required)
             ),
 
-        channel: (e: CommandOption) =>
+        channel: (e: LocalizedCommandOption) =>
             slashCommand.addChannelOption(o =>
                 o.setName(e.name)
                  .setDescription(e.description)
@@ -79,7 +79,7 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
                  .addChannelTypes(...channelTypes)
             ),
 
-        string: (e: CommandOption) =>
+        string: (e: LocalizedCommandOption) =>
             slashCommand.addStringOption(o => {
                 o.setName(e.name)
                  .setDescription(e.description)
@@ -91,7 +91,7 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
                 return o;
             }),
 
-        number: (e: CommandOption) =>
+        number: (e: LocalizedCommandOption) =>
             slashCommand.addIntegerOption(o => {
                 o.setName(e.name)
                  .setDescription(e.description)
@@ -101,7 +101,7 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
                 return o;
             }),
 
-        float: (e: CommandOption) =>
+        float: (e: LocalizedCommandOption) =>
             slashCommand.addNumberOption(o => {
                 o.setName(e.name)
                  .setDescription(e.description)
@@ -111,7 +111,7 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
                 return o;
             }),
 
-        attachment: (e: CommandOption) =>
+        attachment: (e: LocalizedCommandOption) =>
             slashCommand.addAttachmentOption(o =>
                 o.setName(e.name)
                  .setDescription(e.description)
@@ -120,7 +120,7 @@ export const buildCommandJsonBody = (config: CommandConfig) => {
     } as const;
 
     // required first, optional second
-    const allOptions: { type: keyof typeof optionHandlers; data: CommandOption }[] = [];
+    const allOptions: { type: keyof typeof optionHandlers; data: LocalizedCommandOption }[] = [];
     for (const [type, options] of Object.entries(config.options)) {
         const handler = optionHandlers[type as keyof typeof optionHandlers];
         if (!handler) continue;

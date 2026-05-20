@@ -8,15 +8,14 @@ import {
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class menu_get_avatar extends Command {
     constructor() {
         super();
         this.setConfig({
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            name: "取得用戶頭像連結",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "取得用戶的頭像 URL",
+            // Stable ASCII id; the user-facing Discord name is resolved
+            // from `commands:menu_get_avatar.name` (gap D7).
+            name: "menu_get_avatar",
             type: ApplicationCommandType.User as ContextMenuCommandType,
         });
     }
@@ -38,8 +37,7 @@ export default class menu_get_avatar extends Command {
 
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:menu_get_avatar.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:menu_get_avatar.failed', interaction.guild?.id);
         }
     }
 }

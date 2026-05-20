@@ -2,28 +2,42 @@
   "activity_create": {
     "description": "建立活動",
     "options": {
-      "title": { "description": "活動標題" },
-      "duration": { "description": "活動時限 (1s, 1m, 1h, 1d, 1w)" },
-      "description": { "description": "活動描述 (optional)" }
+      "title": {
+        "description": "活動標題"
+      },
+      "duration": {
+        "description": "活動時限 (1s, 1m, 1h, 1d, 1w)"
+      },
+      "description": {
+        "description": "活動描述 (optional)"
+      }
     }
   },
   "activity_delete": {
     "description": "刪除活動",
     "options": {
-      "activity_id": { "description": "活動ID" }
+      "activity_id": {
+        "description": "活動ID"
+      }
     }
   },
   "add_reply": {
     "description": "新增自動回覆",
     "options": {
-      "keyword": { "description": "關鍵字" },
-      "reply": { "description": "回覆" }
+      "keyword": {
+        "description": "關鍵字"
+      },
+      "reply": {
+        "description": "回覆"
+      }
     }
   },
   "ai_settings": {
     "description": "一次性編輯你的 AI 設定（model / temperature / web search / system prompt）",
     "options": {
-      "provider": { "description": "選擇 AI provider，後續 model 候選將依此 provider 動態載入" }
+      "provider": {
+        "description": "選擇 AI provider，後續 model 候選將依此 provider 動態載入"
+      }
     }
   },
   "ai_status": {
@@ -32,7 +46,9 @@
   "ai_whitelist_add": {
     "description": "[管理員] 將用戶加入 AI 白名單",
     "options": {
-      "user": { "description": "要加入白名單的用戶" }
+      "user": {
+        "description": "要加入白名單的用戶"
+      }
     }
   },
   "ai_whitelist_list": {
@@ -41,45 +57,63 @@
   "ai_whitelist_remove": {
     "description": "[管理員] 將用戶從 AI 白名單移除",
     "options": {
-      "user": { "description": "要移除的用戶" }
+      "user": {
+        "description": "要移除的用戶"
+      }
     }
   },
   "ban_user": {
     "description": "暫時禁言使用者(ban_threshold: 5 votes, judge_time: 1 min)",
     "options": {
-      "user": { "description": "被禁言的使用者" },
-      "duration": { "description": "禁言時限 (單位: 分鐘, max: 5)" }
+      "user": {
+        "description": "被禁言的使用者"
+      },
+      "duration": {
+        "description": "禁言時限 (單位: 分鐘, max: 5)"
+      }
     }
   },
   "bubble_wrap": {
     "description": "產生泡泡紙",
     "options": {
-      "str": { "description": "隱藏字" }
+      "str": {
+        "description": "隱藏字"
+      }
     }
   },
   "bug_report": {
     "description": "回報問題",
     "options": {
-      "content": { "description": "問題描述" }
+      "content": {
+        "description": "問題描述"
+      }
     }
   },
   "change_avatar": {
     "description": "人格變換",
     "options": {
-      "identity": { "description": "就是身分" }
+      "identity": {
+        "description": "就是身分"
+      }
     }
   },
   "change_nickname": {
     "description": "更改bot暱稱",
     "options": {
-      "nickname": { "description": "新暱稱" }
+      "nickname": {
+        "description": "新暱稱"
+      }
     }
   },
   "db_list_message": {
     "description": "列出特定頻道、特定日期、特定時段(hour)的訊息紀錄",
     "options": {
-      "channel": { "description": "要查詢的頻道/討論串" },
-      "date": { "description": "日期 (YYYY-MM-DD)" },
+      "channel": {
+        "description": "要查詢的頻道/討論串"
+      },
+      "date": {
+        "description": "日期 (YYYY-MM-DD)"
+      },
       "print": {
         "description": "是否直接發成訊息 (yes: 直接發訊息, no: 文字檔, 預設 no)",
         "choices": {
@@ -87,13 +121,17 @@
           "yes": "訊息"
         }
       },
-      "hour": { "description": "時段 (0-23)" }
+      "hour": {
+        "description": "時段 (0-23)"
+      }
     }
   },
   "delete_reply": {
     "description": "刪除自動回覆",
     "options": {
-      "keyword": { "description": "關鍵字" }
+      "keyword": {
+        "description": "關鍵字"
+      }
     }
   },
   "emoji_frequency": {
@@ -113,35 +151,53 @@
           "static": "靜態"
         }
       },
-      "top_n": { "description": "前n名 (optional, max: 30)" },
-      "last_n_months": { "description": "搜尋過去n個月 (optional, max: 24)" }
+      "top_n": {
+        "description": "前n名 (optional, max: 30)"
+      },
+      "last_n_months": {
+        "description": "搜尋過去n個月 (optional, max: 24)"
+      }
     }
   },
   "gay": {
     "description": "是不是給",
     "options": {
-      "user": { "description": "選擇對象" }
+      "user": {
+        "description": "選擇對象"
+      }
     }
   },
   "get_avatar": {
     "description": "取得使用者頭像",
     "options": {
-      "user": { "description": "選擇對象" }
+      "user": {
+        "description": "選擇對象"
+      }
     }
   },
   "giveaway_create": {
     "description": "建立抽獎",
     "options": {
-      "duration": { "description": "抽獎時限 (1s, 1m, 1h, 1d, 1w)" },
-      "prize": { "description": "獎品" },
-      "description": { "description": "抽獎描述 (optional)" },
-      "winner_num": { "description": "中獎人數" }
+      "duration": {
+        "description": "抽獎時限 (1s, 1m, 1h, 1d, 1w)"
+      },
+      "prize": {
+        "description": "獎品"
+      },
+      "description": {
+        "description": "抽獎描述 (optional)"
+      },
+      "winner_num": {
+        "description": "中獎人數"
+      }
     }
   },
   "giveaway_delete": {
     "description": "刪除抽獎",
     "options": {
-      "message_id": { "description": "抽獎訊息ID (Bot發布的公告)" }
+      "message_id": {
+        "description": "抽獎訊息ID (Bot發布的公告)"
+      }
     }
   },
   "give_score": {
@@ -153,14 +209,20 @@
   "inspect_member_ids": {
     "description": "檢查多個 ID 是否在本 guild，並列出可查資訊",
     "options": {
-      "ids": { "description": "可貼多個 ID（逗號/空白/換行分隔）" }
+      "ids": {
+        "description": "可貼多個 ID（逗號/空白/換行分隔）"
+      }
     }
   },
   "level_detail": {
     "description": "查看等級詳細資訊",
     "options": {
-      "left": { "description": "左邊界" },
-      "right": { "description": "右邊界" }
+      "left": {
+        "description": "左邊界"
+      },
+      "right": {
+        "description": "右邊界"
+      }
     }
   },
   "list_guild_members": {
@@ -169,7 +231,9 @@
   "list_reply": {
     "description": "列出自動回覆",
     "options": {
-      "keyword": { "description": "關鍵字" }
+      "keyword": {
+        "description": "關鍵字"
+      }
     }
   },
   "menu_get_avatar": {
@@ -188,18 +252,32 @@
           "unpin": "取消釘選"
         }
       },
-      "message_link": { "description": "要釘選的訊息連結" }
+      "message_link": {
+        "description": "要釘選的訊息連結"
+      }
     }
   },
   "random_restaurant": {
     "description": "隨機餐廳抽取器 (台北/部分新北地區)",
     "options": {
-      "type": { "description": "餐廳種類" },
-      "name_keyword": { "description": "餐廳名稱關鍵字" },
-      "address_keyword": { "description": "餐廳地址關鍵字" },
-      "budget": { "description": "預算（整數）" },
-      "min_rating": { "description": "最低評分" },
-      "max_rating": { "description": "最高評分" }
+      "type": {
+        "description": "餐廳種類"
+      },
+      "name_keyword": {
+        "description": "餐廳名稱關鍵字"
+      },
+      "address_keyword": {
+        "description": "餐廳地址關鍵字"
+      },
+      "budget": {
+        "description": "預算（整數）"
+      },
+      "min_rating": {
+        "description": "最低評分"
+      },
+      "max_rating": {
+        "description": "最高評分"
+      }
     }
   },
   "record": {
@@ -213,27 +291,39 @@
           "save": "儲存音檔 (last n minutes)"
         }
       },
-      "duration": { "description": "錄音時間長度 (last n minutes) (optional)" }
+      "duration": {
+        "description": "錄音時間長度 (last n minutes) (optional)"
+      }
     }
   },
   "role_message": {
     "description": "發送身份組領取訊息",
     "options": {
-      "roles": { "description": "可領取身份組id (ex: @身份組1 @身份組2...)" }
+      "roles": {
+        "description": "可領取身份組id (ex: @身份組1 @身份組2...)"
+      }
     }
   },
   "roll_call": {
     "description": "點名",
     "options": {
-      "users": { "description": "被點名者 (ex: @user1 @user2...)" },
-      "activity_id": { "description": "活動ID (用於連動活動參與者點名)" }
+      "users": {
+        "description": "被點名者 (ex: @user1 @user2...)"
+      },
+      "activity_id": {
+        "description": "活動ID (用於連動活動參與者點名)"
+      }
     }
   },
   "search_anime_scene": {
     "description": "搜尋動漫截圖來源",
     "options": {
-      "image": { "description": "動漫截圖" },
-      "display_num": { "description": "顯示幾筆搜尋結果 (optional)" }
+      "image": {
+        "description": "動漫截圖"
+      },
+      "display_num": {
+        "description": "顯示幾筆搜尋結果 (optional)"
+      }
     }
   },
   "sticker_frequency": {
@@ -246,21 +336,31 @@
           "desc": "前n高頻率"
         }
       },
-      "top_n": { "description": "前n名 (optional, max: 30)" },
-      "last_n_months": { "description": "搜尋過去n個月 (optional, max: 24)" }
+      "top_n": {
+        "description": "前n名 (optional, max: 30)"
+      },
+      "last_n_months": {
+        "description": "搜尋過去n個月 (optional, max: 24)"
+      }
     }
   },
   "talk": {
     "description": "讓機器人說話",
     "options": {
-      "channel": { "description": "選擇頻道" },
-      "content": { "description": "就是內容" }
+      "channel": {
+        "description": "選擇頻道"
+      },
+      "content": {
+        "description": "就是內容"
+      }
     }
   },
   "talk_signed": {
     "description": "讓機器人說話(署名)",
     "options": {
-      "content": { "description": "就是內容" }
+      "content": {
+        "description": "就是內容"
+      }
     }
   },
   "todo_list": {
@@ -274,7 +374,9 @@
           "list": "查看"
         }
       },
-      "content": { "description": "內容 (optional)" }
+      "content": {
+        "description": "內容 (optional)"
+      }
     }
   },
   "update_role": {

@@ -136,6 +136,26 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         return view;
     }
 
+    /**
+     * Typed accessor for the per-bot {@link ConnectionManager} (gap D5,
+     * C6 slice).
+     *
+     * Mirrors the {@link translator} / {@link logger} / {@link env}
+     * accessor pattern: handler-layer code (notably
+     * `requireGuildRepos`) must not import the IoC container — the
+     * eslint `no-restricted-imports` rule blocks `@core/ioc` outside
+     * composition roots — so the disabled-guild query reaches the
+     * manager through this getter instead of the legacy
+     * {@link disabledGuilds} projection.
+     *
+     * Returns `undefined` only in the pre-`run()` window or when the
+     * bot was constructed without a `MONGO_URI`; any handler-context
+     * callsite that needs it null-checks before reading.
+     */
+    public get connectionManager(): ConnectionManager | undefined {
+        return this.container.tryResolve<ConnectionManager>(TOKENS.ConnectionManager);
+    }
+
     public commandHandlers: Map<string, Command>;
     public buttonHandler: Map<string, ButtonHandler>;
     public ssmHandler: Map<string, SSMHandler>;

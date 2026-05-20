@@ -36,14 +36,10 @@ export default class ai_settings extends Command {
         super();
         this.setConfig({
             name: 'ai_settings',
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: '一次性編輯你的 AI 設定（model / temperature / web search / system prompt）',
             options: {
                 string: [
                     {
                         name: 'provider',
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: '選擇 AI provider，後續 model 候選將依此 provider 動態載入',
                         required: true,
                         choices: PROVIDER_CHOICES,
                     },

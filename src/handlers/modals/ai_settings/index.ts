@@ -6,7 +6,7 @@ import { ModalHandler } from '@modal';
 import { type LLMProviderName } from '../../../infra/llm';
 import { requireGuildRepos } from '../../require-guild-repos';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set(['xai', 'openai', 'anthropic', 'gemini']);
 
 export default class ai_settings_modal extends ModalHandler {
@@ -63,8 +63,7 @@ export default class ai_settings_modal extends ModalHandler {
             });
             if (!updateResult.ok) throw updateResult.error;
         } catch (err) {
-            logError(bot.logger, bot.clientId, interaction.guildId, err);
-            await interaction.reply({ content: bot.translator?.t('errors:db.operation_failed') ?? '', flags: MessageFlags.Ephemeral });
+            await replyForError(interaction, bot, err, 'replies:ai_settings.failed', interaction.guildId);
             return;
         }
 

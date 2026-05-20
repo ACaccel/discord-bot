@@ -10,37 +10,28 @@ import path from 'path';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 
 export default class record extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "record",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "錄音",
             options: {
                 string: [
                     {
                         name: "action",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "開始或停止錄音",
                         required: true,
                         choices: [
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "開始", value: "start" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "停止", value: "stop" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "儲存音檔 (last n minutes)", value: "save" }
+                            { value: "start" },
+                            { value: "stop" },
+                            { value: "save" }
                         ]
                     }
                 ],
                 number: [
                     {
                         name: "duration",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "錄音時間長度 (last n minutes) (optional)",
                         required: false
                     }
                 ]
@@ -114,8 +105,7 @@ export default class record extends Command {
                 await interaction.editReply({ content: t('replies:record.invalid_action') });
             }
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: t('replies:record.failed') });
+            await replyForError(interaction, bot, error, 'replies:record.failed', interaction.guild?.id);
         }
     }
 }

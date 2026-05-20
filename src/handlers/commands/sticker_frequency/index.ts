@@ -5,39 +5,29 @@ import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { misc } from '@utils';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class sticker_frequency extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "sticker_frequency",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "統計貼圖使用頻率",
             options: {
                 string: [
                     {
                         name: "frequency",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "頻率順序 (optional)",
                         required: false,
                         choices: [
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "前n低頻率", value: "asc" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "前n高頻率", value: "desc" }
+                            { value: "asc" },
+                            { value: "desc" }
                         ]
                     }
                 ],
                 number: [
                     {
                         name: "top_n",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "前n名 (optional, max: 30)",
                         required: false
                     },{
                         name: "last_n_months",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "搜尋過去n個月 (optional, max: 24)",
                         required: false
                     }
                 ]
@@ -133,8 +123,7 @@ export default class sticker_frequency extends Command {
     
             await interaction.editReply({ content: content, files: attachment ? [attachment] : [] });
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:sticker_frequency.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:sticker_frequency.failed', interaction.guild?.id);
         }
     }
 }

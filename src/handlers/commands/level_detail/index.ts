@@ -5,25 +5,19 @@ import Mee6LevelsApi from 'mee6-levels-api';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class level_detail extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "level_detail",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "查看等級詳細資訊",
             options: {
                 number: [
                     {
                         name: "left",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "左邊界",
                         required: true
                     },{
                         name: "right",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "右邊界",
                         required: true
                     }
                 ]
@@ -60,8 +54,7 @@ export default class level_detail extends Command {
                 await interaction.editReply({ content: bot.translator?.t('replies:level_detail.too_long') ?? '' });
             }
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:level_detail.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:level_detail.failed', interaction.guild?.id);
         }
     }
 }

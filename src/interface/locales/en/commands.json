@@ -2,22 +2,34 @@
   "activity_create": {
     "description": "Create an activity",
     "options": {
-      "title": { "description": "Activity title" },
-      "duration": { "description": "Activity duration (1s, 1m, 1h, 1d, 1w)" },
-      "description": { "description": "Activity description (optional)" }
+      "title": {
+        "description": "Activity title"
+      },
+      "duration": {
+        "description": "Activity duration (1s, 1m, 1h, 1d, 1w)"
+      },
+      "description": {
+        "description": "Activity description (optional)"
+      }
     }
   },
   "activity_delete": {
     "description": "Delete an activity",
     "options": {
-      "activity_id": { "description": "Activity ID" }
+      "activity_id": {
+        "description": "Activity ID"
+      }
     }
   },
   "add_reply": {
     "description": "Add an auto-reply",
     "options": {
-      "keyword": { "description": "Keyword" },
-      "reply": { "description": "Reply" }
+      "keyword": {
+        "description": "Keyword"
+      },
+      "reply": {
+        "description": "Reply"
+      }
     }
   },
   "ai_settings": {
@@ -34,7 +46,9 @@
   "ai_whitelist_add": {
     "description": "[Admin] Add a user to the AI whitelist",
     "options": {
-      "user": { "description": "The user to add to the whitelist" }
+      "user": {
+        "description": "The user to add to the whitelist"
+      }
     }
   },
   "ai_whitelist_list": {
@@ -43,45 +57,63 @@
   "ai_whitelist_remove": {
     "description": "[Admin] Remove a user from the AI whitelist",
     "options": {
-      "user": { "description": "The user to remove" }
+      "user": {
+        "description": "The user to remove"
+      }
     }
   },
   "ban_user": {
     "description": "Temporarily time out a user (ban_threshold: 5 votes, judge_time: 1 min)",
     "options": {
-      "user": { "description": "The user to time out" },
-      "duration": { "description": "Timeout duration (unit: minutes, max: 5)" }
+      "user": {
+        "description": "The user to time out"
+      },
+      "duration": {
+        "description": "Timeout duration (unit: minutes, max: 5)"
+      }
     }
   },
   "bubble_wrap": {
     "description": "Generate bubble wrap",
     "options": {
-      "str": { "description": "Hidden text" }
+      "str": {
+        "description": "Hidden text"
+      }
     }
   },
   "bug_report": {
     "description": "Report a bug",
     "options": {
-      "content": { "description": "Bug description" }
+      "content": {
+        "description": "Bug description"
+      }
     }
   },
   "change_avatar": {
     "description": "Switch persona",
     "options": {
-      "identity": { "description": "The identity to switch to" }
+      "identity": {
+        "description": "The identity to switch to"
+      }
     }
   },
   "change_nickname": {
     "description": "Change the bot's nickname",
     "options": {
-      "nickname": { "description": "New nickname" }
+      "nickname": {
+        "description": "New nickname"
+      }
     }
   },
   "db_list_message": {
     "description": "List message records for a specific channel, date, and hour",
     "options": {
-      "channel": { "description": "The channel/thread to query" },
-      "date": { "description": "Date (YYYY-MM-DD)" },
+      "channel": {
+        "description": "The channel/thread to query"
+      },
+      "date": {
+        "description": "Date (YYYY-MM-DD)"
+      },
       "print": {
         "description": "Whether to post directly as messages (yes: messages, no: text file, default no)",
         "choices": {
@@ -89,13 +121,17 @@
           "yes": "Messages"
         }
       },
-      "hour": { "description": "Hour (0-23)" }
+      "hour": {
+        "description": "Hour (0-23)"
+      }
     }
   },
   "delete_reply": {
     "description": "Delete an auto-reply",
     "options": {
-      "keyword": { "description": "Keyword" }
+      "keyword": {
+        "description": "Keyword"
+      }
     }
   },
   "emoji_frequency": {
@@ -104,8 +140,8 @@
       "frequency": {
         "description": "Frequency order (optional)",
         "choices": {
-          "asc": "Lowest frequency first",
-          "desc": "Highest frequency first"
+          "asc": "Lowest-N frequency",
+          "desc": "Highest-N frequency"
         }
       },
       "type": {
@@ -115,35 +151,53 @@
           "static": "Static"
         }
       },
-      "top_n": { "description": "Top n (optional, max: 30)" },
-      "last_n_months": { "description": "Search the past n months (optional, max: 24)" }
+      "top_n": {
+        "description": "Top n (optional, max: 30)"
+      },
+      "last_n_months": {
+        "description": "Search the past n months (optional, max: 24)"
+      }
     }
   },
   "gay": {
     "description": "Are they gay",
     "options": {
-      "user": { "description": "Choose a target" }
+      "user": {
+        "description": "Choose a target"
+      }
     }
   },
   "get_avatar": {
     "description": "Get a user's avatar",
     "options": {
-      "user": { "description": "Choose a target" }
+      "user": {
+        "description": "Choose a target"
+      }
     }
   },
   "giveaway_create": {
     "description": "Create a giveaway",
     "options": {
-      "duration": { "description": "Giveaway duration (1s, 1m, 1h, 1d, 1w)" },
-      "prize": { "description": "Prize" },
-      "description": { "description": "Giveaway description (optional)" },
-      "winner_num": { "description": "Number of winners" }
+      "duration": {
+        "description": "Giveaway duration (1s, 1m, 1h, 1d, 1w)"
+      },
+      "prize": {
+        "description": "Prize"
+      },
+      "description": {
+        "description": "Giveaway description (optional)"
+      },
+      "winner_num": {
+        "description": "Number of winners"
+      }
     }
   },
   "giveaway_delete": {
     "description": "Delete a giveaway",
     "options": {
-      "message_id": { "description": "Giveaway message ID (the announcement posted by the bot)" }
+      "message_id": {
+        "description": "Giveaway message ID (the announcement posted by the bot)"
+      }
     }
   },
   "give_score": {
@@ -155,14 +209,20 @@
   "inspect_member_ids": {
     "description": "Check whether multiple IDs are in this guild and list available info",
     "options": {
-      "ids": { "description": "Paste multiple IDs (separated by comma/space/newline)" }
+      "ids": {
+        "description": "Paste multiple IDs (separated by comma/space/newline)"
+      }
     }
   },
   "level_detail": {
     "description": "View detailed level information",
     "options": {
-      "left": { "description": "Left bound" },
-      "right": { "description": "Right bound" }
+      "left": {
+        "description": "Left bound"
+      },
+      "right": {
+        "description": "Right bound"
+      }
     }
   },
   "list_guild_members": {
@@ -171,7 +231,9 @@
   "list_reply": {
     "description": "List auto-replies",
     "options": {
-      "keyword": { "description": "Keyword" }
+      "keyword": {
+        "description": "Keyword"
+      }
     }
   },
   "menu_get_avatar": {
@@ -190,18 +252,32 @@
           "unpin": "Unpin"
         }
       },
-      "message_link": { "description": "Link to the message to pin" }
+      "message_link": {
+        "description": "Link to the message to pin"
+      }
     }
   },
   "random_restaurant": {
     "description": "Random restaurant picker (Taipei / parts of New Taipei)",
     "options": {
-      "type": { "description": "Restaurant type" },
-      "name_keyword": { "description": "Restaurant name keyword" },
-      "address_keyword": { "description": "Restaurant address keyword" },
-      "budget": { "description": "Budget (integer)" },
-      "min_rating": { "description": "Minimum rating" },
-      "max_rating": { "description": "Maximum rating" }
+      "type": {
+        "description": "Restaurant type"
+      },
+      "name_keyword": {
+        "description": "Restaurant name keyword"
+      },
+      "address_keyword": {
+        "description": "Restaurant address keyword"
+      },
+      "budget": {
+        "description": "Budget (integer)"
+      },
+      "min_rating": {
+        "description": "Minimum rating"
+      },
+      "max_rating": {
+        "description": "Maximum rating"
+      }
     }
   },
   "record": {
@@ -215,27 +291,39 @@
           "save": "Save audio (last n minutes)"
         }
       },
-      "duration": { "description": "Recording length (last n minutes) (optional)" }
+      "duration": {
+        "description": "Recording length (last n minutes) (optional)"
+      }
     }
   },
   "role_message": {
     "description": "Send a role-claim message",
     "options": {
-      "roles": { "description": "Claimable role IDs (ex: @role1 @role2...)" }
+      "roles": {
+        "description": "Claimable role IDs (ex: @role1 @role2...)"
+      }
     }
   },
   "roll_call": {
     "description": "Roll call",
     "options": {
-      "users": { "description": "Users to call (ex: @user1 @user2...)" },
-      "activity_id": { "description": "Activity ID (used to roll-call activity participants)" }
+      "users": {
+        "description": "Users to call (ex: @user1 @user2...)"
+      },
+      "activity_id": {
+        "description": "Activity ID (used to roll-call activity participants)"
+      }
     }
   },
   "search_anime_scene": {
     "description": "Search for the source of an anime screenshot",
     "options": {
-      "image": { "description": "Anime screenshot" },
-      "display_num": { "description": "How many search results to display (optional)" }
+      "image": {
+        "description": "Anime screenshot"
+      },
+      "display_num": {
+        "description": "How many search results to display (optional)"
+      }
     }
   },
   "sticker_frequency": {
@@ -244,25 +332,35 @@
       "frequency": {
         "description": "Frequency order (optional)",
         "choices": {
-          "asc": "Lowest frequency first",
-          "desc": "Highest frequency first"
+          "asc": "Lowest-N frequency",
+          "desc": "Highest-N frequency"
         }
       },
-      "top_n": { "description": "Top n (optional, max: 30)" },
-      "last_n_months": { "description": "Search the past n months (optional, max: 24)" }
+      "top_n": {
+        "description": "Top n (optional, max: 30)"
+      },
+      "last_n_months": {
+        "description": "Search the past n months (optional, max: 24)"
+      }
     }
   },
   "talk": {
     "description": "Make the bot speak",
     "options": {
-      "channel": { "description": "Choose a channel" },
-      "content": { "description": "The content" }
+      "channel": {
+        "description": "Choose a channel"
+      },
+      "content": {
+        "description": "The content"
+      }
     }
   },
   "talk_signed": {
     "description": "Make the bot speak (signed)",
     "options": {
-      "content": { "description": "The content" }
+      "content": {
+        "description": "The content"
+      }
     }
   },
   "todo_list": {
@@ -272,11 +370,13 @@
         "description": "Add or delete",
         "choices": {
           "add": "Add (+ content: text)",
-          "delete": "Delete (+ content: index)",
-          "list": "View"
+          "delete": "Delete (+ content: id)",
+          "list": "List"
         }
       },
-      "content": { "description": "Content (optional)" }
+      "content": {
+        "description": "Content (optional)"
+      }
     }
   },
   "update_role": {

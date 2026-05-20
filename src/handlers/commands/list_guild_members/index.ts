@@ -7,7 +7,7 @@ import {
 import type { BaseBot } from "@bot";
 import { Command } from "@cmd";
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 const MAX_DESCRIPTION_LENGTH = 3800;
 
 const chunkLines = (lines: string[], maxLength: number): string[] => {
@@ -49,8 +49,6 @@ export default class list_guild_members extends Command {
         super();
         this.setConfig({
             name: "list_guild_members",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "列出目前伺服器所有成員（含機器人）",
         });
     }
 
@@ -108,8 +106,7 @@ export default class list_guild_members extends Command {
                 await interaction.followUp({ embeds: [pageEmbed] });
             }
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:list_guild_members.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:list_guild_members.failed', interaction.guild?.id);
         }
     }
 }

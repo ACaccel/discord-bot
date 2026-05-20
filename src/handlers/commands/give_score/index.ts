@@ -9,8 +9,6 @@ export default class give_score extends Command {
         super();
         this.setConfig({
             name: "give_score",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "給分"
         });
     }
 

@@ -46,8 +46,21 @@ export default defineConfig({
     },
   },
   resolve: {
+    // Mirror the `tsconfig.json` path aliases so handler-layer unit
+    // tests can import the handler barrels (which carry `@bot` /
+    // `@utils` / `handlers` imports). `@core` keeps its leading entry
+    // for the bulk of the suite that only needs the core alias.
     alias: {
       '@core': path.resolve(__dirname, 'src/core'),
+      '@bot': path.resolve(__dirname, 'src/bot/index'),
+      '@cmd': path.resolve(__dirname, 'src/handlers/commands/index'),
+      '@button': path.resolve(__dirname, 'src/handlers/buttons/index'),
+      '@select-menu': path.resolve(__dirname, 'src/handlers/select-menus/index'),
+      '@modal': path.resolve(__dirname, 'src/handlers/modals/index'),
+      '@reaction': path.resolve(__dirname, 'src/handlers/reactions/index'),
+      '@utils': path.resolve(__dirname, 'src/utils/index'),
+      '@plugins': path.resolve(__dirname, 'src/plugins/index'),
+      handlers: path.resolve(__dirname, 'src/handlers/index'),
     },
   },
 });
