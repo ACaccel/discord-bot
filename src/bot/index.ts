@@ -109,16 +109,32 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public config: TConfig;
     public guildInfo: Record<string, GuildInfo>;
     /**
-     * Guilds whose MongoDB initialisation has failed (audit 3.7).
-     * Populated by `connectOneGuild` (both the startup fan-out AND the
-     * new-guild-join path go through that single helper), cleared on
-     * the next successful `connectOneGuild`. Each entry carries a
-     * stable `traceId` so the user-facing
-     * `errors:db.guild_disabled` message can be correlated to the
-     * boot-time log line by `grep traceId=<id>`. Handlers consult the
-     * map indirectly via `requireGuildRepos`.
+     * Read-only view of guilds whose MongoDB initialisation has failed
+     * (gap D5).
+     *
+     * The disabled state itself is owned by the {@link ConnectionManager}
+     * — it classifies transient vs persistent failures, retries the
+     * former, and stamps a stable `traceId` on the latter. `BaseBot` is
+     * now purely a *query side*: this getter projects the manager's
+     * disabled set into the legacy `Map`-shaped view that
+     * `requireGuildRepos` consumes (`.get(guildId)?.traceId`).
+     *
+     * Each entry carries the same `traceId` written to the structured
+     * boot log, so a support ticket ("got error xxxxxx") correlates to
+     * the originating connection failure by `grep traceId=<id>`.
      */
-    public disabledGuilds: Map<string, { error: Error; traceId: string }> = new Map();
+    public get disabledGuilds(): ReadonlyMap<string, { error: Error; traceId: string }> {
+        const cm = this.container.tryResolve<ConnectionManager>(TOKENS.ConnectionManager);
+        const view = new Map<string, { error: Error; traceId: string }>();
+        if (cm === undefined) return view;
+        for (const guildId of Object.keys(this.guildInfo)) {
+            const state = cm.isDisabled(asGuildId(guildId));
+            if (state !== undefined) {
+                view.set(guildId, { error: state.error, traceId: state.traceId });
+            }
+        }
+        return view;
+    }
 
     public commandHandlers: Map<string, Command>;
     public buttonHandler: Map<string, ButtonHandler>;
@@ -325,28 +341,26 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             // Resolve the typed repository bag BEFORE touching `slot`
             // so a partial connect cannot leave a half-baked state.
             // The shared ConnectionManager primes its per-guild pool
-            // inside reposFactory.
+            // inside reposFactory — including transient-failure retry
+            // and persistent-failure disabling (gap D5).
             const reposFactory = this.container.resolve<ReposFactory>(TOKENS.ReposFactory);
             const repos = await reposFactory(branded);
             // Single mutation — atomic from the handlers' point of view.
             slot.repos = repos;
-            // Successful (re-)connect clears any prior disabled-marker so a
-            // recovered guild stops returning `errors:db.guild_disabled`
-            // on the next handler invocation. See audit 3.7.
-            this.disabledGuilds.delete(guildId);
         } catch (err) {
-            // Audit 3.7 plus reliability review: this is the single chokepoint
-            // for "MongoDB unavailable for this guild" so BOTH callers (the
-            // startup fan-out AND the new-guild-join path in
-            // src/events/guild_event.ts) populate the same map. Generate a
-            // stable trace id now so the user-facing message can be grep'd
-            // against the log line below — see requireGuildRepos.
+            // Gap D5: the ConnectionManager already classified the
+            // failure, exhausted any transient retries, and (on a
+            // persistent / exhausted failure) recorded the guild as
+            // disabled with a stable `traceId`. BaseBot no longer owns
+            // that map — it just surfaces the manager's `traceId` on
+            // the structured boot log so the user-facing
+            // `errors:db.guild_disabled` message can be grep-correlated.
             const normalised =
                 err instanceof Error
                     ? err
                     : new Error(typeof err === 'string' ? err : 'connectOneGuild failed');
-            const traceId = Math.random().toString(36).slice(2, 8).padStart(6, '0');
-            this.disabledGuilds.set(guildId, { error: normalised, traceId });
+            const cm = this.container.tryResolve<ConnectionManager>(TOKENS.ConnectionManager);
+            const traceId = cm?.isDisabled(branded)?.traceId ?? 'unknown';
             logSystem(
                 this.logger,
                 this.clientId,

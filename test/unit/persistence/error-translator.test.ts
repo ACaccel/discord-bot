@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DatabaseError } from '../../../src/core/errors';
 import {
   databaseErrorFrom,
+  isTransient,
   __classifyMongoErrorForTests as classify,
 } from '../../../src/persistence/error-translator';
 
@@ -58,5 +59,26 @@ describe('databaseErrorFrom', () => {
     });
     expect(out.code).toBe('DATABASE_TIMEOUT');
     expect(out.context.input).toEqual({ messageId: 'm1' });
+  });
+});
+
+describe('isTransient', () => {
+  const errorWith = (raw: unknown): DatabaseError =>
+    databaseErrorFrom(raw, { operation: 'MongoConnectionManager.open' });
+
+  it('treats timeout and network failures as transient (retry-eligible)', () => {
+    expect(isTransient(errorWith({ name: 'MongooseServerSelectionError' }))).toBe(true);
+    expect(isTransient(errorWith({ name: 'MongoNetworkTimeoutError' }))).toBe(true);
+    expect(isTransient(errorWith({ message: 'operation timed out after 5s' }))).toBe(true);
+    expect(isTransient(errorWith({ name: 'MongoNetworkError' }))).toBe(true);
+    expect(isTransient(errorWith({ message: 'connect ECONNREFUSED 127.0.0.1:27017' }))).toBe(true);
+  });
+
+  it('treats duplicate-key, validation and unknown failures as persistent', () => {
+    expect(isTransient(errorWith({ code: 11000 }))).toBe(false);
+    expect(isTransient(errorWith({ name: 'ValidationError', message: 'bad' }))).toBe(false);
+    expect(isTransient(errorWith({ name: 'CastError', message: 'bad' }))).toBe(false);
+    expect(isTransient(errorWith({ name: 'SomethingWeird' }))).toBe(false);
+    expect(isTransient(errorWith(null))).toBe(false);
   });
 });

@@ -43,7 +43,11 @@ const buildGuildMongoUri: (baseUri: string, guildId: string) => string; // guild
 - **`MongoConnectionManager`**（production，建構子 `(baseUri: string)`）：每 `GuildId` 快取 `GuildConnection`；另一 `pending` Map 以 in-flight promise **去重併發 `getConnection`**。`open()` 呼叫 `mongoose.createConnection(uri).asPromise()`，建 model registry，再 `Promise.allSettled` 跑各 `model.init()`。**index-init 失敗策略**：被拒的 `init()` 只寫一行 stderr，連線**保持開啟並服務**——「無法用的 bot 比缺索引更糟」。
 - **`StaticConnectionManager`**（測試 adapter，建構子 `(underlying: Connection)`）：包裝外部管理的 mongoose `Connection`（mongodb-memory-server）；`getConnection` 以阻塞式 `Promise.all(model.init())` 確保索引競態在測試中收斂。
 
-`mongo/error-translator.ts` 的 `databaseErrorFrom(raw, context): DatabaseError`：私有 `classify()` 以 duck-typing（`name`/`code`/`message`，非 `instanceof`，以撐過 mongoose 版本升級）映射至 `DatabaseErrorCode`（`DUPLICATE_KEY` code 11000、`VALIDATION`、`TIMEOUT`、`NETWORK`、`UNKNOWN`），各對應一個 i18n key。
+`persistence/error-translator.ts` 的 `databaseErrorFrom(raw, context): DatabaseError`：私有 `classify()` 以 duck-typing（`name`/`code`/`message`，非 `instanceof`，以撐過 mongoose 版本升級）映射至 `DatabaseErrorCode`（`DUPLICATE_KEY` code 11000、`VALIDATION`、`TIMEOUT`、`NETWORK`、`UNKNOWN`），各對應一個 i18n key。同檔的 `isTransient(error: DatabaseError): boolean` 依 `DATABASE_TIMEOUT` / `DATABASE_NETWORK` sub-code 判定失敗是否可重試（G-2 把此檔自 `infra/mongo/` 搬至 `persistence/`，D5 在新位置補 `isTransient`；`infra/mongo/connection-manager.ts` 由 `persistence/` import 之，`infra → persistence` 為合法依賴方向）。
+
+**D5 retry / 降級分類**：`MongoConnectionManager` 與 `StaticConnectionManager` 內部各持 `disabled: Map<GuildId, DisabledGuildState>`。`getConnection` 對 transient 失敗（`isTransient` 為真）做**有上限的指數退避重試**（`RetryPolicy`：預設 3 次嘗試、初始 200ms、上限 2s，建構子可注入；`SleepFn` 亦可注入使測試零等待）。重試耗盡或 persistent 失敗時把該 `guildId` 標記 disabled，**自行生成 `traceId`**（原由 `BaseBot` boot 時 per-bot 產生），並寫一行 operator-facing stderr。對外暴露 `isDisabled(guildId): DisabledGuildState | undefined`（回傳 `traceId` 與分類後的 `DatabaseError`）；disabled 後續 `getConnection` 直接短路丟同一 `DatabaseError`，`close` / `closeAll` 清除 marker。`StaticConnectionManager` 另提供 `openOverride` 注入孔供測試以注入失敗驗證 retry / disable 行為。
+
+**per-URI 共用範圍**：`MongoConnectionManager` 由組裝根（`BaseBot.sharedConnectionManagers`）以 base URI 為 key 共用。`disabledGuilds` 成為 `ConnectionManager` 內部狀態後，**共用同一 base URI 的兩個 bot 也共用同一 `disabled` set**——對其中一個 bot disabled 的 guild，對另一個亦 disabled。此為刻意設計：兩 bot 指向同一實體資料庫，失敗是同一個失敗。
 
 ### 2.2 `llm/` — Provider Strategy + Registry
 
@@ -81,7 +85,7 @@ const createDefaultRegistry: (env: Env) => LlmProviderRegistry;
 
 ```mermaid
 classDiagram
-    class ConnectionManager { <<interface>> +getConnection() +close() +closeAll() }
+    class ConnectionManager { <<interface>> +getConnection() +isDisabled() +close() +closeAll() }
     ConnectionManager <|.. MongoConnectionManager
     ConnectionManager <|.. StaticConnectionManager
     class LLMProvider { <<interface>> +supportsWebSearch +chat() }
@@ -137,7 +141,7 @@ sequenceDiagram
 | Registry              | `LlmProviderRegistry`（name → factory）                               | 缺 key 不崩潰，實例 lazy 快取        |
 | Adapter               | 四家 provider 適配 SDK；`StaticConnectionManager` 適配外部 Connection | 隔離外部 SDK                         |
 | Factory               | `buildRepos`、`createDefaultRegistry`、`LlmProviderFactory` 閉包      | 延遲建構                             |
-| Anti-corruption layer | `mongo/error-translator`、`llm/error-translator`                      | vendor 錯誤轉 `DomainError` taxonomy |
+| Anti-corruption layer | `persistence/error-translator`、`llm/error-translator`                | vendor 錯誤轉 `DomainError` taxonomy |
 
 ---
 
@@ -162,6 +166,12 @@ sequenceDiagram
 
 **邊界契約**：`LLMService.chat` 對「不支援 web search 的 provider 卻請求 web search」**擲出**（視為 UI/程式員 bug），非回 `Result`——呼叫端須在送出前確認 provider 能力。
 
-### 與 HLD 的偏差（對應索引 D5）
+### 與 HLD 的偏差（對應索引 D5）— 已收斂
 
-**D5 — `ConnectionManager` 無 retry / 降級分類**：HLD §5 C5 與 §7.4 稱 `ConnectionManager` 「區分 transient（可重試）與 persistent 失敗；持續失敗的 guild 進入 `disabledGuilds`」。實際 `connection-manager.ts` **無 retry 邏輯、無 transient/persistent 分類、無 `disabledGuilds` map**。唯一的韌性機制是 `pending` Map 的併發去重與 `Promise.allSettled` 的 index-init 非致命策略。失敗**分類**僅存在於 `error-translator.ts` 的 sub-code（`DATABASE_TIMEOUT`/`NETWORK` 等），不參與連線生命週期。`disabledGuilds` 的追蹤實際發生在 `BaseBot`（C11）的 `connectGuildDB` 流程，而非 C5。REQ-C3 的「transient vs persistent 降級」就 `ConnectionManager` 而言**未落地**——目前的降級是 boot 時 catch 連線失敗、把該 guild 記入 `BaseBot.disabledGuilds`，無重試。
+**D5 — `ConnectionManager` retry / 降級分類**：HLD §5 C5 與 §7.4 稱 `ConnectionManager` 「區分 transient（可重試）與 persistent 失敗；持續失敗的 guild 進入 `disabledGuilds`」。此偏差已依 gaps.md 方案 A 收斂：
+
+- 失敗分類由 `persistence/error-translator.ts` 的 `isTransient(error: DatabaseError)` 提供（`DATABASE_TIMEOUT` / `DATABASE_NETWORK` 為 transient，其餘為 persistent）。
+- retry、`disabled` set、`isDisabled(guildId)` 全部移入 `ConnectionManager`（`MongoConnectionManager` 與 `StaticConnectionManager` 皆然）。`getConnection` 對 transient 失敗做有上限的指數退避重試（`RetryPolicy`），耗盡或 persistent 失敗則把 guild 標記 disabled 並自行生成 `traceId`。
+- `BaseBot` 退化為查詢端：不再自持 `disabledGuilds` map，`connectOneGuild` 不再 catch-記錄並寫入自有 map；`BaseBot.disabledGuilds` 改為投影 `ConnectionManager.isDisabled` 的唯讀 getter（供 `requireGuildRepos` 沿用既有讀取形狀，C6 D5 再切換為直接讀 `ConnectionManager`）。
+
+REQ-C3「transient vs persistent 降級」就 `ConnectionManager` 而言**已落地**：故意設壞測試 guild 的 Mongo URI 會經分類、（transient 時）重試、最終 disable 該 guild，handler 經 `requireGuildRepos` 回 `errors:db.guild_disabled` 附 `ConnectionManager` 生成的 `traceId`。

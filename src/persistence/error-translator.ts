@@ -93,5 +93,25 @@ export const databaseErrorFrom = (raw: unknown, context: ErrorContext): Database
   });
 };
 
+/**
+ * Decide whether a {@link DatabaseError} represents a *transient*
+ * failure — one worth retrying — versus a *persistent* one.
+ *
+ * Only `DATABASE_TIMEOUT` and `DATABASE_NETWORK` are transient: a
+ * server-selection timeout or a dropped/refused socket can clear on
+ * its own (replica-set election, brief network blip), so a bounded
+ * retry has a real chance of succeeding. Every other sub-code
+ * (`DATABASE_DUPLICATE_KEY`, `DATABASE_VALIDATION`, `DATABASE_UNKNOWN`)
+ * is treated as persistent: retrying a duplicate-key or a malformed
+ * document just burns the backoff budget and ends in the same error.
+ *
+ * Consumed by `infra/mongo/connection-manager.ts` to drive the
+ * transient-retry / persistent-disable split (gap D5). Kept here, next
+ * to {@link databaseErrorFrom}, so the sub-code classification and the
+ * retry-eligibility policy stay in one module and cannot drift.
+ */
+export const isTransient = (error: DatabaseError): boolean =>
+  error.code === 'DATABASE_TIMEOUT' || error.code === 'DATABASE_NETWORK';
+
 /** Test-only export so unit tests can pin the classifier without going through `databaseErrorFrom`. */
 export const __classifyMongoErrorForTests = classify;

@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-05-21 — C5 D5 落地（`ConnectionManager` retry / 降級分類）
+
+- **元件**：C5 Infra Adapters
+- **缺口**：D5（方案 A）
+- **變更**：`ConnectionManager`（`MongoConnectionManager` /
+  `StaticConnectionManager`）內建 transient/persistent 降級。新增
+  `isTransient(error: DatabaseError)` helper 於
+  `src/persistence/error-translator.ts`（依 `DATABASE_TIMEOUT` /
+  `DATABASE_NETWORK` sub-code 判定）。`getConnection` 對 transient 失敗做
+  有上限的指數退避重試（`RetryPolicy`：預設 3 次 / 200ms / 2s 上限,
+  建構子可注入；`SleepFn` 可注入使測試零等待）;重試耗盡或 persistent
+  失敗則把 `guildId` 標記 disabled、自行生成 `traceId`、寫一行 operator
+  stderr。新增 `isDisabled(guildId): DisabledGuildState | undefined` 對外
+  可查;disabled 後 `getConnection` 短路丟同一 `DatabaseError`,
+  `close` / `closeAll` 清除 marker。retry 迴圈抽為共用 `retryOpen` free
+  function,兩個 manager 共用同一韌性實作。`BaseBot` 退化為查詢端：移除
+  自持的 `disabledGuilds` map 與 `connectOneGuild` 的 catch-記錄寫入,
+  `disabledGuilds` 改為投影 `ConnectionManager.isDisabled` 的唯讀 getter。
+- **影響**：四個 bot 對外行為等價——壞 URI 的 guild 仍最終 disabled、
+  handler 經 `requireGuildRepos` 回 `errors:db.guild_disabled` 附
+  `traceId`,差異僅在 transient 失敗多了重試、`traceId` 改由
+  `ConnectionManager` 生成。per-URI 共用語意：共用同一 base URI 的 bot
+  共用同一 `disabled` set。`requireGuildRepos`（C6 D5）與 `BaseBot` 完整
+  退化（C11 D5）的讀取來源收斂為後續任務。
+
 ## 2026-05-21 — C4 G-2 落地（repository 邊界 `Result` 一致性）
 
 - **元件**：C4 Persistence
