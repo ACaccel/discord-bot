@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-05-21 — C8 D1/D3 落地、D4 callsite 盤點（plugins 缺口收斂）
+
+- **元件**：C8 Plugins
+- **缺口**：D1、D3、D4
+- **變更**：
+  - D1 — `guild-events` plugin 新增 `events.guildCreate` 訂閱，經
+    `ctx.resolve(TOKENS.GuildOnboardingPort)` 完成新 guild 初始化；新增
+    `handleGuildCreate`（失敗只記 log、不重擲）。`BaseBot.listen` 新增
+    `dispatcherSubscribesTo` 守衛，於 `guildCreate` 已被 plugin 訂閱時跳過
+    顯式 `client.on`，避免雙重 onboarding。刪除 `src/events/guild_event.ts`。
+  - D3 — 刪除整個 `src/events/` 過渡層（`earthquake.ts`、`guild_event.ts`、
+    `index.ts`）；移除 `tsconfig.json`、`tsconfig.strict.json`、`knip.json`
+    的 `@event` path 對映與三條 `src/events/*` knip ignore。全 repo
+    `grep "@event"` 為 0。
+  - D4 — 完成 `src/utils/{bot_cmd,job_manager,misc}` callsite 盤點（步驟
+    1）；`JobManager` / `misc` 的最終承接位置待 C1 / C9 評估後遷移。
+- **影響**：behavior-equivalent。`guildCreate` onboarding 改由 plugin 經
+  typed port 驅動，不再穿透 `BaseBot` 內部結構；無 plugin 的 bot（Tomori）
+  仍經 `BaseBot.guildCreateListener` 走 port。`src/events/` 與 `@event`
+  alias 移除。C10 D3（CJK scanner `SCOPED_DIRECTORIES` 移除 `src/events`）
+  待承接。
+
+---
+
 ## 2026-05-21 — C11 D1/D2/D5 落地（bot composition root 缺口收斂）
 
 - **元件**：C11 Bot Composition Roots

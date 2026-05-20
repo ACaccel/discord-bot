@@ -16,8 +16,8 @@ import { createLlmChatPlugin } from '@plugins';
  * (messageCreate / messageUpdate / messageDelete / guildMemberUpdate)
  * default to no-op on BaseBot, so those overrides were dropped; the
  * three remaining overrides below mirror listeners BaseBot still
- * wires to legacy handlers (reactionAdd/Remove → executeReaction*,
- * guildCreate → detectGuildCreate) and must stay silent for Konata.
+ * wires (reactionAdd/Remove → executeReaction*, guildCreate →
+ * GuildOnboardingPort) and must stay silent for Konata.
  */
 export class Konata extends BaseBot<Config> {
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: Config) {

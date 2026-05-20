@@ -9,6 +9,12 @@
  *     URLs separately.
  *   - `guildMemberUpdate`: when role membership changes, send a role-
  *     delta embed (added / removed).
+ *   - `guildCreate`: when the bot joins a new guild, onboard it
+ *     (connect its per-guild database, register slash commands)
+ *     through the typed {@link GuildOnboardingPort} resolved from the
+ *     IoC container (gap D1). This replaces the legacy
+ *     `detectGuildCreate` free function, which reached directly into
+ *     `BaseBot` internals.
  *
  * Why a factory (`createGuildEventsPlugin(config)`) rather than a
  * plain `Plugin` const: the per-bot `blockedChannels` list lives in
@@ -19,18 +25,25 @@
  * encapsulate config. This keeps the plugin object pure-data
  * once produced and avoids module-scoped mutable state.
  */
-import { EmbedBuilder, type Message, type PartialMessage, type TextChannel } from 'discord.js';
+import {
+  EmbedBuilder,
+  type Guild,
+  type Message,
+  type PartialMessage,
+  type TextChannel,
+} from 'discord.js';
 import { z } from 'zod';
 
 import { TOKENS } from '../../core/ioc';
 import type { GuildRegistry } from '../../core/guild-registry';
 import type { Plugin } from '../../core/plugin';
+import type { GuildOnboardingPort } from '../../core/plugin';
 // Import directly from the leaf module (not the barrel) so the strict
 // typecheck does not transitively pull the legacy `utils/misc.ts` and
 // `utils/bot_cmd.ts` files, which still use `@bot` / `@cmd` path
 // aliases not present in `tsconfig.strict.json`. `utils/logger.ts`
 // itself was rewritten as a strict-clean shim in Phase 3.
-import { logError, logGuildEvent, type Logger } from '../../core/logger';
+import { logError, logGuildEvent, logSystem, type Logger } from '../../core/logger';
 import { archiveDeletedAttachment } from '../../infra/discord';
 
 const PLUGIN_ID = 'guild-events';
@@ -157,6 +170,14 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
           message,
         );
       },
+      guildCreate: async (ctx, guild) => {
+        await handleGuildCreate(
+          ctx.resolve(TOKENS.GuildOnboardingPort),
+          ctx.resolve(TOKENS.Logger),
+          config.clientId,
+          guild,
+        );
+      },
       guildMemberUpdate: async (ctx, oldMember, newMember) => {
         const guildId = newMember.guild.id;
         const logger = ctx.resolve(TOKENS.Logger);
@@ -210,9 +231,6 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
     },
   };
 };
-
-/** Test-only access. Not part of the plugin's public API. */
-export const __test = { safeSendEmbed };
 
 const handleMessageUpdate = async (
   registry: GuildRegistry,
@@ -340,3 +358,38 @@ const handleMessageDelete = async (
     `Message: ${message.content ?? ''}`;
   logGuildEvent(logger, clientId, message.guildId, 'message_delete', log, message.guild.name);
 };
+
+/**
+ * Onboard a freshly joined guild through the {@link GuildOnboardingPort}
+ * (gap D1).
+ *
+ * The port owns the two infrastructure actions a new guild needs —
+ * connecting its per-guild database and registering the bot's slash
+ * commands. The plugin merely resolves the port and invokes it, so no
+ * plugin code reaches into `BaseBot` internals.
+ *
+ * A failed onboarding is caught and logged rather than rethrown: the
+ * dispatcher already isolates subscription failures, but onboarding is
+ * a structural side effect (not user-facing) and the structured
+ * operator log is the actionable record. Letting it escape would only
+ * produce a less-contextual dispatcher-level error line.
+ */
+const handleGuildCreate = async (
+  onboardingPort: GuildOnboardingPort,
+  logger: Logger | undefined,
+  clientId: string,
+  guild: Guild,
+): Promise<void> => {
+  try {
+    await onboardingPort.onboardGuild(guild.id);
+  } catch (err: unknown) {
+    logSystem(
+      logger,
+      clientId,
+      `guild-events: failed to onboard guild ${guild.name} (${guild.id}): ${String(err)}`,
+    );
+  }
+};
+
+/** Test-only access. Not part of the plugin's public API. */
+export const __test = { safeSendEmbed, handleGuildCreate };

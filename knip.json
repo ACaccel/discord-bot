@@ -21,7 +21,6 @@
     "@modal": ["src/handlers/modals/index.ts"],
     "@reaction": ["src/handlers/reactions/index.ts"],
     "@utils": ["src/utils/index.ts"],
-    "@event": ["src/events/index.ts"],
     "@core/*": ["src/core/*"],
     "@plugins": ["src/plugins/index.ts"]
   },
@@ -44,10 +43,7 @@
     "src/plugins/index.ts",
     "src/plugins/*/index.ts",
     "src/handlers/*/index.ts",
-    "test/fixtures/discord/*.ts",
-    "src/events/earthquake.ts",
-    "src/events/guild_event.ts",
-    "src/events/index.ts"
+    "test/fixtures/discord/*.ts"
   ],
   "rules": {
     "files": "error",

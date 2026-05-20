@@ -16,7 +16,6 @@
       "@modal": ["handlers/modals/index"],
       "@reaction": ["handlers/reactions/index"],
       "@utils": ["utils/index"],
-      "@event": ["events/index"],
       "@core/*": ["core/*"],
       "@plugins": ["plugins/index"]
     },

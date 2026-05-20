@@ -332,7 +332,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * now the only entry point.
      *
      * Reused by the startup loop in {@link connectGuildDB} and by the
-     * new-guild-join path in `src/events/guild_event.ts`.
+     * new-guild-join path via {@link BaseBotGuildOnboardingPort}.
      */
     public connectOneGuild = async (guildId: string): Promise<void> => {
         const slot = this.guildInfo[guildId];
@@ -370,8 +370,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 this.clientId,
                 ops.guildDb.connectFailed(guildId, traceId, normalised.message),
             );
-            // Re-throw so existing callers (connectGuildDB, guild_event.ts)
-            // keep their previous control-flow semantics.
+            // Re-throw so existing callers (connectGuildDB and the
+            // GuildOnboardingPort) keep their previous control-flow
+            // semantics.
             throw normalised;
         }
     }
@@ -711,11 +712,35 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 logError(this.logger, this.clientId, newMember.guild.id || null, err);
             });
         });
-        this.client.on(Events.GuildCreate, async (guild) => {
-            await this.guildCreateListener(guild).catch((err) => {
-                logError(this.logger, this.clientId, guild.id || null, err);
+        // Gap D1: when a plugin (the `guild-events` plugin) subscribes
+        // to `guildCreate`, the EventDispatcher already forwards the
+        // event into that plugin, which onboards the new guild through
+        // `GuildOnboardingPort`. Registering this explicit listener as
+        // well would onboard the same guild twice. Skip it in that case
+        // so the plugin is the single driver; bots without the plugin
+        // (e.g. Tomori) keep onboarding through `guildCreateListener`.
+        if (!this.dispatcherSubscribesTo(Events.GuildCreate)) {
+            this.client.on(Events.GuildCreate, async (guild) => {
+                await this.guildCreateListener(guild).catch((err) => {
+                    logError(this.logger, this.clientId, guild.id || null, err);
+                });
             });
-        });
+        }
+    }
+
+    /**
+     * True when a registered plugin subscribes to `event`, i.e. the
+     * plugin host's {@link EventDispatcher} already forwards it from the
+     * Discord client. Used to avoid double-wiring an event that a
+     * plugin already owns. Safe to call after `host.startAll()`; before
+     * that the host is undefined and this returns `false`.
+     */
+    private dispatcherSubscribesTo = (event: keyof ClientEvents): boolean => {
+        if (this.pluginHost === undefined) return false;
+        return this.pluginHost
+            .getEventDispatcher()
+            .subscribedEvents()
+            .includes(event);
     }
 
     public getMongoURI = () => {

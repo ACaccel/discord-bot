@@ -23,6 +23,9 @@
 
 - 2026-05-21 — D1：新增 `src/bot/guild-onboarding.ts`（`BaseBotGuildOnboardingPort`），
   註冊 `TOKENS.GuildOnboardingPort`，`guildCreateListener` 改用 port (gap D1)
+- 2026-05-21 — D1（C8 協調）：`BaseBot.listen` 新增 `dispatcherSubscribesTo`
+  守衛，於 `guildCreate` 已被 `guild-events` plugin 訂閱時跳過顯式
+  `client.on(GuildCreate)`，避免 plugin 與 BaseBot 雙重 onboarding (gap D1)
 - 2026-05-21 — D2：`nijika` 改以 earthquake plugin 組裝，移除 inline Express
   地震路由 (gap D2)
 - 2026-05-21 — D5：移除 `BaseBot.disabledGuilds` 唯讀 getter，完成查詢端退化 (gap D5)

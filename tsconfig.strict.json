@@ -16,7 +16,6 @@
       "@modal": ["src/handlers/modals/index"],
       "@reaction": ["src/handlers/reactions/index"],
       "@utils": ["src/utils/index"],
-      "@event": ["src/events/index"],
       "@core/*": ["src/core/*"],
       "@plugins": ["src/plugins/index"],
       // The handler `index.ts` files import `HandlerFactory` via the
