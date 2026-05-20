@@ -8,8 +8,23 @@ provider Strategy, structured errors + Result types, full i18n
 routing, and a CJK-literal scanner in strict mode.
 
 For the day-to-day architecture overview, see
-[`docs/architecture.md`](docs/architecture.md). For setup +
+[`docs/high-level-design.md`](docs/high-level-design.md). For setup +
 contribution flow, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## Active engineering: gap-remediation
+
+The detailed design (`docs/design/`) found 11 places where the target
+design has not actually landed (gaps D1-D9, G-1, G-2). Closing those
+gaps is the current work. **Start any new session from
+[`docs/tasks/README.md`](docs/tasks/README.md)** — it is the single
+entry point: what the engineering is, current progress, how to resume,
+the agent team, and the document map. Progress lives in
+[`docs/tasks/progress.md`](docs/tasks/progress.md).
+
+The work is designed to run autonomously: spawn the
+`engineering-orchestrator` agent and it drives the
+`component-implementer` subagents through all components until every
+quality gate is green.
 
 ## Directory layout
 
@@ -168,17 +183,23 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full developer flow:
 quality gates, the rules a reviewer agent will enforce, and step-by-step
 recipes for adding a slash command or a plugin.
 
-## Agent reviewers
+## Agents and skills
 
-The per-phase reviewer-agent definitions live in `.claude/agents/`:
+Agent definitions live in `.claude/agents/`. Six reviewer agents —
+`architecture-reviewer`, `type-system-reviewer`, `reliability-reviewer`,
+`test-architect`, `config-and-security-reviewer`,
+`i18n-discipline-reviewer` — each support Consult / Review / Audit
+modes. Run the relevant reviewer before committing changes that touch
+`src/`; the PR template asks for each verdict.
 
-- `.claude/agents/architecture-reviewer.md`
-- `.claude/agents/type-system-reviewer.md`
-- `.claude/agents/reliability-reviewer.md`
-- `.claude/agents/test-architect.md`
-- `.claude/agents/config-and-security-reviewer.md`
-- `.claude/agents/i18n-discipline-reviewer.md`
+Two engineering agents drive the gap-remediation work:
+`engineering-orchestrator` (lead — monitors progress, dispatches
+subagents, runs the final gate) and `component-implementer` (worker —
+implements one component's tasks with tests).
 
-Run the relevant agent in Consult / Review / Audit mode before
-committing changes that touch `src/`. PR template asks for each
-agent's verdict.
+Skill definitions live in `.claude/skills/`:
+`project-conventions` (architecture framework rules),
+`coding-standards` (code-quality standards), `gap-task-workflow`
+(the per-component implementation workflow), and `update-wiki`
+(auto-syncs `docs/wiki/` on any change). The two convention skills
+carry self-check lists; apply them whenever writing code under `src/`.

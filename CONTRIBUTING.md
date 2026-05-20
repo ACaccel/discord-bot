@@ -4,8 +4,9 @@ Thanks for working on this codebase. This guide covers local setup,
 the test workflow, and step-by-step recipes for the two most common
 extensions: adding a slash command and adding a plugin.
 
-See [`docs/architecture.md`](docs/architecture.md) for the layered
-architecture overview and why things are arranged the way they are.
+See [`docs/high-level-design.md`](docs/high-level-design.md) for the
+layered architecture overview and why things are arranged the way they
+are.
 
 ## Local setup
 
@@ -76,7 +77,7 @@ land strict-compliant.
 
 ## Architectural rules
 
-The full list is in [`docs/architecture.md`](docs/architecture.md).
+The full list is in [`docs/high-level-design.md`](docs/high-level-design.md).
 Three rules are load-bearing and a CI gate or a reviewer agent will
 catch a violation:
 
