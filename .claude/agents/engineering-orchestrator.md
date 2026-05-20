@@ -104,7 +104,11 @@ yarn smoke --bot nijika   # also konata / tomori / msg-archive; needs env, recor
   engineering is not complete until every gate is green.
 - Do not fabricate completion — a `progress.md` checkmark must be backed by
   actual gate evidence.
-- Do not commit / push / open a PR unless explicitly instructed.
+- Do not commit / push / open a PR unless explicitly instructed. When you are
+  instructed to open a PR, land it with `gh pr merge <n> --auto --merge`: the
+  repo has auto-merge enabled, so GitHub merges it once the required status
+  checks pass — no polling needed. Auto-merge is the default; it cannot bypass
+  branch protection.
 - If a gap's remediation direction is marked "to be decided" in the task file,
   stop that gap and list it in the final report; keep the other gaps moving
   (as of now all gap directions are decided).
