@@ -73,6 +73,21 @@ provider `v8`。全域門檻 `lines:46 / functions:69 / branches:80 / statements
 
 `scripts/smoke.ts`（`yarn smoke`，預設 `--bot nijika`）——連線探針，非完整 boot。三步 timeboxed：`loadEnv()`；可選 `mongoose.createConnection` + `admin.ping`；discord.js 登入並等 `clientReady`、斷言 `client.user.id === CLIENT_ID`。不註冊指令、不起 plugin。
 
+### 2.8 必須通過的 status check（branch protection）
+
+CI job 為「閘門即設定」，但唯有設為 branch-protection 的 **required status
+check** 才真正阻擋合併。`refactor/architecture-overhaul`（重構整合分支）已設
+required checks 為全部 **10 個 CI job**：`lint`、`typecheck`、`typecheck-emit`、
+`test-unit`、`test-coverage`、`test-int`、`test-contract`、`knip`、`security`、
+`analyze`（CodeQL）。設定為 `strict: false`（不要求 PR 先與 base 同步）、
+**不要求人工 PR review**——使 `engineering-orchestrator` 的全自主開 PR / 合併
+流程不需人工介入，同時任一 CI 閘門紅燈仍擋下合併。`yarn smoke` 需真實連線
+憑證，為手動 pre-deploy 探針，刻意不列入 required check。
+
+> 注：`main` 分支的 protection 目前仍列兩個過時的 check context
+> （`test-integration`、`audit`），其為 CI job 改名前的舊名（現為 `test-int`、
+> `security`）；待工程再以 `main` 為目標時須一併修正。
+
 ---
 
 ## 3. 閘門關係圖
