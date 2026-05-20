@@ -55,6 +55,32 @@ describe('catalog runtime behaviour', () => {
     expect(translator.t('replies:help.no_commands', undefined, 'en')).toBe('沒有指令清單');
   });
 
+  it('resolves every errors:db.* DatabaseError messageKey with no leftover placeholder', async () => {
+    // The five DatabaseErrorCode sub-codes map to these keys via
+    // `error-translator.i18nKeyFor`. `databaseErrorFrom` passes no
+    // `messageParams`, so none of these texts may carry an interpolation
+    // slot — otherwise a raw `{{...}}` token would leak into the reply.
+    const translator = await I18NextTranslator.create(loadCatalogResources());
+    const dbKeys = [
+      'errors:db.duplicate_key',
+      'errors:db.timeout',
+      'errors:db.network',
+      'errors:db.validation',
+      'errors:db.unavailable',
+    ] as const;
+    for (const locale of ['zh-TW', 'en'] as const) {
+      for (const key of dbKeys) {
+        const resolved = translator.t(key, undefined, locale);
+        expect(resolved, `${key} (${locale}) must resolve to a real string`).not.toBe(key);
+        expect(resolved.length, `${key} (${locale}) must be non-empty`).toBeGreaterThan(0);
+        expect(
+          /\{\{\s*\w+\s*\}\}/.test(resolved),
+          `${key} (${locale}) must not contain an uninterpolated placeholder`,
+        ).toBe(false);
+      }
+    }
+  });
+
   it('keeps a {{traceId}} slot in every per-feature failed fallback string', () => {
     const resources = loadCatalogResources();
     for (const locale of ['zh-TW', 'en'] as const) {

@@ -47,9 +47,34 @@ describe('databaseErrorFrom', () => {
     const out = databaseErrorFrom(raw, { operation: 'MongoMessageRepo.insertOne' });
     expect(out).toBeInstanceOf(DatabaseError);
     expect(out.code).toBe('DATABASE_DUPLICATE_KEY');
-    expect(out.messageKey).toBe('errors.db.duplicate_key');
+    expect(out.messageKey).toBe('errors:db.duplicate_key');
     expect(out.context.operation).toBe('MongoMessageRepo.insertOne');
     expect(out.cause).toBe(raw);
+  });
+
+  it('produces an i18next-style errors:db.* messageKey for every sub-code', () => {
+    // Regression for the gap-remediation fix: the key must use the
+    // `namespace:key.path` colon convention so the D9 handler boundary can
+    // resolve it; the `.`-separated form silently missed the catalog.
+    const cases: ReadonlyArray<readonly [unknown, string]> = [
+      [
+        (() => {
+          const e = new Error('E11000 duplicate key');
+          (e as Error & { code: number }).code = 11000;
+          return e;
+        })(),
+        'errors:db.duplicate_key',
+      ],
+      [{ name: 'MongooseServerSelectionError' }, 'errors:db.timeout'],
+      [{ name: 'MongoNetworkError' }, 'errors:db.network'],
+      [{ name: 'ValidationError', message: 'bad' }, 'errors:db.validation'],
+      [{ name: 'SomethingWeird' }, 'errors:db.unavailable'],
+    ];
+    for (const [raw, expectedKey] of cases) {
+      const out = databaseErrorFrom(raw, { operation: 'MongoMessageRepo.run' });
+      expect(out.messageKey).toBe(expectedKey);
+      expect(out.messageKey.startsWith('errors:db.')).toBe(true);
+    }
   });
 
   it('threads context.input through unchanged', () => {

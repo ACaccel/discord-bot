@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-05-21 — `DatabaseError` messageKey 格式修正（D9 交界 bug）
+
+- **元件**：C4 Persistence、C6 Handlers、C7 i18n（交界修正，不改 task 勾選）
+- **缺口**：D9（揭露於 C6 D9 工作）
+- **變更**：
+  - C4 — `src/persistence/error-translator.ts` 的 `i18nKeyFor` 五個分支由
+    `errors.db.*`（點分隔）改為 `errors:db.*`（冒號分隔），與專案其他
+    `DomainError.messageKey`（`errors:conflict.*`、`errors:llm.*`）一致。
+    原點分隔格式在 i18next 解析下會落空 catalog，使 D9「handler 對
+    `DomainError` 依 `messageKey` 回覆」對 `DatabaseError` 退回防禦性
+    per-feature `.failed` 回退;修正後改為 taxonomy-driven `errors:db.*`。
+  - C7 — `src/interface/locales/{zh-TW,en}/errors.json` 的 `db` 物件補上
+    `duplicate_key` / `timeout` / `network` / `validation` 四個原本完全
+    缺失的文案,以 bot 人格語氣撰寫(雙語)。`databaseErrorFrom` 不帶入
+    `messageParams`,故四個新文案皆不含插值佔位符;同步移除 `db.unavailable`
+    既有的 `{{traceId}}` 佔位符——該 key 對應 `DATABASE_UNKNOWN`、同樣無
+    `messageParams`,留著會讓使用者文案露出原始 `{{traceId}}` 字串。
+  - 測試 — `test/unit/persistence/error-translator.test.ts` 驗證五個 sub-code
+    的 `messageKey` 皆為 `errors:db.*`;`test/i18n/catalog-runtime.test.ts`
+    驗證五個 key 在雙語系皆可解析且無未插值佔位符。
+- **行為等價**：`DatabaseError` 回覆由「防禦性回退到 per-feature `.failed`」
+  變為「taxonomy-driven `errors:db.*`」,屬 D9 明文目標,非回歸。
+- **閘門**：typecheck / lint / format:check / test / test:i18n 全綠。
+
+---
+
 ## 2026-05-21 — D4 落地（`src/utils/` 過渡層退場）
 
 - **元件**：C1 Core Infrastructure、C6 Handlers、C8 Plugins、C9 Codegen & Scripts、C11 Bot Composition Roots

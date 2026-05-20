@@ -62,18 +62,28 @@ const classify = (raw: unknown): DatabaseErrorCode => {
   return 'DATABASE_UNKNOWN';
 };
 
+/**
+ * Map a {@link DatabaseErrorCode} to its i18n catalog key.
+ *
+ * The key uses the i18next `namespace:key.path` convention (colon
+ * separator) so the value can be handed straight to `DomainError.messageKey`
+ * and resolved by the handler boundary (gap D9). Every key returned here
+ * has a toned entry under the `db` object of `errors.json` in both
+ * locales; none of these texts carry an interpolation placeholder because
+ * {@link databaseErrorFrom} does not populate `messageParams`.
+ */
 const i18nKeyFor = (code: DatabaseErrorCode): string => {
   switch (code) {
     case 'DATABASE_DUPLICATE_KEY':
-      return 'errors.db.duplicate_key';
+      return 'errors:db.duplicate_key';
     case 'DATABASE_TIMEOUT':
-      return 'errors.db.timeout';
+      return 'errors:db.timeout';
     case 'DATABASE_NETWORK':
-      return 'errors.db.network';
+      return 'errors:db.network';
     case 'DATABASE_VALIDATION':
-      return 'errors.db.validation';
+      return 'errors:db.validation';
     case 'DATABASE_UNKNOWN':
-      return 'errors.db.unavailable';
+      return 'errors:db.unavailable';
   }
 };
 
