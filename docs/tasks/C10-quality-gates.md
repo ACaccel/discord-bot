@@ -14,9 +14,9 @@
 > 此任務依賴 [C8](C8-plugins.md) D3 — `src/events/` 目錄須先實際刪除。在 D3
 > 完成前，scanner 納入 `src/events` 是正確的（過渡層仍在就該掃）。
 
-- [ ] 待 `src/events/` 刪除後，從 `test/i18n/no-literal-cjk.test.ts` 的
+- [x] 待 `src/events/` 刪除後，從 `test/i18n/no-literal-cjk.test.ts` 的
       `SCOPED_DIRECTORIES` 移除 `src/events`
-- [ ] 確認 CJK scanner 仍對 `src/handlers`、`src/plugins`、`src/bot` 三目錄
+- [x] 確認 CJK scanner 仍對 `src/handlers`、`src/plugins`、`src/bot` 三目錄
       strict-mode 掃描且 CI 綠
 
 **驗收**：`SCOPED_DIRECTORIES` 與現存目錄一致；scanner 為 CI gate。

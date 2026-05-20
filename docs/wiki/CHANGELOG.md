@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-05-21 — C10 D3 落地（CJK scanner 範圍收斂）
+
+- **元件**：C10 Quality Gates
+- **缺口**：D3
+- **變更**：
+  - 從 CJK scanner（`test/i18n/no-literal-cjk.test.ts`）的
+    `SCOPED_DIRECTORIES` 移除已刪除的 `src/events` entry，現掃描
+    `src/handlers`、`src/plugins`、`src/bot`；更新檔頭 scope rationale 註解。
+  - 從 `eslint.config.mjs` service-locator guard 的 `no-restricted-imports`
+    block 移除 stale 的 `src/events/**/*.ts`、`src/features/**/*.ts` glob
+    （兩目錄均已不存在），並修正註解中 `src/bots/**` 筆誤為 `src/bot/**`。
+- **行為等價**：純設定 / 測試範圍收斂，四個 bot 對外行為不變。
+- **閘門**：typecheck / lint / knip / test / test:i18n 全綠。
+
+---
+
 ## 2026-05-21 — C8 D1/D3 落地、D4 callsite 盤點（plugins 缺口收斂）
 
 - **元件**：C8 Plugins

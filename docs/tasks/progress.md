@@ -34,7 +34,7 @@ proposal §5 宣稱已落地的 REQ 不再列為任務。
 - [x] [C7 — i18n Catalog](C7-i18n-catalog.md) — D7 ✅、D9 ✅
 - [ ] [C8 — Plugins](C8-plugins.md) — D1 ✅、D2 ✅、D3 ✅、G-1 ✅；D4 步驟 1（callsite 盤點）✅，其餘待 C1 / C9 承接評估
 - [ ] [C9 — Codegen & Scripts](C9-codegen-scripts.md) — D4 候選承接點評估（條件性）
-- [ ] [C10 — Quality Gates](C10-quality-gates.md) — D8 ✅；D3 待辦（依賴 C8 D3）
+- [x] [C10 — Quality Gates](C10-quality-gates.md) — D8 ✅、D3 ✅
 - [ ] [C11 — Bot Composition Roots](C11-bot-composition-roots.md) — D1 ✅、D2 ✅、D5 ✅；D4 待辦（依賴 C8 D4）
 
 > C2、C4、C9 的設計檔 §7 判定「無實質偏差」。C2 無收斂任務（任務檔僅作存檔
@@ -45,19 +45,19 @@ proposal §5 宣稱已落地的 REQ 不再列為任務。
 
 ## 3. 缺口 → 元件對照
 
-| 缺口 | 標題                                              | 優先級 | 涉及元件                                              | 狀態                           |
-| ---- | ------------------------------------------------- | ------ | ----------------------------------------------------- | ------------------------------ |
-| D1   | guild-onboarding port 不存在                      | P1     | C3（介面）、C11（實作）、C8（消費）                   | C3 ✅；C11 切片 ✅；C8 ✅      |
-| D2   | `earthquake` plugin 不存在                        | P1     | C8（plugin）、C11（組裝）                             | C8 ✅；C11 切片 ✅             |
-| D3   | `src/events/` 過渡層仍存在                        | P1     | C8（刪目錄/alias）、C10（scanner 範圍）               | C8 切片 ✅；C10 scanner 範圍待辦 |
-| D4   | `src/utils/` 仍存在且被依賴                       | P2     | C8（收斂）、C11（alias/CLAUDE.md）、C1·C9（承接評估） | OPEN                           |
-| D5   | `ConnectionManager` 無 retry / 降級分類           | P1     | C5（主）、C11（查詢端）、C6（requireGuildRepos）      | C5 ✅；C6 切片 ✅；C11 切片 ✅ |
-| D6   | `host/` 無 `lifecycle.ts`                         | P2     | C3                                                    | DECIDED 方案 A+窄介面          |
-| D7   | i18n 僅 `zh-TW`、`commands.json` 為空             | P2     | C7（catalog）、C6（handler 去 literal）               | DECIDED 方案 A                 |
-| D8   | strict tsconfig 未涵蓋 `src/bot`、`src/handlers`  | P1     | C10                                                   | OPEN                           |
-| D9   | handler 不直接 catch `DomainError`                | P2     | C6（helper）、C7（文案語氣）                          | DECIDED 方案 B                 |
-| G-1  | giveaway/activity `msgReact` 用 `console.error`   | P3     | C8                                                    | OPEN                           |
-| G-2  | repository 邊界 `Result` 一致性（任務劃分時新增） | P2     | C4（主）、C5（error-translator 落點協調）             | DONE 方案 Y                    |
+| 缺口 | 標題                                              | 優先級 | 涉及元件                                              | 狀態                            |
+| ---- | ------------------------------------------------- | ------ | ----------------------------------------------------- | ------------------------------- |
+| D1   | guild-onboarding port 不存在                      | P1     | C3（介面）、C11（實作）、C8（消費）                   | C3 ✅；C11 切片 ✅；C8 ✅       |
+| D2   | `earthquake` plugin 不存在                        | P1     | C8（plugin）、C11（組裝）                             | C8 ✅；C11 切片 ✅              |
+| D3   | `src/events/` 過渡層仍存在                        | P1     | C8（刪目錄/alias）、C10（scanner 範圍）               | C8 切片 ✅；C10 scanner 範圍 ✅ |
+| D4   | `src/utils/` 仍存在且被依賴                       | P2     | C8（收斂）、C11（alias/CLAUDE.md）、C1·C9（承接評估） | OPEN                            |
+| D5   | `ConnectionManager` 無 retry / 降級分類           | P1     | C5（主）、C11（查詢端）、C6（requireGuildRepos）      | C5 ✅；C6 切片 ✅；C11 切片 ✅  |
+| D6   | `host/` 無 `lifecycle.ts`                         | P2     | C3                                                    | DECIDED 方案 A+窄介面           |
+| D7   | i18n 僅 `zh-TW`、`commands.json` 為空             | P2     | C7（catalog）、C6（handler 去 literal）               | DECIDED 方案 A                  |
+| D8   | strict tsconfig 未涵蓋 `src/bot`、`src/handlers`  | P1     | C10                                                   | C10 ✅                          |
+| D9   | handler 不直接 catch `DomainError`                | P2     | C6（helper）、C7（文案語氣）                          | DECIDED 方案 B                  |
+| G-1  | giveaway/activity `msgReact` 用 `console.error`   | P3     | C8                                                    | OPEN                            |
+| G-2  | repository 邊界 `Result` 一致性（任務劃分時新增） | P2     | C4（主）、C5（error-translator 落點協調）             | DONE 方案 Y                     |
 
 ---
 
