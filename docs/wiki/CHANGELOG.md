@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-05-21 — C7 D7 + D9 落地（雙語系 i18n catalog）
+
+- **元件**：C7 i18n Catalog
+- **缺口**：D7、D9
+- **變更**：填 `zh-TW/commands.json` 指令 metadata key（描述 / 選項描述 /
+  穩定 value choices）;新建 `src/interface/locales/en/{commands,errors,replies}.json`
+  並把 `zh-TW` 全部 key 英譯。每個指令 feature 補有語氣的
+  `replies:<feature>.failed` 回退文案,一律帶 `{{traceId}}` 內插位。新增
+  `test/i18n/catalog-runtime.test.ts` 以實際載入管線驗證 en 解析、雙語系零缺
+  key、缺 key 回退。C7 設計檔與 `CONTRIBUTING.md` 明示雙語系維護負擔。
+- **影響**：catalog 新增 key（commands 命名空間、`en/` 語系、per-feature
+  `failed` 回退）;handler 端去 literal 與 `replyForError` 屬 C6 範圍。
+  `failed` 文案新增 `{{traceId}}` 屬 D9 明示的允許行為變更,其餘文案語意不變。
+
 ## 2026-05-21 — C10 D8 落地（strict tsconfig 涵蓋全 src）
 
 - **元件**：C10 Quality Gates

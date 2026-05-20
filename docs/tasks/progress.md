@@ -31,7 +31,7 @@ proposal §5 宣稱已落地的 REQ 不再列為任務。
 - [ ] [C4 — Persistence](C4-persistence.md) — G-2（repository 邊界 `Result` 一致性）
 - [ ] [C5 — Infra Adapters](C5-infra-adapters.md) — D5
 - [ ] [C6 — Handlers](C6-handlers.md) — D5、D7、D9
-- [ ] [C7 — i18n Catalog](C7-i18n-catalog.md) — D7、D9
+- [x] [C7 — i18n Catalog](C7-i18n-catalog.md) — D7 ✅、D9 ✅
 - [ ] [C8 — Plugins](C8-plugins.md) — D2 ✅、G-1 ✅；D1、D3、D4 待辦
 - [ ] [C9 — Codegen & Scripts](C9-codegen-scripts.md) — D4 候選承接點評估（條件性）
 - [ ] [C10 — Quality Gates](C10-quality-gates.md) — D8 ✅；D3 待辦（依賴 C8 D3）

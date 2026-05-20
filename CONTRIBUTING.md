@@ -182,18 +182,42 @@ Discord.
    }
    ```
 
-2. **Add the i18n keys.** Open
-   `src/interface/locales/zh-TW/replies.json` and add a namespace:
+2. **Add the i18n keys — in every locale.** The catalog is bilingual
+   (`zh-TW` and `en`). Open **both**
+   `src/interface/locales/zh-TW/replies.json` and
+   `src/interface/locales/en/replies.json` and add the same namespace
+   to each:
 
    ```json
+   // zh-TW/replies.json
    "my_command": {
      "success": "✅ {{thing}} 已建立",
-     "failed": "my_command 執行失敗,請稍後再試"
+     "failed": "唔...執行失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
    }
    ```
 
+   ```json
+   // en/replies.json
+   "my_command": {
+     "success": "✅ {{thing}} created",
+     "failed": "Hmm... it failed. Give it another try later! (error code: {{traceId}})"
+   }
+   ```
+
+   Rules the `yarn test:i18n` catalog-completeness gate enforces:
+   - **Every key must exist in both locales.** A key added to one
+     locale only fails the cross-locale parity check.
+   - **`{{placeholder}}` sets must match across locales** for the same
+     key.
+   - The per-command `replies:<feature>.failed` fallback string must
+     carry a `{{traceId}}` interpolation slot — `replyForError` uses it
+     to surface a trace code for non-`DomainError` failures.
+   - Command metadata (description / option descriptions / choices)
+     lives under `commands.json`, again in both locales.
+
    Reuse `errors.json` keys for cross-cutting failures
-   (`errors:db.not_found`, `errors:permission.denied`, etc.).
+   (`errors:db.not_found`, `errors:permission.denied`, etc.); those
+   strings carry the bot-facing tone for `DomainError.messageKey`.
 
 3. **Regenerate the codegen registry.**
 
