@@ -28,13 +28,14 @@
 
 > `nijika` 組裝改動見 [C11](C11-bot-composition-roots.md) D2。
 
-- [ ] 新建 `src/plugins/earthquake/`，工廠 `createEarthquakePlugin(config)`，
+- [x] 新建 `src/plugins/earthquake/`，工廠 `createEarthquakePlugin(config)`，
       `scope='bot'`
-- [ ] `start` hook 內建立 Express 路由 `/discord/earthquake`，收速報後對各 guild
+- [x] `start` hook 內建立 Express 路由 `/discord/earthquake`，收速報後對各 guild
       的地震 channel 廣播
-- [ ] 把 `earthquake_warning` 邏輯遷入 plugin `internal/`
-- [ ] 刪除 `src/events/earthquake.ts`
-- [ ] 補 plugin 生命週期與路由 integration test
+- [x] 把 `earthquake_warning` 邏輯遷入 plugin `internal/`
+- [ ] 刪除 `src/events/earthquake.ts`（與 D3 + C11 D2 一併處理，保持每次 commit
+      建置綠燈）
+- [x] 補 plugin 生命週期與路由 integration test
 
 **驗收**：`src/plugins/earthquake/` 存在；`src/events/earthquake.ts` 不存在。
 
@@ -75,9 +76,9 @@
 
 ## G-1 — `msgReact` 改用結構化 logger（P3）
 
-- [ ] `src/plugins/giveaway/internal/giveaway.ts` 的 `msgReact` 把 `console.error`
+- [x] `src/plugins/giveaway/internal/giveaway.ts` 的 `msgReact` 把 `console.error`
       改為注入的 `Logger`（經 `deps.logger` 或 `ctx.logger`），記結構化欄位
-- [ ] `src/plugins/activity/internal/activity.ts` 的 `msgReact` 同上
+- [x] `src/plugins/activity/internal/activity.ts` 的 `msgReact` 同上
 
 **驗收**：`src/plugins/` 無 raw `console.*`；ESLint `no-console` 於 production
 code 綠。

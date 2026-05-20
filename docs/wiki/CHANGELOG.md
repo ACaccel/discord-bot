@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-05-21 — C8 D2（earthquake plugin）+ G-1 落地
+
+- **元件**：C8 Plugins
+- **缺口**：D2、G-1
+- **變更**：新增 `src/plugins/earthquake/`——`createEarthquakePlugin` 工廠、
+  `start` hook 內的 Express `/discord/earthquake` 路由、`internal/broadcast.ts`
+  的 per-guild 廣播邏輯（自 legacy `events/earthquake.ts` 遷入）。giveaway /
+  activity 的 `msgReact` 改用結構化 logger。
+- **影響**：行為等價——地震廣播語意不變；`nijika` 仍經 legacy inline 路由（待 C11
+  D2 切換後再移除 `events/earthquake.ts`）。
+
 ## 2026-05-21 — C3 D1 介面 + D6 落地
 
 - **元件**：C3 Plugin Runtime

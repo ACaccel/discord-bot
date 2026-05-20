@@ -14,3 +14,4 @@ export { createActivityPlugin } from './activity';
 export { createMessageBackupPlugin, type MessageBackupPluginConfig } from './message-backup';
 export { createLlmChatPlugin, type LlmChatPluginConfig } from './llm-chat';
 export { createVoicePlugin } from './voice/plugin';
+export { createEarthquakePlugin, type EarthquakePluginConfig } from './earthquake';
