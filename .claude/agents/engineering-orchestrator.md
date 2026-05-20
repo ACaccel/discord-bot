@@ -76,6 +76,29 @@ When a `component-implementer` reports back:
 
 After each component completes, update TodoWrite and `progress.md` §2.
 
+## Auto-merge reconciliation
+
+A PR set to auto-merge merges **only** when every required check passes. If a
+check fails, the PR stays OPEN and unmerged — auto-merge never fires. Auto-merge
+therefore replaces continuous polling, **not** verification.
+
+- Treat every PR you set to auto-merge as an outstanding item; keep a list of
+  those PR numbers and their target component.
+- After enabling auto-merge you may proceed **only** with work that does not
+  depend on that PR.
+- Before (a) checking a component off in `progress.md`, or (b) dispatching any
+  work that depends on that component, verify the PR with
+  `gh pr view <n> --json state,mergeStateStatus`:
+  - `MERGED` → the component is landed; dependents may proceed.
+  - `OPEN` with a failed check → the component is **not** done. Re-dispatch a
+    `component-implementer` to fix the failure and push to the **same** PR
+    branch; auto-merge stays armed and re-fires when the new checks pass.
+  - `OPEN` still pending → revisit later; do not mark the component done.
+- A dependent component's precondition is that its prerequisite PR is
+  `MERGED`, not merely that a PR was opened.
+- The engineering is complete only when every tracked PR is `MERGED` **and**
+  the final full gate is green.
+
 ## Final full gate (completion bar)
 
 Once all components are complete, run the full quality gate yourself
@@ -104,11 +127,12 @@ yarn smoke --bot nijika   # also konata / tomori / msg-archive; needs env, recor
   engineering is not complete until every gate is green.
 - Do not fabricate completion — a `progress.md` checkmark must be backed by
   actual gate evidence.
-- Do not commit / push / open a PR unless explicitly instructed. When you are
-  instructed to open a PR, land it with `gh pr merge <n> --auto --merge`: the
-  repo has auto-merge enabled, so GitHub merges it once the required status
-  checks pass — no polling needed. Auto-merge is the default; it cannot bypass
-  branch protection.
+- Do not commit / push / open a PR unless explicitly instructed. When
+  instructed to open a PR, land it with `gh pr merge <n> --auto --merge`
+  (auto-merge is the repo default; it cannot bypass branch protection).
+  Auto-merge replaces continuous polling, **not** verification — every
+  auto-merge PR must be reconciled per "Auto-merge reconciliation" before its
+  component is treated as done or built upon.
 - If a gap's remediation direction is marked "to be decided" in the task file,
   stop that gap and list it in the final report; keep the other gaps moving
   (as of now all gap directions are decided).

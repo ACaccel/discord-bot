@@ -98,6 +98,13 @@ pass. Auto-merge cannot bypass branch protection — it only releases the
 merge after the gate is green. A PR that should not merge unattended is
 simply not opted into auto-merge (review it, then merge by hand).
 
+Auto-merge fires **only on success**: if a required check fails, the PR
+stays open and unmerged. It is not fire-and-forget — the author must
+still confirm the PR reached `MERGED`. Fix a failed check by pushing to
+the same PR branch; auto-merge stays armed and re-triggers when the new
+run is green. Treat anything that depends on a PR as blocked until that
+PR is actually merged, not merely opened.
+
 Note: the `main` branch protection still lists two stale check
 contexts (`test-integration`, `audit`) that predate a CI job rename
 (now `test-int` and `security`); they must be corrected before work

@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-05-21 — 補上 auto-merge reconciliation 規則
+
+- **元件**：C10 Quality Gates / 工程團隊
+- **缺口**：—
+- **變更**：明確規範 auto-merge 非 fire-and-forget——check 失敗時 PR 會停在
+  OPEN。`engineering-orchestrator` agent 新增「Auto-merge reconciliation」段落
+  （追蹤待結 PR、依賴工作以 `MERGED` 為前置條件、失敗則 push 修正至同分支）；
+  `CONTRIBUTING.md` 補上失敗 PR 的處理說明。
+- **影響**：行為等價（無 `src/` 變更）。修正先前「派完 PR 即不理會」的不完整
+  描述。
+
 ## 2026-05-21 — 啟用 auto-merge 為預設合併方式
 
 - **元件**：C10 Quality Gates
