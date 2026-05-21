@@ -3,7 +3,7 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import type { BaseBot } from '../../../bot';
 import { bindTranslator } from '../../../core/i18n';
 import { logError } from '../../../core/logger';
-import { misc, JobManager } from '../../../utils';
+import { JobManager, parseDuration } from '@core/scheduling';
 import {
     activityAnnouncement,
     activityJobKey,
@@ -48,7 +48,7 @@ export const handleActivityCreate = async (
             return;
         }
 
-        const durationMs = misc.parseDuration(duration);
+        const durationMs = parseDuration(duration);
         if (durationMs === null) {
             await interaction.editReply({ content: t('replies:activity.invalid_duration') });
             return;
@@ -72,7 +72,9 @@ export const handleActivityCreate = async (
             return;
         }
 
-        await repos.activity.create({
+        // G-2: create returns Result<ActivityDoc, DatabaseError>. An
+        // `err` is re-thrown into the surrounding catch.
+        const createResult = await repos.activity.create({
             activity_id,
             message_id,
             title,
@@ -81,6 +83,7 @@ export const handleActivityCreate = async (
             channel_id: channel.id,
             participants: [],
         });
+        if (!createResult.ok) throw createResult.error;
 
         if (await findActivity(deps, guild.id, activity_id)) {
             new JobManager(deps.jobMap).schedule(

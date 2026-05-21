@@ -5,14 +5,12 @@ import { Command } from '@cmd';
 
 import { requireGuildRepos } from '../../require-guild-repos';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class ai_status extends Command {
     constructor() {
         super();
         this.setConfig({
             name: 'ai_status',
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: '顯示你目前的 AI 設定',
         });
     }
 
@@ -23,7 +21,10 @@ export default class ai_status extends Command {
         if (repos === null) return;
 
         try {
-            const doc = await repos.userApiSetting.findByUserId(userId);
+            // G-2: an `err` is re-thrown into the surrounding catch.
+            const docResult = await repos.userApiSetting.findByUserId(userId);
+            if (!docResult.ok) throw docResult.error;
+            const doc = docResult.value;
 
             if (!doc) {
                 await interaction.editReply({ content: bot.translator?.t('errors:ai.not_whitelisted') ?? '' });
@@ -53,8 +54,7 @@ export default class ai_status extends Command {
             ];
             await interaction.editReply({ content: lines.join('\n') });
         } catch (err) {
-            logError(bot.logger, bot.clientId, interaction.guildId, err);
-            await interaction.editReply({ content: bot.translator?.t('errors:db.operation_failed') ?? '' });
+            await replyForError(interaction, bot, err, 'replies:ai_status.failed', interaction.guildId);
         }
     }
 }

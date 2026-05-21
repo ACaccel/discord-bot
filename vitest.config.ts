@@ -13,8 +13,8 @@ import path from 'path';
  *   - Overall lines floor (`lines: 46`) is the post-PR-G5 baseline.
  *     `src/core/**` and the persistence repos are well-covered (90% /
  *     integration tests via mongodb-memory-server); the remaining gap
- *     to the plan's ≥ 75% target is in `src/handlers/**`, `src/bot/**`,
- *     `src/utils/**`, and `src/events/**` — handler-side fixtures
+ *     to the plan's ≥ 75% target is in `src/handlers/**` and
+ *     `src/bot/**` — handler-side fixtures
  *     ship in PR-G5 (audit C-12) and the targeted unit tests for the
  *     pure helpers in `core/plugin/host/topology.ts` +
  *     `core/plugin/host/contributes-merger.ts` land alongside. The
@@ -46,8 +46,20 @@ export default defineConfig({
     },
   },
   resolve: {
+    // Mirror the `tsconfig.json` path aliases so handler-layer unit
+    // tests can import the handler barrels (which carry `@bot` /
+    // `@cmd` / `handlers` imports). `@core` keeps its leading entry
+    // for the bulk of the suite that only needs the core alias.
     alias: {
       '@core': path.resolve(__dirname, 'src/core'),
+      '@bot': path.resolve(__dirname, 'src/bot/index'),
+      '@cmd': path.resolve(__dirname, 'src/handlers/commands/index'),
+      '@button': path.resolve(__dirname, 'src/handlers/buttons/index'),
+      '@select-menu': path.resolve(__dirname, 'src/handlers/select-menus/index'),
+      '@modal': path.resolve(__dirname, 'src/handlers/modals/index'),
+      '@reaction': path.resolve(__dirname, 'src/handlers/reactions/index'),
+      '@plugins': path.resolve(__dirname, 'src/plugins/index'),
+      handlers: path.resolve(__dirname, 'src/handlers/index'),
     },
   },
 });

@@ -3,16 +3,16 @@ import { ReactionHandler } from "..";
 import type { BaseBot } from "@bot";
 
 export default class roll_call extends ReactionHandler {
-    public override async executeAdded(reaction: MessageReaction, user: User, bot: BaseBot): Promise<void> {
+    public override async executeAdded(reaction: MessageReaction, user: User, _bot: BaseBot): Promise<void> {
         await rollCallReact(reaction, user);
     }
 
-    public override async executeRemoved(reaction: MessageReaction, user: User, bot: BaseBot): Promise<void> {
+    public override async executeRemoved(reaction: MessageReaction, user: User, _bot: BaseBot): Promise<void> {
         await rollCallReact(reaction, user);
     }
 }
 
-const rollCallReact = async (reaction: MessageReaction, user: User) => {
+const rollCallReact = async (reaction: MessageReaction, _user: User) => {
     // i18n-ignore: trigger prefix matched against the announcement broadcast by /roll_call.
     if (reaction.message.content?.startsWith("初華大人的點名簿")) {
         // parse all users

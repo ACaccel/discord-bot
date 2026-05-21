@@ -77,8 +77,6 @@ src/
 │   ├── tomori/
 │   └── msg-archive/
 │
-├── events/                # legacy event helpers (shrinking each phase)
-├── utils/                 # transitional grab-bag; only `logger.ts` is strict
 └── deploy.ts              # slash-command registration entry point
 ```
 
@@ -92,15 +90,18 @@ src/
 | `@modal`       | `src/handlers/modals/index`       |
 | `@select-menu` | `src/handlers/select-menus/index` |
 | `@reaction`    | `src/handlers/reactions/index`    |
-| `@utils`       | `src/utils/index`                 |
-| `@event`       | `src/events/index`                |
 | `@core/*`      | `src/core/*`                      |
 | `@plugins`     | `src/plugins/index`               |
 
 The `@db`, `@features`, and `@llm_chat` aliases were retired in
 audit PR-E (C-2 + C-3) when the legacy `src/db/` shim and the
 `src/features/` directory were folded into typed `Repos` and
-`src/plugins/<x>/internal/` respectively.
+`src/plugins/<x>/internal/` respectively. The `@event` and `@utils`
+aliases were retired during gap-remediation (gaps D3 / D4): `src/events/`
+was absorbed into the `guild-events` / `earthquake` plugins, and
+`src/utils/` was decomposed — `JobManager` / `parseDuration` moved to
+`src/core/scheduling/`, the command-builder and Discord helpers moved
+under `src/handlers/commands/`.
 
 ## Key abstractions
 

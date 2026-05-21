@@ -5,6 +5,7 @@ import {
     AutoReplyPlugin,
     TtsReplyPlugin,
     createActivityPlugin,
+    createEarthquakePlugin,
     createGiveawayPlugin,
     createGuildEventsPlugin,
     createVoicePlugin,
@@ -16,7 +17,21 @@ interface NijikaConfig extends Config {
 }
 
 export class Nijika extends BaseBot<NijikaConfig> {
-    public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: NijikaConfig) {
+    /**
+     * @param webhookPort - TCP port for the earthquake-alert webhook
+     *   server. Sourced from the validated `Env.PORT` in `index.ts`;
+     *   passed through the constructor (rather than read from
+     *   `process.env` here) so the composition root stays the single
+     *   place that touches the environment.
+     */
+    public constructor(
+        client: Client,
+        token: string,
+        mongoURI: string,
+        clientId: string,
+        config: NijikaConfig,
+        webhookPort: number,
+    ) {
         super(client, token, mongoURI, clientId, config);
         // help_msg is resolved from this key inside BaseBot.run() after
         // the translator is loaded — see audit 3.4.
@@ -39,6 +54,10 @@ export class Nijika extends BaseBot<NijikaConfig> {
         this.use(createGiveawayPlugin());
         this.use(createActivityPlugin());
         this.use(createVoicePlugin());
+        // Gap D2: the earthquake webhook server + per-guild broadcast
+        // is now a bot-scoped plugin. Its `start` hook owns the Express
+        // route that previously lived inline in `index.ts`.
+        this.use(createEarthquakePlugin({ port: webhookPort }));
     }
 
     protected override channelLoggingBlockedChannels(): readonly string[] {

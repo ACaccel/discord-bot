@@ -1,17 +1,16 @@
-import type { 
+import type {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import type { BaseBot } from '@bot';
-import { Command } from '@cmd';
+import { Command, localizeCommandConfig } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
+
 export default class help extends Command {
     constructor() {
         super();
         this.setConfig({
             name: 'help',
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: '顯示指令清單與說明',
         });
     }
 
@@ -28,14 +27,16 @@ export default class help extends Command {
             helpContent += bot.translator?.t('replies:help.commands_header') ?? '';
             bot.commandHandlers.forEach((cmd) => {
                 if (cmd.config) {
-                    helpContent += `* \`/${cmd.config.name}\` : ${cmd.config.description}\n`;
+                    // Gap D7: descriptions are i18n keys resolved here against
+                    // the `commands` catalog instead of inline CJK literals.
+                    const localized = localizeCommandConfig(cmd.config, bot.translator);
+                    helpContent += `* \`/${localized.name}\` : ${localized.description}\n`;
                 }
             });
 
             await interaction.editReply({ content: helpContent });
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:help.failed') ?? ''});
+            await replyForError(interaction, bot, error, 'replies:help.failed', interaction.guild?.id);
         }
     }
 }

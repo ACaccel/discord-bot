@@ -8,8 +8,14 @@
 
 ## 現況
 
-設計檔判定無偏差。待辦：D4 — 評估 `bot_cmd.ts` 是否遷入 `scripts/`（條件性，待 C8 D4 盤點）。
+設計檔判定無偏差。D4 已評估：`bot_cmd.ts` 的 `buildCommandJsonBody` 雖在
+`deploy.ts`（build 期）使用，但同時由 `handlers/commands/index.ts` 在 runtime
+command 註冊路徑消費，且其輸入型別 `LocalizedCommandConfig` 屬 handler 契約，
+故裁定承接於 C6 handler 側（`src/handlers/commands/command-builder.ts`），不遷入
+`scripts/`；`scripts/` 維持「不參與 runtime」的邊界規則。
 
 ## 近期變更
 
+- 2026-05-21 — D4：評估 `bot_cmd.ts` 承接點，裁定歸 C6 handlers（runtime 消費），
+  `scripts/` 不承接;此元件 D4 子任務標記為「評估完成、不適用遷入」。
 - 2026-05-21 — 建立元件 wiki 頁（工程基礎建設）。

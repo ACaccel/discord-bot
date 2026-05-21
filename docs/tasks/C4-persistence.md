@@ -44,25 +44,25 @@ C4 設計檔 §7 判定「無實質偏差」。HLD §5 C4 列出的 7 個 reposi
 
 ### 任務
 
-- [ ] 把 mongoose error-translator 從 `src/infra/mongo/error-translator.ts`
+- [x] 把 mongoose error-translator 從 `src/infra/mongo/error-translator.ts`
       移至 `src/persistence/error-translator.ts`（含 `databaseErrorFrom`、
       私有 `classify`、`__classifyMongoErrorForTests` 測試 export）；更新
       `MongoMessageRepo` 與其餘既有 import 路徑
-- [ ] 與 [C5](C5-infra-adapters.md) D5 協調：`isTransient` helper 一併落於
+- [x] 與 [C5](C5-infra-adapters.md) D5 協調：`isTransient` helper 一併落於
       搬遷後的 `persistence/error-translator.ts`，兩項任務不得各自重建此檔
-- [ ] 七個 `XRepo` 介面方法簽章改為回傳 `Result<T, DatabaseError>`
+- [x] 七個 `XRepo` 介面方法簽章改為回傳 `Result<T, DatabaseError>`
       （`T` 含 not-found 的 `XDoc | undefined`、布林、`InsertResult` 等原型別）
-- [ ] 七個 `MongoXRepo` 實作加 `try/catch`，mongoose 錯誤經 `databaseErrorFrom`
+- [x] 七個 `MongoXRepo` 實作加 `try/catch`，mongoose 錯誤經 `databaseErrorFrom`
       包成 `DatabaseError` 回 `err(...)`，成功回 `ok(...)`
-- [ ] 確認程式員錯誤路徑（`TypeError`）保留，未被包進 `Result`
-- [ ] in-memory fake repo 同步改簽章，與新介面一致
-- [ ] 更新所有 repo callsite（plugin / handler 內委派邏輯）改以 `isOk` /
+- [x] 確認程式員錯誤路徑（`TypeError`）保留，未被包進 `Result`
+- [x] in-memory fake repo 同步改簽章，與新介面一致
+- [x] 更新所有 repo callsite（plugin / handler 內委派邏輯）改以 `isOk` /
       `isErr` 解構；以 `yarn typecheck:emit`（涵蓋全 `src/**`）掃出漏改的
       callsite
-- [ ] 補 / 改各 repo 的單元與 integration test，覆蓋 `Ok` / `Err` 兩路徑
-- [ ] 修正 HLD §7.2、C4 設計檔 §7 與其偏差段落，使文件與實作一致（偏差消失）
-- [ ] 在 `docs/design/gaps.md` §3 彙總表與 §4 決議紀錄補登 G-2
-- [ ] 本缺口獨立成一個 PR，便於 review 與必要時 revert
+- [x] 補 / 改各 repo 的單元與 integration test，覆蓋 `Ok` / `Err` 兩路徑
+- [x] 修正 HLD §7.2、C4 設計檔 §7 與其偏差段落，使文件與實作一致（偏差消失）
+- [x] 在 `docs/design/gaps.md` §3 彙總表與 §4 決議紀錄補登 G-2
+- [x] 本缺口獨立成一個 PR，便於 review 與必要時 revert
 
 **驗收**：七個 repository 邊界皆回 `Result<T, DatabaseError>`；程式員錯誤仍走
 `TypeError`；error-translator 位於 `persistence/`；HLD §7.2、C4 設計檔與

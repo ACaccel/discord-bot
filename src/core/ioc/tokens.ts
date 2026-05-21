@@ -34,6 +34,7 @@ import type { GuildRegistry } from '../guild-registry';
 import type { Translator } from '../i18n';
 import type { Logger } from '../logger';
 import type { Repos } from '../../persistence/repositories';
+import type { GuildOnboardingPort } from '../plugin/guild-onboarding-port';
 
 /** Per-guild repository factory shape. Reserved for Phase 4a when the
  *  plugin/interaction scope makes per-repo registration meaningful. */
@@ -78,6 +79,13 @@ export interface Tokens {
    * holding a BaseBot reference (audit ARCH-BLOCK3 / PR-G4).
    */
   readonly JobMap: ServiceToken<Map<string, Job>>;
+  /**
+   * Guild-onboarding port (D1). The composition root binds the concrete
+   * `BaseBot`-backed implementation; the `guild-events` plugin resolves
+   * this to onboard new guilds from its `guildCreate` subscription
+   * without reaching into `BaseBot` internals.
+   */
+  readonly GuildOnboardingPort: ServiceToken<GuildOnboardingPort>;
 }
 
 export const TOKENS: Tokens = {
@@ -90,4 +98,5 @@ export const TOKENS: Tokens = {
   DiscordClient: token<Client>('DiscordClient'),
   Env: token<Env>('Env'),
   JobMap: token<Map<string, Job>>('JobMap'),
+  GuildOnboardingPort: token<GuildOnboardingPort>('GuildOnboardingPort'),
 };

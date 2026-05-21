@@ -14,13 +14,13 @@
 > 裁定方案 A：補完整 `en/` 語系，不收斂 `Locale` union。handler 端去 CJK
 > literal 見 [C6](C6-handlers.md) D7。
 
-- [ ] 填 `zh-TW/commands.json` 的指令名稱 / 描述 key（依 `README` 之 PR 6-3 規劃）
-- [ ] 新建 `src/interface/locales/en/{commands,errors,replies}.json`，把 `zh-TW`
+- [x] 填 `zh-TW/commands.json` 的指令名稱 / 描述 key（依 `README` 之 PR 6-3 規劃）
+- [x] 新建 `src/interface/locales/en/{commands,errors,replies}.json`，把 `zh-TW`
       的全部 key 英譯（含 D9 新增 / 調整的 `errors:*` 與 `replies:<feature>.failed`）
-- [ ] 確認 catalog-completeness 測試（`yarn test:i18n`）以雙語系比對——任一語系
+- [x] 確認 catalog-completeness 測試（`yarn test:i18n`）以雙語系比對——任一語系
       缺 key 即 fail
-- [ ] 確認 `I18NextTranslator` 的 `fallbackLocale` 對缺漏 key 仍優雅回退至 `zh-TW`
-- [ ] 在 C7 設計文件與 `CONTRIBUTING.md` 明示維護負擔：每新增一個 catalog key
+- [x] 確認 `I18NextTranslator` 的 `fallbackLocale` 對缺漏 key 仍優雅回退至 `zh-TW`
+- [x] 在 C7 設計文件與 `CONTRIBUTING.md` 明示維護負擔：每新增一個 catalog key
       須同步提供 `zh-TW` 與 `en` 兩份翻譯
 
 **驗收**：`commands.json` 非空；`en/` 三個命名空間檔齊備；catalog-completeness
@@ -32,11 +32,11 @@
 
 > handler 端 `replyForError` helper 見 [C6](C6-handlers.md) D9。
 
-- [ ] 確認 `errors.json` 內被 `DomainError.messageKey` 引用的文案皆以 bot 人格
+- [x] 確認 `errors.json` 內被 `DomainError.messageKey` 引用的文案皆以 bot 人格
       語氣撰寫（taxonomy-driven 不等於無語氣——語氣住在 catalog 文案裡）
-- [ ] 確認各指令保留有語氣的 `replies:<feature>.failed` 文案，作為非 `DomainError`
+- [x] 確認各指令保留有語氣的 `replies:<feature>.failed` 文案，作為非 `DomainError`
       錯誤的回退（須含 `{{traceId}}` 內插位）
-- [ ] D7 新建 `en/` 時，一併英譯上述 `errors:*` 與 `replies:<feature>.failed` 文案
+- [x] D7 新建 `en/` 時，一併英譯上述 `errors:*` 與 `replies:<feature>.failed` 文案
 
 **驗收**：`DomainError.messageKey` 目標文案有語氣；per-feature 回退文案含
 `traceId` 內插；雙語系皆備齊。

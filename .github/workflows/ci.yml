@@ -25,6 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/yarn-install
+      # `tsconfig.strict.json` includes the whole `src/` tree (gap D8),
+      # so `yarn typecheck` now compiles `src/bot/<name>/index.ts`,
+      # which `import`s the gitignored per-bot `config.json`. Seed it
+      # so type resolution succeeds — same reason as `typecheck-emit`.
+      - uses: ./.github/actions/seed-bot-config
       - run: yarn typecheck
 
   test-unit:
@@ -150,17 +155,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/yarn-install
-      - name: Bootstrap per-bot config.json from config.example.json
-        # Each `src/bot/<name>/config.json` is gitignored (contains
-        # operator secrets — guild IDs, channel IDs, admin user id).
-        # `tsc` cannot resolve the `import config from './config.json'`
-        # without a file present, so seed each bot from its committed
-        # example. The values are placeholder; only the JSON shape
-        # matters for type resolution.
-        run: |
-          for bot in nijika konata tomori msg-archive; do
-            cp "src/bot/${bot}/config.example.json" "src/bot/${bot}/config.json"
-          done
+      - uses: ./.github/actions/seed-bot-config
       - run: yarn typecheck:emit
 
   security:

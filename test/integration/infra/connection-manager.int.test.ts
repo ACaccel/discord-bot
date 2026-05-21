@@ -16,6 +16,7 @@
 import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
 import { asGuildId } from '../../../src/core/ids';
+import { DatabaseError } from '../../../src/core/errors';
 import {
   MongoConnectionManager,
   buildGuildMongoUri,
@@ -59,6 +60,43 @@ describe('MongoConnectionManager (integration)', () => {
       const b = await mgr.getConnection(asGuildId('222222222222222222'));
       expect(a.connection).not.toBe(b.connection);
     } finally {
+      await mgr.closeAll();
+    }
+  });
+
+  it('retries then disables a guild whose Mongo URI is broken (REQ-C3)', async () => {
+    // REQ-C3 acceptance: a deliberately broken base URI (unresolvable
+    // host) makes every `getConnection` attempt fail with a transient
+    // server-selection timeout. The manager retries with bounded
+    // backoff, then — once the budget is spent — marks the guild
+    // disabled with a generated traceId. A real cluster is not needed:
+    // the failure happens before any handshake.
+    const stderrWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+
+    // Short serverSelectionTimeout keeps the test fast; 2 attempts with
+    // a no-op sleep means the whole case is sub-second despite 2 real
+    // (failed) connection attempts.
+    const brokenUri = 'mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=200&connectTimeoutMS=200&';
+    const mgr = new MongoConnectionManager(
+      brokenUri,
+      { maxAttempts: 2, initialDelayMs: 1, maxDelayMs: 1 },
+      async () => {},
+    );
+    try {
+      const brokenGuild = asGuildId('444444444444444444');
+      await expect(mgr.getConnection(brokenGuild)).rejects.toBeInstanceOf(DatabaseError);
+
+      const disabled = mgr.isDisabled(brokenGuild);
+      expect(disabled).toBeDefined();
+      expect(disabled?.traceId).toMatch(/^[0-9a-z]{6}$/);
+      expect(disabled?.error).toBeInstanceOf(DatabaseError);
+
+      // A disabled guild short-circuits — the next call rejects with
+      // the exact same typed error and does not retry the cluster.
+      await expect(mgr.getConnection(brokenGuild)).rejects.toBe(disabled?.error);
+    } finally {
+      process.stderr.write = stderrWrite;
       await mgr.closeAll();
     }
   });

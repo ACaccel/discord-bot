@@ -10,14 +10,10 @@ export default class giveaway_delete extends Command {
         super();
         this.setConfig({
             name: "giveaway_delete",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "刪除抽獎",
             options: {
                 string: [
                     {
                         name: "message_id",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "抽獎訊息ID (Bot發布的公告)",
                         required: true
                     }
                 ]

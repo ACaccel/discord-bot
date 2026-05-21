@@ -47,7 +47,12 @@ export const performBackup = async (
   try {
     const startTime = Date.now();
     let newCount = 0;
-    const existingCount = await repos.message.countAll();
+    // G-2: repo methods return Result<T, DatabaseError>. An `err` is
+    // re-thrown so the surrounding catch writes the FATAL log line —
+    // behaviour-equivalent to the pre-G-2 raw-error propagation.
+    const existingCountResult = await repos.message.countAll();
+    if (!existingCountResult.ok) throw existingCountResult.error;
+    const existingCount = existingCountResult.value;
 
     const statusMsg = await debugCh.send(
       `[ SYSTEM ] Backup started. DB contains ${existingCount} messages.`,
@@ -112,7 +117,9 @@ export const performBackup = async (
       log.writeln();
     }
 
-    const allFetchChannelIds = await repos.fetch.listChannelIds();
+    const fetchChannelIdsResult = await repos.fetch.listChannelIds();
+    if (!fetchChannelIdsResult.ok) throw fetchChannelIdsResult.error;
+    const allFetchChannelIds = fetchChannelIdsResult.value;
     const deletedChannelIds: string[] = [];
     for (const channelID of allFetchChannelIds) {
       if (liveChannelIds.has(channelID)) continue;
@@ -120,14 +127,17 @@ export const performBackup = async (
         await client.channels.fetch(channelID, { force: true });
       } catch (err) {
         if (err instanceof DiscordAPIError && err.code === 10003) {
-          await repos.fetch.deleteByChannelId(channelID);
+          const deleteResult = await repos.fetch.deleteByChannelId(channelID);
+          if (!deleteResult.ok) throw deleteResult.error;
           deletedChannelIds.push(channelID);
         }
       }
     }
 
     const duration = (Date.now() - startTime) / 1000;
-    const finalCount = await repos.message.countAll();
+    const finalCountResult = await repos.message.countAll();
+    if (!finalCountResult.ok) throw finalCountResult.error;
+    const finalCount = finalCountResult.value;
     const totalFetched = allStats.reduce((s, x) => s + x.totalFetched, 0);
     const totalBots = allStats.reduce((s, x) => s + x.skippedBots, 0);
     const totalDupes = allStats.reduce((s, x) => s + x.skippedDuplicates, 0);

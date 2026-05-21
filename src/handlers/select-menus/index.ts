@@ -35,7 +35,7 @@ export const executeSSM = async (interaction: StringSelectMenuInteraction, bot: 
     }
 
     // customId format: <ssm_type>|<ssm_value>
-    const ssm_type = interaction.customId.split('|')[0];
+    const ssm_type = interaction.customId.split('|')[0] ?? '';
     const handler = bot.ssmHandler.get(ssm_type);
     if (handler) {
         await handler.execute(interaction, bot);

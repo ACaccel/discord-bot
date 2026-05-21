@@ -9,10 +9,10 @@ import type { BaseBot } from '@bot';
 import { ButtonHandler } from '@button';
 
 export default class toggle_role extends ButtonHandler {
-    public override async execute(interaction: ButtonInteraction, bot: BaseBot): Promise<void> {
+    public override async execute(interaction: ButtonInteraction, _bot: BaseBot): Promise<void> {
         const member = interaction.member as GuildMember;
         const guild = interaction.guild as Guild;
-        const roleId = interaction.customId.split("|")[1];
+        const roleId = interaction.customId.split("|")[1] ?? '';
         const role = guild.roles.cache.get(roleId);
         if (!role) {
             await interaction.reply({

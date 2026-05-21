@@ -58,5 +58,13 @@ export const ops = {
   router: {
     replySkipped: (code: number | string): string =>
       `ops:router.reply_skipped | discord reply skipped (expired interaction, code=${code}).`,
+    /**
+     * Correlation marker for a handler-boundary error (gap D9). The
+     * `traceId` matches the id interpolated into the user-facing
+     * `replies:<feature>.failed` copy so operators can `grep` from a
+     * support ticket back to the structured error line.
+     */
+    handlerError: (traceId: string): string =>
+      `ops:router.handler_error | handler boundary error (traceId=${traceId}).`,
   },
 } as const;

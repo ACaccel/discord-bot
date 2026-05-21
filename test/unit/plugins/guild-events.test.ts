@@ -1,7 +1,8 @@
-import { EmbedBuilder, type TextChannel } from 'discord.js';
+import { EmbedBuilder, type Guild, type TextChannel } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 import { createGuildEventsPlugin } from '../../../src/plugins/guild-events';
 import { __test as guildEventsTest } from '../../../src/plugins/guild-events/plugin';
+import type { GuildOnboardingPort } from '../../../src/core/plugin';
 
 describe('createGuildEventsPlugin', () => {
   it('accepts a minimal config (clientId only) and defaults blockedChannels to []', () => {
@@ -11,6 +12,7 @@ describe('createGuildEventsPlugin', () => {
     expect(plugin.events?.messageUpdate).toBeTypeOf('function');
     expect(plugin.events?.messageDelete).toBeTypeOf('function');
     expect(plugin.events?.guildMemberUpdate).toBeTypeOf('function');
+    expect(plugin.events?.guildCreate).toBeTypeOf('function');
   });
 
   it('accepts a blockedChannels list', () => {
@@ -76,5 +78,37 @@ describe('safeSendEmbed', () => {
       'message_delete',
     );
     expect(fakeChannel.send).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('handleGuildCreate', () => {
+  const fakeGuild = (id: string): Guild => ({ id, name: `guild-${id}` }) as unknown as Guild;
+
+  it('delegates onboarding of a new guild to the GuildOnboardingPort', async () => {
+    const onboardGuild = vi.fn(async () => ({
+      guildId: 'g-1',
+      databaseConnected: true,
+      commandsRegistered: true,
+    }));
+    const port: GuildOnboardingPort = { onboardGuild };
+
+    await guildEventsTest.handleGuildCreate(port, undefined, 'bot-1', fakeGuild('g-1'));
+
+    expect(onboardGuild).toHaveBeenCalledTimes(1);
+    expect(onboardGuild).toHaveBeenCalledWith('g-1');
+  });
+
+  it('swallows a port failure so a dispatcher subscription never rejects', async () => {
+    const port: GuildOnboardingPort = {
+      onboardGuild: vi.fn(async () => {
+        throw new Error('connect failed');
+      }),
+    };
+
+    // Regression contract: onboarding is a structural side effect; a
+    // failure is logged, not rethrown.
+    await expect(
+      guildEventsTest.handleGuildCreate(port, undefined, 'bot-1', fakeGuild('g-2')),
+    ).resolves.toBeUndefined();
   });
 });

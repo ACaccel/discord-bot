@@ -317,6 +317,34 @@
 | D8  | strict tsconfig 未涵蓋 `src/bot`、`src/handlers` | P1     | OPEN    | —                                          |
 | D9  | handler 不直接 catch `DomainError`               | P2     | DECIDED | B — taxonomy-driven + per-feature 語氣回退 |
 | G-1 | giveaway/activity `msgReact` 用 `console.error`  | P3     | OPEN    | —                                          |
+| G-2 | repository 邊界 `Result` 一致性                  | P2     | DONE    | Y — 七個 repo 邊界統一回 `Result`          |
+
+---
+
+## G-2 — repository 邊界 `Result` 一致性
+
+| 欄位     | 內容                                                |
+| -------- | --------------------------------------------------- |
+| 優先級   | P2                                                  |
+| 狀態     | DONE                                                |
+| 涉及元件 | C4 Persistence（主）、C5 Infra Adapters（落點協調） |
+| 對應需求 | REQ-A5、HLD §7.2                                    |
+
+**背景**：此項不在 D1–D9 / G-1 原始 backlog 內，為任務劃分時依使用者裁定新增（見 `docs/tasks/C4-persistence.md`）。HLD §7.2 稱 repository 邊界以 `Result` 傳遞，但收斂前僅 `MongoMessageRepo` 包 `DatabaseError`（且為**擲出**而非回 `Result`），其餘六個 repo 讓 raw mongoose 錯誤直接 propagate——文件與實作不一致。
+
+**裁定方案（Y）**：七個 repository 邊界統一改為回傳 `Result<T, DatabaseError>`，對齊 HLD §7.2；並把 mongoose error-translator 自 `src/infra/mongo/error-translator.ts` 搬至 `src/persistence/error-translator.ts`，避免七個 repo 反向 import `infra/mongo`。
+
+**收斂結果**：
+
+1. `error-translator.ts` 移至 `persistence/`（含 `databaseErrorFrom`、私有 `classify`、`__classifyMongoErrorForTests`）；`MongoMessageRepo` 與 barrel import 路徑更新。
+2. 七個 `XRepo` 介面方法簽章改為 `Promise<Result<T, DatabaseError>>`；七個 `MongoXRepo` 實作以 try/catch 包裹，mongoose 錯誤經 `databaseErrorFrom` 包成 `err(DatabaseError)`，成功回 `ok(...)`。
+3. 查無資料為 `ok(undefined)`；`insertManyIgnoringDuplicates` 對帶 `insertedDocs` 的 `BulkWriteError` 維持 `ok`；程式員錯誤（非正整數 `limit` 等）仍擲 `TypeError`，不進 `Result`。
+4. 所有 repo callsite（handler / plugin 委派邏輯）改以 `result.ok` 判斷，`err` 重擲入既有 catch，保持四個 bot 行為等價。
+5. HLD §7.2、C4 設計檔 §7 與實作三者一致，偏差消失。
+
+**與 C5 D5 的協調**：error-translator 搬至 `persistence/` 後，C5 D5 將在同一檔新增 `isTransient` helper。G-2 僅完成搬遷，不預建 `isTransient`；檔案結構（具名 export + 私有 `classify`）使 D5 可乾淨新增該 helper。
+
+**驗收**：七個 repository 邊界皆回 `Result<T, DatabaseError>`；程式員錯誤仍走 `TypeError`；error-translator 位於 `persistence/`；`yarn typecheck:emit`、單元與 integration 測試全綠。
 
 ---
 
@@ -324,11 +352,12 @@
 
 下列四項原為「須由 proposal / HLD 作者裁定」的決議點，已於 2026-05-20 裁定，修正方向見各項 §2 的「裁定方案」與「修正步驟」。
 
-| #   | 決議點                                         | 裁定結果                                                                                                                                                                                               |
-| --- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| D5  | `disabledGuilds` 與 retry / 降級分類的職責歸屬 | **方案 A** — 全部移入 `ConnectionManager`，依 HLD §5 C5 / §7.4 修正實作；`BaseBot` 退化為查詢端。                                                                                                      |
-| D6  | `runLifecycle` 是否抽成 `host/lifecycle.ts`    | **方案 A + 窄介面** — 抽出 `host/lifecycle.ts` 的 `PluginLifecycleRunner`，但以窄介面 `LifecycleHost` 收斂耦合，避免「host 第二部分」式抽象。                                                          |
-| D7  | 是否實際支援 `en` 語系                         | **方案 A** — 補完整 `en/` catalog，不收斂 `Locale` union；接受每個新 key 須雙語翻譯的維護負擔。                                                                                                        |
-| D9  | handler 非 `DomainError` 的錯誤回退策略        | **方案 B** — `DomainError` 走 `messageKey`（語氣寫在 `errors.json` 文案）；非 `DomainError` 回退 per-feature 的 `replies:<feature>.failed` 語氣文案並附 `traceId`；operator 通道永遠記完整結構化 log。 |
+| #   | 決議點                                         | 裁定結果                                                                                                                                                                                                      |
+| --- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D5  | `disabledGuilds` 與 retry / 降級分類的職責歸屬 | **方案 A** — 全部移入 `ConnectionManager`，依 HLD §5 C5 / §7.4 修正實作；`BaseBot` 退化為查詢端。                                                                                                             |
+| D6  | `runLifecycle` 是否抽成 `host/lifecycle.ts`    | **方案 A + 窄介面** — 抽出 `host/lifecycle.ts` 的 `PluginLifecycleRunner`，但以窄介面 `LifecycleHost` 收斂耦合，避免「host 第二部分」式抽象。                                                                 |
+| D7  | 是否實際支援 `en` 語系                         | **方案 A** — 補完整 `en/` catalog，不收斂 `Locale` union；接受每個新 key 須雙語翻譯的維護負擔。                                                                                                               |
+| D9  | handler 非 `DomainError` 的錯誤回退策略        | **方案 B** — `DomainError` 走 `messageKey`（語氣寫在 `errors.json` 文案）；非 `DomainError` 回退 per-feature 的 `replies:<feature>.failed` 語氣文案並附 `traceId`；operator 通道永遠記完整結構化 log。        |
+| G-2 | repository 邊界是否統一以 `Result` 傳遞        | **方案 Y** — 七個 repository 邊界統一回 `Result<T, DatabaseError>`，對齊 HLD §7.2；mongoose error-translator 搬至 `persistence/`，供七個 repo 共用、不反向 import `infra/mongo`；程式員錯誤仍走 `TypeError`。 |
 
 **仍 OPEN 的項目**（D1–D4、D8、G-1）修正方向已明確，無待決議點，可依各項 §2 修正步驟開工。其中 D3 依賴 D1 + D2 先完成。

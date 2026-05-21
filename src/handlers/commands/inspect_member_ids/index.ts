@@ -8,7 +8,7 @@ import {
 import type { BaseBot } from "@bot";
 import { Command } from "@cmd";
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 const MAX_IDS_PER_RUN = 20;
 
 const parseIds = (raw: string): string[] => {
@@ -100,14 +100,10 @@ export default class inspect_member_ids extends Command {
         super();
         this.setConfig({
             name: "inspect_member_ids",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "檢查多個 ID 是否在本 guild，並列出可查資訊",
             options: {
                 string: [
                     {
                         name: "ids",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "可貼多個 ID（逗號/空白/換行分隔）",
                         required: true,
                     },
                 ],
@@ -139,7 +135,7 @@ export default class inspect_member_ids extends Command {
             const t: TFn = (key, params) => bot.translator?.t(key, params) ?? '';
 
             for (let i = 0; i < ids.length; i++) {
-                const id = ids[i];
+                const id = ids[i] as string;
                 const member = await guild.members.fetch(id).catch(() => null);
                 const fetchedUser = member?.user || await bot.client.users.fetch(id).catch(() => null);
                 const user = fetchedUser ? await fetchedUser.fetch(true).catch(() => fetchedUser) : null;
@@ -170,8 +166,7 @@ export default class inspect_member_ids extends Command {
                 await interaction.followUp({ embeds: [embed] });
             }
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:inspect_member_ids.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:inspect_member_ids.failed', interaction.guild?.id);
         }
     }
 }

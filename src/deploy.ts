@@ -26,9 +26,9 @@ import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 
-import { createCommand } from "@cmd";
-import { bot_cmd } from "@utils";
+import { buildCommandJsonBody, createCommand, localizeCommandConfig } from "@cmd";
 import { loadEnv } from '@core/config';
+import { createDefaultTranslator, type Translator } from '@core/i18n';
 
 type DeployArgs = {
     bot?: string;
@@ -89,7 +89,10 @@ function loadBotConfig(botName: string): { token: string; clientId: string; comm
     return { token, clientId, commands: cfg.commands };
 }
 
-function buildCommandsFromConfig(commands: string[]): ApplicationCommandDataResolvable[] {
+function buildCommandsFromConfig(
+    commands: string[],
+    translator: Translator,
+): ApplicationCommandDataResolvable[] {
     const out: ApplicationCommandDataResolvable[] = [];
 
     for (const name of commands) {
@@ -99,7 +102,10 @@ function buildCommandsFromConfig(commands: string[]): ApplicationCommandDataReso
             continue;
         }
 
-        out.push(bot_cmd.buildCommandJsonBody(instance.config));
+        // Gap D7: command / option descriptions are i18n keys resolved
+        // here against the `commands` catalog so the deployed JSON keeps
+        // its localised text.
+        out.push(buildCommandJsonBody(localizeCommandConfig(instance.config, translator)));
     }
 
     return out;
@@ -108,7 +114,8 @@ function buildCommandsFromConfig(commands: string[]): ApplicationCommandDataReso
 async function deployGlobal(botName: string): Promise<void> {
     const { token, clientId, commands } = loadBotConfig(botName);
 
-    const body = buildCommandsFromConfig(commands);
+    const translator = await createDefaultTranslator();
+    const body = buildCommandsFromConfig(commands, translator);
     if (body.length === 0) {
         console.error("No commands to deploy (after filtering).");
         process.exit(1);
@@ -130,7 +137,8 @@ async function deployGlobal(botName: string): Promise<void> {
 async function deployDevGuild(botName: string, guildId: string): Promise<void> {
     const { token, clientId, commands } = loadBotConfig(botName);
 
-    const body = buildCommandsFromConfig(commands);
+    const translator = await createDefaultTranslator();
+    const body = buildCommandsFromConfig(commands, translator);
     if (body.length === 0) {
         console.error("No commands to deploy (after filtering).");
         process.exit(1);

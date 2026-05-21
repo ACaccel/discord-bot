@@ -428,8 +428,12 @@ C1 `errors/` 定義 discriminated `DomainError` 樹：`ValidationError` /
 `ExternalServiceError`（→ `DiscordApiError` / `DatabaseError` /
 `LlmProviderError`）/ `ConfigurationError`。每個錯誤帶 `code` /
 `messageKey` / `messageParams` / `cause`。use case 邊界（LLM service、
-repository）以 `Result<T, DomainError>` 傳遞（REQ-A5、REQ-C1）。
-operator-facing 訊息集中為常數，不散落 literal（REQ-C2）。
+repository）以 `Result<T, DomainError>` 傳遞（REQ-A5、REQ-C1）。七個
+repository 邊界皆回 `Result<T, DatabaseError>`：mongoose 錯誤經
+`persistence/error-translator.ts` 的 `databaseErrorFrom` 轉譯後以 `err`
+回傳，查無資料為 `ok(undefined)`；契約違反（如非正整數 `limit`）為程式員
+錯誤，仍擲原生 `TypeError`，不進 `Result`（缺口 G-2）。operator-facing
+訊息集中為常數，不散落 literal（REQ-C2）。
 
 ### 7.3 可觀測性
 

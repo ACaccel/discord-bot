@@ -3,8 +3,12 @@
  * functions over the registration map; no class state. Kahn's
  * algorithm with deterministic tie-breaking by `Map` iteration order.
  */
-import type { Plugin, PluginId } from '../types';
-import { PluginRegistrationError } from './errors';
+import type { DisabledPlugin, Plugin, PluginId } from '../types';
+import {
+  PluginRegistrationError,
+  CriticalPluginFailureError,
+  DependencyDisabledError,
+} from './errors';
 
 /**
  * Minimum shape needed for topology calculation — only `plugin.dependencies`
@@ -82,4 +86,64 @@ export const buildDependentsIndex = (
     }
   }
   return out;
+};
+
+/**
+ * Minimum shape needed by {@link cascadeDisable}: the ability to read a
+ * plugin's `critical` flag from the registration map.
+ */
+interface CascadeEntry {
+  readonly plugin: Pick<Plugin<unknown>, 'critical'>;
+}
+
+/** Side-effecting hooks the cascade walk reports through. */
+interface CascadeDisableCallbacks {
+  /** True when `id` is already disabled (skip it). */
+  readonly isDisabled: (id: PluginId) => boolean;
+  /** Mark `id` disabled with the supplied descriptor. */
+  readonly disable: (id: PluginId, descriptor: DisabledPlugin) => void;
+  /** Emit a structured log line for one cascade victim. */
+  readonly onVictim: (victimId: PluginId, rootCause: Error) => void;
+}
+
+/**
+ * Disable every plugin that transitively depends on `failedId`. Pure
+ * with respect to graph traversal — all state mutation is delegated to
+ * {@link CascadeDisableCallbacks}, which keeps this function unit-testable
+ * against fakes. Extracted from `host.ts` as the natural companion of
+ * {@link buildDependentsIndex} (D6).
+ *
+ * Returns the cascade victims that were marked `critical: true`; the
+ * caller folds them into its critical-failure rethrow list.
+ */
+export const cascadeDisable = (
+  failedId: PluginId,
+  phase: DisabledPlugin['phase'],
+  rootCause: Error,
+  dependents: ReadonlyMap<PluginId, ReadonlySet<PluginId>>,
+  registered: ReadonlyMap<PluginId, CascadeEntry>,
+  callbacks: CascadeDisableCallbacks,
+): readonly CriticalPluginFailureError[] => {
+  const criticals: CriticalPluginFailureError[] = [];
+  const queue: PluginId[] = [failedId];
+  const seen = new Set<PluginId>([failedId]);
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current === undefined) break;
+    for (const dependent of dependents.get(current) ?? []) {
+      if (seen.has(dependent)) continue;
+      seen.add(dependent);
+      if (callbacks.isDisabled(dependent)) continue;
+      const entry = registered.get(dependent);
+      if (entry === undefined) continue;
+      const cascadeErr = new DependencyDisabledError(dependent, failedId, rootCause);
+      callbacks.disable(dependent, { id: dependent, phase, error: cascadeErr });
+      callbacks.onVictim(dependent, rootCause);
+      if (entry.plugin.critical === true) {
+        criticals.push(new CriticalPluginFailureError(dependent, phase, cascadeErr));
+      }
+      queue.push(dependent);
+    }
+  }
+  return criticals;
 };

@@ -66,7 +66,13 @@ export const lookupReply = async (
 ): Promise<string | null> => {
   const repos = registry.getRepos(guildId);
   if (repos === undefined) return null;
-  const results = await repos.reply.findByInput(input);
+  // G-2: findByInput returns Result<readonly ReplyDoc[], DatabaseError>.
+  // An `err` is re-thrown so `safeLookup` catches it, logs through the
+  // structured logger, and continues with the static behaviours —
+  // behaviour-equivalent to the pre-G-2 raw-error propagation.
+  const result = await repos.reply.findByInput(input);
+  if (!result.ok) throw result.error;
+  const results = result.value;
   if (results.length === 0) return null;
   const pick = results[Math.floor(Math.random() * results.length)];
   return pick?.reply ?? null;

@@ -98,10 +98,20 @@ C7 為純資料，無 OO pattern。設計上的要點是**外部化文案**—�
 - C7 本身不處理錯誤；缺 key 的處理在 C1 `Translator`：`t()` 回退（回 key 本身或 fallback locale），`tStrict()` 擲 `MissingTranslationError`。
 - **不變式**：`errors.json` 內每個 key 必須是某個 `DomainError.messageKey` 的合法目標；新增 `DomainError` code 時須同步補 catalog key，否則 catalog-completeness / `tStrict` 測試會攔下。
 
-### 與 HLD 的偏差（對應索引 D7）
+### 與 HLD 的偏差（對應索引 D7、D9）
 
-**D7 — 僅 `zh-TW` 一個語系，`commands.json` 為空**：
+**D7 — 僅 `zh-TW` 一個語系，`commands.json` 為空（已收斂）**：
 
-- HLD §5 C7 與 §7.1 描述 `<lang>/{commands,errors,replies}.json` 多語系結構，C1 `translator.ts` 也定義 `Locale = 'zh-TW' | 'en'`。實際磁碟上**只有 `zh-TW/`**——`en/` 不存在。多語系為設計就緒但資料未補。
-- `commands.json` 目前是空物件 `{}`（依 README 待 PR 6-3 補 `name_localizations`）。指令名稱／選項描述目前仍是 handler 內的 CJK literal，以 `// i18n-ignore` 註記豁免。
-- 因此 REQ-E1「`Translator` 統一 user-facing 文案」就 `errors`／`replies` 已落地，就 `commands` 命名空間**尚未落地**；catalog-completeness 測試因只有單一語系，目前實質上無跨語系比對對象。
+- HLD §5 C7 與 §7.1 描述 `<lang>/{commands,errors,replies}.json` 多語系結構，C1 `translator.ts` 也定義 `Locale = 'zh-TW' | 'en'`。
+- 收斂結果：`zh-TW/commands.json` 已補完每個指令的 `description`、選項 `options.<opt>.description`、以及以穩定 `value` 為 key 的 `choices`；`menu_*` context menu 指令補 `name`。`src/interface/locales/en/{commands,errors,replies}.json` 三個命名空間檔已建立，並把 `zh-TW` 全部 key 英譯。
+- catalog-completeness 測試（`yarn test:i18n`）現以 `zh-TW` / `en` 雙語系比對 key 集合與 `{{placeholder}}` 集合;`test/i18n/catalog-runtime.test.ts` 額外以實際 `loadCatalogResources` + `I18NextTranslator` 管線驗證 en 解析、跨語系零缺 key、以及缺 key 對 `zh-TW` 的優雅回退。
+- handler 端去 CJK literal（移除 `// i18n-ignore`）屬 C6 D7 範圍;C7 僅負責提供 catalog key。
+
+**D9 — `errors` / `replies` 文案語氣（C7 切片，已收斂）**：
+
+- `errors.json` 內被 `DomainError.messageKey` 引用的文案（目前為 `llm.*` 系列，由 LLM provider strategy 預設）保有可讀、對使用者友善的語氣;taxonomy-driven 的回覆機制把語氣留在 catalog 文案。
+- 每個指令 feature 補上有語氣的 `replies:<feature>.failed`，作為非 `DomainError` 錯誤的回退文案,並一律含 `{{traceId}}` 內插位供 operator 對照。`en/` 同步提供英譯。
+
+### 維護負擔（雙語系常駐成本）
+
+補 `en/` 後，i18n catalog 永久為**雙語系**。每新增或修改一個 catalog key，**必須同步提供 `zh-TW` 與 `en` 兩份**，且兩語系的 `{{placeholder}}` 集合須一致——否則 `yarn test:i18n` 的 catalog-completeness 測試會 fail。此規約亦記於 `CONTRIBUTING.md`。

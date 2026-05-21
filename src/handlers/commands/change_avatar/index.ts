@@ -6,45 +6,30 @@ import { Command } from '@cmd';
 
 import identity_config from './identity.json';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class change_avatar extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "change_avatar",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "人格變換",
             options: {
                 string: [
                     {
                         name: "identity",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "就是身分",
                         required: true,
-                        choices: [
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "高松燈", value: "高松燈" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "千早愛音", value: "千早愛音" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "長崎爽世", value: "長崎爽世" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "要樂奈", value: "要樂奈" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "椎名立希", value: "椎名立希" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "若葉睦", value: "若葉睦" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "豐川祥子", value: "豐川祥子" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "祐天寺にゃむ", value: "祐天寺にゃむ" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "三角初音", value: "三角初音" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "八幡海鈴", value: "八幡海鈴" },
-                            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                            { name: "純田真奈", value: "純田真奈" }
-                        ]
+                        // Gap D7: the identity choices are the persona names
+                        // already declared in the colocated `identity.json`
+                        // data file. Deriving them here keeps the choice
+                        // `name`/`value` CJK strings out of this `.ts`
+                        // source (the i18n scanner walks `.ts` only) and
+                        // removes the duplicated hard-coded list — the JSON
+                        // is the single source of truth. The `value` stays
+                        // the persona name because `execute` matches it back
+                        // against `identity_config`.
+                        choices: identity_config.map((identity) => ({
+                            name: identity.name,
+                            value: identity.name,
+                        }))
                     }
                 ]
             }
@@ -67,7 +52,7 @@ export default class change_avatar extends Command {
 
             // change nickname and avatar
             const newName = interaction.options.get("identity")?.value as string;
-            const oldName = bot.guildInfo[guild?.id].bot_name;
+            const oldName = bot.guildInfo[guild.id]?.bot_name;
             const userBot = guild.members.cache.get(bot.client.user?.id as string);
             if (!userBot) {
                 await interaction.editReply({ content: bot.translator?.t('errors:command.bot_not_found') ?? ''});
@@ -83,7 +68,10 @@ export default class change_avatar extends Command {
             await userBot.setNickname(newName);
             await userBot.client.user.setAvatar(new_identity.avatar_url);
             await bot.reLogin();
-            bot.guildInfo[guild.id].bot_name = newName;
+            const guildEntry = bot.guildInfo[guild.id];
+            if (guildEntry) {
+                guildEntry.bot_name = newName;
+            }
 
             // change color role
             const colorRole = userBot.roles.color;
@@ -95,10 +83,9 @@ export default class change_avatar extends Command {
             if (newColorRole)
                 await userBot.roles.add(newColorRole);
 
-            await interaction.editReply({ content: bot.translator?.t('replies:change_avatar.changed', { oldName, newName }) ?? '' });
+            await interaction.editReply({ content: bot.translator?.t('replies:change_avatar.changed', { oldName: oldName ?? '', newName }) ?? '' });
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:change_avatar.failed') ?? ''});
+            await replyForError(interaction, bot, error, 'replies:change_avatar.failed', interaction.guild?.id);
         }
     }
 }

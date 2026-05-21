@@ -2,10 +2,12 @@
  * Translate raw mongoose / MongoDB driver errors into typed
  * {@link DatabaseError} instances.
  *
- * Lives in `infra/mongo` (not `core/errors`) so that `core/` stays
- * free of mongoose imports — the boundary is upheld at the type
- * level by the layer contract and at the import-graph level by
- * convention.
+ * Lives in `persistence/` (not `core/errors`, and no longer in
+ * `infra/mongo`) so that `core/` stays free of mongoose imports and
+ * the seven repositories can reach the translator without an upward
+ * import into `infra/mongo` (gap G-2). The translation here is pure
+ * string-shape inspection and carries no mongoose import itself; the
+ * boundary is upheld at the type level by the layer contract.
  *
  * Sub-code mapping:
  *   - `DATABASE_DUPLICATE_KEY` — MongoServerError code 11000.
@@ -21,8 +23,8 @@
  * mongoose version bumps don't require a coordinated upgrade — we
  * inspect `name` + `code` + `message` rather than `instanceof`.
  */
-import { DatabaseError, type DatabaseErrorCode } from '../../core/errors/external-service-error';
-import type { ErrorContext } from '../../core/errors/error-context';
+import { DatabaseError, type DatabaseErrorCode } from '../core/errors/external-service-error';
+import type { ErrorContext } from '../core/errors/error-context';
 
 interface MongoLikeError {
   readonly name?: string;
@@ -60,18 +62,28 @@ const classify = (raw: unknown): DatabaseErrorCode => {
   return 'DATABASE_UNKNOWN';
 };
 
+/**
+ * Map a {@link DatabaseErrorCode} to its i18n catalog key.
+ *
+ * The key uses the i18next `namespace:key.path` convention (colon
+ * separator) so the value can be handed straight to `DomainError.messageKey`
+ * and resolved by the handler boundary (gap D9). Every key returned here
+ * has a toned entry under the `db` object of `errors.json` in both
+ * locales; none of these texts carry an interpolation placeholder because
+ * {@link databaseErrorFrom} does not populate `messageParams`.
+ */
 const i18nKeyFor = (code: DatabaseErrorCode): string => {
   switch (code) {
     case 'DATABASE_DUPLICATE_KEY':
-      return 'errors.db.duplicate_key';
+      return 'errors:db.duplicate_key';
     case 'DATABASE_TIMEOUT':
-      return 'errors.db.timeout';
+      return 'errors:db.timeout';
     case 'DATABASE_NETWORK':
-      return 'errors.db.network';
+      return 'errors:db.network';
     case 'DATABASE_VALIDATION':
-      return 'errors.db.validation';
+      return 'errors:db.validation';
     case 'DATABASE_UNKNOWN':
-      return 'errors.db.unavailable';
+      return 'errors:db.unavailable';
   }
 };
 
@@ -90,6 +102,26 @@ export const databaseErrorFrom = (raw: unknown, context: ErrorContext): Database
     cause: raw,
   });
 };
+
+/**
+ * Decide whether a {@link DatabaseError} represents a *transient*
+ * failure — one worth retrying — versus a *persistent* one.
+ *
+ * Only `DATABASE_TIMEOUT` and `DATABASE_NETWORK` are transient: a
+ * server-selection timeout or a dropped/refused socket can clear on
+ * its own (replica-set election, brief network blip), so a bounded
+ * retry has a real chance of succeeding. Every other sub-code
+ * (`DATABASE_DUPLICATE_KEY`, `DATABASE_VALIDATION`, `DATABASE_UNKNOWN`)
+ * is treated as persistent: retrying a duplicate-key or a malformed
+ * document just burns the backoff budget and ends in the same error.
+ *
+ * Consumed by `infra/mongo/connection-manager.ts` to drive the
+ * transient-retry / persistent-disable split (gap D5). Kept here, next
+ * to {@link databaseErrorFrom}, so the sub-code classification and the
+ * retry-eligibility policy stay in one module and cannot drift.
+ */
+export const isTransient = (error: DatabaseError): boolean =>
+  error.code === 'DATABASE_TIMEOUT' || error.code === 'DATABASE_NETWORK';
 
 /** Test-only export so unit tests can pin the classifier without going through `databaseErrorFrom`. */
 export const __classifyMongoErrorForTests = classify;

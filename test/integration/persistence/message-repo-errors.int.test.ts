@@ -1,17 +1,19 @@
 /**
- * Integration regression for the Phase-3 DatabaseError wrapping
- * contract on `MongoMessageRepo`.
+ * Integration regression for the G-2 `Result<T, DatabaseError>`
+ * boundary on `MongoMessageRepo`.
  *
- * The unit tests in `test/unit/infra/mongo/error-translator.test.ts`
+ * The unit tests in `test/unit/persistence/error-translator.test.ts`
  * cover the classifier with synthetic shapes; this suite drives a
- * real mongoose call against the shared memory-server so the actual
- * BulkWriteError-with-no-`insertedDocs`-shape branch is exercised
- * exactly as production would experience it.
+ * real mongoose call against the shared memory-server so both the
+ * `err(DatabaseError)` path (closed connection) and the
+ * BulkWriteError-with-`insertedDocs` happy path are exercised exactly
+ * as production would experience them.
  */
 import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
 import { DatabaseError } from '../../../src/core/errors';
 import { asGuildId } from '../../../src/core/ids';
+import { isErr, isOk } from '../../../src/core/result';
 import {
   StaticConnectionManager,
   buildGuildMongoUri,
@@ -21,8 +23,8 @@ import { withFreshConnection } from '../helpers/mongo';
 
 const guildId = asGuildId('999999999999999999');
 
-describe('MongoMessageRepo error wrapping (integration)', () => {
-  it('countAll wraps a closed-connection failure as DatabaseError', async () => {
+describe('MongoMessageRepo error boundary (integration)', () => {
+  it('countAll resolves to err(DatabaseError) on a closed-connection failure', async () => {
     const baseUri = (() => {
       const uri = process.env.INTEGRATION_MONGO_URI;
       if (uri === undefined) throw new Error('INTEGRATION_MONGO_URI not set');
@@ -38,18 +40,17 @@ describe('MongoMessageRepo error wrapping (integration)', () => {
     );
     await connection.close();
 
-    await expect(repo.countAll()).rejects.toBeInstanceOf(DatabaseError);
-    try {
-      await repo.countAll();
-    } catch (e) {
-      const err = e as DatabaseError;
-      expect(err.kind).toBe('DatabaseError');
-      expect(err.context.operation).toBe('MongoMessageRepo.countAll');
-      expect(err.cause).toBeDefined();
+    const result = await repo.countAll();
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error).toBeInstanceOf(DatabaseError);
+      expect(result.error.kind).toBe('DatabaseError');
+      expect(result.error.context.operation).toBe('MongoMessageRepo.countAll');
+      expect(result.error.cause).toBeDefined();
     }
   });
 
-  it('insertManyIgnoringDuplicates returns partial counts on duplicate-key (NOT thrown as DatabaseError)', async () => {
+  it('insertManyIgnoringDuplicates resolves to ok with partial counts on duplicate-key (NOT err)', async () => {
     await withFreshConnection(async (connection) => {
       const repo = new MongoMessageRepo(
         await new StaticConnectionManager(connection).getConnection(guildId),
@@ -76,16 +77,19 @@ describe('MongoMessageRepo error wrapping (integration)', () => {
 
       // First insert seeds m1.
       await repo.insertManyIgnoringDuplicates([buildDoc('m1')]);
-      // Second batch collides on m1; the contract is "partial success
-      // counts returned, not a thrown DatabaseError" because duplicate-
+      // Second batch collides on m1; the contract is "ok with partial
+      // success counts, NOT an err(DatabaseError)" because duplicate-
       // ignoring is the documented behaviour of this method.
       const result = await repo.insertManyIgnoringDuplicates([
         buildDoc('m1'),
         buildDoc('m2'),
         buildDoc('m3'),
       ]);
-      expect(result.inserted).toBe(2);
-      expect(result.duplicates).toBe(1);
+      expect(isOk(result)).toBe(true);
+      if (isOk(result)) {
+        expect(result.value.inserted).toBe(2);
+        expect(result.value.duplicates).toBe(1);
+      }
     });
   });
 });

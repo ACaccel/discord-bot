@@ -36,14 +36,10 @@ export default class ai_settings extends Command {
         super();
         this.setConfig({
             name: 'ai_settings',
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: '一次性編輯你的 AI 設定（model / temperature / web search / system prompt）',
             options: {
                 string: [
                     {
                         name: 'provider',
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: '選擇 AI provider，後續 model 候選將依此 provider 動態載入',
                         required: true,
                         choices: PROVIDER_CHOICES,
                     },
@@ -58,14 +54,16 @@ export default class ai_settings extends Command {
         const repos = await requireGuildRepos(bot, interaction);
         if (repos === null) return;
 
-        let doc: UserApiDoc | undefined;
-        try {
-            doc = (await repos.userApiSetting.findByUserId(userId)) as UserApiDoc | undefined;
-        } catch (err) {
-            logError(bot.logger, bot.clientId, interaction.guildId, err);
+        // G-2: findByUserId returns Result<UserApiSettingDoc | undefined,
+        // DatabaseError>. An `err` keeps the original behaviour — log
+        // the failure and reply with `errors:db.operation_failed`.
+        const docResult = await repos.userApiSetting.findByUserId(userId);
+        if (!docResult.ok) {
+            logError(bot.logger, bot.clientId, interaction.guildId, docResult.error);
             await interaction.reply({ content: bot.translator?.t('errors:db.operation_failed') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
+        const doc = docResult.value as UserApiDoc | undefined;
         if (!doc) {
             await interaction.reply({ content: bot.translator?.t('errors:ai.not_whitelisted') ?? '', flags: MessageFlags.Ephemeral });
             return;

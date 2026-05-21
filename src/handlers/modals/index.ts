@@ -31,7 +31,7 @@ export const executeModal = async (interaction: ModalSubmitInteraction, bot: Bas
     }
 
     // customId format: <modal_type>|<modal_value>
-    const modal_type = interaction.customId.split('|')[0];
+    const modal_type = interaction.customId.split('|')[0] ?? '';
     const handler = bot.modalHandler.get(modal_type);
     if (handler) {
         await handler.execute(interaction, bot);

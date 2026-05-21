@@ -10,9 +10,15 @@
  *      duplicate-key tolerance contract.
  *   4. The `withFreshConnection` helper drops the database afterwards
  *      so each `it()` is fully isolated.
+ *
+ * G-2: every repo method returns `Result<T, DatabaseError>`. Happy-path
+ * cases unwrap with the test-only `unwrap`. Programmer errors (a non-
+ * positive `limit`) still throw `TypeError` — they are not a domain
+ * failure and never enter the `Result` channel.
  */
 import { describe, expect, it } from 'vitest';
 import { asChannelId, asGuildId } from '../../../src/core/ids';
+import { unwrap } from '../../../src/core/result';
 import { StaticConnectionManager } from '../../../src/infra/mongo/connection-manager';
 import { MongoMessageRepo } from '../../../src/persistence/repositories/message.repo';
 import type { MessageDoc } from '../../../src/persistence/schemas/message.schema';
@@ -42,7 +48,7 @@ describe('MongoMessageRepo (integration)', () => {
       const manager = new StaticConnectionManager(connection);
       const guildConn = await manager.getConnection(guildId);
       const repo = new MongoMessageRepo(guildConn);
-      expect(await repo.countAll()).toBe(0);
+      expect(unwrap(await repo.countAll())).toBe(0);
     });
   });
 
@@ -52,14 +58,16 @@ describe('MongoMessageRepo (integration)', () => {
       const guildConn = await manager.getConnection(guildId);
       const repo = new MongoMessageRepo(guildConn);
 
-      const result = await repo.insertManyIgnoringDuplicates([
-        buildMessageDoc({ messageId: 'm1' }),
-        buildMessageDoc({ messageId: 'm2' }),
-        buildMessageDoc({ messageId: 'm3' }),
-      ]);
+      const result = unwrap(
+        await repo.insertManyIgnoringDuplicates([
+          buildMessageDoc({ messageId: 'm1' }),
+          buildMessageDoc({ messageId: 'm2' }),
+          buildMessageDoc({ messageId: 'm3' }),
+        ]),
+      );
 
       expect(result).toEqual({ inserted: 3, duplicates: 0 });
-      expect(await repo.countAll()).toBe(3);
+      expect(unwrap(await repo.countAll())).toBe(3);
     });
   });
 
@@ -69,17 +77,19 @@ describe('MongoMessageRepo (integration)', () => {
       const guildConn = await manager.getConnection(guildId);
       const repo = new MongoMessageRepo(guildConn);
 
-      await repo.insertManyIgnoringDuplicates([buildMessageDoc({ messageId: 'm1' })]);
+      unwrap(await repo.insertManyIgnoringDuplicates([buildMessageDoc({ messageId: 'm1' })]));
 
-      const result = await repo.insertManyIgnoringDuplicates([
-        buildMessageDoc({ messageId: 'm1' }), // duplicate
-        buildMessageDoc({ messageId: 'm2' }),
-        buildMessageDoc({ messageId: 'm3' }),
-      ]);
+      const result = unwrap(
+        await repo.insertManyIgnoringDuplicates([
+          buildMessageDoc({ messageId: 'm1' }), // duplicate
+          buildMessageDoc({ messageId: 'm2' }),
+          buildMessageDoc({ messageId: 'm3' }),
+        ]),
+      );
 
       expect(result.inserted).toBe(2);
       expect(result.duplicates).toBe(1);
-      expect(await repo.countAll()).toBe(3);
+      expect(unwrap(await repo.countAll())).toBe(3);
     });
   });
 
@@ -89,23 +99,25 @@ describe('MongoMessageRepo (integration)', () => {
       const guildConn = await manager.getConnection(guildId);
       const repo = new MongoMessageRepo(guildConn);
 
-      await repo.insertManyIgnoringDuplicates([
-        buildMessageDoc({ messageId: 'a', timestamp: 100 }),
-        buildMessageDoc({ messageId: 'b', timestamp: 200 }),
-        buildMessageDoc({ messageId: 'c', timestamp: 300 }),
-        buildMessageDoc({
-          messageId: 'd',
-          timestamp: 400,
-          channelId: String(otherChannelId),
-        }),
-      ]);
+      unwrap(
+        await repo.insertManyIgnoringDuplicates([
+          buildMessageDoc({ messageId: 'a', timestamp: 100 }),
+          buildMessageDoc({ messageId: 'b', timestamp: 200 }),
+          buildMessageDoc({ messageId: 'c', timestamp: 300 }),
+          buildMessageDoc({
+            messageId: 'd',
+            timestamp: 400,
+            channelId: String(otherChannelId),
+          }),
+        ]),
+      );
 
-      const recent = await repo.findRecentByChannel(channelId, 2);
+      const recent = unwrap(await repo.findRecentByChannel(channelId, 2));
       expect(recent.map((d) => d.messageId)).toEqual(['c', 'b']);
     });
   });
 
-  it('findRecentByChannel rejects a non-positive limit', async () => {
+  it('findRecentByChannel rejects a non-positive limit with TypeError (programmer error, not a Result)', async () => {
     await withFreshConnection(async (connection) => {
       const manager = new StaticConnectionManager(connection);
       const guildConn = await manager.getConnection(guildId);
@@ -116,27 +128,39 @@ describe('MongoMessageRepo (integration)', () => {
     });
   });
 
-  it('findRecentByChannel returns every match when limit ≥ data size', async () => {
+  it('findByTimestampRange rejects an invalid window with TypeError', async () => {
+    await withFreshConnection(async (connection) => {
+      const manager = new StaticConnectionManager(connection);
+      const guildConn = await manager.getConnection(guildId);
+      const repo = new MongoMessageRepo(guildConn);
+      await expect(repo.findByTimestampRange(200, 100)).rejects.toThrow(TypeError);
+      await expect(repo.findByTimestampRange(Number.NaN, 100)).rejects.toThrow(TypeError);
+    });
+  });
+
+  it('findRecentByChannel returns every match when limit >= data size', async () => {
     await withFreshConnection(async (connection) => {
       const manager = new StaticConnectionManager(connection);
       const guildConn = await manager.getConnection(guildId);
       const repo = new MongoMessageRepo(guildConn);
 
-      await repo.insertManyIgnoringDuplicates([
-        buildMessageDoc({ messageId: 'a', timestamp: 100 }),
-        buildMessageDoc({ messageId: 'b', timestamp: 200 }),
-      ]);
-      const all = await repo.findRecentByChannel(channelId, 100);
+      unwrap(
+        await repo.insertManyIgnoringDuplicates([
+          buildMessageDoc({ messageId: 'a', timestamp: 100 }),
+          buildMessageDoc({ messageId: 'b', timestamp: 200 }),
+        ]),
+      );
+      const all = unwrap(await repo.findRecentByChannel(channelId, 100));
       expect(all.map((d) => d.messageId)).toEqual(['b', 'a']);
     });
   });
 
-  it('findByMessageId returns undefined when the message is not stored', async () => {
+  it('findByMessageId returns ok(undefined) when the message is not stored', async () => {
     await withFreshConnection(async (connection) => {
       const manager = new StaticConnectionManager(connection);
       const guildConn = await manager.getConnection(guildId);
       const repo = new MongoMessageRepo(guildConn);
-      expect(await repo.findByMessageId('does-not-exist')).toBeUndefined();
+      expect(unwrap(await repo.findByMessageId('does-not-exist'))).toBeUndefined();
     });
   });
 
@@ -145,11 +169,29 @@ describe('MongoMessageRepo (integration)', () => {
       const manager = new StaticConnectionManager(connection);
       const guildConn = await manager.getConnection(guildId);
       const repo = new MongoMessageRepo(guildConn);
-      await repo.insertManyIgnoringDuplicates([
-        buildMessageDoc({ messageId: 'unique-id', content: 'find me' }),
-      ]);
-      const doc = await repo.findByMessageId('unique-id');
+      unwrap(
+        await repo.insertManyIgnoringDuplicates([
+          buildMessageDoc({ messageId: 'unique-id', content: 'find me' }),
+        ]),
+      );
+      const doc = unwrap(await repo.findByMessageId('unique-id'));
       expect(doc?.content).toBe('find me');
+    });
+  });
+
+  it('findExistingMessageIds returns the subset already stored', async () => {
+    await withFreshConnection(async (connection) => {
+      const manager = new StaticConnectionManager(connection);
+      const guildConn = await manager.getConnection(guildId);
+      const repo = new MongoMessageRepo(guildConn);
+      unwrap(
+        await repo.insertManyIgnoringDuplicates([
+          buildMessageDoc({ messageId: 'm1' }),
+          buildMessageDoc({ messageId: 'm2' }),
+        ]),
+      );
+      const existing = unwrap(await repo.findExistingMessageIds(['m1', 'm3']));
+      expect([...existing].sort()).toEqual(['m1']);
     });
   });
 });

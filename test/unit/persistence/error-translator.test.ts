@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DatabaseError } from '../../../../src/core/errors';
+import { DatabaseError } from '../../../src/core/errors';
 import {
   databaseErrorFrom,
+  isTransient,
   __classifyMongoErrorForTests as classify,
-} from '../../../../src/infra/mongo/error-translator';
+} from '../../../src/persistence/error-translator';
 
 describe('classifyMongoError', () => {
   it('maps the well-known duplicate-key code 11000', () => {
@@ -46,9 +47,34 @@ describe('databaseErrorFrom', () => {
     const out = databaseErrorFrom(raw, { operation: 'MongoMessageRepo.insertOne' });
     expect(out).toBeInstanceOf(DatabaseError);
     expect(out.code).toBe('DATABASE_DUPLICATE_KEY');
-    expect(out.messageKey).toBe('errors.db.duplicate_key');
+    expect(out.messageKey).toBe('errors:db.duplicate_key');
     expect(out.context.operation).toBe('MongoMessageRepo.insertOne');
     expect(out.cause).toBe(raw);
+  });
+
+  it('produces an i18next-style errors:db.* messageKey for every sub-code', () => {
+    // Regression for the gap-remediation fix: the key must use the
+    // `namespace:key.path` colon convention so the D9 handler boundary can
+    // resolve it; the `.`-separated form silently missed the catalog.
+    const cases: ReadonlyArray<readonly [unknown, string]> = [
+      [
+        (() => {
+          const e = new Error('E11000 duplicate key');
+          (e as Error & { code: number }).code = 11000;
+          return e;
+        })(),
+        'errors:db.duplicate_key',
+      ],
+      [{ name: 'MongooseServerSelectionError' }, 'errors:db.timeout'],
+      [{ name: 'MongoNetworkError' }, 'errors:db.network'],
+      [{ name: 'ValidationError', message: 'bad' }, 'errors:db.validation'],
+      [{ name: 'SomethingWeird' }, 'errors:db.unavailable'],
+    ];
+    for (const [raw, expectedKey] of cases) {
+      const out = databaseErrorFrom(raw, { operation: 'MongoMessageRepo.run' });
+      expect(out.messageKey).toBe(expectedKey);
+      expect(out.messageKey.startsWith('errors:db.')).toBe(true);
+    }
   });
 
   it('threads context.input through unchanged', () => {
@@ -58,5 +84,26 @@ describe('databaseErrorFrom', () => {
     });
     expect(out.code).toBe('DATABASE_TIMEOUT');
     expect(out.context.input).toEqual({ messageId: 'm1' });
+  });
+});
+
+describe('isTransient', () => {
+  const errorWith = (raw: unknown): DatabaseError =>
+    databaseErrorFrom(raw, { operation: 'MongoConnectionManager.open' });
+
+  it('treats timeout and network failures as transient (retry-eligible)', () => {
+    expect(isTransient(errorWith({ name: 'MongooseServerSelectionError' }))).toBe(true);
+    expect(isTransient(errorWith({ name: 'MongoNetworkTimeoutError' }))).toBe(true);
+    expect(isTransient(errorWith({ message: 'operation timed out after 5s' }))).toBe(true);
+    expect(isTransient(errorWith({ name: 'MongoNetworkError' }))).toBe(true);
+    expect(isTransient(errorWith({ message: 'connect ECONNREFUSED 127.0.0.1:27017' }))).toBe(true);
+  });
+
+  it('treats duplicate-key, validation and unknown failures as persistent', () => {
+    expect(isTransient(errorWith({ code: 11000 }))).toBe(false);
+    expect(isTransient(errorWith({ name: 'ValidationError', message: 'bad' }))).toBe(false);
+    expect(isTransient(errorWith({ name: 'CastError', message: 'bad' }))).toBe(false);
+    expect(isTransient(errorWith({ name: 'SomethingWeird' }))).toBe(false);
+    expect(isTransient(errorWith(null))).toBe(false);
   });
 });

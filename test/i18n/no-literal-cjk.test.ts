@@ -1,7 +1,7 @@
 /**
  * CJK-literal scanner — enforces that every user-facing string in the
- * interface / handler / plugin / event layers flows through the
- * translator (`Translator.t`) rather than living as an inline literal.
+ * handler / plugin / bot layers flows through the translator
+ * (`Translator.t`) rather than living as an inline literal.
  *
  * Phase 6 lands this in **warn mode**: the test reports every
  * violation but does not fail. The output is consumed by PR 6-2's
@@ -17,9 +17,10 @@
  * Scope rationale:
  *   - `src/handlers/**` (commands / buttons / modals / SSMs / reactions)
  *     and `src/plugins/**` reach Discord users directly.
- *   - `src/events/**` is on the way out (Phase 4b stripped most of it)
- *     but the remaining `detectGuildCreate` still emits user-visible
- *     guild-create chatter — covered for that reason.
+ *   - `src/events/**` no longer exists: the transitional event layer was
+ *     fully removed in gap-remediation D3 (its last user-visible behaviour,
+ *     `detectGuildCreate`, moved into the guild-onboarding plugin), so the
+ *     scanner no longer scopes it.
  *   - `src/bot/**` (composition roots + bot subclasses) is scanned
  *     in strict mode after audit 3.4. Composition roots used to seed
  *     help_msg / presence as inline CJK; they now must route through
@@ -27,8 +28,8 @@
  *     `replies:konata.presence_text`). `src/bot/index.ts` BaseBot only
  *     emits ops-log lines that are deliberately English; if a future
  *     change reintroduces CJK there, the scanner catches it.
- *   - `src/utils/` and `src/features/` carry domain code that is not
- *     yet a user-facing boundary; left alone for now.
+ *   - `src/utils/` and `src/features/` were transitional trees removed
+ *     during gap-remediation (gaps D4 / earlier audits); no longer scoped.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -44,12 +45,7 @@ const STRICT_MODE_PHASE = 6; // PR 6-3b: scanner now strict at PHASE >= 6.
  * catalog sweep WILL fail in strict mode — coordinate with the
  * migration PR.
  */
-const SCOPED_DIRECTORIES: readonly string[] = [
-  'src/handlers',
-  'src/plugins',
-  'src/events',
-  'src/bot',
-];
+const SCOPED_DIRECTORIES: readonly string[] = ['src/handlers', 'src/plugins', 'src/bot'];
 
 /**
  * Per-file allowlist. Use sparingly — every entry should carry a

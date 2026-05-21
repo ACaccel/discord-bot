@@ -8,16 +8,11 @@ export default class gay extends Command {
   constructor() {
     super();
     this.setConfig({
-      // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations / description_localizations.
       name: 'gay',
-      // i18n-ignore: command-builder metadata; localised in PR 6-3.
-      description: '是不是給',
       options: {
         user: [
           {
             name: 'user',
-            // i18n-ignore: command-builder metadata; localised in PR 6-3.
-            description: '選擇對象',
             required: true,
           },
         ],

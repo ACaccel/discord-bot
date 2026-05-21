@@ -5,6 +5,24 @@
     "moduleResolution": "Node",
     "rootDir": ".",
     "baseUrl": ".",
+    // D8: the strict config now covers the whole `src` tree, including
+    // `src/bot` / `src/handlers` which use the path aliases. Mirror the
+    // base tsconfig's aliases (rebased onto this config's `.` baseUrl).
+    "paths": {
+      "@bot": ["src/bot/index"],
+      "@cmd": ["src/handlers/commands/index"],
+      "@button": ["src/handlers/buttons/index"],
+      "@select-menu": ["src/handlers/select-menus/index"],
+      "@modal": ["src/handlers/modals/index"],
+      "@reaction": ["src/handlers/reactions/index"],
+      "@core/*": ["src/core/*"],
+      "@plugins": ["src/plugins/index"],
+      // The handler `index.ts` files import `HandlerFactory` via the
+      // bare specifier `'handlers'`, which the base tsconfig resolves
+      // through `baseUrl: 'src'`. This strict config keeps `baseUrl`
+      // at the repo root, so the alias is mapped explicitly.
+      "handlers": ["src/handlers/index"]
+    },
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -22,18 +40,10 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  // Strict-mode scope. Each layer joins as it is migrated; PR-G will
-  // extend this to `src/handlers/**`, `src/bot/**`, and `src/utils/**`.
-  // `src/db/**` retired in PR-E (audit C-2): schemas live in
-  // `src/persistence/schemas/**` and the legacy shim was deleted.
-  "include": [
-    "src/core/**/*",
-    "src/persistence/**/*",
-    "src/infra/mongo/**/*",
-    "src/infra/llm/**/*",
-    "src/utils/logger.ts",
-    "scripts/**/*",
-    "test/**/*"
-  ],
+  // Strict-mode scope. D8 (gaps.md): strict typecheck now covers the
+  // whole `src` tree — every layer migrated. `src/db/**` retired in
+  // PR-E (audit C-2): schemas live in `src/persistence/schemas/**` and
+  // the legacy shim was deleted.
+  "include": ["src/**/*", "scripts/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]
 }

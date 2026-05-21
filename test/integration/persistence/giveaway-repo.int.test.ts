@@ -1,6 +1,12 @@
+import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
 import { asGuildId } from '../../../src/core/ids';
-import { StaticConnectionManager } from '../../../src/infra/mongo/connection-manager';
+import { DatabaseError } from '../../../src/core/errors';
+import { isErr, unwrap } from '../../../src/core/result';
+import {
+  StaticConnectionManager,
+  buildGuildMongoUri,
+} from '../../../src/infra/mongo/connection-manager';
 import {
   MongoGiveawayRepo,
   type GiveawayInput,
@@ -25,24 +31,24 @@ describe('MongoGiveawayRepo (integration)', () => {
   it('create persists and findByMessageId returns the same doc', async () => {
     await withFreshConnection(async (connection) => {
       const repo = await buildRepo(new StaticConnectionManager(connection));
-      await repo.create(input({ message_id: 'm1' }));
-      expect((await repo.findByMessageId('m1'))?.prize).toBe('mug');
+      unwrap(await repo.create(input({ message_id: 'm1' })));
+      expect(unwrap(await repo.findByMessageId('m1'))?.prize).toBe('mug');
     });
   });
 
-  it('findByMessageId returns undefined for an unknown message id', async () => {
+  it('findByMessageId returns ok(undefined) for an unknown message id', async () => {
     await withFreshConnection(async (connection) => {
       const repo = await buildRepo(new StaticConnectionManager(connection));
-      expect(await repo.findByMessageId('missing')).toBeUndefined();
+      expect(unwrap(await repo.findByMessageId('missing'))).toBeUndefined();
     });
   });
 
   it('listAll returns every giveaway (used by reboot job)', async () => {
     await withFreshConnection(async (connection) => {
       const repo = await buildRepo(new StaticConnectionManager(connection));
-      await repo.create(input({ message_id: 'm1' }));
-      await repo.create(input({ message_id: 'm2', prize: 'hat' }));
-      const all = await repo.listAll();
+      unwrap(await repo.create(input({ message_id: 'm1' })));
+      unwrap(await repo.create(input({ message_id: 'm2', prize: 'hat' })));
+      const all = unwrap(await repo.listAll());
       expect(all.map((d) => d.message_id).sort()).toEqual(['m1', 'm2']);
     });
   });
@@ -50,9 +56,32 @@ describe('MongoGiveawayRepo (integration)', () => {
   it('deleteByMessageId removes and returns true / false correctly', async () => {
     await withFreshConnection(async (connection) => {
       const repo = await buildRepo(new StaticConnectionManager(connection));
-      await repo.create(input({ message_id: 'm1' }));
-      expect(await repo.deleteByMessageId('m1')).toBe(true);
-      expect(await repo.deleteByMessageId('m1')).toBe(false);
+      unwrap(await repo.create(input({ message_id: 'm1' })));
+      expect(unwrap(await repo.deleteByMessageId('m1'))).toBe(true);
+      expect(unwrap(await repo.deleteByMessageId('m1'))).toBe(false);
     });
+  });
+
+  // G-2: a genuine DB failure resolves to `err(DatabaseError)`.
+  it('listAll resolves to err(DatabaseError) when the connection is closed', async () => {
+    const baseUri = (() => {
+      const uri = process.env.INTEGRATION_MONGO_URI;
+      if (uri === undefined) throw new Error('INTEGRATION_MONGO_URI not set');
+      return uri.replace(/[^/]*$/, '');
+    })();
+    const connection = await mongoose
+      .createConnection(buildGuildMongoUri(baseUri, guildId))
+      .asPromise();
+    const repo = new MongoGiveawayRepo(
+      await new StaticConnectionManager(connection).getConnection(guildId),
+    );
+    await connection.close();
+
+    const result = await repo.listAll();
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error).toBeInstanceOf(DatabaseError);
+      expect(result.error.context.operation).toBe('MongoGiveawayRepo.listAll');
+    }
   });
 });

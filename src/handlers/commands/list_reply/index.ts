@@ -6,20 +6,16 @@ import { Command } from '@cmd';
 
 import { requireGuildRepos } from '../../require-guild-repos';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class list_reply extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "list_reply",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "列出自動回覆",
             options: {
                 string: [
                     {
                         name: "keyword",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "關鍵字",
                         required: true
                     }
                 ]
@@ -33,7 +29,10 @@ export default class list_reply extends Command {
             const keyword = interaction.options.get("keyword")?.value as string;
             const repos = await requireGuildRepos(bot, interaction);
             if (repos === null) return;
-            const replyList = await repos.reply.findByInput(keyword);
+            // G-2: an `err` is re-thrown into the surrounding catch.
+            const replyListResult = await repos.reply.findByInput(keyword);
+            if (!replyListResult.ok) throw replyListResult.error;
+            const replyList = replyListResult.value;
             if (replyList.length === 0) {
                 await interaction.editReply({ content: bot.translator?.t('replies:list_reply.not_found', { keyword }) ?? '' });
             } else {
@@ -44,8 +43,7 @@ export default class list_reply extends Command {
                 await interaction.editReply({ content });
             }
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: bot.translator?.t('replies:list_reply.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:list_reply.failed', interaction.guild?.id);
         }
     }
 }

@@ -18,8 +18,21 @@ import path from 'path';
  * `globalSetup` for the integration project is wired now so Phase 2's
  * mongodb-memory-server lifecycle has a real entry point already loaded.
  */
+/**
+ * Path aliases mirrored from `tsconfig.json` so handler-layer unit
+ * tests can import the handler barrels (which carry `@bot` / `@cmd` /
+ * `handlers` imports).
+ */
 const aliases = {
   '@core': path.resolve(__dirname, 'src/core'),
+  '@bot': path.resolve(__dirname, 'src/bot/index'),
+  '@cmd': path.resolve(__dirname, 'src/handlers/commands/index'),
+  '@button': path.resolve(__dirname, 'src/handlers/buttons/index'),
+  '@select-menu': path.resolve(__dirname, 'src/handlers/select-menus/index'),
+  '@modal': path.resolve(__dirname, 'src/handlers/modals/index'),
+  '@reaction': path.resolve(__dirname, 'src/handlers/reactions/index'),
+  '@plugins': path.resolve(__dirname, 'src/plugins/index'),
+  handlers: path.resolve(__dirname, 'src/handlers/index'),
 };
 
 export default defineWorkspace([

@@ -47,18 +47,8 @@ import {
   DependencyDisabledError as DependencyDisabledErrorClass,
 } from './host/errors';
 import { topologicalOrder, buildDependentsIndex } from './host/topology';
-import type {
-  ContributedRegistry,
-  DisabledPlugin,
-  Plugin,
-  PluginEventSubscriptions,
-  PluginId,
-  PluginInitContext,
-  PluginRuntimeContext,
-  PluginRuntimeServices,
-  PluginStartContext,
-  TypedResolver,
-} from './types';
+import { PluginLifecycleRunner, type LifecycleHost, type RegisteredPlugin } from './host/lifecycle';
+import type { ContributedRegistry, DisabledPlugin, Plugin, PluginId, TypedResolver } from './types';
 
 // Public errors live in `host/errors.ts` (audit C-8 split). Re-exported
 // here so existing callers continue to import them from `core/plugin`.
@@ -72,12 +62,6 @@ export type DependencyDisabledError = DependencyDisabledErrorClass;
 // ---------------------------------------------------------------------------
 // Host
 // ---------------------------------------------------------------------------
-
-interface RegisteredPlugin {
-  readonly plugin: Plugin<unknown>;
-  /** Validated config from `configSchema.parse(rawConfig)`. */
-  readonly config: unknown;
-}
 
 export interface PluginHostOptions {
   readonly container: ServiceContainer;
@@ -110,6 +94,12 @@ export class PluginHost {
   private dependents: Map<PluginId, Set<PluginId>> = new Map();
   private effectiveRegistries: EffectiveRegistries | undefined;
   private readonly dispatcher: EventDispatcher;
+  /**
+   * Lifecycle runner — built lazily after {@link finalizeRegistration}
+   * so it captures the finalized `order` / `dependents`. The D6 split
+   * keeps phase logic in `host/lifecycle.ts`; the host only wires it.
+   */
+  private lifecycleRunner: PluginLifecycleRunner | undefined;
 
   constructor(private readonly options: PluginHostOptions) {
     this.dispatcher = new EventDispatcher(options.logger);
@@ -193,16 +183,12 @@ export class PluginHost {
   }
 
   // -------------------------------------------------------------------
-  // Lifecycle
+  // Lifecycle — thin delegation to PluginLifecycleRunner (D6 split)
   // -------------------------------------------------------------------
 
   /** Run `init` on every enabled plugin in topological order. */
   public async initAll(): Promise<void> {
-    await this.runLifecycle('init', async (entry, ctx) => {
-      if (entry.plugin.init !== undefined) {
-        await entry.plugin.init(ctx as PluginInitContext<unknown>);
-      }
-    });
+    await this.getLifecycleRunner().runInit();
   }
 
   /**
@@ -218,23 +204,12 @@ export class PluginHost {
    * see a partially-initialised world.
    */
   public async startAll(): Promise<void> {
-    await this.runLifecycle('start', async (entry, ctx) => {
-      if (entry.plugin.start !== undefined) {
-        await entry.plugin.start(ctx as PluginStartContext);
-      }
-    });
-    // After every plugin has started, attach event subscriptions so
-    // discord.js events fan out as soon as they fire post-ready.
-    this.attachEventSubscriptions();
+    await this.getLifecycleRunner().runStart();
   }
 
   /** Run `onReady` on every enabled plugin in topological order. */
   public async readyAll(): Promise<void> {
-    await this.runLifecycle('onReady', async (entry, ctx) => {
-      if (entry.plugin.onReady !== undefined) {
-        await entry.plugin.onReady(ctx as PluginRuntimeContext);
-      }
-    });
+    await this.getLifecycleRunner().runReady();
   }
 
   /**
@@ -242,34 +217,39 @@ export class PluginHost {
    * always non-fatal here — the bot is shutting down regardless.
    */
   public async shutdownAll(): Promise<void> {
-    const reverse = [...this.order].reverse();
-    for (const id of reverse) {
-      if (this.disabled.has(id)) continue;
-      const entry = this.registered.get(id);
-      if (entry === undefined) continue;
-      if (entry.plugin.onShutdown !== undefined) {
-        try {
-          const ctx = this.buildRuntimeContext(entry);
-          await entry.plugin.onShutdown(ctx);
-        } catch (err: unknown) {
-          this.options.logger.warn(
-            {
-              plugin: id,
-              err: err instanceof Error ? err : new Error(String(err)),
-            },
-            'plugin onShutdown threw; ignored',
-          );
-        }
-      }
-      // Always detach subscriptions — even for plugins that only
-      // subscribed to events without registering an onShutdown hook.
-      this.dispatcher.unsubscribeAll(id);
-    }
+    await this.getLifecycleRunner().runShutdown();
   }
 
   // -------------------------------------------------------------------
   // Internals
   // -------------------------------------------------------------------
+
+  /**
+   * Lazily build the lifecycle runner, exposing the host's state to it
+   * through the narrow {@link LifecycleHost} interface. Built lazily so
+   * it captures the finalized `order` and `dependents`.
+   */
+  private getLifecycleRunner(): PluginLifecycleRunner {
+    if (this.lifecycleRunner === undefined) {
+      this.lifecycleRunner = new PluginLifecycleRunner(this.buildLifecycleHost());
+    }
+    return this.lifecycleRunner;
+  }
+
+  /** Adapt the host's mutable state into the narrow {@link LifecycleHost}. */
+  private buildLifecycleHost(): LifecycleHost {
+    return {
+      registered: this.registered,
+      order: this.order,
+      disabled: this.disabled,
+      dependents: this.dependents,
+      resolve: this.buildResolver(),
+      dispatcher: this.dispatcher,
+      logger: this.options.logger,
+      translator: this.options.translator,
+      clock: this.options.clock,
+    };
+  }
 
   private validateConfig<Config>(plugin: Plugin<Config>, rawConfig: unknown): Config {
     const schema = plugin.configSchema as z.ZodType<Config> | undefined;
@@ -314,133 +294,9 @@ export class PluginHost {
     return buildDependentsIndex(this.registered);
   }
 
-  /**
-   * Disable every plugin that depends (transitively) on `failedId`.
-   * Each cascade victim is marked with a {@link DependencyDisabledError}
-   * whose `cause` is the original failure, so the disabled set is
-   * self-explanatory for operators.
-   *
-   * Returns the list of victims that were marked `critical` — caller
-   * folds them into the critical-failure rethrow.
-   */
-  private cascadeDisable(
-    failedId: PluginId,
-    phase: DisabledPlugin['phase'],
-    rootCause: Error,
-  ): readonly CriticalPluginFailureError[] {
-    const criticals: CriticalPluginFailureError[] = [];
-    const queue: PluginId[] = [failedId];
-    const seen = new Set<PluginId>([failedId]);
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (current === undefined) break;
-      for (const dependent of this.dependents.get(current) ?? []) {
-        if (seen.has(dependent)) continue;
-        seen.add(dependent);
-        if (this.disabled.has(dependent)) continue;
-        const entry = this.registered.get(dependent);
-        if (entry === undefined) continue;
-        const cascadeErr = new DependencyDisabledError(dependent, failedId, rootCause);
-        this.disabled.set(dependent, { id: dependent, phase, error: cascadeErr });
-        this.options.logger.warn(
-          {
-            plugin: dependent,
-            phase,
-            dependency: failedId,
-            cause: rootCause instanceof Error ? { message: rootCause.message } : undefined,
-          },
-          'plugin disabled because its dependency failed; lifecycle hook will not run',
-        );
-        if (entry.plugin.critical === true) {
-          criticals.push(new CriticalPluginFailureError(dependent, phase, cascadeErr));
-        }
-        queue.push(dependent);
-      }
-    }
-    return criticals;
-  }
-
   private buildResolver(): TypedResolver {
     const container = this.options.container;
     return <T>(token: ServiceToken<T>): T => container.resolve<T>(token);
-  }
-
-  private buildRuntimeServices(entry: RegisteredPlugin): PluginRuntimeServices {
-    return Object.freeze({
-      logger: this.options.logger.child({ plugin: entry.plugin.id }),
-      translator: this.options.translator,
-      clock: this.options.clock,
-      resolve: this.buildResolver(),
-    });
-  }
-
-  private buildRuntimeContext(entry: RegisteredPlugin): PluginRuntimeContext {
-    return this.buildRuntimeServices(entry);
-  }
-
-  private buildInitContext(entry: RegisteredPlugin): PluginInitContext<unknown> {
-    return Object.freeze({
-      ...this.buildRuntimeServices(entry),
-      config: entry.config,
-    }) as PluginInitContext<unknown>;
-  }
-
-  private async runLifecycle(
-    phase: 'init' | 'start' | 'onReady',
-    invoke: (
-      entry: RegisteredPlugin,
-      ctx: PluginInitContext<unknown> | PluginRuntimeContext,
-    ) => Promise<void>,
-  ): Promise<void> {
-    const criticalFailures: CriticalPluginFailureError[] = [];
-    for (const id of this.order) {
-      if (this.disabled.has(id)) continue;
-      const entry = this.registered.get(id);
-      if (entry === undefined) continue;
-      try {
-        const ctx =
-          phase === 'init' ? this.buildInitContext(entry) : this.buildRuntimeContext(entry);
-        await invoke(entry, ctx);
-      } catch (err: unknown) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        this.disabled.set(id, { id, phase, error });
-        this.options.logger.error(
-          {
-            plugin: id,
-            phase,
-            critical: entry.plugin.critical === true,
-            err: error,
-          },
-          'plugin lifecycle hook threw; plugin disabled',
-        );
-        if (entry.plugin.critical === true) {
-          criticalFailures.push(new CriticalPluginFailureError(id, phase, error));
-        }
-        // Cascade-disable every plugin that (transitively) depended
-        // on this one — their lifecycle hooks would observe a partly-
-        // initialised world otherwise. Cascade victims marked
-        // `critical: true` also fold into the rethrow list.
-        const cascaded = this.cascadeDisable(id, phase, error);
-        criticalFailures.push(...cascaded);
-      }
-    }
-    if (criticalFailures.length > 0) {
-      // Surface the first critical failure (preserving cause). The
-      // remaining critical failures are still visible in
-      // disabledPlugins for diagnostics.
-      throw criticalFailures[0];
-    }
-  }
-
-  private attachEventSubscriptions(): void {
-    for (const id of this.order) {
-      if (this.disabled.has(id)) continue;
-      const entry = this.registered.get(id);
-      if (entry === undefined) continue;
-      const subs: PluginEventSubscriptions | undefined = entry.plugin.events;
-      if (subs === undefined) continue;
-      this.dispatcher.subscribe(id, this.buildRuntimeServices(entry), subs);
-    }
   }
 }
 

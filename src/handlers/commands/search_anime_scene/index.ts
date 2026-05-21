@@ -7,28 +7,22 @@ import axios from 'axios';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 export default class search_anime_scene extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "search_anime_scene",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "搜尋動漫截圖來源",
             options: {
                 attachment: [
                     {
                         name: "image",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "動漫截圖",
                         required: true
                     }
                 ],
                 number: [
                     {
                         name: "display_num",
-                        // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-                        description: "顯示幾筆搜尋結果 (optional)",
                         required: false
                     }
                 ]
@@ -95,8 +89,7 @@ export default class search_anime_scene extends Command {
                 }
             })
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:search_anime_scene.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:search_anime_scene.failed', interaction.guild?.id);
         }
     }
 }

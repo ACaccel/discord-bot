@@ -5,7 +5,7 @@ import Mee6LevelsApi from 'mee6-levels-api';
 import type { BaseBot, Config } from '@bot';
 import { Command } from '@cmd';
 
-import { logError } from '@core/logger';
+import { replyForError } from '../../reply-for-error';
 // import { Nijika } from 'bot/nijika/nijika';
 
 interface UpdateRoleConfig extends Config {
@@ -18,8 +18,6 @@ export default class update_role extends Command {
         super();
         this.setConfig({
             name: "update_role",
-            // i18n-ignore: command-builder metadata; localised in PR 6-3 via name_localizations.
-            description: "更新Mee6等級身分組"
         });
     }
 
@@ -40,7 +38,7 @@ export default class update_role extends Command {
             }
 
             const leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
-            const guild = bot.guildInfo[interaction.guild?.id as string].guild;
+            const guild = bot.guildInfo[interaction.guild?.id as string]!.guild;
             const channel = interaction.channel;
             if (!channel?.isSendable()) return;
             // let alive_role = guild.roles.cache.find(role => role.name === "活人");
@@ -61,8 +59,8 @@ export default class update_role extends Command {
                 // find corresponding role
                 let roleToAssign = "";
                 for (const roleLevel in botConfig.level_roles) {
-                    if (level >= parseInt(roleLevel.split('_')[1])) {
-                        roleToAssign = botConfig.level_roles[roleLevel];
+                    if (level >= parseInt(roleLevel.split('_')[1] ?? '0')) {
+                        roleToAssign = botConfig.level_roles[roleLevel] ?? '';
                     } else {
                         break;
                     }
@@ -78,7 +76,7 @@ export default class update_role extends Command {
                     
                     if (guildMember.roles.cache.has(removedRole.id) && removedRole.name !== roleToAssign) {
                         await guildMember.roles.remove(removedRole);
-                        await channel.send(bot.translator?.t('replies:update_role.removed', { name: guildMember.user.displayName, role: botConfig.level_roles[roleLevel] }) ?? '');
+                        await channel.send(bot.translator?.t('replies:update_role.removed', { name: guildMember.user.displayName, role: botConfig.level_roles[roleLevel] ?? '' }) ?? '');
                     }
                 }
                 if (addedRole && !hasRoleToAssign) {
@@ -88,8 +86,7 @@ export default class update_role extends Command {
             }));
             await interaction.editReply({ content: bot.translator?.t('replies:update_role.done') ?? '' });
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: bot.translator?.t('replies:update_role.failed') ?? '' });
+            await replyForError(interaction, bot, error, 'replies:update_role.failed', interaction.guild?.id);
         }
     }
 }

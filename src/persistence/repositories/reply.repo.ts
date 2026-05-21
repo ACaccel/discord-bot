@@ -2,54 +2,90 @@
  * `ReplyRepo` — auto-reply pair storage. One per guild; pairs are
  * keyed by an exact-match `input` and produce a `reply` string.
  *
- * Phase 2 scope: covers every call site currently using
- * `db.models["Reply"]` (add_reply, delete_reply, list_reply, plus the
- * delete_reply SSM that uses ObjectId-by-string lookups). PR B will
- * switch those call sites over.
+ * **Error boundary (gap G-2)**: every method returns
+ * `Result<T, DatabaseError>`. A mongoose failure is translated by the
+ * shared `databaseErrorFrom` translator and returned as `err`; a
+ * missing lookup is a success (`ok(undefined)`).
  */
+import type { DatabaseError } from '../../core/errors/external-service-error';
+import { err, ok, type Result } from '../../core/result';
 import type { GuildConnection } from '../../infra/mongo/connection-manager';
+import { databaseErrorFrom } from '../error-translator';
 import type { ReplyDoc } from '../schemas/reply.schema';
 
 export interface ReplyRepo {
   /** Exact-pair existence check (used by add_reply to dedupe). */
-  findExactPair(input: string, reply: string): Promise<readonly ReplyDoc[]>;
+  findExactPair(input: string, reply: string): Promise<Result<readonly ReplyDoc[], DatabaseError>>;
 
   /** All replies registered under `input`. */
-  findByInput(input: string): Promise<readonly ReplyDoc[]>;
+  findByInput(input: string): Promise<Result<readonly ReplyDoc[], DatabaseError>>;
 
   /** Find by Mongoose `_id` rendered as a string (delete_reply SSM). */
-  findById(id: string): Promise<ReplyDoc | undefined>;
+  findById(id: string): Promise<Result<ReplyDoc | undefined, DatabaseError>>;
 
   /** Create a new pair and return the persisted doc. */
-  create(input: string, reply: string): Promise<ReplyDoc>;
+  create(input: string, reply: string): Promise<Result<ReplyDoc, DatabaseError>>;
 
-  /** Delete by `_id`; returns true when a document was removed. */
-  deleteById(id: string): Promise<boolean>;
+  /** Delete by `_id`; `ok(true)` when a document was removed. */
+  deleteById(id: string): Promise<Result<boolean, DatabaseError>>;
 }
 
 export class MongoReplyRepo implements ReplyRepo {
   constructor(private readonly conn: GuildConnection) {}
 
-  public async findExactPair(input: string, reply: string): Promise<readonly ReplyDoc[]> {
-    return this.conn.models.Reply.find({ input, reply }).lean<ReplyDoc[]>().exec();
+  public async findExactPair(
+    input: string,
+    reply: string,
+  ): Promise<Result<readonly ReplyDoc[], DatabaseError>> {
+    try {
+      return ok(await this.conn.models.Reply.find({ input, reply }).lean<ReplyDoc[]>().exec());
+    } catch (rawErr: unknown) {
+      return err(
+        databaseErrorFrom(rawErr, { operation: 'MongoReplyRepo.findExactPair', input: { input } }),
+      );
+    }
   }
 
-  public async findByInput(input: string): Promise<readonly ReplyDoc[]> {
-    return this.conn.models.Reply.find({ input }).lean<ReplyDoc[]>().exec();
+  public async findByInput(input: string): Promise<Result<readonly ReplyDoc[], DatabaseError>> {
+    try {
+      return ok(await this.conn.models.Reply.find({ input }).lean<ReplyDoc[]>().exec());
+    } catch (rawErr: unknown) {
+      return err(
+        databaseErrorFrom(rawErr, { operation: 'MongoReplyRepo.findByInput', input: { input } }),
+      );
+    }
   }
 
-  public async findById(id: string): Promise<ReplyDoc | undefined> {
-    const doc = await this.conn.models.Reply.findById(id).lean<ReplyDoc>().exec();
-    return doc ?? undefined;
+  public async findById(id: string): Promise<Result<ReplyDoc | undefined, DatabaseError>> {
+    try {
+      const doc = await this.conn.models.Reply.findById(id).lean<ReplyDoc>().exec();
+      return ok(doc ?? undefined);
+    } catch (rawErr: unknown) {
+      return err(
+        databaseErrorFrom(rawErr, { operation: 'MongoReplyRepo.findById', input: { id } }),
+      );
+    }
   }
 
-  public async create(input: string, reply: string): Promise<ReplyDoc> {
-    const doc = await this.conn.models.Reply.create({ input, reply });
-    return doc.toObject<ReplyDoc>();
+  public async create(input: string, reply: string): Promise<Result<ReplyDoc, DatabaseError>> {
+    try {
+      const doc = await this.conn.models.Reply.create({ input, reply });
+      return ok(doc.toObject<ReplyDoc>());
+    } catch (rawErr: unknown) {
+      return err(
+        databaseErrorFrom(rawErr, { operation: 'MongoReplyRepo.create', input: { input } }),
+      );
+    }
   }
 
-  public async deleteById(id: string): Promise<boolean> {
-    const res = await this.conn.models.Reply.findByIdAndDelete(id).exec();
-    return res !== null;
+  public async deleteById(id: string): Promise<Result<boolean, DatabaseError>> {
+    try {
+      const res = await this.conn.models.Reply.findByIdAndDelete(id).exec();
+      return ok(res !== null);
+    } catch (rawErr: unknown) {
+      return err(
+        databaseErrorFrom(rawErr, { operation: 'MongoReplyRepo.deleteById', input: { id } }),
+      );
+    }
   }
 }

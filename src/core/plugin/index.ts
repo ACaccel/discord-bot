@@ -44,3 +44,5 @@ export { mergeRegistries, type ContributionSource } from './registries';
 export { EventDispatcher } from './event-dispatcher';
 
 export { InteractionRouter, DoubleNextError } from './interaction-router';
+
+export type { GuildOnboardingPort, GuildOnboardingResult } from './guild-onboarding-port';

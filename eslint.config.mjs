@@ -79,11 +79,12 @@ export default tseslint.config(
     },
   },
   // Service-locator guard (Phase 2): the IoC container is a composition
-  // tool, not an ambient lookup. Only composition roots (`src/bots/**`,
-  // and the legacy `src/bot/**` until Phase 4b retires it) and tests
-  // may import it. Application / domain / interface / persistence /
-  // infra layers receive dependencies via constructor parameters from
-  // their composition root.
+  // tool, not an ambient lookup. Only composition roots (`src/bot/**`)
+  // and tests may import it. Application / domain / interface /
+  // persistence / infra layers receive dependencies via constructor
+  // parameters from their composition root. The legacy `src/events/**`
+  // and `src/features/**` trees were removed during gap-remediation, so
+  // their globs are no longer listed here.
   {
     files: [
       'src/application/**/*.ts',
@@ -92,9 +93,6 @@ export default tseslint.config(
       'src/persistence/**/*.ts',
       'src/infra/**/*.ts',
       'src/handlers/**/*.ts',
-      'src/events/**/*.ts',
-      'src/features/**/*.ts',
-      'src/utils/**/*.ts',
     ],
     rules: {
       'no-restricted-imports': [
@@ -104,7 +102,7 @@ export default tseslint.config(
             {
               group: ['**/core/ioc', '**/core/ioc/*', '@core/ioc', '@core/ioc/*'],
               message:
-                'IoC container imports are restricted to composition roots (src/bots/**) and tests. Receive dependencies via constructor parameters instead.',
+                'IoC container imports are restricted to composition roots (src/bot/**) and tests. Receive dependencies via constructor parameters instead.',
             },
           ],
         },
