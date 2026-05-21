@@ -1,12 +1,12 @@
 /**
- * `TodoRepo` — guild-scoped to-do list. The legacy handler treats
- * `content` as a soft-unique key (it pre-checks via `findByContent`
- * before insert) and addresses entries by 1-based position when
- * deleting — list ordering therefore matters.
+ * `TodoRepo` — guild-scoped to-do list. The `content` field is a
+ * soft-unique key (the handler pre-checks via `findByContent` before
+ * insert) and entries are addressed by 1-based position when deleting
+ * — list ordering therefore matters.
  *
- * **Error boundary (gap G-2)**: every method returns
- * `Result<T, DatabaseError>`. A mongoose failure is translated by the
- * shared `databaseErrorFrom` translator and returned as `err`.
+ * Error boundary: every method returns `Result<T, DatabaseError>`. A
+ * mongoose failure is translated by the shared `databaseErrorFrom`
+ * translator and returned as `err`.
  */
 import type { DatabaseError } from '../../core/errors/external-service-error';
 import { err, ok, type Result } from '../../core/result';
@@ -15,7 +15,7 @@ import { databaseErrorFrom } from '../error-translator';
 import type { TodoDoc } from '../schemas/todo.schema';
 
 export interface TodoRepo {
-  /** All to-dos in insertion order — the legacy handler addresses by 1-based index. */
+  /** All to-dos in insertion order — callers address entries by 1-based index. */
   listAll(): Promise<Result<readonly TodoDoc[], DatabaseError>>;
   /** Find existing entries with this exact content (used to dedupe). */
   findByContent(content: string): Promise<Result<readonly TodoDoc[], DatabaseError>>;

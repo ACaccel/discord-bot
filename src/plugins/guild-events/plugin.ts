@@ -2,7 +2,7 @@
  * GuildEventsPlugin — mirrors message edits/deletes and role changes
  * to a guild's configured `event` channel.
  *
- * Behaviours migrated verbatim from `src/events/guild_event.ts`:
+ * Behaviours:
  *   - `messageUpdate`: if the bot's guild has an `event` channel and
  *     the content actually changed, send an embed describing the diff.
  *   - `messageDelete`: same shape; attaches images / non-image file
@@ -12,9 +12,8 @@
  *   - `guildCreate`: when the bot joins a new guild, onboard it
  *     (connect its per-guild database, register slash commands)
  *     through the typed {@link GuildOnboardingPort} resolved from the
- *     IoC container (gap D1). This replaces the legacy
- *     `detectGuildCreate` free function, which reached directly into
- *     `BaseBot` internals.
+ *     IoC container, so no plugin code reaches into `BaseBot`
+ *     internals.
  *
  * Why a factory (`createGuildEventsPlugin(config)`) rather than a
  * plain `Plugin` const: the per-bot `blockedChannels` list lives in
@@ -56,12 +55,10 @@ const ConfigSchema = z
      */
     blockedChannels: z.array(z.string()).default([]),
     /**
-     * The host bot's Discord client id. Required because the legacy
-     * audit-log path (`logger.guildLogger`) tags every line with the
-     * emitting bot; preserving that side-effect verbatim is part of
-     * the Phase 4b behaviour contract. Passed in by the composition
-     * root rather than resolved at runtime so the plugin stays
-     * decoupled from BaseBot.
+     * The host bot's Discord client id. Required because the
+     * audit-log path tags every line with the emitting bot. Passed in
+     * by the composition root rather than resolved at runtime so the
+     * plugin stays decoupled from BaseBot.
      */
     clientId: z.string().min(1),
   })
@@ -90,8 +87,7 @@ const resolveEventChannel = (
   if (channel === undefined) return undefined;
   // Use `isSendable()` — discord.js's narrowing predicate models
   // exactly the "this channel accepts .send" capability the embed
-  // mirror needs. Direct cast avoids the previous `'send' in channel`
-  // duck-type pattern.
+  // mirror needs.
   return channel.isSendable() ? (channel as TextChannel) : undefined;
 };
 
@@ -99,9 +95,8 @@ const resolveEventChannel = (
  * Mirror an embed to the event channel, swallowing send failures so a
  * misconfigured channel (perms revoked, channel deleted between cache
  * read and send) never suppresses the audit-log side effects that
- * follow. Replicates the legacy `logger.channelLogger` swallowing
- * behaviour; without it a Discord-side rejection here would abort the
- * surrounding handler before `guildLogger` / `attachmentLogger` ran.
+ * follow. Without the swallow, a Discord-side rejection here would
+ * abort the surrounding handler before the audit-log writes ran.
  *
  * `clientId` is threaded in so the structured error line is tagged
  * with the originating bot, matching the rest of this plugin's audit
@@ -210,9 +205,8 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
             .setTimestamp();
           await safeSendEmbed(eventChannel, embed, logger, config.clientId, guildId, 'guild_member_update');
         }
-        // Audit-log line preserved verbatim from legacy
-        // `detectGuildMemberUpdate`. Decoupled from the embed write so
-        // a missing `event` channel does not suppress the audit trail.
+        // Audit-log line, decoupled from the embed write so a missing
+        // `event` channel does not suppress the audit trail.
         const log = `User: ${newMember.user.username}, Added: ${addedRolesList}, Removed: ${removedRolesList}`;
         logGuildEvent(
           logger,
@@ -238,9 +232,9 @@ const handleMessageUpdate = async (
   const parentId = (oldMessage.channel as TextChannel).parentId;
   if (isBlocked(oldMessage.channel.id, parentId, blockedChannels)) return;
 
-  // Legacy guards preserved exactly: skip when either content side is
-  // missing, identical, or the author / guild is unresolvable. These
-  // also filter the partial-message edge that pre-cache messages emit.
+  // Guards: skip when either content side is missing, identical, or
+  // the author / guild is unresolvable. These also filter the
+  // partial-message edge that pre-cache messages emit.
   if (oldMessage.content === null || oldMessage.content === undefined) return;
   if (newMessage.content === null || newMessage.content === undefined) return;
   if (oldMessage.content === newMessage.content) return;
@@ -269,10 +263,9 @@ const handleMessageUpdate = async (
     await safeSendEmbed(eventChannel, embed, logger, clientId, newMessage.guildId, 'message_update');
   }
 
-  // Audit-log side effect from legacy `detectMessageUpdate` — emitted
-  // independently of the embed so a missing `event` channel does not
-  // suppress the audit trail. `?.name` mirrors the legacy nullable
-  // chain on the channel cache.
+  // Audit-log side effect — emitted independently of the embed so a
+  // missing `event` channel does not suppress the audit trail.
+  // `?.name` tolerates a channel missing from the cache.
   const channelName = newMessage.guild.channels.cache.get(newMessage.channel.id)?.name;
   const log =
     `User: ${newMessage.author.username}, Channel: ${channelName ?? '<unknown>'}, ` +
@@ -334,11 +327,10 @@ const handleMessageDelete = async (
     await safeSendEmbed(eventChannel, embed, logger, clientId, message.guildId, 'message_delete');
   }
 
-  // Forensic attachment download (legacy `detectMessageDelete` ran
-  // this for EVERY attachment, including images that the embed
-  // separately previews). Fire-and-forget; the helper has its own
-  // internal try/catch so a failed save does not break the audit
-  // log below.
+  // Forensic attachment download — runs for every attachment,
+  // including images that the embed separately previews.
+  // Fire-and-forget; the helper has its own internal try/catch so a
+  // failed save does not break the audit log below.
   if (message.attachments.size > 0) {
     message.attachments.forEach((attachment) => {
       void archiveDeletedAttachment(logger, message.guildId as string, attachment);
@@ -355,8 +347,7 @@ const handleMessageDelete = async (
 };
 
 /**
- * Onboard a freshly joined guild through the {@link GuildOnboardingPort}
- * (gap D1).
+ * Onboard a freshly joined guild through the {@link GuildOnboardingPort}.
  *
  * The port owns the two infrastructure actions a new guild needs —
  * connecting its per-guild database and registering the bot's slash

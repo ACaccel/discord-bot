@@ -7,11 +7,9 @@
  * symbol` field) so the compiler refuses to interchange them while the
  * runtime cost stays zero.
  *
- * Phase 1 introduces the brands at the data layer (db doc types,
- * repository signatures in Phase 2). Existing handler / event code
- * still uses bare `string`; new code should consume the branded forms
- * and call the `as*` constructors at the boundary where untyped
- * strings (Discord SDK, env) enter the system.
+ * Branded forms are used at the data layer (db doc types, repository
+ * signatures). Call the `as*` constructors at the boundary where
+ * untyped strings (Discord SDK, env) enter the system.
  */
 type Brand<T, B> = T & { readonly __brand: B };
 

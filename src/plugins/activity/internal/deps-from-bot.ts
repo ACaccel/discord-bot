@@ -1,12 +1,11 @@
 /**
- * Bridge that builds an {@link ActivityDeps} bundle from the legacy
- * `BaseBot` reference. Used only by the slash-command handlers in
+ * Bridge that builds an {@link ActivityDeps} bundle from a `BaseBot`
+ * reference. Used only by the slash-command handlers in
  * `internal/handlers.ts`; the plugin itself resolves the deps via
  * `ctx.resolve(...)` and never touches `BaseBot`. Kept in its own file
  * so the plugin module does not transitively pull `BaseBot` (and its
  * imports of middlewares / @cmd / @button / ...) into the test-strict
- * compile when the test imports `src/plugins/activity` (audit
- * ARCH-BLOCK3 / PR-G4).
+ * compile when the test imports `src/plugins/activity`.
  */
 import type { BaseBot } from '../../../bot';
 import type { Logger } from '../../../core/logger';

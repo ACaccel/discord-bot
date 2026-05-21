@@ -7,8 +7,7 @@
  *   - A middleware that throws aborts the chain. The exception bubbles
  *     to the caller of `dispatch()` and is the caller's responsibility
  *     to translate into a user-facing reply (the outermost catch in
- *     BaseBot's interaction listener performs this translation in
- *     Phase 4b).
+ *     BaseBot's interaction listener performs this translation).
  *   - A middleware that completes without calling `next()` ends the
  *     chain cleanly — typical of permission gates or rate limiters
  *     that reply to the user directly.

@@ -2,9 +2,8 @@
  * xAI Grok provider adapter.
  *
  * xAI exposes two endpoints behind one OpenAI-compatible client:
- *   - `/v1/chat/completions` — plain chat. Does NOT accept the new
- *     Agent Tools; the legacy `search_parameters` field returns
- *     HTTP 410 (deprecated).
+ *   - `/v1/chat/completions` — plain chat. Does NOT accept the Agent
+ *     Tools; the older `search_parameters` field returns HTTP 410.
  *   - `/v1/responses` — Agent Tools API. Server-side `web_search`
  *     runs inside xAI and merges into `output_text` automatically.
  *

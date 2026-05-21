@@ -1,20 +1,14 @@
 /**
- * Handler-facing structured-log helpers — the post-PR-F2 home for the
- * positional-args `(clientId, guildId, err)` shape that handler / plugin
- * / event callsites grew up calling. Replaces the deprecated
- * `src/utils/logger.ts` shim (PR-E retired the file-backup leg; PR-F2
- * collapses everything into pure `core/logger` `child().error()` /
- * `child().info()` lines).
+ * Handler-facing structured-log helpers — the canonical facade over the
+ * typed {@link Logger} for handler / plugin / event callsites that log
+ * with the positional `(clientId, guildId, err)` shape.
  *
- * These functions are **not** deprecated — they are the canonical
- * handler-side facade over the typed {@link Logger}. The shape exists
- * because:
- *   - handler callsites pre-date constructor-injected loggers
+ * The shape exists because:
+ *   - handler callsites do not carry a constructor-injected logger
  *   - the bot scope (`{ bot: clientId }`) + guild scope (`{ guildId }`)
  *     bindings are the same on every line, so pre-composing them at the
  *     helper keeps callsites short
- *   - the legacy file backup (`./logs/<bot>/...`) is gone — ops dashboards
- *     consume the pino JSON stream directly
+ *   - all output is pino JSON; ops dashboards consume the stream directly
  *
  * Layer purity: this module deliberately depends only on the
  * {@link Logger} interface. Helpers that touch discord.js / axios / fs
@@ -50,14 +44,13 @@ export const logError = (
   }
 };
 
-/** Bot-scoped info-level log; the legacy `systemLogger` shape. */
+/** Bot-scoped info-level log for operator-facing system messages. */
 export const logSystem = (logger: Logger | undefined, clientId: string, msg: string): void => {
   logger?.child({ bot: clientId }).info({ msg }, 'system');
 };
 
 /**
- * Audit-log-style line tagged with the guild's display name. Drops the
- * pre-PR-F2 file backup (deprecated since Phase 6 per the shim header).
+ * Audit-log-style line tagged with the guild's display name.
  */
 export const logGuildEvent = (
   logger: Logger | undefined,

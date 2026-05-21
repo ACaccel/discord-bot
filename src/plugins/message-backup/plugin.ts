@@ -1,12 +1,10 @@
 /**
  * MessageBackupPlugin — periodic per-guild message backup.
  *
- * The plugin owns the full backup logic that used to live on the
- * `MsgArchive` BaseBot subclass. `MsgArchive` shrinks to a composition
- * root that registers this plugin; behaviour (channel fetch, retry,
- * pagination, log file format, stale-Fetch-doc cleanup) is preserved
- * verbatim. The hot loop and its helpers live in `internal/` so this
- * file stays the lifecycle wiring only (audit C-8 split).
+ * The plugin owns the full backup logic; the `MsgArchive` composition
+ * root simply registers it. The hot loop and its helpers (channel
+ * fetch, retry, pagination, log file format, stale-Fetch-doc cleanup)
+ * live in `internal/` so this file stays lifecycle wiring only.
  *
  * Wiring:
  *   - Reads `backupServers` config — the list of guild ids the bot
@@ -18,7 +16,7 @@
  * Why bot-scope rather than guild-scope: backup batches all
  * configured guilds in series to keep request-rate predictable. A
  * guild-scoped variant would race against itself on the Mongo
- * connection pool and would not match the legacy timing contract.
+ * connection pool.
  */
 import { TOKENS } from '../../core/ioc';
 import { logError } from '../../core/logger';

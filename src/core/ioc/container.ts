@@ -1,11 +1,11 @@
 /**
- * Manual IoC container for the discord-bot refactor.
+ * Manual IoC container for the discord-bot.
  *
  * Why hand-rolled and not Inversify / tsyringe / NestJS:
  *   - No reflect-metadata, no decorators, no class-emit gymnastics.
  *   - The implementation fits in this file and is debuggable in isolation.
- *   - Phase 11 of the plan explicitly excludes DI frameworks for this
- *     project's scale; this module is the stated alternative.
+ *   - At this project's scale a DI framework adds more surface than it
+ *     removes; this module is the deliberate alternative.
  *
  * Public surface:
  *   - {@link ServiceToken} + {@link token}: typed handles with symbol
@@ -19,12 +19,11 @@
  *     shadow parent registrations).
  *
  * Service-locator guard:
- *   Only composition roots (`src/bots/**`) and tests are allowed to
+ *   Only composition roots (`src/bot/**`) and tests are allowed to
  *   import this module. ESLint's `no-restricted-imports` enforces this so
  *   `application/`, `domain/`, `interface/`, `persistence/`, `infra/` may
  *   not call `container.resolve()` directly — they receive dependencies
- *   via constructor parameters. The transitional exception is the
- *   legacy `src/bot/**` god class until Phase 4b removes it.
+ *   via constructor parameters.
  */
 
 /**

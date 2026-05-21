@@ -9,15 +9,12 @@
  * the empty-array contract gives the UI a clear "no models available"
  * signal instead of a stale guess.
  *
- * Audit C-3 / PR-E E-4 relocated this file from
- * `src/features/llm_chat/llm/` to `src/infra/llm/`. The previous
- * implementation kept the cache as module-level state and read
- * `process.env[...]` directly. The architecture review on PR-E
- * flagged both as service-locator-by-globals: two bots in one process
- * (the test harness, future multi-tenant deploy) would clobber each
- * other. This file now exposes a `ModelCatalog` class held by the
- * plugin and resolved by the `/ai_settings` handler through the IoC
- * container — per-bot isolation, init-order explicit, testable.
+ * The cache and API keys are instance state on the `ModelCatalog`
+ * class, not module-level globals: two bots in one process (the test
+ * harness, a multi-tenant deploy) each get their own catalog without
+ * clobbering each other. The plugin holds the instance and the
+ * `/ai_settings` handler reaches it through the bot-scoped accessor —
+ * per-bot isolation, explicit init order, testable.
  */
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
@@ -161,10 +158,7 @@ function normalizeList(list: string[]): string[] {
  * container either. The catalog therefore lives behind this thin
  * accessor pair, set once during `LlmChatPlugin.init` and read by
  * `/ai_settings` and `/ai_status` handlers via {@link
- * getModelCatalog}. Replacing this with a proper bot-scoped DI
- * surface is tracked as audit C-9 (VoicePlugin extraction's twin
- * problem); the holder is honest about the constraint, the previous
- * `setProviderApiKeys` free function pretended otherwise.
+ * getModelCatalog}.
  *
  * Per-bot isolation in tests: tests construct their own ModelCatalog
  * directly (the class is exported) — they do NOT call

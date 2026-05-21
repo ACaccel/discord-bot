@@ -14,7 +14,7 @@ export default class menu_get_avatar extends Command {
         super();
         this.setConfig({
             // Stable ASCII id; the user-facing Discord name is resolved
-            // from `commands:menu_get_avatar.name` (gap D7).
+            // from `commands:menu_get_avatar.name`.
             name: "menu_get_avatar",
             type: ApplicationCommandType.User as ContextMenuCommandType,
         });

@@ -3,9 +3,9 @@
  * persistence-layer document shape and bulk-insert via
  * `insertManyIgnoringDuplicates`. Bot messages are dropped; already-
  * stored messages are filtered out with a single index lookup before
- * the bulk write (audit C-1: pre-filter is an optimisation, not a
+ * the bulk write. The pre-filter is an optimisation, not a
  * correctness gate — the unique index on `messageId` plus
- * `insertManyIgnoringDuplicates` would already absorb a double-write).
+ * `insertManyIgnoringDuplicates` already absorbs a double-write.
  */
 import type { MessageRepo } from '../../../persistence/repositories';
 import type { MessageDoc } from '../../../persistence/schemas/message.schema';
@@ -49,9 +49,8 @@ export const saveBatch = async (
     if (newestId === undefined || BigInt(msg.id) > BigInt(newestId)) newestId = msg.id;
   }
 
-  // G-2: repo methods return Result<T, DatabaseError>. An `err` is
-  // re-thrown so `backupChannel`'s catch records it on `stats.error` —
-  // behaviour-equivalent to the pre-G-2 raw-error propagation.
+  // Repo methods return Result<T, DatabaseError>. An `err` is
+  // re-thrown so `backupChannel`'s catch records it on `stats.error`.
   const existingResult = await messageRepo.findExistingMessageIds(ids);
   if (!existingResult.ok) throw existingResult.error;
   const existingSet = existingResult.value;

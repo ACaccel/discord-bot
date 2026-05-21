@@ -29,10 +29,9 @@ export default class gay extends Command {
 
     const target = interaction.guild.members.cache.get(userId as string);
     const t = bot.translator;
-    // Defensive guard for the pre-run() window. Once `run()` resolves
-    // the translator field is set; the early-return keeps the strict
-    // typecheck honest while preserving the legacy "silently no-op
-    // when target is unknown" behaviour.
+    // Defensive guard for the pre-run() window: the translator field is
+    // only set once `run()` resolves. The early-return keeps the strict
+    // typecheck honest and silently no-ops when the target is unknown.
     if (t === undefined || target === undefined) return;
 
     const key =

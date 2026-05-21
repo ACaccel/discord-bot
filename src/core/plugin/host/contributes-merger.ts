@@ -2,7 +2,7 @@
  * Build the effective per-handler-type registries by merging the
  * codegen-shipped `coreRegistries` with each enabled plugin's
  * `contributes` block. Pure function over the host's registration map
- * + topological order (audit C-8 split).
+ * + topological order.
  *
  * The merge is delegated to `mergeRegistries`, which throws
  * `DuplicateContributionError` on a name collision and tags every

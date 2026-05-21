@@ -8,12 +8,11 @@
  *   - Redact path list is derived from `src/core/config/redact.ts`
  *     (single source of truth shared with the env loader).
  *   - Child loggers compose: bot-scoped → guild-scoped →
- *     interaction-scoped (with `traceId`). The traceId binding is just
- *     a field — Phase 4a's InteractionRouter will generate the value;
- *     for Phase 3 the slot exists but is intentionally unpopulated
- *     outside of tests. Do NOT introduce AsyncLocalStorage to push
- *     traceId through the call stack — handlers will receive their
- *     child logger explicitly via the interaction context.
+ *     interaction-scoped (with `traceId`). The InteractionRouter
+ *     generates the `traceId` value and binds it on the child logger.
+ *     Do NOT introduce AsyncLocalStorage to push traceId through the
+ *     call stack — handlers receive their child logger explicitly via
+ *     the interaction context.
  *   - `err()` accepts a DomainError or any unknown thrown value; pino's
  *     default error serialiser preserves stack + `cause`. We additionally
  *     log the DomainError JSON shape under the `err` key so structured

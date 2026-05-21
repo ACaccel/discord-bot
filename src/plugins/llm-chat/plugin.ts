@@ -1,8 +1,7 @@
 /**
- * LlmChatPlugin — moves Konata's chat lifecycle onto the plugin host.
+ * LlmChatPlugin — Konata's chat lifecycle on the plugin host.
  *
- * Listens for `messageCreate` events. Behaviour preserved verbatim
- * from `src/bot/konata/konata.ts`:
+ * Listens for `messageCreate` events. Behaviour:
  *   - whitelisted users only (via `UserApiSettingRepo`);
  *   - @-mention starts a new session;
  *   - a reply to an active session message continues it (owner-only);
@@ -14,8 +13,8 @@
  *     so prompt-induced @everyone/@role/@user pings cannot fire.
  *
  * Bot identity is injected via `clientId` — the plugin uses it to
- * strip its own mention from input and to drive the new-vs-continue
- * branching, and to tag legacy error logs.
+ * strip its own mention from input, to drive the new-vs-continue
+ * branching, and to tag error logs.
  */
 import type { Message } from 'discord.js';
 
@@ -115,8 +114,8 @@ const deliverChunked = async (
  * Render an LLM failure into a Discord reply. The error has already been
  * translated into a typed {@link LlmProviderError} by `LLMService.chat`,
  * so this handler does not need to discriminate on instance kinds — it
- * reads `messageKey` + `messageParams` directly. The legacy log line
- * keeps the err object intact so pino's serialiser captures the cause
+ * reads `messageKey` + `messageParams` directly. The log line keeps
+ * the err object intact so pino's serialiser captures the cause
  * chain.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -167,8 +166,8 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
       // API-key map and publish it as the active catalog (handlers
       // reach it through `listProviderModels`, which delegates to
       // this instance). Encapsulating the cache + api-key map in a
-      // class avoids the previous free-function module globals that
-      // would have clobbered keys across multiple bots in one process.
+      // class keeps multiple bots in one process from clobbering each
+      // other's API keys.
       const modelCatalog = new ModelCatalog({
         xai: env.XAI_API_KEY,
         openai: env.OPENAI_API_KEY,
@@ -192,9 +191,9 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
         const repos = registry.getRepos(message.guildId);
         if (repos === undefined) return;
 
-        // G-2: findByUserId returns Result<UserApiSettingDoc | undefined,
+        // findByUserId returns Result<UserApiSettingDoc | undefined,
         // DatabaseError>. An `err` is re-thrown so it propagates to the
-        // dispatcher's catch exactly as a raw mongoose error did before.
+        // dispatcher's catch.
         const userDocResult = await repos.userApiSetting.findByUserId(message.author.id);
         if (!userDocResult.ok) throw userDocResult.error;
         const userDoc = userDocResult.value as UserApiDoc | undefined;

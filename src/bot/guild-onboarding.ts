@@ -1,5 +1,5 @@
 /**
- * Guild-onboarding port implementation (gap D1, C11 slice).
+ * Guild-onboarding port implementation.
  *
  * The `GuildOnboardingPort` contract is defined in
  * `core/plugin/guild-onboarding-port.ts`. This module supplies the
@@ -8,13 +8,11 @@
  * on `BaseBot` internals (`connectOneGuild`, `commandHandlers`,
  * `guildInfo`).
  *
- * Before D1, a newly joined guild was onboarded by the legacy
- * `src/events/guild_event.ts` handler reaching directly into those
- * internals. The port collapses that coupling into a single typed
- * seam: `BaseBot` registers an instance under
- * `TOKENS.GuildOnboardingPort`, and the `guild-events` plugin (C8 D1,
- * a later wave) resolves and invokes it from its `guildCreate`
- * subscription. No plugin code touches `BaseBot` again.
+ * Onboarding a newly joined guild is funnelled through this single
+ * typed seam: `BaseBot` registers an instance under
+ * `TOKENS.GuildOnboardingPort`, and the `guild-events` plugin resolves
+ * and invokes it from its `guildCreate` subscription. No plugin code
+ * touches `BaseBot` directly.
  *
  * Pattern: Adapter — adapts the wide `BaseBot` surface to the narrow
  * `GuildOnboardingPort` interface so consumers depend only on the
@@ -87,9 +85,8 @@ export class BaseBotGuildOnboardingPort implements GuildOnboardingPort {
     }
 
     /**
-     * Create the bot's `guildInfo` slot for a new guild. Mirrors the
-     * shape the legacy `detectGuildCreate` produced: empty channel /
-     * role maps, populated `bot_name` from the member cache.
+     * Create the bot's `guildInfo` slot for a new guild: empty channel
+     * / role maps, with `bot_name` populated from the member cache.
      */
     private initialiseGuildInfoSlot(guild: Guild): void {
         const slot: GuildInfo = {
@@ -135,8 +132,8 @@ export class BaseBotGuildOnboardingPort implements GuildOnboardingPort {
             return false;
         }
         const restCommands = getCommandJsonBody(bot.commandHandlers, bot);
-        // `commands.set` returns a promise; onboarding does not await it
-        // (legacy parity) but the rejection must not escape as an
+        // `commands.set` returns a promise; onboarding deliberately does
+        // not await it, but the rejection must not escape as an
         // unhandledRejection — funnel it into the structured logger.
         application.commands.set(restCommands, guildId).catch((err: unknown) => {
             logSystem(

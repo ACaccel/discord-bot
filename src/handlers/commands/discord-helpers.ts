@@ -10,10 +10,7 @@ import type { Logger } from '@core/logger';
 /**
  * Shared Discord-side helpers for command handlers.
  *
- * These functions were lifted out of the retired `src/utils/` grab-bag
- * (gap D4): `buildButtonRows` / `msgReact` previously lived in
- * `bot_cmd.ts`, the canvas + scheduling helpers in `misc.ts`. They are
- * grouped here because every consumer is a `src/handlers/commands/*`
+ * Grouped here because every consumer is a `src/handlers/commands/*`
  * handler at runtime.
  */
 
@@ -57,8 +54,7 @@ export const buildButtonRows = (
  *
  * Per-reaction failures are isolated so one rejected `react()` does not
  * abort the rest. When a `logger` is supplied the failure is recorded on
- * the structured operator channel; without one it is silently skipped
- * (no raw `console` is used — gap G-1 / coding-standards).
+ * the structured operator channel; without one it is silently skipped.
  */
 export const msgReact = async (
   msg: Message,

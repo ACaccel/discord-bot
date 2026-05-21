@@ -8,9 +8,8 @@
  *
  * `unhandledRejection`: log + counter increment. Do NOT exit; many
  * libraries fire-and-forget promises that reject benignly during
- * teardown. Phase 5+ will wire a rate-based admin notifier; for now
- * we surface the count via {@link getUnhandledRejectionCount} so a
- * /health endpoint can read it.
+ * teardown. The count is surfaced via {@link getUnhandledRejectionCount}
+ * so a /health endpoint can read it.
  *
  * Installation is idempotent at the module level via {@link installed}.
  * Multi-bot processes (one node process running >1 BaseBot) get a

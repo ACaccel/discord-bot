@@ -1,15 +1,13 @@
 /**
  * VoicePlugin — owns the bot-scoped {@link VoiceRecorder} + the
- * per-session {@link VoiceConnection}, replacing the previous
- * handler-side `bot.voice = { ... }` mutation pattern flagged by audit
- * 3.10 (audit C-9).
+ * per-session {@link VoiceConnection}.
  *
  * Module-holder pattern (mirrors `infra/llm/models-catalog.ts`): plugin
  * `init` constructs the controller and stores it in a module-scoped
  * holder. `BaseBot.run()` reads the holder after `host.initAll()` and
- * surfaces it on `bot.voice` so the legacy handler-friendly access
- * path stays a single field read. The handler no longer constructs or
- * mutates the recorder; it calls `bot.voice.start / stop / save`.
+ * surfaces it on `bot.voice` so the handler access path is a single
+ * field read. The handler does not construct or mutate the recorder;
+ * it calls `bot.voice.start / stop / save`.
  *
  * The holder is a small compromise — the plugin contract intentionally
  * forbids re-entering the IoC container, so this is the documented

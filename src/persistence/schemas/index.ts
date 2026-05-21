@@ -1,10 +1,6 @@
 /**
  * Schema registry — single source of truth for "which models exist".
  *
- * The legacy `src/db/schema.ts` re-exports from this module for
- * backward compatibility through Phase 4b; new code should import from
- * `src/persistence/schemas` directly.
- *
  * Each schema lives in its own file so a future change to one schema
  * does not invite drive-by edits to the others.
  */

@@ -1,19 +1,19 @@
 /**
  * Slash-command deploy CLI.
  *
- * Audit B-5 (3.11) flipped the default registration scope from
- * guild-side to **global**: a single `rest.put(Routes.applicationCommands)`
- * call now publishes the bot's command set to every guild it is in
- * (and every guild it joins later). The guild-side path is preserved
- * as an opt-in dev path via `--dev-guild <id>` so iteration on a
- * single test guild stays instant (Discord propagation for global
- * commands can take up to an hour).
+ * The default registration scope is **global**: a single
+ * `rest.put(Routes.applicationCommands)` call publishes the bot's
+ * command set to every guild it is in (and every guild it joins
+ * later). The guild-side path is an opt-in dev path via
+ * `--dev-guild <id>` so iteration on a single test guild stays
+ * instant (Discord propagation for global commands can take up to an
+ * hour).
  *
- * The `--cleanup-guild-commands` flag wipes the legacy guild-scoped
+ * The `--cleanup-guild-commands` flag wipes guild-scoped
  * registrations: it iterates `userGuilds()` and PUTs an empty array
- * to each guild's command bucket. Operators run this once during the
- * guild → global migration window so users do not see duplicate
- * entries (global + legacy guild-scoped at once).
+ * to each guild's command bucket. Run it once to clear any
+ * guild-scoped entries so users do not see duplicates alongside the
+ * global commands.
  *
  * Usage:
  *   yarn deploy -t nijika                 # global (default)
@@ -102,9 +102,9 @@ function buildCommandsFromConfig(
             continue;
         }
 
-        // Gap D7: command / option descriptions are i18n keys resolved
-        // here against the `commands` catalog so the deployed JSON keeps
-        // its localised text.
+        // Command / option descriptions are i18n keys resolved here
+        // against the `commands` catalog so the deployed JSON keeps its
+        // localised text.
         out.push(buildCommandJsonBody(localizeCommandConfig(instance.config, translator)));
     }
 
@@ -158,7 +158,7 @@ async function deployDevGuild(botName: string, guildId: string): Promise<void> {
 }
 
 /**
- * One-shot migration tool. NOT safe to invoke routinely on bots with
+ * One-shot cleanup tool. NOT safe to invoke routinely on bots with
  * many hundreds of guilds: Discord's per-route + global rate limits
  * apply, and the discord.js REST queue handles retries but the loop
  * still walks each guild sequentially. A `rateLimited` listener is

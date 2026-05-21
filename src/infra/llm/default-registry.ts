@@ -4,12 +4,11 @@
  * test that needs an empty / partial registry can build its own
  * without paying for the SDK constructors.
  *
- * Phase 6 PR 2 made the typed `Env` an explicit input: API keys now
- * flow from `src/core/config` rather than being read from
- * `process.env` inside each provider. A bot that does not use a
- * given provider simply leaves the relevant env var unset — the
- * registry's missing-key gate emits a `MissingApiKeyError` only when
- * something actually asks for that provider.
+ * API keys flow in from the typed `Env` (`src/core/config`) rather
+ * than being read from `process.env` inside each provider. A bot that
+ * does not use a given provider simply leaves the relevant env var
+ * unset — the registry's missing-key gate emits a `MissingApiKeyError`
+ * only when something actually asks for that provider.
  */
 import type { Env } from '../../core/config';
 

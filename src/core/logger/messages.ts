@@ -1,12 +1,10 @@
 /**
  * Centralised operator-facing log message templates.
  *
- * Audit B-4 (3.3): production code scatters English log lines across
- * `logger.systemLogger(...)` and `logger.errorLogger(...)` callsites
- * (`"Failed to connect to MongoDB for guild ${id}"`, `"Command X has
- * no config."`, etc). Inline literals are hard to grep, can't carry
- * stable event codes, and quietly drift when the same idea is logged
- * from multiple places.
+ * Inline log literals scattered across callsites are hard to grep,
+ * cannot carry stable event codes, and quietly drift when the same
+ * idea is logged from multiple places. Routing operator-facing lines
+ * through this module avoids all three.
  *
  * The constants below live in one file so:
  *   - `grep -rn ops:<event-id>` finds every callsite at once.
@@ -59,8 +57,8 @@ export const ops = {
     replySkipped: (code: number | string): string =>
       `ops:router.reply_skipped | discord reply skipped (expired interaction, code=${code}).`,
     /**
-     * Correlation marker for a handler-boundary error (gap D9). The
-     * `traceId` matches the id interpolated into the user-facing
+     * Correlation marker for a handler-boundary error. The `traceId`
+     * matches the id interpolated into the user-facing
      * `replies:<feature>.failed` copy so operators can `grep` from a
      * support ticket back to the structured error line.
      */

@@ -16,10 +16,9 @@ import { logSystem } from '@core/logger';
 /**
  * Interactions that can both be replied/edited to.
  *
- * Audit 3.8: this helper subsumes the 4-line null-check-then-reply
- * boilerplate that was duplicated across 11+ handlers, and folds in
- * the audit 3.7 disabled-guild distinction so operators see a useful
- * message instead of a generic `errors:db.not_found`.
+ * This helper centralises the null-check-then-reply guard every handler
+ * needs, and folds in the disabled-guild distinction so operators see a
+ * useful message instead of a generic `errors:db.not_found`.
  */
 type RepliableHandlerInteraction =
     | ChatInputCommandInteraction
@@ -95,14 +94,13 @@ export const requireGuildRepos = async (
         return null;
     }
 
-    // Gap D5 (C6 slice): read the disabled state straight from the
-    // ConnectionManager rather than the legacy `BaseBot.disabledGuilds`
-    // projection. The manager owns retry / transient-vs-persistent
-    // classification and stamps the `traceId`, so `isDisabled` is the
-    // single source of truth — the `traceId` surfaced here is exactly
-    // the one written to the structured boot log, letting operators
-    // correlate a support ticket ("got error xxxxxx") with the
-    // originating connection failure via `grep traceId=<id>`.
+    // Read the disabled state straight from the ConnectionManager: it
+    // owns retry / transient-vs-persistent classification and stamps the
+    // `traceId`, so `isDisabled` is the single source of truth. The
+    // `traceId` surfaced here is exactly the one written to the
+    // structured boot log, letting operators correlate a support ticket
+    // ("got error xxxxxx") with the originating connection failure via
+    // `grep traceId=<id>`.
     const disabled = bot.connectionManager?.isDisabled(asGuildId(guildId));
     if (disabled !== undefined) {
         await replyOrEdit(

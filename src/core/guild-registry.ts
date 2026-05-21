@@ -2,23 +2,18 @@
  * GuildRegistry — typed, read-only view of per-guild runtime state that
  * plugins query without holding a reference to BaseBot itself.
  *
- * Why this exists (plan §1.1):
+ * Why this exists:
  *   - Plugins must reach repos and configured channels by guild id,
  *     but the IoC container only exposes a typed resolver — not the
  *     BaseBot instance — to prevent service-locator anti-patterns.
  *   - A registry implementation backed by `BaseBot.guildInfo` keeps the
  *     plugin surface narrow (`getRepos`, `getChannel`, `getRole`,
- *     `listGuildIds`) and lets future composition roots swap in a
- *     different backing store without touching plugins.
+ *     `listGuildIds`) and lets composition roots swap in a different
+ *     backing store without touching plugins.
  *
  * The registry is intentionally read-only at the interface level; the
  * BaseBot mutates the underlying map and the registry just reads it.
  * Plugins MUST NOT cast to the concrete impl to mutate state.
- *
- * Audit C-2 retired the `getDb()` transitional escape hatch and the
- * `GuildDbHandle` type alongside it — `MessageBackupPlugin` migrated
- * to typed `Repos` in PR-E, so the raw-Mongoose path no longer has
- * any production consumer.
  */
 import type { Channel, Role } from 'discord.js';
 

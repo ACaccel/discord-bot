@@ -1,24 +1,21 @@
 /**
- * Guild-onboarding port (D1).
+ * Guild-onboarding port.
  *
  * When a bot is added to a new Discord guild, two infrastructure
  * actions must happen before the guild is usable: its per-guild Mongo
  * database must be connected, and the bot's slash commands must be
- * registered against that guild. Historically the legacy
- * `src/events/guild_event.ts` handler did this by reaching directly
- * into `BaseBot.connectOneGuild` and `BaseBot.commandHandlers` — a
- * structural coupling the plugin layer was not allowed to depend on.
+ * registered against that guild.
  *
- * This port is the typed seam that removes that coupling. The
- * composition root (C11 `BaseBot`) provides the concrete
- * implementation and registers it under {@link TOKENS.GuildOnboardingPort};
- * the `guild-events` plugin resolves it via `ctx.resolve` and invokes
- * it from its `guildCreate` subscription. No plugin code ever touches
- * `BaseBot` internals again.
+ * This port is the typed seam between the plugin layer and those
+ * infrastructure actions. The composition root (`BaseBot`) provides
+ * the concrete implementation and registers it under
+ * {@link TOKENS.GuildOnboardingPort}; the `guild-events` plugin
+ * resolves it via `ctx.resolve` and invokes it from its `guildCreate`
+ * subscription, so plugin code never touches `BaseBot` internals.
  *
  * Design constraint: this contract uses only primitive / string types,
  * so `core/plugin` does not gain a dependency on `persistence` or
- * `infra` (layer rule §1).
+ * `infra` (layer rule).
  */
 
 /** Outcome of onboarding a single new guild. */

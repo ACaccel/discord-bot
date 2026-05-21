@@ -1,8 +1,9 @@
 /**
- * Archive a deleted Discord attachment to disk for forensics. Lifted
- * from `core/logger/legacy.ts` because it imports `discord.js`, `axios`,
- * and `fs` — none of which belong in the `core/` layer per the plan's
- * "no third-party SDK deps in core" contract.
+ * Archive a deleted Discord attachment to disk for forensics.
+ *
+ * Lives in `infra/discord/` because it imports `discord.js`, `axios`,
+ * and `fs` — third-party SDK dependencies that the `core/` layer
+ * deliberately excludes.
  */
 import type { Attachment } from 'discord.js';
 import axios from 'axios';
@@ -18,9 +19,8 @@ const tzDate = (): string => `${new Date().toLocaleString('zh-TW', { timeZone: '
  * `./data/deleted_attachments/<guildId>/`. Used by the guild-events
  * plugin's `messageDelete` audit path.
  *
- * Retained as I/O behaviour rather than collapsed into a log line —
- * attachments are binary, not text, so structured logging cannot
- * replace them.
+ * Attachments are binary, not text, so this is genuine file I/O —
+ * structured logging cannot stand in for it.
  */
 export const archiveDeletedAttachment = async (
   logger: Logger | undefined,

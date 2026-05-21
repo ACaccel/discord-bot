@@ -1,10 +1,10 @@
 /**
  * Translator abstraction.
  *
- * Phase 0 only ships the contract + a default i18next-backed
- * implementation and seeds the zh-TW catalog. Phase 6 wires this
- * through every user-facing boundary and enforces no-literal-string
- * lint rules.
+ * The contract for every user-facing string in the codebase. A
+ * default i18next-backed implementation lives in `i18next-translator.ts`;
+ * application and interface code receives a `Translator` and never
+ * embeds literal user-facing text (lint rules enforce this).
  *
  * Adding a new locale requires only:
  *   1. add a value to the `Locale` union below
@@ -25,12 +25,10 @@ export const DEFAULT_LOCALE: Locale = 'zh-TW';
 export type TranslationParams = Readonly<Record<string, string | number>>;
 
 /**
- * String literal type alias for translation keys.
- *
- * Today this is `string`; Phase 6 will narrow it to a union generated
- * from the zh-TW catalog. Call sites should already import this name
- * rather than typing `string` directly, so the narrowing later is a
- * pure compile-time tightening.
+ * Type alias for translation keys. Currently `string`. Call sites
+ * import this name rather than typing `string` directly so a future
+ * narrowing to a catalog-generated union stays a pure compile-time
+ * tightening with no callsite churn.
  */
 export type TranslationKey = string;
 
