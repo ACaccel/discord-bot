@@ -3,10 +3,10 @@
  * msg-archive bot. One document per channel records the most recent
  * Discord message id consumed; the next backup pass starts after it.
  *
- * **Error boundary (gap G-2)**: every method returns
- * `Result<T, DatabaseError>`. A mongoose failure is translated by the
- * shared `databaseErrorFrom` translator and returned as `err`; a
- * missing lookup is a success (`ok(undefined)`).
+ * Error boundary: every method returns `Result<T, DatabaseError>`. A
+ * mongoose failure is translated by the shared `databaseErrorFrom`
+ * translator and returned as `err`; a missing lookup is a success
+ * (`ok(undefined)`).
  */
 import type { DatabaseError } from '../../core/errors/external-service-error';
 import { err, ok, type Result } from '../../core/result';
@@ -22,7 +22,7 @@ export interface FetchRepo {
   /**
    * Insert a new progress marker. Caller is responsible for ensuring
    * uniqueness — schema-level `index: true` on `channelID` is not a
-   * `unique` constraint, matching legacy behaviour.
+   * `unique` constraint.
    */
   create(
     channel: string,

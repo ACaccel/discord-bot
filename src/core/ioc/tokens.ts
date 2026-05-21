@@ -5,21 +5,13 @@
  *   - Token naming is reviewed in one place (no `MESSAGE_REPO_FACTORY` vs
  *     `MessageRepoFactory` drift across PRs).
  *   - The full catalog is visible to readers learning the container.
- *   - Future cross-phase additions (LlmProvider in Phase 5, plugin
- *     contributions in Phase 4a) land here, not scattered.
+ *   - New service additions land here, not scattered across modules.
  *
- * Phase 2 PR B ships repository factories for all 7 schemas plus a
- * `Repos` factory that bundles them. Tokens for not-yet-implemented
- * services are declared but unbound — `tryResolve` returns undefined
- * for unbound tokens, so this is safe.
- *
- * Repository tokens are deliberately **factory tokens** of shape
- * `(g: GuildId) => Repo` rather than scoped registrations. Per the
- * Phase-2 design (architecture-reviewer consult): scoped registration
- * requires a real per-request scope object threaded through, which
- * we do not have until Phase 4a. A factory token is one explicit line
- * in the composition root and revisits naturally when the plugin
- * lifecycle introduces an interaction scope.
+ * Repository access is exposed as a **factory token** of shape
+ * `(g: GuildId) => Promise<Repos>` rather than scoped registrations:
+ * scoped registration would require a per-request scope object threaded
+ * through the call graph, whereas a factory token is one explicit line
+ * in the composition root.
  */
 import type { Client } from 'discord.js';
 import type { Job } from 'node-schedule';
@@ -36,11 +28,10 @@ import type { Logger } from '../logger';
 import type { Repos } from '../../persistence/repositories';
 import type { GuildOnboardingPort } from '../plugin/guild-onboarding-port';
 
-/** Per-guild repository factory shape. Reserved for Phase 4a when the
- *  plugin/interaction scope makes per-repo registration meaningful. */
+/** Per-guild single-repository factory shape. */
 export type RepoFactory<R> = (guildId: GuildId) => Promise<R>;
 
-/** Per-guild full-bag factory — current preferred entry point. */
+/** Per-guild full-bundle factory — the preferred repository entry point. */
 export type ReposFactory = (guildId: GuildId) => Promise<Repos>;
 
 export interface Tokens {
@@ -52,8 +43,9 @@ export interface Tokens {
    * `.child({ traceId })` for narrower scope.
    */
   readonly Logger: ServiceToken<Logger>;
-  /** Bot-scoped Translator. Phase 4b-1 registers the i18next-backed
-   *  default; the plugin host receives it via PluginHostOptions. */
+  /** Bot-scoped Translator. The composition root registers the
+   *  i18next-backed default; the plugin host receives it via
+   *  PluginHostOptions. */
   readonly Translator: ServiceToken<Translator>;
   /** Wall-clock abstraction; tests substitute a FakeClock. */
   readonly Clock: ServiceToken<Clock>;
@@ -76,11 +68,11 @@ export interface Tokens {
   /**
    * Bot-scoped scheduled-job map. The activity + giveaway plugins
    * resolve this from `onReady` to drive their reboot loops without
-   * holding a BaseBot reference (audit ARCH-BLOCK3 / PR-G4).
+   * holding a BaseBot reference.
    */
   readonly JobMap: ServiceToken<Map<string, Job>>;
   /**
-   * Guild-onboarding port (D1). The composition root binds the concrete
+   * Guild-onboarding port. The composition root binds the concrete
    * `BaseBot`-backed implementation; the `guild-events` plugin resolves
    * this to onboard new guilds from its `guildCreate` subscription
    * without reaching into `BaseBot` internals.

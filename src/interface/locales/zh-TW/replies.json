@@ -3,7 +3,7 @@
     "reboot_notice": "{{botName}}重開機囉!"
   },
   "nijika": {
-    "help_message": "### 目前支援的功能：\n1. tts: 回覆一則訊息並輸入tts，bot會產生該訊息的語音檔\n2. auto reply: bot會根據資料庫的message pair回覆訊息\n3. roll dice: 輸入範例-> `2d5`, 在1~5隨機選擇兩個數字\n"
+    "help_message": "### 目前支援的功能：\n1. auto reply: bot會根據資料庫的message pair回覆訊息\n2. roll dice: 輸入範例-> `2d5`, 在1~5隨機選擇兩個數字\n"
   },
   "konata": {
     "presence_text": "貧乳はステータスだ、希少価値だ！"

@@ -1,17 +1,16 @@
 /**
- * AutoReplyPlugin — Discord `messageCreate` subscriber that performs
- * the legacy `auto_reply` behaviour as a self-contained plugin.
+ * AutoReplyPlugin — Discord `messageCreate` subscriber that drives the
+ * auto-reply behaviour as a self-contained plugin.
  *
- * Behaviours preserved verbatim from `src/events/message_reply.ts` so
- * Phase 4b is behaviour-neutral:
+ * Behaviours:
  *   - Hard-coded reaction to the "肥貓晚安" line (fires even for bots).
  *   - DB-backed reply lookup via `ReplyRepo.findByInput`; random pick
  *     when multiple replies match the same input.
  *   - Per-user lucky replies (fatcat / mubaimu) at fixed probabilities.
  *   - Global lucky "[*]" reply at 0.5% probability.
  *   - `長髮男` regex reply.
- *   - `<count>d<sides>` dice expression with the original 0 < count <
- *     100 and 0 < sides < 2^30 bounds.
+ *   - `<count>d<sides>` dice expression with 0 < count < 100 and
+ *     0 < sides < 2^30 bounds.
  *
  * DI: the plugin resolves {@link GuildRegistry} per event from
  * `ctx.resolve`. The resolver is a O(1) map lookup and avoids holding
@@ -66,10 +65,9 @@ export const lookupReply = async (
 ): Promise<string | null> => {
   const repos = registry.getRepos(guildId);
   if (repos === undefined) return null;
-  // G-2: findByInput returns Result<readonly ReplyDoc[], DatabaseError>.
+  // findByInput returns Result<readonly ReplyDoc[], DatabaseError>.
   // An `err` is re-thrown so `safeLookup` catches it, logs through the
-  // structured logger, and continues with the static behaviours —
-  // behaviour-equivalent to the pre-G-2 raw-error propagation.
+  // structured logger, and continues with the static behaviours.
   const result = await repos.reply.findByInput(input);
   if (!result.ok) throw result.error;
   const results = result.value;

@@ -19,8 +19,8 @@ import type { Translator } from '../../core/i18n';
 /**
  * Self-describing slash-command metadata.
  *
- * Gap D7: `description` (and `CommandOption.description`) are no longer
- * inline CJK literals. A handler's `setConfig` omits them entirely;
+ * `description` (and `CommandOption.description`) are not stored inline:
+ * a handler's `setConfig` omits them entirely, and
  * {@link localizeCommandConfig} fills them from the `commands` i18n
  * namespace, deriving the catalog key from {@link CommandConfig.name}.
  * Context-menu commands take their localised `name` from
@@ -33,7 +33,7 @@ import type { Translator } from '../../core/i18n';
  */
 export interface CommandConfig {
     name: string; // command name for handler lookup and Discord registration
-    /** Resolved at build time from `commands:<name>.description`; omitted by handlers. */
+    /** Resolved from `commands:<name>.description`; omitted by handlers. */
     description?: string;
     type?: ContextMenuCommandType; // for context menu commands, default is Chat Input
     options?: {
@@ -48,7 +48,7 @@ export interface CommandConfig {
 
 export interface CommandOption {
     name: string;
-    /** Resolved at build time from `commands:<cmd>.options.<name>.description`. */
+    /** Resolved from `commands:<cmd>.options.<name>.description`. */
     description?: string;
     required: boolean;
     choices?: CommandChoice[];
@@ -124,7 +124,7 @@ export abstract class Command {
 
 /**
  * Resolve a {@link CommandConfig}'s i18n-keyed metadata into a config
- * carrying concrete display strings (gap D7).
+ * carrying concrete display strings.
  *
  * Catalog keys are derived from the command / option names:
  *   - command description -> `commands:<name>.description`
@@ -132,10 +132,8 @@ export abstract class Command {
  *   - option description -> `commands:<name>.options.<opt>.description`
  *   - choice label -> `commands:<name>.options.<opt>.choices.<value>`
  *
- * Resolution happens against the translator's default locale, so the
- * deployed command JSON is byte-identical to the pre-D7 hard-coded
- * `zh-TW` strings — behaviour-equivalent. Returns a shallow copy; the
- * input is not mutated.
+ * Resolution happens against the translator's default locale. Returns
+ * a shallow copy; the input is not mutated.
  */
 export const localizeCommandConfig = (
     config: CommandConfig,

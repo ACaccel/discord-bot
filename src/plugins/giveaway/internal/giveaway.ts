@@ -1,16 +1,14 @@
 /**
  * Giveaway reboot + scheduling internals.
  *
- * Audit ARCH-BLOCK3 (PR-G4): the public surface now takes a typed
- * {@link GiveawayDeps} bundle instead of the whole `BaseBot`, so the
- * plugin can resolve its dependencies through the IoC container
- * (`ctx.resolve(...)`) rather than receiving a callback that closes
- * over the composition root's `this`. Composition roots no longer
- * deep-import this file.
+ * The public surface takes a typed {@link GiveawayDeps} bundle rather
+ * than the whole `BaseBot`, so the plugin can resolve its dependencies
+ * through the IoC container (`ctx.resolve(...)`) instead of closing
+ * over the composition root's `this`.
  *
- * The legacy slash-command handlers still hold a `BaseBot` reference;
- * they call {@link buildGiveawayDepsFromBot} to bridge into the new
- * surface without changing the handler signature.
+ * The slash-command handlers hold a `BaseBot` reference; they call
+ * {@link buildGiveawayDepsFromBot} to bridge into this surface without
+ * changing the handler signature.
  */
 import type { Client, GuildMember, Channel } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
@@ -34,8 +32,8 @@ const msgReact = async (
     try {
       await msg.react(reaction);
     } catch (error) {
-      // G-1: route through the structured logger instead of raw
-      // console.error so reaction failures are observable.
+      // Route through the structured logger so reaction failures are
+      // observable.
       logger.error(
         {
           err: error instanceof Error ? error : new Error(String(error)),
@@ -105,9 +103,8 @@ export const findGiveaway = async (deps: GiveawayDeps, guild_id: string, message
   if (!guild) return false;
   const repos = deps.registry.getRepos(guild_id);
   if (!repos) return false;
-  // G-2: repo methods return Result<T, DatabaseError>. An `err` is
-  // re-thrown so the caller's surrounding catch handles it exactly as
-  // the pre-G-2 raw-error propagation did.
+  // Repo methods return Result<T, DatabaseError>. An `err` is
+  // re-thrown so the caller's surrounding catch handles it.
   const result = await repos.giveaway.findByMessageId(message_id);
   if (!result.ok) throw result.error;
   return result.value !== undefined && result.value !== null;
@@ -123,7 +120,7 @@ export const scheduleGiveaway = async (
   const repos = deps.registry.getRepos(guild_id);
   if (!repos) return 'Database not found';
 
-  // G-2: an `err` is re-thrown for the caller's surrounding catch.
+  // An `err` is re-thrown for the caller's surrounding catch.
   const giveawayResult = await repos.giveaway.findByMessageId(message_id);
   if (!giveawayResult.ok) throw giveawayResult.error;
   const giveaway = giveawayResult.value;
@@ -179,17 +176,16 @@ export const deleteGiveaway = async (deps: GiveawayDeps, guild_id: string, messa
   if (!repos) return 'Database not found';
 
   new JobManager(deps.jobMap).cancel(giveawayJobKey(message_id));
-  // G-2: an `err` is re-thrown for the caller's surrounding catch.
+  // An `err` is re-thrown for the caller's surrounding catch.
   const deleteResult = await repos.giveaway.deleteByMessageId(message_id);
   if (!deleteResult.ok) throw deleteResult.error;
   return null;
 };
 
 /**
- * Same exponential-backoff retry as `activity.rebootRetry`. Audit C-1
- * reviewer follow-up — a transient Mongo blip during boot used to
- * silently leave the guild's scheduled giveaways un-rebuilt for the
- * process lifetime.
+ * Same exponential-backoff retry as `activity.rebootRetry`. Without
+ * it, a transient Mongo blip during boot would silently leave the
+ * guild's scheduled giveaways un-rebuilt for the process lifetime.
  */
 const REBOOT_MAX_ATTEMPTS = 3;
 const rebootRetry = async <T>(op: () => Promise<T>): Promise<T> => {
@@ -214,9 +210,9 @@ export const rebootGiveawayJobs = async (deps: GiveawayDeps): Promise<void> => {
       try {
         const repos = deps.registry.getRepos(guildId);
         if (!repos) return;
-        // G-2: listAll returns Result<T, DatabaseError>. Throw the `err`
-        // inside the retried op so `rebootRetry`'s backoff still treats a
-        // transient DB failure as retryable, exactly as before G-2.
+        // listAll returns Result<T, DatabaseError>. Throw the `err`
+        // inside the retried op so `rebootRetry`'s backoff treats a
+        // transient DB failure as retryable.
         const giveaways = await rebootRetry(async () => {
           const result = await repos.giveaway.listAll();
           if (!result.ok) throw result.error;

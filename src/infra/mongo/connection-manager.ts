@@ -13,7 +13,7 @@
  *   category as a Discord client or LLM HTTP client. Per the layer
  *   contract (plan §1, layer rules, and architecture-reviewer consult).
  *
- * Resilience (gap D5):
+ * Resilience:
  *   `getConnection` classifies a failed open via the `persistence/`
  *   error-translator. A *transient* failure (`DATABASE_TIMEOUT` /
  *   `DATABASE_NETWORK`) is retried with bounded exponential backoff; a
@@ -39,10 +39,7 @@ import { SCHEMAS, type DocByName, type SchemaName } from '../../persistence/sche
 import { DatabaseError } from '../../core/errors/external-service-error';
 import { databaseErrorFrom, isTransient } from '../../persistence/error-translator';
 
-/**
- * Typed model registry for one guild connection. Replaces the legacy
- * `Record<string, Model<any>>` map.
- */
+/** Typed model registry for one guild connection. */
 export type Models = {
   readonly [K in SchemaName]: Model<DocByName[K]>;
 };
@@ -132,13 +129,11 @@ const buildModels = (connection: Connection): Models => ({
 /**
  * Run every model's index build, tolerating per-model rejections.
  *
- * Pre-Phase-2 the bot relied on mongoose's lazy `autoIndex` and
- * tolerated index-build failures silently. Phase 2 added `await
- * m.init()` to close a startup race between
+ * Awaiting `m.init()` closes a startup race between
  * `insertManyIgnoringDuplicates` and the auto-built unique index.
  *
- * But treating every init failure as fatal is strictly worse for the
- * operator: a single permission gap or one collection with legacy
+ * Treating an init failure as fatal would be strictly worse for the
+ * operator: a single permission gap or one collection with pre-existing
  * duplicates would block ALL DB commands across EVERY guild. So we
  * `allSettled`: we still await the build (race window stays closed
  * when permissions/data are OK), but rejections drop a stderr line

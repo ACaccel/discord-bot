@@ -2,7 +2,7 @@
  * PluginHost — orchestrates plugin registration, lifecycle, and
  * contribution merging.
  *
- * Lifecycle (per plan §1.1.4):
+ * Lifecycle:
  *   register(plugin)*    -- captured immediately; configSchema runs.
  *   register() returns   -- topology + missing-dep checked here too.
  *   buildEffectiveRegistries()  -- merge plugin `contributes` with core.
@@ -18,10 +18,9 @@
  *   - Critical plugin failures => collect the error and rethrow at the
  *     end of the phase. Caller (BaseBot) decides how to abort.
  *
- * Discord client is intentionally NOT a constructor dependency. The
- * Phase 4a deliverable is "host fully unit-testable without
- * discord.js"; the host emits effective registries + an
- * {@link EventDispatcher} that Phase 4b's BaseBot will attach to the
+ * Discord client is intentionally NOT a constructor dependency, so the
+ * host stays fully unit-testable without discord.js. It emits effective
+ * registries + an {@link EventDispatcher} that BaseBot attaches to the
  * real `client.on(...)` plumbing.
  *
  * Service-locator guard: plugins receive `services.resolve` (typed
@@ -50,8 +49,8 @@ import { topologicalOrder, buildDependentsIndex } from './host/topology';
 import { PluginLifecycleRunner, type LifecycleHost, type RegisteredPlugin } from './host/lifecycle';
 import type { ContributedRegistry, DisabledPlugin, Plugin, PluginId, TypedResolver } from './types';
 
-// Public errors live in `host/errors.ts` (audit C-8 split). Re-exported
-// here so existing callers continue to import them from `core/plugin`.
+// Public errors live in `host/errors.ts`. Re-exported here so callers
+// can import them from `core/plugin`.
 export const PluginRegistrationError = PluginRegistrationErrorClass;
 export type PluginRegistrationError = PluginRegistrationErrorClass;
 export const CriticalPluginFailureError = CriticalPluginFailureErrorClass;
@@ -68,7 +67,7 @@ export interface PluginHostOptions {
   readonly logger: Logger;
   readonly translator: Translator;
   readonly clock: Clock;
-  /** Per-handler-type registries shipped by codegen — see plan §1.1.3. */
+  /** Per-handler-type registries shipped by codegen. */
   readonly coreRegistries: {
     readonly commands?: ContributedRegistry;
     readonly buttons?: ContributedRegistry;
@@ -88,7 +87,7 @@ export class PluginHost {
   /**
    * Forward dependency edges: `dependents.get(X)` is the set of
    * plugins that name X in their `dependencies`. Populated at
-   * {@link finalizeRegistration} time so cascade-disable can run in
+   * {@link finalizeRegistration} time so cascade-disable runs in
    * O(|edges|) when a plugin fails.
    */
   private dependents: Map<PluginId, Set<PluginId>> = new Map();
@@ -96,8 +95,8 @@ export class PluginHost {
   private readonly dispatcher: EventDispatcher;
   /**
    * Lifecycle runner — built lazily after {@link finalizeRegistration}
-   * so it captures the finalized `order` / `dependents`. The D6 split
-   * keeps phase logic in `host/lifecycle.ts`; the host only wires it.
+   * so it captures the finalized `order` / `dependents`. Phase logic
+   * lives in `host/lifecycle.ts`; the host only wires it.
    */
   private lifecycleRunner: PluginLifecycleRunner | undefined;
 
@@ -112,7 +111,7 @@ export class PluginHost {
   /**
    * Register a plugin with its raw (un-validated) config. Performs:
    *   1. duplicate-id check
-   *   2. scope check (4a: `'guild'` rejected)
+   *   2. scope check (`'guild'` rejected)
    *   3. zod parse against `configSchema` (when supplied)
    *
    * Topology checks (missing deps, cycles) run lazily inside
@@ -130,7 +129,7 @@ export class PluginHost {
     if (plugin.scope !== 'bot') {
       throw new PluginRegistrationError(
         'UNSUPPORTED_SCOPE',
-        `PluginHost.register: per-guild plugin scope is not supported until Phase 4b (plugin "${plugin.id}").`,
+        `PluginHost.register: per-guild plugin scope is not supported (plugin "${plugin.id}").`,
         plugin.id,
       );
     }
@@ -149,12 +148,10 @@ export class PluginHost {
     this.dependents = this.buildDependentsIndex();
   }
 
-  /** Merge codegen registries with plugin contributions; cached. */
   /**
    * Merge codegen-shipped + plugin-contributed handlers into the
    * effective per-handler-type registries. Cached after the first call.
-   * Implementation extracted to `host/contributes-merger.ts` (audit
-   * C-8 split).
+   * Implementation lives in `host/contributes-merger.ts`.
    */
   public buildEffectiveRegistries(): EffectiveRegistries {
     if (this.effectiveRegistries !== undefined) return this.effectiveRegistries;
@@ -167,7 +164,7 @@ export class PluginHost {
     return built;
   }
 
-  /** Event dispatcher consumed by Phase 4b's BaseBot to attach Discord events. */
+  /** Event dispatcher consumed by BaseBot to attach Discord events. */
   public getEventDispatcher(): EventDispatcher {
     return this.dispatcher;
   }
@@ -196,8 +193,8 @@ export class PluginHost {
    * attach every enabled plugin's event subscriptions to the host's
    * {@link EventDispatcher}.
    *
-   * Wiring contract for Phase 4b's BaseBot: events do **not** flow
-   * until `startAll()` resolves. Callers MUST defer
+   * Wiring contract for BaseBot: events do **not** flow until
+   * `startAll()` resolves. Callers MUST defer
    * `client.on(name, (...args) => host.getEventDispatcher().emit(name, ...args))`
    * until after the awaited `startAll()` returns, otherwise plugins
    * whose `start` hook hasn't finished can still observe events and
@@ -283,9 +280,8 @@ export class PluginHost {
     }
   }
 
-  // Topology helpers extracted to `host/topology.ts` (audit C-8 split).
-  // These private methods stay as thin wrappers so the lifecycle
-  // sites keep their original call shape.
+  // Topology helpers live in `host/topology.ts`. These private methods
+  // are thin wrappers that keep the lifecycle call sites concise.
   private topologicalOrder(): readonly PluginId[] {
     return topologicalOrder(this.registered);
   }

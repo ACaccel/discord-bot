@@ -1,26 +1,24 @@
 /**
  * LLMService — Strategy dispatcher over a {@link LlmProviderRegistry}.
  *
- * Phase 5 split: the registry owns provider lookup / lifetime; the
- * service owns the per-call contract (web-search compatibility check,
- * call delegation). Plugin / handler code depends only on this class
- * via DI — never on a concrete provider — so swapping a provider
+ * Responsibility split: the registry owns provider lookup / lifetime;
+ * the service owns the per-call contract (web-search compatibility
+ * check, call delegation). Plugin / handler code depends only on this
+ * class via DI — never on a concrete provider — so swapping a provider
  * (or adding a new one) does not ripple beyond the registry.
  *
- * Audit B-1 (Result at the LLM boundary): `chat()` returns
- * `Result<LLMResult, LlmProviderError>`. Both expected failure modes
- * (the registry's missing-key gate, and the upstream SDK / HTTP
- * failures already typed by `error-translator.ts`) flow through the
- * typed error channel. Programmer errors (e.g. asking for a
+ * `chat()` returns `Result<LLMResult, LlmProviderError>`. Both expected
+ * failure modes (the registry's missing-key gate, and the upstream SDK
+ * / HTTP failures already typed by `error-translator.ts`) flow through
+ * the typed error channel. Programmer errors (e.g. asking for a
  * web-search-capable model from a provider that lacks the capability)
  * stay as thrown native errors — the Result contract is for recoverable
  * boundary failures only.
  *
- * PR-E E-6 (B-3 reviewer): the inner `try/catch` around
- * `registry.resolve` is gone. The registry's new `tryResolve` returns
- * a Result-shaped value with the same already-translated
- * `LlmProviderError`, so this method short-circuits with a clean
- * Result branch instead.
+ * Provider resolution goes through `registry.tryResolve`, which returns
+ * a Result-shaped value carrying an already-translated
+ * `LlmProviderError`, so this method short-circuits on the missing-key
+ * path with a clean Result branch.
  */
 import { LlmProviderError } from '../../core/errors';
 import { err, ok, type Result } from '../../core/result';

@@ -11,8 +11,8 @@
  *     the host's `init`/`start` hooks own that decision; event-time
  *     failures are always non-fatal.
  *   - The dispatcher is constructible without a Discord `Client`.
- *     Phase 4a tests drive it via `emit()` directly; Phase 4b
- *     attaches it to the real `client.on(event, ...)` plumbing.
+ *     Tests drive it via `emit()` directly; BaseBot attaches it to
+ *     the real `client.on(event, ...)` plumbing.
  */
 import type { ClientEvents } from 'discord.js';
 import type { Logger } from '../logger';
@@ -122,10 +122,10 @@ export class EventDispatcher {
 
   /**
    * Snapshot of every event name that currently has at least one
-   * subscriber. Phase 4b's BaseBot uses this after `startAll()` to
-   * attach a single `client.on(event, ...)` per subscribed event,
-   * forwarding into {@link emit}. Returning a fresh array keeps the
-   * caller from mutating the dispatcher's internal map.
+   * subscriber. BaseBot uses this after `startAll()` to attach a
+   * single `client.on(event, ...)` per subscribed event, forwarding
+   * into {@link emit}. Returning a fresh array keeps the caller from
+   * mutating the dispatcher's internal map.
    */
   public subscribedEvents(): readonly (keyof ClientEvents)[] {
     return [...this.subscriptions.keys()] as (keyof ClientEvents)[];

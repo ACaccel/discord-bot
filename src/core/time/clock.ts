@@ -5,10 +5,9 @@
  * instead of calling `Date.now()` / `new Date()` directly — tests
  * substitute a deterministic fake, production uses {@link systemClock}.
  *
- * Phase 4a introduces this contract because the plugin lifecycle
- * context (`PluginInitContext.clock`) needs to carry a Clock through
- * to every plugin so scheduled jobs / TTL checks stay testable when
- * Phase 4b's plugin migrations land.
+ * The plugin lifecycle context (`PluginInitContext.clock`) carries a
+ * Clock through to every plugin so scheduled jobs / TTL checks stay
+ * testable.
  *
  * Convention: business code receives `Clock` via constructor; modules
  * that legitimately need wall-clock time at module load (rare, mostly

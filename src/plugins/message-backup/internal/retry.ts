@@ -1,6 +1,6 @@
 /**
- * Retry primitives lifted out of the main plugin so the policy and the
- * orchestration live in separate modules (audit C-8 split).
+ * Retry primitives kept separate from the main plugin so the retry
+ * policy and the backup orchestration live in distinct modules.
  *
  * `isRetryableError` is intentionally generous on the network-failure
  * side: a single Discord fetch can fail with `DiscordAPIError`,

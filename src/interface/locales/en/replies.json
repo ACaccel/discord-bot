@@ -3,7 +3,7 @@
     "reboot_notice": "{{botName}} has rebooted!"
   },
   "nijika": {
-    "help_message": "### Currently supported features:\n1. tts: reply to a message with `tts` and the bot will generate a voice file for it\n2. auto reply: the bot replies based on message pairs in the database\n3. roll dice: example input -> `2d5`, randomly picks two numbers between 1 and 5\n"
+    "help_message": "### Currently supported features:\n1. auto reply: the bot replies based on message pairs in the database\n2. roll dice: example input -> `2d5`, randomly picks two numbers between 1 and 5\n"
   },
   "konata": {
     "presence_text": "Small breasts are a status symbol, a rare commodity!"

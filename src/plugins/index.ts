@@ -7,7 +7,6 @@
  * relative path; only the public-facing plugin exports surface here.
  */
 export { AutoReplyPlugin } from './auto-reply';
-export { TtsReplyPlugin } from './tts-reply';
 export { createGuildEventsPlugin, type GuildEventsConfig } from './guild-events';
 export { createGiveawayPlugin } from './giveaway';
 export { createActivityPlugin } from './activity';

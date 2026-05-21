@@ -1,7 +1,7 @@
 /**
  * Encapsulates `VoiceRecorder` + the active `VoiceConnection` for the
- * record slash command. Pre-PR-G1 these lived loose on `BaseBot.voice`
- * and the handler mutated them directly (audit 3.10).
+ * record slash command, so the handler drives recording through this
+ * controller instead of mutating loose `BaseBot` state.
  */
 import { joinVoiceChannel, type DiscordGatewayAdapterCreator } from '@discordjs/voice';
 import type { VoiceConnection } from '@discordjs/voice';
@@ -34,8 +34,6 @@ export class VoiceController {
   /**
    * Join the voice channel and start the recorder. Returns the live
    * connection so the caller can chain disconnect logic if needed.
-   * Replaces the previous handler-side `joinVoiceChannel(...) ->
-   * bot.voice.connection = ...` mutation.
    */
   public start(
     guildId: string,
@@ -62,7 +60,7 @@ export class VoiceController {
 
   /**
    * Drain the recorder buffer for the last `durationMinutes`. The
-   * `voiceStream` is the legacy filesystem-mirror sink — kept as a
+   * `voiceStream` is the filesystem-mirror sink — kept as a
    * caller-supplied stream so the plugin stays free of `fs` deps.
    */
   public async save(

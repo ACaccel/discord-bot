@@ -1,16 +1,14 @@
 /**
  * Activity reboot + scheduling internals.
  *
- * Audit ARCH-BLOCK3 (PR-G4): the public surface now takes a typed
- * {@link ActivityDeps} bundle instead of the whole `BaseBot`, so the
- * plugin can resolve its dependencies through the IoC container
- * (`ctx.resolve(...)`) rather than receiving a callback that closes
- * over the composition root's `this`. Composition roots no longer
- * deep-import this file.
+ * The public surface takes a typed {@link ActivityDeps} bundle rather
+ * than the whole `BaseBot`, so the plugin can resolve its dependencies
+ * through the IoC container (`ctx.resolve(...)`) instead of closing
+ * over the composition root's `this`.
  *
- * The legacy slash-command handlers still hold a `BaseBot` reference;
- * they call {@link buildActivityDepsFromBot} to bridge into the new
- * surface without changing the handler signature.
+ * The slash-command handlers hold a `BaseBot` reference; they call
+ * {@link buildActivityDepsFromBot} to bridge into this surface without
+ * changing the handler signature.
  */
 import type { Client, GuildMember, Channel } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
@@ -34,8 +32,8 @@ const msgReact = async (
     try {
       await msg.react(reaction);
     } catch (error) {
-      // G-1: route through the structured logger instead of raw
-      // console.error so reaction failures are observable.
+      // Route through the structured logger so reaction failures are
+      // observable.
       logger.error(
         {
           err: error instanceof Error ? error : new Error(String(error)),
@@ -52,7 +50,7 @@ const msgReact = async (
  * Typed dependency bundle for every activity-plugin operation. Built
  * once in `createActivityPlugin.onReady` from `ctx.resolve(...)`, or
  * by {@link buildActivityDepsFromBot} when a slash-command handler
- * holds the legacy `BaseBot` reference.
+ * holds the `BaseBot` reference.
  */
 export interface ActivityDeps {
   readonly client: Client;
@@ -109,9 +107,8 @@ export const findActivity = async (deps: ActivityDeps, guild_id: string, activit
   if (!guild) return false;
   const repos = deps.registry.getRepos(guild_id);
   if (!repos) return false;
-  // G-2: repo methods return Result<T, DatabaseError>. An `err` is
-  // re-thrown so the caller's surrounding catch handles it exactly as
-  // the pre-G-2 raw-error propagation did.
+  // Repo methods return Result<T, DatabaseError>. An `err` is
+  // re-thrown so the caller's surrounding catch handles it.
   const result = await repos.activity.findByActivityId(activity_id);
   if (!result.ok) throw result.error;
   return result.value !== undefined && result.value !== null;
@@ -127,7 +124,7 @@ export const scheduleActivity = async (
   const repos = deps.registry.getRepos(guild_id);
   if (!repos) return 'Database not found';
 
-  // G-2: an `err` is re-thrown for the caller's surrounding catch.
+  // An `err` is re-thrown for the caller's surrounding catch.
   const activityResult = await repos.activity.findByActivityId(activity_id);
   if (!activityResult.ok) throw activityResult.error;
   const activity = activityResult.value;
@@ -178,7 +175,7 @@ export const deleteActivity = async (deps: ActivityDeps, guild_id: string, activ
   if (!repos) return 'Database not found';
 
   new JobManager(deps.jobMap).cancel(activityJobKey(activity_id));
-  // G-2: an `err` is re-thrown for the caller's surrounding catch.
+  // An `err` is re-thrown for the caller's surrounding catch.
   const deleteResult = await repos.activity.deleteByActivityId(activity_id);
   if (!deleteResult.ok) throw deleteResult.error;
   return null;
@@ -186,9 +183,9 @@ export const deleteActivity = async (deps: ActivityDeps, guild_id: string, activ
 
 /**
  * Retry helper. Exponential backoff: 250ms → 500ms → 1000ms before
- * giving up. Audit C-1 reviewer follow-up — the reboot loop used to
- * log-and-continue on a transient Mongo blip, silently leaving the
- * guild's scheduled jobs un-rebuilt for the lifetime of the process.
+ * giving up. Without it, a transient Mongo blip during the reboot
+ * loop would silently leave the guild's scheduled jobs un-rebuilt for
+ * the lifetime of the process.
  */
 const REBOOT_MAX_ATTEMPTS = 3;
 const rebootRetry = async <T>(op: () => Promise<T>): Promise<T> => {
@@ -213,9 +210,9 @@ export const rebootActivityJobs = async (deps: ActivityDeps): Promise<void> => {
       try {
         const repos = deps.registry.getRepos(guildId);
         if (!repos) return;
-        // G-2: listAll returns Result<T, DatabaseError>. Throw the `err`
-        // inside the retried op so `rebootRetry`'s backoff still treats a
-        // transient DB failure as retryable, exactly as before G-2.
+        // listAll returns Result<T, DatabaseError>. Throw the `err`
+        // inside the retried op so `rebootRetry`'s backoff treats a
+        // transient DB failure as retryable.
         const activities = await rebootRetry(async () => {
           const result = await repos.activity.listAll();
           if (!result.ok) throw result.error;

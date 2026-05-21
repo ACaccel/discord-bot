@@ -67,7 +67,7 @@ export const registerCommands = async (bot: BaseBot) => {
                 // `interaction.commandName`. For chat-input commands the
                 // localised name equals `config.name` (a lowercase-ASCII
                 // id); for context-menu commands it is the catalog
-                // display name (gap D7).
+                // display name.
                 const registeredName = localizeCommandConfig(
                     newCommand.config,
                     bot.translator,
@@ -101,11 +101,9 @@ export const registerCommands = async (bot: BaseBot) => {
 /**
  * Dispatch a slash-command / context-menu interaction to its handler.
  *
- * Channel + guild logging used to live here (with a `blocked_channels`
- * 3rd arg threaded in from `nijika`); audit B-2 lifted that into
- * `createChannelLoggingMiddleware` so policy lives at the composition
- * root rather than buried in this dispatcher. The function is now
- * purely concerned with handler lookup.
+ * This function is purely concerned with handler lookup. Channel and
+ * guild logging policy lives in `createChannelLoggingMiddleware` at the
+ * composition root, keeping the dispatcher free of policy concerns.
  */
 export const executeCommand = async (interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot) => {
     if (!bot.config.commands) {

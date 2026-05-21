@@ -3,8 +3,8 @@
  *
  * Shared by the giveaway and activity plugins, which both accept a
  * human-typed duration (e.g. `30m`, `2h`, `1d`) and need it as a
- * millisecond offset for `JobManager` scheduling. Lives in `core/`
- * alongside {@link JobManager} as a pure, dependency-free helper.
+ * millisecond offset for `JobManager` scheduling. A pure,
+ * dependency-free helper.
  */
 
 /** A supported single-character duration unit. */

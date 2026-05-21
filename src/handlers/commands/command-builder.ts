@@ -14,9 +14,7 @@ import type {
  *
  * Consumed both at deploy time (`src/deploy.ts`) and at runtime command
  * registration (`getCommandJsonBody`). It lives next to `command.ts`
- * because it operates purely on the localised command-metadata contract;
- * the previous home (`src/utils/bot_cmd.ts`) was a transitional grab-bag
- * retired by gap D4.
+ * because it operates purely on the localised command-metadata contract.
  */
 export const buildCommandJsonBody = (config: LocalizedCommandConfig) => {
   // Context menu commands carry no description / options.

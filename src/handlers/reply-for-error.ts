@@ -1,5 +1,5 @@
 /**
- * Handler-boundary error reply helper (gap D9, decided plan B).
+ * Handler-boundary error reply helper.
  *
  * Every handler's `catch` block routes a failure down two independent
  * channels:
@@ -81,7 +81,7 @@ const sendUserChannel = async (
 };
 
 /**
- * Resolve the user-facing message for `error` (gap D9 plan B).
+ * Resolve the user-facing message for `error`.
  *
  * Exported for unit tests that want to assert the channel selection
  * without driving a Discord interaction fixture.

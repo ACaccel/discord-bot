@@ -7,21 +7,18 @@
  * Construction is deferred to first use; the registry caches the
  * instance after that.
  *
- * Phase 6 PR 2 changed the API-key sourcing path. Previously the
- * registry read `process.env[PROVIDER_API_KEY_ENV[name]]` directly
- * with an `eslint-disable no-restricted-syntax`. Now it takes a
- * pre-resolved `apiKeys` map (populated by the composition root from
- * the typed `Env`), so the strict env-access rule is honoured
- * throughout `infra/llm`.
+ * API keys arrive as a pre-resolved `apiKeys` map (populated by the
+ * composition root from the typed `Env`) rather than being read from
+ * `process.env`, so the strict env-access rule holds throughout
+ * `infra/llm`.
  *
- * PR-E E-6 (B-3 reviewer follow-up): two-shape resolution. `tryResolve`
- * returns `Result<LLMProvider, LlmProviderError>` for the recoverable
+ * Two-shape resolution: `tryResolve` returns
+ * `Result<LLMProvider, LlmProviderError>` for the recoverable
  * missing-key path so `LLMService` can stay on the Result rail end-
- * to-end. `resolve` keeps the throwing shape for callers that
- * already handle `MissingApiKeyError` (test fixtures, anything that
- * predates the Result contract).
+ * to-end; `resolve` keeps the throwing shape for callers that handle
+ * `MissingApiKeyError` directly (test fixtures).
  *
- * Both shapes still throw a native `TypeError` for the unknown-provider
+ * Both shapes throw a native `TypeError` for the unknown-provider
  * programmer error per the DomainError convention.
  *
  * Adding a new provider:

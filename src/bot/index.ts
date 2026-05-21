@@ -24,9 +24,7 @@ import { getActiveVoiceController, type VoiceController } from '../plugins/voice
  * Process-wide pool of {@link MongoConnectionManager}s keyed by base
  * URI. Two BaseBots sharing a URI reuse the same manager (and thus
  * the same per-guild connection pool), and tests / multi-cluster
- * setups that pass distinct URIs get distinct managers. Audit C-2
- * inlined this here after the legacy `@db` shim that previously
- * exported the same map was deleted.
+ * setups that pass distinct URIs get distinct managers.
  */
 const sharedConnectionManagers = new Map<string, MongoConnectionManager>();
 const sharedConnectionManagerForUri = (uri: string): MongoConnectionManager => {
@@ -111,8 +109,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public guildInfo: Record<string, GuildInfo>;
 
     /**
-     * Typed accessor for the per-bot {@link ConnectionManager} (gap D5,
-     * C6 slice).
+     * Typed accessor for the per-bot {@link ConnectionManager}.
      *
      * Mirrors the {@link translator} / {@link logger} / {@link env}
      * accessor pattern: handler-layer code (notably
@@ -150,8 +147,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * subclasses (e.g. `Nijika`) in their constructor; resolved during
      * {@link run} once the translator is loaded and the rendered string
      * stored in {@link help_msg}. Keeping the key (rather than the
-     * resolved text) in the subclass avoids hard-coded CJK in
-     * composition roots — see audit 3.4 / i18n scanner scope.
+     * resolved text) in the subclass avoids hard-coded CJK literals in
+     * composition roots, which the i18n scanner forbids.
      */
     protected helpMessageKey?: string;
     public jobs: Map<string, Job>;
@@ -179,10 +176,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
 
     /**
      * Bot-scoped structured logger. Populated at the top of {@link run}
-     * from the IoC container so handler callsites (which pre-date
-     * constructor-injected loggers) can reach a typed pino instance
-     * without resolving the container themselves. Mirrors the
-     * {@link translator} access pattern.
+     * from the IoC container so handler callsites can reach a typed
+     * pino instance without resolving the container themselves.
+     * Mirrors the {@link translator} access pattern.
      *
      * Optional only to model the pre-`run()` window; in any handler
      * context the field is guaranteed defined.
@@ -211,8 +207,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     /**
      * Chain-of-Responsibility dispatcher for inbound interactions.
      * Built in {@link run} once the translator + clock are loaded;
-     * `interactionEventListener` forwards every interaction through
-     * the chain. Subclasses may inject extra middleware via
+     * {@link interactionEventListener} forwards every interaction
+     * through the chain. Subclasses may inject extra middleware via
      * {@link configureInteractionRouter}.
      */
     protected interactionRouter: InteractionRouter | undefined;
@@ -282,16 +278,16 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // primitives (channel fetch, message archive) resolve through
         // here rather than holding a BaseBot reference.
         this.container.registerSingleton(TOKENS.DiscordClient, () => this.client);
-        // Audit ARCH-BLOCK3: expose the scheduled-job map so the
-        // activity + giveaway plugins can drive their reboot loops
-        // without holding a BaseBot reference.
+        // Expose the scheduled-job map so the activity + giveaway
+        // plugins can drive their reboot loops without holding a
+        // BaseBot reference.
         this.container.registerSingleton(TOKENS.JobMap, () => this.jobs);
-        // Gap D1: register the guild-onboarding port so the
-        // `guild-events` plugin can onboard newly joined guilds from
-        // its `guildCreate` subscription without reaching into
-        // `BaseBot` internals. The port is a thin Adapter over this
-        // bot; `guildCreateListener` also dispatches through it so the
-        // onboarding path has a single implementation.
+        // Register the guild-onboarding port so the `guild-events`
+        // plugin can onboard newly joined guilds from its `guildCreate`
+        // subscription without reaching into `BaseBot` internals. The
+        // port is a thin Adapter over this bot; `guildCreateListener`
+        // also dispatches through it so the onboarding path has a
+        // single implementation.
         this.container.registerSingleton(
             TOKENS.GuildOnboardingPort,
             () => new BaseBotGuildOnboardingPort(this),
@@ -327,9 +323,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
 
     /**
      * Open (or reuse) the per-guild MongoDB connection and populate
-     * `guildInfo[g].repos` with the typed repository bag. Audit C-2
-     * (PR-E) retired the legacy `guildInfo[g].db` slot — `repos` is
-     * now the only entry point.
+     * `guildInfo[g].repos` with the typed repository bag. `repos` is
+     * the sole entry point handlers use to reach persistence.
      *
      * Reused by the startup loop in {@link connectGuildDB} and by the
      * new-guild-join path via {@link BaseBotGuildOnboardingPort}.
@@ -346,18 +341,18 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             // so a partial connect cannot leave a half-baked state.
             // The shared ConnectionManager primes its per-guild pool
             // inside reposFactory — including transient-failure retry
-            // and persistent-failure disabling (gap D5).
+            // and persistent-failure disabling.
             const reposFactory = this.container.resolve<ReposFactory>(TOKENS.ReposFactory);
             const repos = await reposFactory(branded);
             // Single mutation — atomic from the handlers' point of view.
             slot.repos = repos;
         } catch (err) {
-            // Gap D5: the ConnectionManager already classified the
+            // The ConnectionManager has already classified the
             // failure, exhausted any transient retries, and (on a
             // persistent / exhausted failure) recorded the guild as
-            // disabled with a stable `traceId`. BaseBot no longer owns
-            // that map — it just surfaces the manager's `traceId` on
-            // the structured boot log so the user-facing
+            // disabled with a stable `traceId`. The manager owns that
+            // disabled set; BaseBot only surfaces the manager's
+            // `traceId` on the structured boot log so the user-facing
             // `errors:db.guild_disabled` message can be grep-correlated.
             const normalised =
                 err instanceof Error
@@ -389,11 +384,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      *   4. {@link attachListeners} — startAll + dispatcher attach +
      *      clientReady latch + event listeners
      *
-     * Splitting the original ~120 LOC `run` body into named phases
-     * (audit C-7) trades one method for four; the lifecycle invariants
+     * Each phase is a named helper so the lifecycle invariants
      * (host.initAll before login, host.startAll after login but before
-     * dispatcher attach, clientReady latch closed only after dispatcher
-     * is hot) are now expressed by the orchestrator's call sequence.
+     * dispatcher attach, clientReady latch closed only after the
+     * dispatcher is hot) are expressed directly by this orchestrator's
+     * call sequence.
      */
     public run = async (callback?: () => Promise<void>) => {
         const rootLogger = this.setupContainer();
@@ -431,11 +426,10 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // Load the typed Env once at run() so plugins resolve LLM API
         // keys and other configuration through `TOKENS.Env` instead of
         // touching `process.env` directly. Failures here are non-fatal:
-        // legacy bots still pass TOKEN / MONGO_URI / CLIENT_ID through
-        // the constructor, so a deployment with a partially valid env
+        // TOKEN / MONGO_URI / CLIENT_ID still arrive through the
+        // constructor, so a deployment with a partially valid env
         // still boots. The warning lets ops see when typed Env is
-        // unavailable so the no-restricted-syntax rule is the only
-        // failure mode left for misconfigured keys.
+        // unavailable.
         try {
             const env = loadEnv({
                 exitOnFailure: false,
@@ -467,9 +461,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // can call `resolve(TOKENS.Translator)` synchronously.
         const translator = await createDefaultTranslator();
         this.container.registerSingleton(TOKENS.Translator, () => translator);
-        // Surface the resolved Translator on the bot itself so legacy
-        // handlers (which still receive `bot: BaseBot` rather than a
-        // per-interaction context) can call `bot.translator.t(...)`.
+        // Surface the resolved Translator on the bot itself so handlers
+        // that receive `bot: BaseBot` rather than a per-interaction
+        // context can call `bot.translator.t(...)`.
         this.translator = translator;
         // Resolve the deferred help-message key now that the translator
         // is loaded. Subclasses set `helpMessageKey` in their ctor; the
@@ -477,10 +471,10 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         if (this.helpMessageKey !== undefined) {
             this.help_msg = translator.t(this.helpMessageKey);
         }
-        // Audit B-2: assemble the Chain-of-Responsibility interaction
-        // router. Subclass-injected middleware runs FIRST (typical use
-        // case: gate / filter / context-priming), then the terminal
-        // dispatch + observability stages.
+        // Assemble the Chain-of-Responsibility interaction router.
+        // Subclass-injected middleware runs FIRST (typical use case:
+        // gate / filter / context-priming), then the terminal dispatch
+        // + observability stages.
         this.interactionRouter = new InteractionRouter();
         this.configureInteractionRouter(this.interactionRouter);
         this.interactionRouter.use(createDispatchMiddleware(this));
@@ -490,9 +484,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             }),
         );
         // Build the host now that Translator + Clock + Logger are all
-        // bound. Phase 4b-1 passes empty core registries because the
-        // legacy registerCommands/... paths still feed the BaseBot's
-        // Map<>s directly.
+        // bound. Core registries are passed empty because the
+        // registerCommands/... paths feed the BaseBot's Map<>s
+        // directly.
         const host = new PluginHost({
             container: this.container,
             logger: rootLogger,
@@ -526,14 +520,13 @@ export abstract class BaseBot<TConfig extends Config = Config> {
 
     /**
      * Phase 3 prelude: register the ClientReady listener BEFORE
-     * `client.login()`. Pre-fix, `init()` ran AFTER login + startAll and
-     * so could miss a `clientReady` event that already fired — observed
-     * as Konata's reboot reply silently disappearing because
-     * `rebootMessage` only runs from inside that handler. The latch
-     * lets the handler observe a fully-set-up host (startAll done,
-     * dispatcher attached) before it invokes `host.readyAll()`.
+     * `client.login()` so a `clientReady` event that fires quickly is
+     * never missed (`rebootMessage` runs only from inside that
+     * handler). The latch lets the handler observe a fully-set-up host
+     * (startAll done, dispatcher attached) before it invokes
+     * `host.readyAll()`.
      *
-     * Returns the latch opener — the orchestrator calls it after
+     * Returns the latch opener — {@link run} calls it after
      * `attachDispatcherToClient` so the deferred handler is unblocked.
      */
     private armReadyLatch = (callback?: () => Promise<void>): (() => void) => {
@@ -634,14 +627,13 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     }
 
     /**
-     * Body of the `clientReady` handler. Extracted from the old
-     * `init()` method so {@link run} can register the `once()`
-     * listener BEFORE `client.login()` returns — that closes the
-     * race that caused Konata's reboot message to silently drop.
-     * The latch in {@link run} ensures this runs only after the
-     * plugin host's `startAll` + dispatcher attach completes, so
-     * `host.readyAll()` still observes the post-start invariants
-     * the host contract requires.
+     * Body of the `clientReady` handler. Kept as a separate method so
+     * {@link run} can register the `once()` listener BEFORE
+     * `client.login()` returns, which avoids racing a fast
+     * `clientReady` event. The latch in {@link run} ensures this runs
+     * only after the plugin host's `startAll` + dispatcher attach
+     * completes, so `host.readyAll()` observes the post-start
+     * invariants the host contract requires.
      */
     private handleClientReady = async (callback?: () => Promise<void>): Promise<void> => {
         try {
@@ -652,10 +644,10 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             await registerSSMs(this);
             await registerModals(this);
             await registerReactions(this);
-            // Giveaway / activity reboot logic moved to
-            // {@link createGiveawayPlugin} / {@link createActivityPlugin}
-            // in Phase 4b-3. Bots that need them call `.use()`
-            // with a `rebootJobs` closure in their composition root.
+            // Giveaway / activity reboot logic lives in
+            // {@link createGiveawayPlugin} / {@link createActivityPlugin};
+            // bots that need it register those plugins in their
+            // composition root.
             await this.rebootMessage();
             if (callback) {
                 await callback();
@@ -712,13 +704,13 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 logError(this.logger, this.clientId, newMember.guild.id || null, err);
             });
         });
-        // Gap D1: when a plugin (the `guild-events` plugin) subscribes
-        // to `guildCreate`, the EventDispatcher already forwards the
-        // event into that plugin, which onboards the new guild through
+        // When a plugin (the `guild-events` plugin) subscribes to
+        // `guildCreate`, the EventDispatcher already forwards the event
+        // into that plugin, which onboards the new guild through
         // `GuildOnboardingPort`. Registering this explicit listener as
         // well would onboard the same guild twice. Skip it in that case
         // so the plugin is the single driver; bots without the plugin
-        // (e.g. Tomori) keep onboarding through `guildCreateListener`.
+        // (e.g. Tomori) onboard through `guildCreateListener`.
         if (!this.dispatcherSubscribesTo(Events.GuildCreate)) {
             this.client.on(Events.GuildCreate, async (guild) => {
                 await this.guildCreateListener(guild).catch((err) => {
@@ -881,14 +873,14 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * pushing middleware through {@link configureInteractionRouter}
      * instead. The arrow-property + `readonly` modifier together
      * prevent both prototype-override and re-assignment, so a child
-     * class accidentally restoring the pre-B-2 inline switch is a
-     * compile error rather than a silent dispatch divergence.
+     * class that tries to replace the router dispatch is a compile
+     * error rather than a silent dispatch divergence.
      */
     public readonly interactionEventListener = async (interaction: Interaction): Promise<void> => {
-        // Audit B-2: every interaction goes through the
-        // Chain-of-Responsibility middleware stack. The router is
-        // built inside `run()`; pre-`run()` (test paths) we fall
-        // through to a minimal default reply.
+        // Every interaction goes through the Chain-of-Responsibility
+        // middleware stack. The router is built inside `run()`;
+        // pre-`run()` (test paths) we fall through to a minimal
+        // default reply.
         if (this.interactionRouter === undefined) {
             if (!interaction.isAutocomplete() && interaction.isRepliable()) {
                 await interaction.reply({
@@ -923,11 +915,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         try {
             await this.interactionRouter.dispatch(ctx);
         } catch (err) {
-            // Reviewer-flagged BLOCK: a dispatch-chain throw must still
-            // produce a user-visible reply. The outer Events.InteractionCreate
-            // handler only logs; without this catch the user sees an
-            // indefinite "thinking…" or a silent failure. Surface the
-            // traceId so support tickets correlate to logs.
+            // A dispatch-chain throw must still produce a user-visible
+            // reply. The outer Events.InteractionCreate handler only
+            // logs; without this catch the user sees an indefinite
+            // "thinking…" or a silent failure. Surface the traceId so
+            // support tickets correlate to logs.
             logError(this.logger, this.clientId, interaction.guildId, err);
             if (interaction.isRepliable()) {
                 const content =
@@ -955,17 +947,16 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     }
 
     /**
-     * Default no-op for `messageCreate`. Phase 4b-2 moved `auto_reply`
-     * and `tts_reply` into {@link AutoReplyPlugin} / {@link TtsReplyPlugin};
-     * bots opt in via `bot.use(AutoReplyPlugin)`. Subclasses (e.g.
-     * Konata) still override this when they own a non-plugin chat flow;
-     * Phase 4b-3 migrates those too.
+     * Default no-op for `messageCreate`. Message-driven behaviour is
+     * supplied by plugins (e.g. {@link AutoReplyPlugin}); a bot opts in
+     * via `bot.use(...)`. Subclasses override this only when they own a
+     * chat flow that is not expressed as a plugin.
      */
     public messageCreateListener = async (_message: Message): Promise<void> => {}
 
     /**
-     * Default no-op for `messageUpdate`. Phase 4b-2 moved
-     * `detectMessageUpdate` into {@link GuildEventsPlugin}.
+     * Default no-op for `messageUpdate`. Message-update handling is
+     * owned by {@link GuildEventsPlugin}.
      */
     public messageUpdateListener = async (
         _oldMessage: Message | PartialMessage,
@@ -973,8 +964,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     ): Promise<void> => {}
 
     /**
-     * Default no-op for `messageDelete`. Phase 4b-2 moved
-     * `detectMessageDelete` into {@link GuildEventsPlugin}.
+     * Default no-op for `messageDelete`. Message-delete handling is
+     * owned by {@link GuildEventsPlugin}.
      */
     public messageDeleteListener = async (_message: Message | PartialMessage): Promise<void> => {}
 
@@ -997,8 +988,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     }
 
     /**
-     * Default no-op for `guildMemberUpdate`. Phase 4b-2 moved
-     * `detectGuildMemberUpdate` into {@link GuildEventsPlugin}.
+     * Default no-op for `guildMemberUpdate`. Guild-member-update
+     * handling is owned by {@link GuildEventsPlugin}.
      */
     public guildMemberUpdateListener = async (
         _oldMember: GuildMember | PartialGuildMember,
@@ -1006,11 +997,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     ): Promise<void> => {}
 
     public guildCreateListener = async (guild: Guild): Promise<void> => {
-        // Gap D1: onboard the new guild through the typed port instead
-        // of the legacy `detectGuildCreate` free function. The port is
-        // the single onboarding implementation; the `guild-events`
-        // plugin (C8 D1) will additionally drive it from its own
-        // `guildCreate` subscription.
+        // Onboard the new guild through the typed port. The port is the
+        // single onboarding implementation; the `guild-events` plugin
+        // also drives it from its own `guildCreate` subscription.
         const port = this.container.resolve<GuildOnboardingPort>(
             TOKENS.GuildOnboardingPort,
         );

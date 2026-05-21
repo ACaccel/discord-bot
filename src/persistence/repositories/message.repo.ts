@@ -8,10 +8,9 @@
  *
  * Inputs use branded ID types from `@core/ids` so a `UserId` cannot be
  * passed where a `ChannelId` is expected. Returned `MessageDoc` carries
- * the raw stored shape; rebranding the embedded id fields is a Phase 4
- * concern when domain-doc types land alongside the plugin layer.
+ * the raw stored shape; the embedded id fields are not rebranded.
  *
- * **Error boundary (gap G-2)**: every method returns
+ * Error boundary: every method returns
  * `Result<T, DatabaseError>`. A mongoose failure is translated by the
  * shared `databaseErrorFrom` translator (`persistence/error-translator`)
  * and returned as `err(DatabaseError)` — the typed error carries a
@@ -213,9 +212,8 @@ export class MongoMessageRepo implements MessageRepo {
       );
     }
     try {
-      // The stored `timestamp` field is a String per the legacy
-      // schema; the `$toLong` projection makes the comparison
-      // numeric, matching the original handler queries.
+      // The stored `timestamp` field is a String; the `$toLong`
+      // projection makes the comparison numeric.
       const docs = await this.conn.models.Message.find({
         $expr: {
           $and: [

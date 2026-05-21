@@ -2,10 +2,9 @@
  * Translate raw mongoose / MongoDB driver errors into typed
  * {@link DatabaseError} instances.
  *
- * Lives in `persistence/` (not `core/errors`, and no longer in
- * `infra/mongo`) so that `core/` stays free of mongoose imports and
- * the seven repositories can reach the translator without an upward
- * import into `infra/mongo` (gap G-2). The translation here is pure
+ * Lives in `persistence/` so that `core/` stays free of mongoose
+ * imports and the repositories can reach the translator without an
+ * upward import into `infra/mongo`. The translation here is pure
  * string-shape inspection and carries no mongoose import itself; the
  * boundary is upheld at the type level by the layer contract.
  *
@@ -67,7 +66,7 @@ const classify = (raw: unknown): DatabaseErrorCode => {
  *
  * The key uses the i18next `namespace:key.path` convention (colon
  * separator) so the value can be handed straight to `DomainError.messageKey`
- * and resolved by the handler boundary (gap D9). Every key returned here
+ * and resolved by the handler boundary. Every key returned here
  * has a toned entry under the `db` object of `errors.json` in both
  * locales; none of these texts carry an interpolation placeholder because
  * {@link databaseErrorFrom} does not populate `messageParams`.
@@ -116,8 +115,8 @@ export const databaseErrorFrom = (raw: unknown, context: ErrorContext): Database
  * document just burns the backoff budget and ends in the same error.
  *
  * Consumed by `infra/mongo/connection-manager.ts` to drive the
- * transient-retry / persistent-disable split (gap D5). Kept here, next
- * to {@link databaseErrorFrom}, so the sub-code classification and the
+ * transient-retry / persistent-disable split. Kept here, next to
+ * {@link databaseErrorFrom}, so the sub-code classification and the
  * retry-eligibility policy stay in one module and cannot drift.
  */
 export const isTransient = (error: DatabaseError): boolean =>

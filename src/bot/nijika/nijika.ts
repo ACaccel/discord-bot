@@ -3,7 +3,6 @@ import type { Config } from '@bot';
 import { BaseBot } from '@bot';
 import {
     AutoReplyPlugin,
-    TtsReplyPlugin,
     createActivityPlugin,
     createEarthquakePlugin,
     createGiveawayPlugin,
@@ -33,20 +32,17 @@ export class Nijika extends BaseBot<NijikaConfig> {
         webhookPort: number,
     ) {
         super(client, token, mongoURI, clientId, config);
-        // help_msg is resolved from this key inside BaseBot.run() after
-        // the translator is loaded — see audit 3.4.
+        // help_msg is resolved from this key inside BaseBot.run() once
+        // the translator is loaded.
         this.helpMessageKey = 'replies:nijika.help_message';
 
-        // Phase 4b plugin registration. Audit B-2 removed the previous
-        // `interactionEventListener` override: blocked_channels now
-        // flows through the InteractionRouter via the
-        // `channelLoggingBlockedChannels` hook below, and the dispatch
-        // logic is the default `createDispatchMiddleware`. PR-G4 dropped
-        // the `rebootJobs` callback config — plugins now resolve their
-        // deps through `ctx` so the composition root no longer
-        // deep-imports `plugins/*/internal`.
+        // Plugin registration. `blocked_channels` flows through the
+        // InteractionRouter via the `channelLoggingBlockedChannels`
+        // hook below; dispatch uses the default
+        // `createDispatchMiddleware`. Plugins resolve their
+        // dependencies through `ctx`, so the composition root does not
+        // deep-import `plugins/*/internal`.
         this.use(AutoReplyPlugin);
-        this.use(TtsReplyPlugin);
         this.use(createGuildEventsPlugin({
             blockedChannels: this.config.blocked_channels,
             clientId: this.clientId,
@@ -54,9 +50,8 @@ export class Nijika extends BaseBot<NijikaConfig> {
         this.use(createGiveawayPlugin());
         this.use(createActivityPlugin());
         this.use(createVoicePlugin());
-        // Gap D2: the earthquake webhook server + per-guild broadcast
-        // is now a bot-scoped plugin. Its `start` hook owns the Express
-        // route that previously lived inline in `index.ts`.
+        // The earthquake webhook server + per-guild broadcast is a
+        // bot-scoped plugin; its `start` hook owns the Express route.
         this.use(createEarthquakePlugin({ port: webhookPort }));
     }
 

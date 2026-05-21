@@ -1,23 +1,20 @@
 /**
  * Default interaction middlewares for {@link InteractionRouter}.
  *
- * Audit B-2 wires the router as BaseBot's primary dispatch path. The
- * functions here factor the previously-inline "switch by interaction
- * type" logic and the channel-logging behaviour into the
- * Chain-of-Responsibility pattern the plan envisaged.
+ * The router is BaseBot's primary dispatch path. The functions here
+ * express the "switch by interaction type" routing and the
+ * channel-logging behaviour as Chain-of-Responsibility stages.
  *
  * Two middlewares ship today:
  *   - {@link createDispatchMiddleware} — terminal stage. Routes the
  *     interaction to the right `execute*` dispatcher based on its
- *     discriminant, mirroring what `BaseBot.interactionEventListener`
- *     used to do inline. Calls `next()` after dispatch so logging
+ *     discriminant. Calls `next()` after dispatch so logging
  *     middleware runs.
  *   - {@link createChannelLoggingMiddleware} — slash-command logging
  *     sink. Honours an optional `blockedChannels` list so a guild's
- *     noisy channels stay out of the debug feed. Was previously
- *     inlined inside `executeCommand`; lifting it into a middleware
- *     means a bot that wants different logging policy declares one
- *     instead of overriding `executeCommand`.
+ *     noisy channels stay out of the debug feed. Implemented as a
+ *     middleware so a bot that wants a different logging policy
+ *     declares one instead of overriding the command dispatcher.
  */
 import { MessageFlags } from 'discord.js';
 import type { BaseBot } from './index';
@@ -65,10 +62,10 @@ export interface ChannelLoggingMiddlewareConfig {
 
 /**
  * Emits the per-command channel log line + guild log line. Only fires
- * for slash-command / context-menu interactions because the legacy
- * implementation only logged those. `blockedChannels` (including parent
- * thread channels) suppresses the debug-channel line but never the
- * guild log — the latter is a permanent audit trail.
+ * for slash-command / context-menu interactions — other interaction
+ * types are not logged. `blockedChannels` (including parent thread
+ * channels) suppresses the debug-channel line but never the guild log
+ * — the latter is a permanent audit trail.
  */
 export const createChannelLoggingMiddleware = (
     bot: BaseBot,
@@ -77,9 +74,8 @@ export const createChannelLoggingMiddleware = (
     name: 'channel-logging',
     async run(ctx: InteractionContext, next): Promise<void> {
         // try/finally so the durable guild audit-trail entry STILL
-        // lands even if dispatch threw — reviewer-flagged BLOCK on a
-        // previous draft. Re-throw any caught error so the outer
-        // handler still surfaces it to the user.
+        // lands even if dispatch threw. Re-throw any caught error so
+        // the outer handler still surfaces it to the user.
         try {
             await next();
         } finally {

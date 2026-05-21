@@ -1,12 +1,9 @@
 /**
  * Generic handler registry / factory.
  *
- * Audit C-5: the legacy `register(handlerDir)` runtime-discovery shim
- * is gone. The codegen path (`scripts/gen-registry.ts` + each handler
- * subdirectory's `registry.generated.ts`) has been the sole live entry
- * since Phase 1; the shim survived only as a 0-caller back-compat
- * stub keeping `eslint-disable @typescript-eslint/no-var-requires`
- * alive in production code. Both are deleted now.
+ * Handlers are wired up through the codegen path: `scripts/gen-registry.ts`
+ * writes each handler subdirectory's `registry.generated.ts`, and the
+ * factory registers every entry from those statically-imported objects.
  */
 
 type HandlerConstructor<T> = new () => T;

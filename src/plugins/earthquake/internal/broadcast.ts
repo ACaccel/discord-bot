@@ -1,10 +1,7 @@
 /**
- * Earthquake-alert broadcast logic (D2).
+ * Earthquake-alert broadcast logic.
  *
- * Migrated verbatim from the legacy `src/events/earthquake.ts`
- * (`earthquake_warning`) and the inline broadcast loop that used to
- * live in `src/bot/nijika/index.ts`. Behaviour is preserved exactly:
- * for every guild that has both an `earthquake` channel and an
+ * For every guild that has both an `earthquake` channel and an
  * `earthquake` role configured, send the translated alert; per-guild
  * failures are isolated and logged with the guild id.
  */

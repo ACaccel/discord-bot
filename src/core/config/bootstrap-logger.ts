@@ -1,23 +1,18 @@
 /**
- * Bootstrap logger built from `process.env` reads.
+ * Bootstrap logger built directly from `process.env` reads.
  *
- * Audit C-4: this module replaces `src/core/logger/from-process-env.ts`.
- * It lives under `src/core/config/**` so the `no-restricted-syntax`
- * rule that bans `process.env` reads outside `core/config` does not
- * need an eslint-disable waiver. Functionally identical:
+ * Lives under `src/core/config/**` so the `no-restricted-syntax` rule
+ * that bans `process.env` reads outside `core/config` is satisfied
+ * without an eslint-disable waiver. It:
  *
  *   - reads `LOG_LEVEL` / `NODE_ENV`
  *   - validates the level against the typed allowlist
  *   - pretty-prints outside production
  *
- * Used as the lazy IoC Logger factory in `BaseBot.run()` — the
- * factory needs a Logger BEFORE `loadEnv()` runs, so a typed-Env-based
- * logger build is not possible at that point. This bootstrap is
- * intentionally permanent for that reason — the previous file's
- * `TODO(phase-4): delete this module` marker was misleading. The
- * `utils/logger.ts` shim that also relied on this bootstrap was
- * retired in PR-F2 (audit C-6) when handler callsites moved to the
- * `core/logger` helpers directly.
+ * Used as the lazy IoC Logger factory in `BaseBot.run()`: the factory
+ * needs a Logger BEFORE `loadEnv()` runs, so a typed-Env-based logger
+ * build is not possible at that point. This bootstrap exists precisely
+ * to cover that pre-env window.
  */
 import { createLogger, type Logger, type LogLevel } from '../logger/logger';
 

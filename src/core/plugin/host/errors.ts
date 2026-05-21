@@ -1,7 +1,7 @@
 /**
- * Public error types for the plugin host. Extracted from the monolithic
- * `host.ts` so the topology and lifecycle modules can import them
- * without pulling in the host class itself (audit C-8 split).
+ * Public error types for the plugin host. Kept separate from `host.ts`
+ * so the topology and lifecycle modules can import them without
+ * pulling in the host class itself.
  */
 import type { DisabledPlugin, PluginId } from '../types';
 

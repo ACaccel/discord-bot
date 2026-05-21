@@ -42,7 +42,6 @@ const msgArchive = new MsgArchive(
     env.CLIENT_ID,
     config
 );
-// Phase 4b-3: the backup loop now lives in `MessageBackupPlugin`,
-// scheduled by the host's `onReady` hook. The composition root no
-// longer needs a callback into `messageBackup(...)`.
+// The backup loop lives in `MessageBackupPlugin`, scheduled by the
+// host's `onReady` hook, so the composition root just starts the bot.
 msgArchive.run();

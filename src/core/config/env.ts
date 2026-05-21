@@ -61,14 +61,12 @@ const mongoUriSchema = z
     }
   }, 'MONGO_URI must include a non-empty host');
 
-// Optional LLM-provider API keys. Phase 6 PR 2 lifts these into the
-// typed Env so the `infra/llm` providers can resolve them through DI
-// rather than reading `process.env` directly (the `TODO(phase-6)`
-// markers in src/infra/llm/* are retired by this change). A bot that
-// does not use a given provider simply omits the key — the registry's
-// missing-key gate at `resolve(name)` time emits a
-// `MissingApiKeyError` which surfaces only when something actually
-// asks for that provider.
+// Optional LLM-provider API keys. These live in the typed Env so the
+// `infra/llm` providers resolve them through DI rather than reading
+// `process.env` directly. A bot that does not use a given provider
+// simply omits the key — the registry's missing-key gate at
+// `resolve(name)` time emits a `MissingApiKeyError` which surfaces
+// only when something actually asks for that provider.
 //
 // Treat empty / whitespace-only values as absent. Operators frequently
 // keep one .env template per repo with every provider key listed and

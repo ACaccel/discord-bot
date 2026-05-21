@@ -1,7 +1,6 @@
 /**
  * Plugin contract — types only.
  *
- * Production-grade plugin system foundation per plan §1.1.1–§1.1.4.
  * This file declares the interfaces and discriminants every plugin and
  * the {@link PluginHost} agree on. No runtime logic here — see
  * `host.ts`, `event-dispatcher.ts`, `interaction-router.ts`.
@@ -13,9 +12,8 @@
  *   - **configSchema** validates via zod at register; plugins observe
  *     a 100%-typed `config` in their hooks.
  *   - **scope** declares whether one instance serves the whole bot or
- *     one per guild. Phase 4a only supports `'bot'`; `'guild'` is a
- *     type-level placeholder until Phase 4b instantiates per-guild
- *     state.
+ *     one per guild. Only `'bot'` is supported; `'guild'` is a
+ *     type-level placeholder for future per-guild state.
  *   - **critical** marks a plugin whose failure must abort the bot.
  *     Non-critical plugin failures get logged + the plugin enters
  *     {@link DisabledPlugin} state; the rest of the bot keeps running.
@@ -55,9 +53,9 @@ export type PluginId = string;
 export type PluginVersion = string;
 
 /**
- * One plugin's dependency on another. Phase 4a does NOT enforce
- * `versionRange` — it is captured for diagnostics + future versions.
- * The host today only validates that `id` is registered.
+ * One plugin's dependency on another. `versionRange` is NOT enforced —
+ * it is captured for diagnostics and future use. The host only
+ * validates that `id` is registered.
  */
 export interface PluginDependency {
   readonly id: PluginId;
@@ -66,8 +64,8 @@ export interface PluginDependency {
 
 /**
  * `'bot'` plugins exist once per bot process; `'guild'` plugins are
- * instantiated per guild and receive a `GuildContext` (Phase 4b). The
- * 4a host throws on `'guild'` scoping until 4b lands.
+ * instantiated per guild and receive a `GuildContext`. The host
+ * currently throws on `'guild'` scoping.
  */
 export type PluginScope = 'bot' | 'guild';
 
@@ -148,12 +146,12 @@ export type ContributedRegistry = Readonly<Record<string, HandlerConstructor>>;
 /** Cron / interval-scheduled background work declared by a plugin. */
 export interface JobDescriptor {
   readonly name: string;
-  /** Cron expression OR fixed interval ms; consumer (Phase 4b) interprets. */
+  /** Cron expression OR fixed interval ms; the scheduler interprets it. */
   readonly schedule: string | { readonly everyMs: number };
   readonly run: (ctx: PluginRuntimeContext) => Promise<void>;
 }
 
-/** Plugin-owned i18n namespace (catalog merge happens in Phase 6). */
+/** Plugin-owned i18n namespace merged into the translator catalog. */
 export interface LocaleNamespace {
   readonly namespace: string;
   readonly resources: Readonly<Record<string, Readonly<Record<string, string>>>>;

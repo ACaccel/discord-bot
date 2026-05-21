@@ -1,10 +1,10 @@
 /**
  * LLM provider types and Strategy interface.
  *
- * Phase 5 relocates the LLM Strategy from `src/features/llm_chat/llm/`
- * into `src/infra/llm/` so the boundary lives in the infra layer
- * (alongside `infra/mongo/`, `infra/discord/`). `src/features/llm_chat`
- * keeps domain-level concerns: session manager, pricing, model catalog.
+ * The LLM Strategy lives in the infra layer (`src/infra/llm/`,
+ * alongside `infra/mongo/` and `infra/discord/`) because it is an SDK
+ * boundary; domain-level concerns (session manager, pricing) belong to
+ * the consuming plugin.
  *
  * Adding a new provider means: write `src/infra/llm/<name>-provider.ts`,
  * register it in {@link defaultProviderRegistry} (`src/infra/llm/registry.ts`),
