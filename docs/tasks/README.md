@@ -86,5 +86,10 @@ orchestrator 會：讀 `progress.md` → 依 §4 依賴波次派發 `component-i
   指令清單）。`yarn smoke` 需真實 Discord token，環境無 env 時記錄略過、其餘
   閘門照常強制全綠。
 - **行為等價**：重構不得改動四個 bot 的對外行為（proposal §3.2 非目標）。
+- **合併目標**：gap-remediation 的修正一律合併進整合分支
+  `refactor/architecture-overhaul`，**不得**直接進 `main`。`main` 目前處於
+  凍結狀態（保留給使用者尚未完成的修改）；待整合分支與 `main` 的所有工作
+  皆就緒後，才由使用者開啟最終 `refactor/architecture-overhaul → main` PR。
+  收斂工程的 PR base 須設為 `refactor/architecture-overhaul`。
 - 目前 `docs/`、`.claude/skills/`、新 agent 檔尚未 commit；檔案在磁碟上，新
   session 可直接讀取。是否 commit 由使用者決定。
