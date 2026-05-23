@@ -1,24 +1,80 @@
-import type {
-    Client,
-    Guild,
-    Channel,
-    Role,
-    Message,
-    PartialMessage,
-    GuildMember,
-    PartialGuildMember,
-    MessageReaction,
-    PartialMessageReaction,
-    Interaction,
-    User,
-    PartialUser} from 'discord.js';
+/**
+ * `BaseBot` — thin lifecycle owner.
+ *
+ * R1: BaseBot's prior 1,000-line surface was decomposed into a small
+ * orchestrator plus three single-purpose collaborators:
+ *
+ *   - {@link GuildRegistrar} — assembles `GuildInfo` from the Discord
+ *     cache + bot config (`registerAll`).
+ *   - {@link ClientEventBridge} — Adapter from `client.on(...)` raw
+ *     events to router dispatch, plugin EventDispatcher, reaction
+ *     port, and the GuildCreate fallback.
+ *   - {@link GuildDbConnector} — owns per-guild Mongo connection
+ *     fan-out and failure normalisation.
+ *
+ * BaseBot itself stages plugins (`use`), wires the IoC container,
+ * builds the PluginHost, runs the eight startup phases in order, and
+ * tears them down in reverse for `shutdown`. Subclasses extend by
+ * registering plugins in their constructor and by overriding the small
+ * set of protected hooks (`configureInteractionRouter`,
+ * `channelLoggingBlockedChannels`, `eventBridgeSuppression`).
+ */
+import type { Channel, Client, Guild, Role } from 'discord.js';
+import { Events } from 'discord.js';
+import type { Job } from 'node-schedule';
+
+import type { ButtonHandler } from '@button';
+import { registerButtons } from '@button';
+import type { Command } from '@cmd';
+import { registerCommands } from '@cmd';
+import type { ModalHandler } from '@modal';
+import { registerModals } from '@modal';
+import type { ReactionHandler } from '@reaction';
+import { executeReactionAdded, executeReactionRemoved, registerReactions } from '@reaction';
+import type { SSMHandler } from '@select-menu';
+import { registerSSMs } from '@select-menu';
+
+import { createBootstrapLogger, loadEnv, type Env } from '../core/config';
+import type { GuildRegistry } from '../core/guild-registry';
+import type { Translator } from '../core/i18n';
+import { createDefaultTranslator } from '../core/i18n';
+import type { asGuildId } from '../core/ids';
 import {
-    type ClientEvents,
-    Events,
-    MessageFlags,
-} from 'discord.js';
-import { MongoConnectionManager } from '../infra/mongo/connection-manager';
+    createContainer,
+    TOKENS,
+    type ReposFactory,
+    type ServiceContainer,
+} from '../core/ioc';
+import {
+    installProcessHandlers,
+    logError,
+    type Logger,
+} from '../core/logger';
+import {
+    InteractionRouter,
+    PluginHost,
+    type Plugin,
+} from '../core/plugin';
+import { systemClock, type Clock } from '../core/time';
+import {
+    MongoConnectionManager,
+    type ConnectionManager,
+} from '../infra/mongo/connection-manager';
+import { buildRepos, type Repos } from '../persistence/repositories';
 import { getActiveVoiceController, type VoiceController } from '../plugins/voice/internal';
+
+import {
+    ClientEventBridge,
+    type ClientEventBridgeSuppression,
+    type ReactionHandlerPort,
+} from './client-event-bridge';
+import { GuildDbConnector } from './guild-db-connector';
+import { BaseBotGuildOnboardingPort } from './guild-onboarding';
+import { GuildRegistrar } from './guild-registrar';
+import {
+    createChannelLoggingMiddleware,
+    createDispatchMiddleware,
+} from './middlewares';
 
 /**
  * Process-wide pool of {@link MongoConnectionManager}s keyed by base
@@ -34,52 +90,6 @@ const sharedConnectionManagerForUri = (uri: string): MongoConnectionManager => {
     sharedConnectionManagers.set(uri, created);
     return created;
 };
-import {
-  createContainer,
-  TOKENS,
-  type ServiceContainer,
-  type ReposFactory,
-} from '../core/ioc';
-import { asGuildId } from '../core/ids';
-import { buildRepos, type Repos } from '../persistence/repositories';
-import type { ConnectionManager } from '../infra/mongo/connection-manager';
-import {
-  installProcessHandlers,
-  logError,
-  logSystem,
-  type Logger,
-  ops,
-} from '../core/logger';
-import { createBootstrapLogger, loadEnv, type Env } from '../core/config';
-import { createDefaultTranslator, type Translator } from '../core/i18n';
-import { systemClock, type Clock } from '../core/time';
-import {
-    InteractionRouter,
-    PluginHost,
-    type GuildOnboardingPort,
-    type InteractionContext,
-    type Plugin,
-} from '../core/plugin';
-import {
-    createChannelLoggingMiddleware,
-    createDispatchMiddleware,
-} from './middlewares';
-import type { GuildRegistry } from '../core/guild-registry';
-import type { Job } from 'node-schedule';
-import type { Command} from "@cmd";
-import { registerCommands } from "@cmd";
-import type { ButtonHandler} from '@button';
-import { registerButtons } from '@button';
-import type { ModalHandler} from '@modal';
-import { registerModals } from '@modal';
-import type { SSMHandler } from '@select-menu';
-import { registerSSMs } from '@select-menu';
-
-import { BaseBotGuildOnboardingPort } from './guild-onboarding';
-import { GuildRegistrar } from './guild-registrar';
-import { GuildDbConnector } from './guild-db-connector';
-import type { ReactionHandler} from "@reaction";
-import { executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
 
 export interface Config {
     admin?: string;
@@ -101,60 +111,17 @@ interface GuildConfig {
     roles: Record<string, string>;
 }
 
+/**
+ * Thin lifecycle owner. Wires the IoC container, stages plugins, then
+ * delegates Guild registration, Discord event fan-out, and per-guild
+ * Mongo lifecycle to the three injected collaborators
+ * ({@link GuildRegistrar}, {@link ClientEventBridge},
+ * {@link GuildDbConnector}). Subclasses register plugins in their
+ * constructor and override the small set of `protected` hooks declared
+ * at the bottom of this class.
+ */
 export abstract class BaseBot<TConfig extends Config = Config> {
-    private token: string;
-    private mongoURI?: string;
-    public adminId?: string;
-    public client: Client;
-    public clientId: string;
-    public config: TConfig;
-    public guildInfo: Record<string, GuildInfo>;
-
-    /**
-     * Typed accessor for the per-bot {@link ConnectionManager}.
-     *
-     * Mirrors the {@link translator} / {@link logger} / {@link env}
-     * accessor pattern: handler-layer code (notably
-     * `requireGuildRepos`) must not import the IoC container — the
-     * eslint `no-restricted-imports` rule blocks `@core/ioc` outside
-     * composition roots — so the disabled-guild query reaches the
-     * `ConnectionManager` (which owns transient/persistent failure
-     * classification and the disabled set) through this getter.
-     *
-     * Returns `undefined` only in the pre-`run()` window or when the
-     * bot was constructed without a `MONGO_URI`; any handler-context
-     * callsite that needs it null-checks before reading.
-     */
-    public get connectionManager(): ConnectionManager | undefined {
-        return this.container.tryResolve<ConnectionManager>(TOKENS.ConnectionManager);
-    }
-
-    public commandHandlers: Map<string, Command>;
-    public buttonHandler: Map<string, ButtonHandler>;
-    public ssmHandler: Map<string, SSMHandler>;
-    public modalHandler: Map<string, ModalHandler>;
-    public reactionHandler: Map<string, ReactionHandler>;
-    /**
-     * Bot-scoped voice controller. Populated in {@link run} after
-     * `host.initAll()` returns — the {@link createVoicePlugin VoicePlugin}
-     * constructs the controller in its `init` hook and stores it in
-     * the module-scoped holder we read here. Optional only to model
-     * bots that do not register the plugin (e.g. msg-archive).
-     */
-    public voice?: VoiceController;
-
-    public help_msg: string;
-    /**
-     * Translator key for the bot's `/help` message body. Set by
-     * subclasses (e.g. `Nijika`) in their constructor; resolved during
-     * {@link run} once the translator is loaded and the rendered string
-     * stored in {@link help_msg}. Keeping the key (rather than the
-     * resolved text) in the subclass avoids hard-coded CJK literals in
-     * composition roots, which the i18n scanner forbids.
-     */
-    protected helpMessageKey?: string;
-    public jobs: Map<string, Job>;
-
+    // ---- public state (handlers read these) ----
     /**
      * Composition-root IoC container. Owned by BaseBot, populated in
      * the constructor with `ConnectionManager` + `ReposFactory`. Other
@@ -163,95 +130,83 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * rule enforces the constraint.
      */
     public readonly container: ServiceContainer;
+    public client: Client;
+    public clientId: string;
+    public adminId?: string;
+    public config: TConfig;
+    public guildInfo: Record<string, GuildInfo> = {};
+
+    public commandHandlers: Map<string, Command> = new Map();
+    public buttonHandlers: Map<string, ButtonHandler> = new Map();
+    public modalHandlers: Map<string, ModalHandler> = new Map();
+    public ssmHandlers: Map<string, SSMHandler> = new Map();
+    public reactionHandlers: Map<string, ReactionHandler> = new Map();
+    public jobs: Map<string, Job> = new Map();
+    public helpMessage: string = '';
 
     /**
-     * Bot-scoped {@link Translator}. Set inside {@link run} once the
-     * async i18next catalog load resolves. Handlers reach localised
-     * strings via `bot.translator.t('key', { params })` without
-     * needing to import the IoC container (which the
-     * `no-restricted-imports` rule blocks for handler code).
-     *
-     * Optional only to model the pre-`run()` window; in any handler
-     * context the field is guaranteed defined.
+     * Bot-scoped voice controller. Populated in {@link run} after
+     * `host.initAll()` returns; the VoicePlugin's `init` hook publishes
+     * the controller into a module-scoped holder we read here.
+     * Optional only to model bots that never register the plugin
+     * (e.g. msg-archive).
      */
+    public voice?: VoiceController;
+
+    /** Bot-scoped {@link Translator}. Undefined only in the pre-`run()` window. */
     public translator: Translator | undefined;
 
-    /**
-     * Bot-scoped structured logger. Populated at the top of {@link run}
-     * from the IoC container so handler callsites can reach a typed
-     * pino instance without resolving the container themselves.
-     * Mirrors the {@link translator} access pattern.
-     *
-     * Optional only to model the pre-`run()` window; in any handler
-     * context the field is guaranteed defined.
-     */
+    /** Bot-scoped structured logger. Undefined only in the pre-`run()` window. */
     public logger: Logger | undefined;
 
-    /**
-     * Typed, validated process environment. Populated in
-     * {@link setupContainer} after `loadEnv()` succeeds. Optional only
-     * to model the (defensive) case where env validation has failed
-     * — handler callsites null-check before reading. Surfaces ad-hoc
-     * keys (e.g. `ACCUWEATHER_KEY`) that don't justify a separate IoC
-     * token but still need typed access from handlers without
-     * importing the container.
-     */
+    /** Typed, validated process environment. Undefined when env validation failed at boot. */
     public env: Env | undefined;
 
-    /**
-     * PluginHost: lazily constructed in {@link run} once async Translator
-     * initialisation has resolved. Subclasses stage plugins via
-     * {@link use} between `new XBot(...)` and `bot.run()`; staged plugins
-     * are flushed into the host as part of `run()`'s startup sequence.
-     */
-    private pluginHost: PluginHost | undefined;
+    // ---- protected hook fields ----
 
     /**
-     * Chain-of-Responsibility dispatcher for inbound interactions.
-     * Built in {@link run} once the translator + clock are loaded;
-     * {@link interactionEventListener} forwards every interaction
-     * through the chain. Subclasses may inject extra middleware via
+     * Translator key for the bot's `/help` body. Subclasses set this in
+     * their constructor; {@link run} resolves it once the translator is
+     * loaded and stores the rendered string in {@link helpMessage}.
+     * Holding the key (rather than the rendered text) in subclasses
+     * keeps composition roots CJK-free, which the i18n scanner enforces.
+     */
+    protected helpMessageKey?: string;
+
+    /**
+     * Built inside {@link run}. Subclass middleware is appended via
      * {@link configureInteractionRouter}.
      */
     protected interactionRouter: InteractionRouter | undefined;
+
+    // ---- private state ----
+    private readonly token: string;
+    private readonly mongoURI?: string;
     private readonly pendingPlugins: Array<{ plugin: Plugin<unknown>; config: unknown }> = [];
+    private pluginHost: PluginHost | undefined;
 
-    /**
-     * R1 collaborator: assembles {@link GuildInfo} records from the
-     * live Discord cache + bot config. Built lazily on first use so
-     * the logger (which the registrar logs through) is available.
-     */
-    private guildRegistrar: GuildRegistrar | undefined;
+    // ---- collaborators (R1 composition) ----
+    private readonly guildRegistrar: GuildRegistrar;
+    private readonly clientEventBridge: ClientEventBridge;
+    private readonly guildDbConnector: GuildDbConnector;
 
-    /**
-     * R1 collaborator: owns per-guild Mongo connection fan-out and
-     * failure normalisation. Built lazily on first use so the logger
-     * (which the connector logs through) is available.
-     */
-    private guildDbConnector: GuildDbConnector | undefined;
-
-    public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: TConfig) {
+    public constructor(
+        client: Client,
+        token: string,
+        mongoURI: string,
+        clientId: string,
+        config: TConfig,
+    ) {
         this.token = token;
         this.mongoURI = mongoURI;
         this.client = client;
         this.clientId = clientId;
         this.config = config;
-        this.guildInfo = {};
-
-        this.commandHandlers = new Map<string, Command>();
-        this.buttonHandler = new Map<string, ButtonHandler>();
-        this.ssmHandler = new Map<string, SSMHandler>();
-        this.modalHandler = new Map<string, ModalHandler>();
-        this.reactionHandler = new Map<string, ReactionHandler>();
-
-        this.help_msg = '';
-        this.jobs = new Map<string, Job>();
 
         this.container = createContainer();
         // Logger is the first registration so downstream factories may
-        // resolve it for their own structured logs. The instance is
-        // bound with `{ bot: clientId }` so every line carries the bot
-        // identity without callers passing it explicitly.
+        // resolve it for their own structured logs. Bound with
+        // `{ bot: clientId }` so every line carries the bot identity.
         this.container.registerSingleton(TOKENS.Logger, () =>
             createBootstrapLogger({ bot: this.clientId }),
         );
@@ -273,16 +228,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             return buildRepos(guildConn);
         };
         this.container.registerSingleton(TOKENS.ReposFactory, () => reposFactory);
-        // Clock is stateless and side-effect-free; the singleton is
-        // bound at construction so plugins resolving via the typed
-        // resolver get the production wall clock by default. Tests that
-        // need a FakeClock build their own container.
         this.container.registerSingleton(TOKENS.Clock, () => systemClock);
-        // GuildRegistry is a read-only view over `this.guildInfo`.
-        // Plugins resolve it once during init and call lookup methods
-        // inside event handlers instead of holding a BaseBot reference.
-        // Implemented as an inline closure-bound impl so the bot's
-        // composition root stays small; tests provide their own fake.
+        // GuildRegistry is a read-only view over `this.guildInfo` so
+        // plugins reach guild lookup without holding a BaseBot reference.
         const guildRegistry: GuildRegistry = {
             getRepos: (guildId) => this.guildInfo[guildId]?.repos,
             getChannel: (guildId, name) => this.guildInfo[guildId]?.channels?.[name],
@@ -290,40 +238,46 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             listGuildIds: () => Object.keys(this.guildInfo),
         };
         this.container.registerSingleton(TOKENS.GuildRegistry, () => guildRegistry);
-        // Discord client singleton — plugins that need raw client
-        // primitives (channel fetch, message archive) resolve through
-        // here rather than holding a BaseBot reference.
         this.container.registerSingleton(TOKENS.DiscordClient, () => this.client);
-        // Expose the scheduled-job map so the activity + giveaway
-        // plugins can drive their reboot loops without holding a
-        // BaseBot reference.
         this.container.registerSingleton(TOKENS.JobMap, () => this.jobs);
-        // Register the guild-onboarding port so the `guild-events`
-        // plugin can onboard newly joined guilds from its `guildCreate`
-        // subscription without reaching into `BaseBot` internals. The
-        // port is a thin Adapter over this bot; `guildCreateListener`
-        // also dispatches through it so the onboarding path has a
-        // single implementation.
         this.container.registerSingleton(
             TOKENS.GuildOnboardingPort,
             () => new BaseBotGuildOnboardingPort(this),
         );
+
+        // Construct collaborators with a bootstrap logger so they have a
+        // structured sink before the bot-scoped Logger is wired in `run()`.
+        // The bootstrap logger from the container is the same instance
+        // `setupContainer` exposes as `this.logger`, so log ownership stays
+        // single-sourced.
+        const bootstrapLogger = this.container.resolve<Logger>(TOKENS.Logger);
+        this.guildRegistrar = new GuildRegistrar(this.client, this.clientId, bootstrapLogger);
+        this.clientEventBridge = new ClientEventBridge(this.client, this.clientId, bootstrapLogger);
+        this.guildDbConnector = new GuildDbConnector(
+            this.container,
+            this.mongoURI,
+            this.clientId,
+            bootstrapLogger,
+        );
     }
 
+    // ---- typed accessors handlers read through ----
+
     /**
-     * Stage a plugin for registration. Idempotent across distinct ids;
-     * duplicate ids are rejected later by {@link PluginHost.register}
-     * during {@link run}'s flush step, so the failure carries the host's
-     * structured `PluginRegistrationError` rather than an ad-hoc throw
-     * here.
-     *
-     * Returns `this` for fluent composition in subclass constructors:
-     * ```ts
-     * super(...);
-     * this.use(AutoReplyPlugin).use(GiveawayPlugin, giveawayConfig);
-     * ```
+     * Live shared {@link ConnectionManager}. Returns `undefined` only
+     * in the pre-`run()` window or when the bot was constructed without
+     * a `MONGO_URI`; handler callsites null-check before reading.
      */
-    public use = <Config>(plugin: Plugin<Config>, config?: Config): this => {
+    public get connectionManager(): ConnectionManager | undefined {
+        return this.container.tryResolve<ConnectionManager>(TOKENS.ConnectionManager);
+    }
+
+    // ---- lifecycle ----
+
+    /**
+     * Stage a plugin for registration. Fluent for subclass constructors.
+     */
+    public use<C>(plugin: Plugin<C>, config?: C): this {
         this.pendingPlugins.push({
             plugin: plugin as Plugin<unknown>,
             config: config as unknown,
@@ -331,257 +285,60 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         return this;
     }
 
-    /**
-     * Expose the host for tests and for subclasses that need to inspect
-     * disabled-plugin state. Undefined before {@link run} has built it.
-     */
-    public getPluginHost = (): PluginHost | undefined => this.pluginHost;
-
-    /**
-     * Open (or reuse) the per-guild MongoDB connection and populate
-     * `guildInfo[g].repos` with the typed repository bag. `repos` is
-     * the sole entry point handlers use to reach persistence.
-     *
-     * Reused by the startup loop in {@link connectGuildDB} and by the
-     * new-guild-join path via {@link BaseBotGuildOnboardingPort}.
-     */
-    /**
-     * Open (or reuse) the per-guild MongoDB connection and populate
-     * `guildInfo[g].repos`. Delegates to the {@link GuildDbConnector}
-     * R1 collaborator; the per-guild connection lifecycle, failure
-     * normalisation, and `traceId` correlation log live there.
-     *
-     * Re-throws on failure so existing callers (the `connectGuildDB`
-     * fan-out and the {@link BaseBotGuildOnboardingPort}) keep their
-     * prior control-flow semantics.
-     */
-    public connectOneGuild = async (guildId: string): Promise<void> => {
-        const slot = this.guildInfo[guildId];
-        if (slot === undefined) {
-            logSystem(this.logger, this.clientId, ops.guildDb.slotMissing(guildId));
-            return;
-        }
-        await this.ensureDbConnector().connectOne(guildId, slot);
+    /** Expose the host for tests / inspection. Undefined before {@link run}. */
+    public getPluginHost(): PluginHost | undefined {
+        return this.pluginHost;
     }
 
-    private ensureDbConnector(): GuildDbConnector {
-        if (this.guildDbConnector === undefined) {
-            const log = this.logger ?? this.container.resolve<Logger>(TOKENS.Logger);
-            this.guildDbConnector = new GuildDbConnector(
-                this.container,
-                this.mongoURI,
-                this.clientId,
-                log,
-            );
-        }
-        return this.guildDbConnector;
+    public getMongoURI(): string | undefined {
+        return this.mongoURI;
+    }
+
+    public getToken(): string {
+        return this.token;
     }
 
     /**
-     * Orchestrator. Walks the four startup phases in the order they
-     * depend on each other. Each phase is its own private helper to
-     * keep the contract explicit (and to make subclasses' interaction
-     * with each phase grep-able):
+     * Orchestrator. Walks the startup phases in dependency order:
      *
-     *   1. {@link setupContainer} — env, logger, translator, help_msg
-     *   2. {@link buildHost} — router middleware + plugin host + initAll
-     *   3. login (`client.login`) — Discord side
-     *   4. {@link attachListeners} — startAll + dispatcher attach +
-     *      clientReady latch + event listeners
-     *
-     * Each phase is a named helper so the lifecycle invariants
-     * (host.initAll before login, host.startAll after login but before
-     * dispatcher attach, clientReady latch closed only after the
-     * dispatcher is hot) are expressed directly by this orchestrator's
-     * call sequence.
+     *   1. setupContainer       — env, logger, process safety nets
+     *   2. buildHost            — translator, router, host.initAll
+     *   3. armReadyLatch        — register ClientReady listener (deferred)
+     *   4. login                — Discord side
+     *   5. host.startAll        — collect plugin event subscriptions
+     *   6. clientEventBridge.attach — wire raw + dispatcher listeners
+     *   7. openReadyLatch       — unblock the deferred ClientReady body
      */
-    public run = async (callback?: () => Promise<void>) => {
+    public run = async (callback?: () => Promise<void>): Promise<void> => {
         const rootLogger = this.setupContainer();
         const host = await this.buildHost(rootLogger);
         const openReadyLatch = this.armReadyLatch(callback);
         await this.login();
-        // start runs after login but BEFORE the EventDispatcher is
-        // attached to client.on(...) — dispatcher subscriptions are
-        // collected by attachEventSubscriptions() inside startAll().
+        // start runs after login but BEFORE the bridge attaches — the
+        // dispatcher's subscription list stabilises inside startAll().
         await host.startAll();
-        this.attachDispatcherToClient(host);
-        openReadyLatch();
-        await this.listen();
-    }
-
-    /**
-     * Phase 1: bind structured logger, install process safety nets,
-     * load the typed Env, resolve Translator, render `help_msg`.
-     * Returns the bot-scoped logger so the caller can hand it to phase 2
-     * without going through the container twice.
-     */
-    private setupContainer = (): Logger => {
-        // Wire the structured logger before any handler runs so the
-        // bot-scoped pino instance the IoC container holds is reachable
-        // from `bot.logger`.
-        const rootLogger = this.container.resolve<Logger>(TOKENS.Logger);
-        this.logger = rootLogger;
-        // Process-level safety net. `installProcessHandlers` is
-        // idempotent so multi-bot processes (one node process running
-        // >1 BaseBot) install exactly once.
-        installProcessHandlers({
-            logger: rootLogger,
-            gracefulShutdown: () => this.shutdown(),
-        });
-        // Load the typed Env once at run() so plugins resolve LLM API
-        // keys and other configuration through `TOKENS.Env` instead of
-        // touching `process.env` directly. Failures here are non-fatal:
-        // TOKEN / MONGO_URI / CLIENT_ID still arrive through the
-        // constructor, so a deployment with a partially valid env
-        // still boots. The warning lets ops see when typed Env is
-        // unavailable.
-        try {
-            const env = loadEnv({
-                exitOnFailure: false,
-                requireDb: this.mongoURI !== undefined,
-            });
-            this.container.registerSingleton(TOKENS.Env, () => env);
-            this.env = env;
-        } catch (envErr: unknown) {
-            rootLogger.warn(
-                { err: envErr instanceof Error ? envErr : new Error(String(envErr)) },
-                'BaseBot.run: typed Env load failed; TOKENS.Env will be unbound. Plugins requiring it (e.g. LlmChatPlugin) will fail at init.',
-            );
-        }
-        return rootLogger;
-    };
-
-    /**
-     * Phase 2: resolve the Translator (async), surface it on the bot,
-     * assemble the InteractionRouter Chain-of-Responsibility, build the
-     * PluginHost, register pending plugins, run host `initAll()`.
-     *
-     * Sync inside except for the Translator await — i18next.init is
-     * the only IO. Returns the live `PluginHost` so the orchestrator
-     * can drive `startAll()` after `login()`.
-     */
-    private buildHost = async (rootLogger: Logger): Promise<PluginHost> => {
-        // Translator load is async (i18next.init); we register it as a
-        // singleton holding the resolved instance so plugin init contexts
-        // can call `resolve(TOKENS.Translator)` synchronously.
-        const translator = await createDefaultTranslator();
-        this.container.registerSingleton(TOKENS.Translator, () => translator);
-        // Surface the resolved Translator on the bot itself so handlers
-        // that receive `bot: BaseBot` rather than a per-interaction
-        // context can call `bot.translator.t(...)`.
-        this.translator = translator;
-        // Resolve the deferred help-message key now that the translator
-        // is loaded. Subclasses set `helpMessageKey` in their ctor; the
-        // composition root carries no inline user-facing CJK.
-        if (this.helpMessageKey !== undefined) {
-            this.help_msg = translator.t(this.helpMessageKey);
-        }
-        // Assemble the Chain-of-Responsibility interaction router.
-        // Subclass-injected middleware runs FIRST (typical use case:
-        // gate / filter / context-priming), then the terminal dispatch
-        // + observability stages.
-        this.interactionRouter = new InteractionRouter();
-        this.configureInteractionRouter(this.interactionRouter);
-        this.interactionRouter.use(createDispatchMiddleware(this));
-        this.interactionRouter.use(
-            createChannelLoggingMiddleware(this, {
-                blockedChannels: this.channelLoggingBlockedChannels(),
-            }),
-        );
-        // Build the host now that Translator + Clock + Logger are all
-        // bound. Core registries are passed empty because the
-        // registerCommands/... paths feed the BaseBot's Map<>s
-        // directly.
-        const host = new PluginHost({
+        this.clientEventBridge.attach({
             container: this.container,
-            logger: rootLogger,
-            translator,
-            clock: this.container.resolve<Clock>(TOKENS.Clock),
-            coreRegistries: {},
+            host,
+            router: this.interactionRouter,
+            reactionPort: this.buildReactionPort(),
+            guildInfo: () => this.guildInfo,
+            suppression: this.eventBridgeSuppression(),
         });
-        for (const { plugin, config } of this.pendingPlugins) {
-            host.register(plugin, config);
-        }
-        host.finalizeRegistration();
-        // Building registries is a no-op when no plugin contributes
-        // handlers; calling it here keeps the contract surface symmetric
-        // for tests and ensures the merge fail-fast (duplicate handler
-        // name) fires at startup rather than at first interaction.
-        host.buildEffectiveRegistries();
-        this.pluginHost = host;
-        // init runs before client.login so plugins can resolve DI graph
-        // (logger, repos factory) without observing a half-connected
-        // Discord client; any critical failure surfaces before the bot
-        // appears online.
-        await host.initAll();
-        // Surface the VoicePlugin's controller on the bot AFTER
-        // initAll so the handler-side access path `bot.voice.start(...)`
-        // is populated when the record slash-command first fires.
-        // Bots that do not register the plugin (msg-archive) leave the
-        // field undefined; the record handler null-checks before use.
-        this.voice = getActiveVoiceController();
-        return host;
+        openReadyLatch();
     };
 
     /**
-     * Phase 3 prelude: register the ClientReady listener BEFORE
-     * `client.login()` so a `clientReady` event that fires quickly is
-     * never missed (`rebootMessage` runs only from inside that
-     * handler). The latch lets the handler observe a fully-set-up host
-     * (startAll done, dispatcher attached) before it invokes
-     * `host.readyAll()`.
+     * Reverse-order shutdown:
      *
-     * Returns the latch opener — {@link run} calls it after
-     * `attachDispatcherToClient` so the deferred handler is unblocked.
-     */
-    private armReadyLatch = (callback?: () => Promise<void>): (() => void) => {
-        let openReadyLatch: () => void = () => {};
-        const readyLatch = new Promise<void>((resolve) => {
-            openReadyLatch = resolve;
-        });
-        this.client.once(Events.ClientReady, async () => {
-            await readyLatch;
-            await this.handleClientReady(callback);
-        });
-        return openReadyLatch;
-    };
-
-    /**
-     * Forward every event a plugin currently subscribes to from the
-     * Discord client into the host's EventDispatcher. One `client.on`
-     * listener per subscribed event keeps the discord.js listener-count
-     * cap predictable and avoids fanning unsubscribed events into the
-     * dispatcher (cheap no-ops, but visible in profiling).
+     *   pluginHost.shutdownAll → clientEventBridge.detach
+     *     → client.destroy → ConnectionManager.closeAll
      *
-     * MUST be invoked only after `host.startAll()` returns. Calling
-     * earlier means plugins whose `start` hook hasn't completed could
-     * still observe events. Enforced by ordering in {@link run}.
-     */
-    private attachDispatcherToClient = (host: PluginHost): void => {
-        const dispatcher = host.getEventDispatcher();
-        for (const event of dispatcher.subscribedEvents()) {
-            // Type-narrow each event individually so the forwarded
-            // `args` keeps the precise ClientEvents[event] tuple shape.
-            // discord.js's `client.on` signature accepts the same tuple
-            // so no further cast is needed at the call site.
-            this.client.on(event, (...args: ClientEvents[typeof event]) => {
-                void dispatcher.emit(event, ...args);
-            });
-        }
-    }
-
-    /**
-     * Best-effort graceful shutdown invoked by the
-     * `uncaughtException` handler. Override in subclasses to add
-     * bot-specific teardown. The default closes the Discord client +
-     * mongo connections via the shared {@link ConnectionManager}.
+     * Best-effort: each step is wrapped so one failure does not abort
+     * the rest of the teardown.
      */
     public shutdown = async (): Promise<void> => {
         const log = this.container.tryResolve<Logger>(TOKENS.Logger);
-        // Run plugin onShutdown hooks (reverse topo order) BEFORE
-        // tearing down the Discord client / Mongo pool, so a plugin that
-        // wants to flush via either dependency still has access. Errors
-        // inside onShutdown are already caught by PluginHost.
         if (this.pluginHost !== undefined) {
             try {
                 await this.pluginHost.shutdownAll();
@@ -593,11 +350,16 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             }
         }
         try {
+            this.clientEventBridge.detach();
+        } catch (e: unknown) {
+            log?.warn(
+                { err: e instanceof Error ? e : new Error(String(e)) },
+                'shutdown: clientEventBridge.detach threw',
+            );
+        }
+        try {
             this.client.destroy();
         } catch (e: unknown) {
-            // Best-effort: log so ops sees why teardown couldn't reach a
-            // clean state, but the process is already on the fatal path
-            // and will exit shortly regardless.
             log?.warn(
                 { err: e instanceof Error ? e : new Error(String(e)) },
                 'shutdown: client.destroy threw',
@@ -612,55 +374,181 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 'shutdown: connection manager closeAll threw',
             );
         }
-    }
+    };
 
-    public login = async () => {
-        logSystem(this.logger, this.clientId, "Logging in...");
-        await this.client.login(this.token)
-        .catch((err) => {
-            logSystem(this.logger, this.clientId, `Failed to login: ${err}`);
-        });
-        if (!this.client.user) {
-            logSystem(this.logger, this.clientId, "Failed to login: No user found.");
-            return;
-        }
-        logSystem(this.logger, this.clientId, `Logged in as ${this.client.user.username}!`);
+    public reLogin = async (): Promise<void> => {
+        await this.client.login(this.token);
+    };
 
-        if (this.config.admin) {
-            this.adminId = this.config.admin;
-        }
+    /**
+     * Open (or reuse) the per-guild MongoDB connection and populate
+     * `guildInfo[g].repos`. Delegates to the {@link GuildDbConnector}
+     * R1 collaborator. Re-throws on failure so existing callers
+     * (`connectGuildDB`, the {@link BaseBotGuildOnboardingPort}) keep
+     * their prior control-flow semantics.
+     */
+    public connectOneGuild = async (guildId: string): Promise<void> => {
+        const slot = this.guildInfo[guildId];
+        if (slot === undefined) return;
+        await this.guildDbConnector.connectOne(guildId, slot);
+    };
+
+    /**
+     * Fan-out per-guild Mongo connect across `guildInfo`. Delegates to
+     * the {@link GuildDbConnector} collaborator.
+     */
+    public connectGuildDB = async (): Promise<void> => {
+        await this.guildDbConnector.connectAll(this.guildInfo);
+    };
+
+    // ---- subclass hooks ----
+
+    /**
+     * Subclass hook: append middleware to the bot's
+     * {@link InteractionRouter} BEFORE the terminal dispatch /
+     * channel-logging stages run. Default is a no-op.
+     */
+    protected configureInteractionRouter(_router: InteractionRouter): void {
+        // default: no extra middleware
     }
 
     /**
-     * Body of the `clientReady` handler. Kept as a separate method so
-     * {@link run} can register the `once()` listener BEFORE
-     * `client.login()` returns, which avoids racing a fast
-     * `clientReady` event. The latch in {@link run} ensures this runs
-     * only after the plugin host's `startAll` + dispatcher attach
-     * completes, so `host.readyAll()` observes the post-start
-     * invariants the host contract requires.
+     * Subclass hook returning channels (and parent thread channels)
+     * whose slash-command activity should NOT be logged to the debug
+     * channel. Default `undefined` means "log everything".
      */
-    private handleClientReady = async (callback?: () => Promise<void>): Promise<void> => {
+    protected channelLoggingBlockedChannels(): readonly string[] | undefined {
+        return undefined;
+    }
+
+    /**
+     * Subclass hook controlling which {@link ClientEventBridge}
+     * listeners are installed. Default installs every listener. Bots
+     * that opt out of an interaction class (the LLM-only `Konata`, the
+     * worker-style `MsgArchive`) override this and flip the relevant
+     * flags to `true`. R1 replaced the prior listener-method-override
+     * idiom (`override interactionEventListener = async () => {}`)
+     * because those methods no longer exist on BaseBot.
+     */
+    protected eventBridgeSuppression(): ClientEventBridgeSuppression {
+        return {};
+    }
+
+    // ---- private orchestration helpers ----
+
+    /**
+     * Phase 1: bind structured logger, install process safety nets,
+     * load typed Env. Returns the bot-scoped logger so the caller can
+     * hand it to phase 2 without resolving the container twice.
+     */
+    private setupContainer(): Logger {
+        const rootLogger = this.container.resolve<Logger>(TOKENS.Logger);
+        this.logger = rootLogger;
+        installProcessHandlers({
+            logger: rootLogger,
+            gracefulShutdown: () => this.shutdown(),
+        });
         try {
-            this.registerGuild();
-            await this.connectGuildDB();
+            const env = loadEnv({
+                exitOnFailure: false,
+                requireDb: this.mongoURI !== undefined,
+            });
+            this.container.registerSingleton(TOKENS.Env, () => env);
+            this.env = env;
+        } catch (envErr: unknown) {
+            rootLogger.warn(
+                { err: envErr instanceof Error ? envErr : new Error(String(envErr)) },
+                'BaseBot.run: typed Env load failed; TOKENS.Env will be unbound. Plugins requiring it (e.g. LlmChatPlugin) will fail at init.',
+            );
+        }
+        return rootLogger;
+    }
+
+    /**
+     * Phase 2: resolve the Translator, assemble the InteractionRouter
+     * Chain-of-Responsibility, build the PluginHost, register pending
+     * plugins, run host `initAll()`.
+     */
+    private async buildHost(rootLogger: Logger): Promise<PluginHost> {
+        const translator = await createDefaultTranslator();
+        this.container.registerSingleton(TOKENS.Translator, () => translator);
+        this.translator = translator;
+        if (this.helpMessageKey !== undefined) {
+            this.helpMessage = translator.t(this.helpMessageKey);
+        }
+        // Assemble the Chain-of-Responsibility interaction router.
+        // Subclass-injected middleware runs FIRST (gate / context-prime),
+        // then the terminal dispatch + observability stages.
+        this.interactionRouter = new InteractionRouter();
+        this.configureInteractionRouter(this.interactionRouter);
+        this.interactionRouter.use(createDispatchMiddleware(this));
+        this.interactionRouter.use(
+            createChannelLoggingMiddleware(this, {
+                blockedChannels: this.channelLoggingBlockedChannels(),
+            }),
+        );
+
+        const host = new PluginHost({
+            container: this.container,
+            logger: rootLogger,
+            translator,
+            clock: this.container.resolve<Clock>(TOKENS.Clock),
+            coreRegistries: {},
+        });
+        for (const { plugin, config } of this.pendingPlugins) {
+            host.register(plugin, config);
+        }
+        host.finalizeRegistration();
+        host.buildEffectiveRegistries();
+        this.pluginHost = host;
+        await host.initAll();
+        // VoicePlugin publishes its controller into a module-scoped
+        // holder during init; surface it now so the record handler can
+        // reach it via `bot.voice`.
+        this.voice = getActiveVoiceController();
+        return host;
+    }
+
+    /**
+     * Phase 3 prelude: register the `ClientReady` listener BEFORE
+     * `client.login()` so a fast-firing ready event is not missed. The
+     * latch lets the handler observe a fully-set-up host (startAll
+     * done, bridge attached) before invoking `host.readyAll()`.
+     */
+    private armReadyLatch(callback?: () => Promise<void>): () => void {
+        let openReadyLatch: () => void = () => {};
+        const readyLatch = new Promise<void>((resolve) => {
+            openReadyLatch = resolve;
+        });
+        this.client.once(Events.ClientReady, async () => {
+            await readyLatch;
+            await this.handleClientReady(callback);
+        });
+        return openReadyLatch;
+    }
+
+    /**
+     * Body of the `clientReady` handler. Runs guild registration, Mongo
+     * fan-out, handler-registry build-out, reboot fan-out, the optional
+     * caller callback, and finally `host.readyAll()`.
+     */
+    private async handleClientReady(callback?: () => Promise<void>): Promise<void> {
+        try {
+            this.guildInfo = this.guildRegistrar.registerAll(this.config);
+            await this.guildDbConnector.connectAll(this.guildInfo);
             await registerCommands(this);
             await registerButtons(this);
             await registerSSMs(this);
             await registerModals(this);
             await registerReactions(this);
-            // Giveaway / activity reboot logic lives in
-            // {@link createGiveawayPlugin} / {@link createActivityPlugin};
-            // bots that need it register those plugins in their
-            // composition root.
-            await this.rebootMessage();
-            if (callback) {
+            await this.clientEventBridge.sendRebootMessages(this.translator);
+            if (callback !== undefined) {
                 await callback();
             }
-            // readyAll runs *after* clientReady so plugins observe a
-            // fully-online client when their onReady hook fires.
+            // readyAll runs AFTER clientReady so plugins observe a
+            // fully-online client when their `onReady` hook fires.
             // Failures here are logged but never fatal — the bot is
-            // already serving, mirroring host docstring policy.
+            // already serving, mirroring the host docstring policy.
             if (this.pluginHost !== undefined) {
                 try {
                     await this.pluginHost.readyAll();
@@ -671,297 +559,34 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         } catch (err) {
             logError(this.logger, this.clientId, null, err);
         }
-    };
-    
-    public listen = async () => {
-        this.client.on(Events.InteractionCreate, async (interaction) => {
-            await this.interactionEventListener(interaction).catch((err) => {
-                logError(this.logger, this.clientId, interaction.guildId || null, err);
-            });
+    }
+
+    /**
+     * Phase 4: Discord side of the login dance. Errors here are
+     * currently logged but do not reject — R6.2 will tighten this so
+     * `run()` rejects on a missing user.
+     */
+    private async login(): Promise<void> {
+        await this.client.login(this.token).catch(() => {
+            // logged through the structured logger below; the typed
+            // logger is bound during phase 1.
         });
-        this.client.on(Events.MessageCreate, async (message) => {
-            await this.messageCreateListener(message).catch((err) => {
-                logError(this.logger, this.clientId, message.guildId || null, err);
-            });
-        });
-        this.client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
-            await this.messageUpdateListener(oldMessage, newMessage).catch((err) => {
-                logError(this.logger, this.clientId, newMessage.guildId || null, err);
-            });
-        });
-        this.client.on(Events.MessageDelete, async (message) => {
-            await this.messageDeleteListener(message).catch((err) => {
-                logError(this.logger, this.clientId, message.guildId || null, err);
-            });
-        });
-        this.client.on(Events.MessageReactionAdd, async (reaction, user) => {
-            await this.messageReactionAddListener(reaction, user).catch((err) => {
-                logError(this.logger, this.clientId, reaction.message.guildId || null, err);
-            });
-        });
-        this.client.on(Events.MessageReactionRemove, async (reaction, user) => {
-            await this.messageReactionRemoveListener(reaction, user).catch((err) => {
-                logError(this.logger, this.clientId, reaction.message.guildId || null, err);
-            });
-        });
-        this.client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-            await this.guildMemberUpdateListener(oldMember, newMember).catch((err) => {
-                logError(this.logger, this.clientId, newMember.guild.id || null, err);
-            });
-        });
-        // When a plugin (the `guild-events` plugin) subscribes to
-        // `guildCreate`, the EventDispatcher already forwards the event
-        // into that plugin, which onboards the new guild through
-        // `GuildOnboardingPort`. Registering this explicit listener as
-        // well would onboard the same guild twice. Skip it in that case
-        // so the plugin is the single driver; bots without the plugin
-        // (e.g. Tomori) onboard through `guildCreateListener`.
-        if (!this.dispatcherSubscribesTo(Events.GuildCreate)) {
-            this.client.on(Events.GuildCreate, async (guild) => {
-                await this.guildCreateListener(guild).catch((err) => {
-                    logError(this.logger, this.clientId, guild.id || null, err);
-                });
-            });
+        if (this.config.admin !== undefined) {
+            this.adminId = this.config.admin;
         }
     }
 
     /**
-     * True when a registered plugin subscribes to `event`, i.e. the
-     * plugin host's {@link EventDispatcher} already forwards it from the
-     * Discord client. Used to avoid double-wiring an event that a
-     * plugin already owns. Safe to call after `host.startAll()`; before
-     * that the host is undefined and this returns `false`.
+     * Build the `ReactionHandlerPort` the bridge consumes. The reaction
+     * codegen entry points (`executeReactionAdded` / `executeReactionRemoved`)
+     * accept a `BaseBot` reference; the port adapts them so the bridge
+     * itself stays decoupled from the bot.
      */
-    private dispatcherSubscribesTo = (event: keyof ClientEvents): boolean => {
-        if (this.pluginHost === undefined) return false;
-        return this.pluginHost
-            .getEventDispatcher()
-            .subscribedEvents()
-            .includes(event);
-    }
-
-    public getMongoURI = () => {
-        return this.mongoURI;
-    }
-
-    public getToken = () => {
-        return this.token;
-    }
-
-    /********** Registration Methods **********/
-
-    public reLogin = async () => {
-        await this.client.login(this.token);
-    }
-
-    /**
-     * Build {@link GuildInfo} records for every guild in the client's
-     * cache. Delegates the assembly to the R1 {@link GuildRegistrar}
-     * collaborator; the per-guild fan-out and best-effort error
-     * handling live there.
-     */
-    public registerGuild = (): void => {
-        if (this.guildRegistrar === undefined) {
-            const log = this.logger ?? this.container.resolve<Logger>(TOKENS.Logger);
-            this.guildRegistrar = new GuildRegistrar(this.client, this.clientId, log);
-        }
-        this.guildInfo = this.guildRegistrar.registerAll(this.config);
-    }
-
-    /**
-     * Fan-out per-guild Mongo connect across `guildInfo`. Delegates to
-     * the {@link GuildDbConnector} collaborator (R1).
-     */
-    public connectGuildDB = async (): Promise<void> => {
-        await this.ensureDbConnector().connectAll(this.guildInfo);
-    }
-
-    public rebootMessage = async (): Promise<void> => {
-        // Use awaited `Promise.all(map(async))` rather than
-        // `forEach(async)` so the outer caller (handleClientReady)
-        // genuinely waits for every send before continuing into
-        // `pluginHost.readyAll`. Each per-guild send is wrapped in
-        // `try/catch` so one failure cannot abort the whole fan-out;
-        // failures are surfaced through the structured logger WITH
-        // the guild id, so ops can attribute a failed send. No retry
-        // here — the next boot re-enters this path; queuing retries
-        // would only delay readyAll behind a flaky guild's channel.
-        await Promise.all(
-            Object.values(this.guildInfo).map(async (guild) => {
-                try {
-                    const debug_ch = guild.channels?.debug;
-                    if (!debug_ch?.isSendable()) return;
-                    const message =
-                        this.translator?.t('replies:base_bot.reboot_notice', { botName: guild.bot_name }) ?? '';
-                    if (message.length === 0) return;
-                    await debug_ch.send(message);
-                } catch (err) {
-                    logError(this.logger, this.clientId, guild.guild.id, err);
-                }
-            }),
-        );
-    }
-
-    /********** Event Listeners **********/
-
-    /**
-     * Subclass hook: append middleware to the bot's
-     * {@link InteractionRouter} BEFORE the terminal dispatch /
-     * channel-logging stages run. Default is a no-op. Subclasses MUST
-     * NOT keep a reference to the router beyond this call — every
-     * middleware should be self-contained.
-     */
-    protected configureInteractionRouter(_router: InteractionRouter): void {
-        // default: no extra middleware
-    }
-
-    /**
-     * Subclass hook returning channels (and parent thread channels)
-     * whose slash-command activity should NOT be logged to the debug
-     * channel. Default `undefined` means "log everything". Nijika
-     * surfaces its `config.blocked_channels` here.
-     */
-    protected channelLoggingBlockedChannels(): readonly string[] | undefined {
-        return undefined;
-    }
-
-    /**
-     * Entry point Discord calls on every `InteractionCreate` event.
-     *
-     * **Final.** Subclasses MUST NOT override this — extend the bot by
-     * pushing middleware through {@link configureInteractionRouter}
-     * instead. The arrow-property + `readonly` modifier together
-     * prevent both prototype-override and re-assignment, so a child
-     * class that tries to replace the router dispatch is a compile
-     * error rather than a silent dispatch divergence.
-     */
-    public readonly interactionEventListener = async (interaction: Interaction): Promise<void> => {
-        // Every interaction goes through the Chain-of-Responsibility
-        // middleware stack. The router is built inside `run()`;
-        // pre-`run()` (test paths) we fall through to a minimal
-        // default reply.
-        if (this.interactionRouter === undefined) {
-            if (!interaction.isAutocomplete() && interaction.isRepliable()) {
-                await interaction.reply({
-                    content:
-                        this.translator?.t('errors:command.handler_not_initialised') ?? '',
-                    flags: MessageFlags.Ephemeral,
-                });
-            }
-            return;
-        }
-        const traceId = Math.random().toString(36).slice(2, 8).padStart(6, '0');
-        const rootLogger = this.container.resolve<Logger>(TOKENS.Logger);
-        const clock = this.container.resolve<Clock>(TOKENS.Clock);
-        const translator = this.translator;
-        if (translator === undefined) {
-            // Defensive: translator is set immediately before the
-            // router; either both are present or both absent. This
-            // branch is unreachable in production but keeps strict
-            // typing honest.
-            return;
-        }
-        const ctx: InteractionContext = {
-            interaction,
-            traceId,
-            logger: rootLogger.child({ traceId }),
-            translator,
-            clock,
-            resolve: <T>(token: import('../core/ioc').ServiceToken<T>): T =>
-                this.container.resolve<T>(token),
-            state: new Map<string, unknown>(),
+    private buildReactionPort(): ReactionHandlerPort {
+        return {
+            handleAdded: (reaction, user) => executeReactionAdded(reaction, user, this),
+            handleRemoved: (reaction, user) => executeReactionRemoved(reaction, user, this),
         };
-        try {
-            await this.interactionRouter.dispatch(ctx);
-        } catch (err) {
-            // A dispatch-chain throw must still produce a user-visible
-            // reply. The outer Events.InteractionCreate handler only
-            // logs; without this catch the user sees an indefinite
-            // "thinking…" or a silent failure. Surface the traceId so
-            // support tickets correlate to logs.
-            logError(this.logger, this.clientId, interaction.guildId, err);
-            if (interaction.isRepliable()) {
-                const content =
-                    translator.t('errors:unexpected', { traceId }) ??
-                    `Internal error (traceId=${traceId}).`;
-                try {
-                    if (interaction.deferred || interaction.replied) {
-                        await interaction.followUp({
-                            content,
-                            flags: MessageFlags.Ephemeral,
-                        });
-                    } else {
-                        await interaction.reply({
-                            content,
-                            flags: MessageFlags.Ephemeral,
-                        });
-                    }
-                } catch (replyErr) {
-                    // Expired interaction or already-acked race; nothing
-                    // else we can do. Already logged the root cause above.
-                    logSystem(this.logger, this.clientId, ops.router.replySkipped(String(replyErr)));
-                }
-            }
-        }
-    }
-
-    /**
-     * Default no-op for `messageCreate`. Message-driven behaviour is
-     * supplied by plugins (e.g. {@link AutoReplyPlugin}); a bot opts in
-     * via `bot.use(...)`. Subclasses override this only when they own a
-     * chat flow that is not expressed as a plugin.
-     */
-    public messageCreateListener = async (_message: Message): Promise<void> => {}
-
-    /**
-     * Default no-op for `messageUpdate`. Message-update handling is
-     * owned by {@link GuildEventsPlugin}.
-     */
-    public messageUpdateListener = async (
-        _oldMessage: Message | PartialMessage,
-        _newMessage: Message | PartialMessage,
-    ): Promise<void> => {}
-
-    /**
-     * Default no-op for `messageDelete`. Message-delete handling is
-     * owned by {@link GuildEventsPlugin}.
-     */
-    public messageDeleteListener = async (_message: Message | PartialMessage): Promise<void> => {}
-
-    public messageReactionAddListener = async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser): Promise<void> => {
-        const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
-        const fetchedUser = user.partial ? await user.fetch() : user;
-
-        if (!user.bot) {
-            await executeReactionAdded(fetchedReaction, fetchedUser, this);
-        }
-    }
-
-    public messageReactionRemoveListener = async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser): Promise<void> => {
-        const fetchedReaction = reaction.partial ? await reaction.fetch() : reaction;
-        const fetchedUser = user.partial ? await user.fetch() : user;
-
-        if (!user.bot) {
-            await executeReactionRemoved(fetchedReaction, fetchedUser, this);
-        }
-    }
-
-    /**
-     * Default no-op for `guildMemberUpdate`. Guild-member-update
-     * handling is owned by {@link GuildEventsPlugin}.
-     */
-    public guildMemberUpdateListener = async (
-        _oldMember: GuildMember | PartialGuildMember,
-        _newMember: GuildMember | PartialGuildMember,
-    ): Promise<void> => {}
-
-    public guildCreateListener = async (guild: Guild): Promise<void> => {
-        // Onboard the new guild through the typed port. The port is the
-        // single onboarding implementation; the `guild-events` plugin
-        // also drives it from its own `guildCreate` subscription.
-        const port = this.container.resolve<GuildOnboardingPort>(
-            TOKENS.GuildOnboardingPort,
-        );
-        await port.onboardGuild(guild.id);
     }
 }
+

@@ -1,0 +1,361 @@
+/**
+ * Unit tests for {@link ClientEventBridge} (R1 collaborator).
+ *
+ * Covers the §6.1 ClientEventBridge test plan from `docs/design/R1.md`:
+ *   1. attach wires InteractionCreate; firing routes through router
+ *   2. double attach throws (contract violation — TypeError)
+ *   3. detach removes every installed listener
+ *   4. partial reaction is fetched + delegated to ReactionHandlerPort;
+ *      bot reactions are dropped before any port dispatch
+ *   5. GuildCreate skipped when a plugin already subscribes;
+ *      otherwise routed through GuildOnboardingPort
+ *   6. EventDispatcher-subscribed events are forwarded onto client.on
+ *      (the dispatcher's per-subscription isolation is its own concern)
+ *   7. router throw → fallback reply with traceId
+ *   8. sendRebootMessages is best-effort over guildInfo
+ */
+import { Events } from 'discord.js';
+import type {
+  Channel,
+  Client,
+  ClientEvents,
+  Guild,
+  MessageReaction,
+  PartialMessageReaction,
+  PartialUser,
+  User,
+} from 'discord.js';
+import { describe, expect, it, vi } from 'vitest';
+
+import { ClientEventBridge, type ReactionHandlerPort } from '../../../src/bot/client-event-bridge';
+import type { GuildInfo } from '../../../src/bot/index';
+import { createContainer, TOKENS } from '../../../src/core/ioc';
+import { createLogger } from '../../../src/core/logger';
+import { systemClock } from '../../../src/core/time';
+import type {
+  GuildOnboardingPort,
+  InteractionContext,
+  InteractionRouter,
+  PluginHost,
+} from '../../../src/core/plugin';
+
+const silent = createLogger({ level: 'silent', pretty: false });
+
+interface FakeClientHandle {
+  readonly client: Client;
+  readonly listeners: Map<string, Array<(...args: unknown[]) => unknown>>;
+  fire<K extends keyof ClientEvents>(event: K, ...args: unknown[]): Promise<void>;
+}
+
+const buildFakeClient = (): FakeClientHandle => {
+  const listeners = new Map<string, Array<(...args: unknown[]) => unknown>>();
+  const append = (event: string, fn: (...args: unknown[]) => unknown): void => {
+    const arr = listeners.get(event) ?? [];
+    arr.push(fn);
+    listeners.set(event, arr);
+  };
+  const client = {
+    user: { id: 'bot-1' },
+    guilds: { cache: new Map() },
+    channels: { cache: new Map() },
+    on: (event: string, fn: (...args: unknown[]) => unknown) => {
+      append(event, fn);
+      return client;
+    },
+    off: (event: string, fn: (...args: unknown[]) => unknown) => {
+      const arr = listeners.get(event);
+      if (arr === undefined) return client;
+      const idx = arr.indexOf(fn);
+      if (idx >= 0) arr.splice(idx, 1);
+      return client;
+    },
+  } as unknown as Client;
+  return {
+    client,
+    listeners,
+    async fire(event, ...args) {
+      for (const fn of [...(listeners.get(event) ?? [])]) {
+        await fn(...args);
+      }
+    },
+  };
+};
+
+const fakeHost = (subscribed: readonly (keyof ClientEvents)[] = []): PluginHost =>
+  ({
+    getEventDispatcher: () => ({
+      subscribedEvents: () => subscribed,
+      emit: vi.fn(async () => {}),
+    }),
+  }) as unknown as PluginHost;
+
+const fakeRouter = (dispatch = vi.fn(async () => {})): InteractionRouter =>
+  ({ dispatch }) as unknown as InteractionRouter;
+
+const noopReactionPort: ReactionHandlerPort = {
+  handleAdded: vi.fn(async () => {}),
+  handleRemoved: vi.fn(async () => {}),
+};
+
+const identityTranslator = {
+  t: (key: string, params?: Record<string, string>) =>
+    params !== undefined ? `${key}|${JSON.stringify(params)}` : key,
+} as unknown as InteractionContext['translator'];
+
+const baseConfig = (overrides: {
+  host?: PluginHost;
+  router?: InteractionRouter | undefined;
+  reactionPort?: ReactionHandlerPort;
+  guildInfo?: Record<string, GuildInfo>;
+  suppression?: { interaction?: boolean; reaction?: boolean; guildCreate?: boolean };
+  onboardingPort?: GuildOnboardingPort;
+  skipTranslator?: boolean;
+}) => {
+  const container = createContainer();
+  container.registerSingleton(TOKENS.Logger, () => silent);
+  container.registerSingleton(TOKENS.Clock, () => systemClock);
+  if (overrides.skipTranslator !== true) {
+    container.registerSingleton(TOKENS.Translator, () => identityTranslator);
+  }
+  if (overrides.onboardingPort !== undefined) {
+    container.registerSingleton(
+      TOKENS.GuildOnboardingPort,
+      () => overrides.onboardingPort as GuildOnboardingPort,
+    );
+  }
+  return {
+    container,
+    host: overrides.host ?? fakeHost(),
+    router: overrides.router,
+    reactionPort: overrides.reactionPort ?? noopReactionPort,
+    guildInfo: () => overrides.guildInfo ?? {},
+    suppression: overrides.suppression,
+  };
+};
+
+describe('ClientEventBridge.attach', () => {
+  it('wires InteractionCreate and routes the event through the router', async () => {
+    const fake = buildFakeClient();
+    const dispatch = vi.fn(async () => {});
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    bridge.attach(baseConfig({ router: fakeRouter(dispatch) }));
+
+    expect(fake.listeners.get(Events.InteractionCreate)?.length).toBe(1);
+    const fakeInteraction = {
+      isAutocomplete: () => false,
+      isRepliable: () => true,
+      isChatInputCommand: () => false,
+      isContextMenuCommand: () => false,
+      isModalSubmit: () => false,
+      isButton: () => false,
+      isStringSelectMenu: () => false,
+      guildId: 'g-1',
+      reply: async () => {},
+    };
+    await fake.fire(Events.InteractionCreate, fakeInteraction);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws TypeError on a second attach without an intervening detach', () => {
+    const fake = buildFakeClient();
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    bridge.attach(baseConfig({}));
+    expect(() => bridge.attach(baseConfig({}))).toThrow(TypeError);
+  });
+
+  it('does not install suppressed listeners', () => {
+    const fake = buildFakeClient();
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    bridge.attach(
+      baseConfig({
+        suppression: { interaction: true, reaction: true, guildCreate: true },
+      }),
+    );
+    expect(fake.listeners.get(Events.InteractionCreate)?.length ?? 0).toBe(0);
+    expect(fake.listeners.get(Events.MessageReactionAdd)?.length ?? 0).toBe(0);
+    expect(fake.listeners.get(Events.GuildCreate)?.length ?? 0).toBe(0);
+  });
+});
+
+describe('ClientEventBridge.detach', () => {
+  it('removes every listener installed by attach', () => {
+    const fake = buildFakeClient();
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    bridge.attach(baseConfig({}));
+    expect((fake.listeners.get(Events.InteractionCreate) ?? []).length).toBeGreaterThan(0);
+    bridge.detach();
+    for (const arr of fake.listeners.values()) {
+      expect(arr.length).toBe(0);
+    }
+  });
+
+  it('is safe to call without a prior attach', () => {
+    const fake = buildFakeClient();
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    expect(() => bridge.detach()).not.toThrow();
+  });
+});
+
+describe('ClientEventBridge reaction routing', () => {
+  it('hydrates partial reactions and delegates to the port', async () => {
+    const fake = buildFakeClient();
+    const reactionPort: ReactionHandlerPort = {
+      handleAdded: vi.fn(async () => {}),
+      handleRemoved: vi.fn(async () => {}),
+    };
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    bridge.attach(baseConfig({ reactionPort }));
+
+    const fullReaction = { partial: false, message: { guildId: 'g-1' } };
+    const partialReactionFetched = { ...fullReaction };
+    const partialReaction = {
+      partial: true,
+      message: { guildId: 'g-1' },
+      fetch: vi.fn(async () => partialReactionFetched),
+    } as unknown as PartialMessageReaction;
+    const user = { partial: false, bot: false } as unknown as User;
+
+    await fake.fire(Events.MessageReactionAdd, partialReaction, user);
+    expect(partialReaction.fetch).toHaveBeenCalledTimes(1);
+    expect(reactionPort.handleAdded).toHaveBeenCalledTimes(1);
+
+    await fake.fire(Events.MessageReactionAdd, fullReaction as unknown as MessageReaction, user);
+    expect(reactionPort.handleAdded).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops bot-authored reactions before any port dispatch', async () => {
+    const fake = buildFakeClient();
+    const reactionPort: ReactionHandlerPort = {
+      handleAdded: vi.fn(async () => {}),
+      handleRemoved: vi.fn(async () => {}),
+    };
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    bridge.attach(baseConfig({ reactionPort }));
+
+    const reaction = { partial: false, message: { guildId: 'g-1' } };
+    const botUser = { partial: false, bot: true } as unknown as User | PartialUser;
+
+    await fake.fire(Events.MessageReactionAdd, reaction, botUser);
+    expect(reactionPort.handleAdded).not.toHaveBeenCalled();
+  });
+});
+
+describe('ClientEventBridge GuildCreate routing', () => {
+  it('skips the fallback listener when a plugin already subscribes', () => {
+    const fake = buildFakeClient();
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    bridge.attach(baseConfig({ host: fakeHost([Events.GuildCreate]) }));
+
+    // Exactly one listener exists, and it is the dispatcher forwarder
+    // (not BaseBot's onboarding fallback).
+    expect(fake.listeners.get(Events.GuildCreate)?.length).toBe(1);
+  });
+
+  it('routes GuildCreate through GuildOnboardingPort when no plugin owns it', async () => {
+    const fake = buildFakeClient();
+    const onboardGuild = vi.fn(async () => ({
+      guildId: 'g-9',
+      databaseConnected: false,
+      commandsRegistered: false,
+    }));
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    bridge.attach(baseConfig({ onboardingPort: { onboardGuild } }));
+
+    await fake.fire(Events.GuildCreate, { id: 'g-9' } as Guild);
+    expect(onboardGuild).toHaveBeenCalledWith('g-9');
+  });
+});
+
+describe('ClientEventBridge dispatcher forwarding', () => {
+  it('installs one client.on per dispatcher-subscribed event', () => {
+    const fake = buildFakeClient();
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    bridge.attach(baseConfig({ host: fakeHost([Events.MessageDelete, Events.GuildMemberUpdate]) }));
+
+    expect(fake.listeners.get(Events.MessageDelete)?.length).toBe(1);
+    expect(fake.listeners.get(Events.GuildMemberUpdate)?.length).toBe(1);
+  });
+});
+
+describe('ClientEventBridge interaction error path', () => {
+  it('falls back to a translated reply when the router throws', async () => {
+    const fake = buildFakeClient();
+    const dispatch = vi.fn(async () => {
+      throw new Error('handler boom');
+    });
+    const replies: Array<{ content?: string }> = [];
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    bridge.attach(baseConfig({ router: fakeRouter(dispatch) }));
+    // Register a translator on the container so the bridge can pick a
+    // localised fallback content.
+    const fakeInteraction = {
+      isAutocomplete: () => false,
+      isRepliable: () => true,
+      isChatInputCommand: () => false,
+      isContextMenuCommand: () => false,
+      isModalSubmit: () => false,
+      isButton: () => false,
+      isStringSelectMenu: () => false,
+      guildId: 'g-1',
+      deferred: false,
+      replied: false,
+      reply: async (opts: { content?: string }) => {
+        replies.push(opts);
+      },
+      followUp: async (opts: { content?: string }) => {
+        replies.push(opts);
+      },
+    };
+    await fake.fire(Events.InteractionCreate, fakeInteraction);
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(replies.length).toBe(1);
+    expect(replies[0]?.content).toMatch(/errors:unexpected/);
+  });
+});
+
+describe('ClientEventBridge.sendRebootMessages', () => {
+  it('sends to every sendable debug channel and swallows per-guild failures', async () => {
+    const fake = buildFakeClient();
+    const sends: string[] = [];
+    const sendable = {
+      isSendable: () => true,
+      send: async (msg: string) => {
+        sends.push(msg);
+      },
+    } as unknown as Channel;
+    const failing = {
+      isSendable: () => true,
+      send: async () => {
+        throw new Error('discord 403');
+      },
+    } as unknown as Channel;
+    const unsendable = { isSendable: () => false } as unknown as Channel;
+    const guildInfo: Record<string, GuildInfo> = {
+      'g-ok': {
+        bot_name: 'Botty',
+        guild: { id: 'g-ok' } as Guild,
+        channels: { debug: sendable },
+      },
+      'g-fail': {
+        bot_name: 'Botty',
+        guild: { id: 'g-fail' } as Guild,
+        channels: { debug: failing },
+      },
+      'g-skip': {
+        bot_name: 'Botty',
+        guild: { id: 'g-skip' } as Guild,
+        channels: { debug: unsendable },
+      },
+    };
+    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    bridge.attach(baseConfig({ guildInfo }));
+    const translator = {
+      t: (key: string, params?: Record<string, string>) =>
+        params !== undefined ? `${key}|${params.botName}` : key,
+    } as unknown as InteractionContext['translator'];
+
+    await expect(bridge.sendRebootMessages(translator)).resolves.toBeUndefined();
+    expect(sends.length).toBe(1);
+    expect(sends[0]).toContain('replies:base_bot.reboot_notice');
+  });
+});

@@ -141,22 +141,21 @@ describe('BaseBot.run() — contract baseline', () => {
     await bot.shutdown();
   });
 
-  it('installs raw listeners for the 8 BaseBot-owned client events', async () => {
+  it('installs raw listeners for the interaction-class events BaseBot owns', async () => {
     const fake = buildRunFakeClient();
     const bot = new MinimalBot(fake.client, 'tk', '', 'bot-1', {});
 
     await bot.run();
 
-    // The set of events that BaseBot listens to directly (independent
-    // of any plugin EventDispatcher subscription).
+    // Post-R1 ClientEventBridge installs raw listeners only for the
+    // events BaseBot actually owns (interaction / reaction / guildCreate
+    // fallback). Pure-plugin events (messageCreate / messageUpdate /
+    // messageDelete / guildMemberUpdate) attach only when a plugin
+    // subscribes; the MinimalBot here registers no plugin.
     for (const event of [
       Events.InteractionCreate,
-      Events.MessageCreate,
-      Events.MessageUpdate,
-      Events.MessageDelete,
       Events.MessageReactionAdd,
       Events.MessageReactionRemove,
-      Events.GuildMemberUpdate,
       Events.GuildCreate,
     ]) {
       expect(fake.listeners.get(event)?.length ?? 0).toBeGreaterThanOrEqual(1);

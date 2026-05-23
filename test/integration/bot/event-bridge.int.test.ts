@@ -87,13 +87,13 @@ describe('BaseBot raw client.on listeners — contract baseline', () => {
     const bot = new MinimalBot(fake.client, 'tk', '', 'bot-1', {});
     await bot.run();
 
-    const dispatch = vi.fn(async () => {});
-    // Patch in a router so the dispatch path is observable. Cast
-    // through `unknown` to reach the protected field without
-    // widening the public surface.
-    (bot as unknown as { interactionRouter: { dispatch: typeof dispatch } }).interactionRouter = {
-      dispatch,
-    };
+    // Spy on the live router the bridge captured during attach so the
+    // assertion reflects the production dispatch path rather than a
+    // post-hoc property swap.
+    const router = (
+      bot as unknown as { interactionRouter: { dispatch: (ctx: unknown) => Promise<void> } }
+    ).interactionRouter;
+    const dispatchSpy = vi.spyOn(router, 'dispatch').mockResolvedValue(undefined);
 
     const fakeInteraction = {
       isAutocomplete: () => false,
@@ -107,7 +107,7 @@ describe('BaseBot raw client.on listeners — contract baseline', () => {
       reply: async () => {},
     };
     await fake.fire(Events.InteractionCreate, fakeInteraction);
-    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatchSpy).toHaveBeenCalledTimes(1);
   });
 
   it('ignores bot-authored reactions for MessageReactionAdd', async () => {
@@ -145,18 +145,21 @@ describe('BaseBot raw client.on listeners — contract baseline', () => {
     expect(onboardSpy).toHaveBeenCalledWith('g-9');
   });
 
-  it('messageCreate / messageUpdate / messageDelete / guildMemberUpdate default to no-op', async () => {
+  it('does not install raw listeners for pure-plugin events when no plugin subscribes', async () => {
     const fake = buildBridgeFakeClient();
     const bot = new MinimalBot(fake.client, 'tk', '', 'bot-1', {});
     await bot.run();
 
-    await expect(fake.fire(Events.MessageCreate, { guildId: 'g-1' })).resolves.toBeUndefined();
-    await expect(
-      fake.fire(Events.MessageUpdate, { guildId: 'g-1' }, { guildId: 'g-1' }),
-    ).resolves.toBeUndefined();
-    await expect(fake.fire(Events.MessageDelete, { guildId: 'g-1' })).resolves.toBeUndefined();
-    await expect(
-      fake.fire(Events.GuildMemberUpdate, { guild: { id: 'g-1' } }, { guild: { id: 'g-1' } }),
-    ).resolves.toBeUndefined();
+    // Post-R1: messageCreate / messageUpdate / messageDelete /
+    // guildMemberUpdate are EventDispatcher-driven. The bridge only
+    // attaches them when a plugin subscribes; this MinimalBot has none.
+    for (const event of [
+      Events.MessageCreate,
+      Events.MessageUpdate,
+      Events.MessageDelete,
+      Events.GuildMemberUpdate,
+    ]) {
+      expect(fake.listeners.get(event)?.length ?? 0).toBe(0);
+    }
   });
 });

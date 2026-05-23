@@ -20,23 +20,23 @@ export const registerButtons = async (bot: BaseBot) => {
     try {
         // todo: whether to specify handlers for each bot
         // import all button handlers
-        bot.buttonHandler = createAllButtonHandlers();
+        bot.buttonHandlers = createAllButtonHandlers();
 
-        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.buttonHandler.size} button handlers.`)
+        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.buttonHandlers.size} button handlers.`)
     } catch (err) {
         logSystem(bot.logger, bot.clientId, `Failed to register button handlers: ${err}`);
     }
 }
 
 export const executeButton = async (interaction: ButtonInteraction, bot: BaseBot) => {
-    if (!bot.buttonHandler) {
+    if (!bot.buttonHandlers) {
         await replyTranslated(interaction, bot.translator, 'errors:command.handler_not_initialised');
         return;
     }
 
     // customId format: <button_type>|<button_value>
     const button_type = interaction.customId.split('|')[0] ?? '';
-    const handler = bot.buttonHandler.get(button_type);
+    const handler = bot.buttonHandlers.get(button_type);
     if (handler) {
         await handler.execute(interaction, bot);
     }

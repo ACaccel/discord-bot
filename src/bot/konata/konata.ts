@@ -1,7 +1,9 @@
-import type { Client} from 'discord.js';
+import type { Client } from 'discord.js';
 import { ActivityType, Events } from 'discord.js';
+
 import type { Config } from '@bot';
 import { BaseBot } from '@bot';
+import type { ClientEventBridgeSuppression } from '../client-event-bridge';
 import { createLlmChatPlugin } from '@plugins';
 
 /**
@@ -10,14 +12,9 @@ import { createLlmChatPlugin } from '@plugins';
  * {@link createLlmChatPlugin}; this class registers that plugin and a
  * Discord presence.
  *
- * Listener override policy: Konata is a pure LLM-chat bot. It must
- * NOT log reactions or run guild-create initialisation — both are
- * non-chat sinks. The message-event listeners (messageCreate /
- * messageUpdate / messageDelete / guildMemberUpdate) already default
- * to no-op on BaseBot, so they need no override here; the three
- * overrides below silence the listeners BaseBot still wires
- * (reactionAdd/Remove → executeReaction*, guildCreate →
- * GuildOnboardingPort), which Konata does not want.
+ * Listener policy: Konata is a pure LLM-chat bot. It opts out of the
+ * reaction and guildCreate raw listeners through the R1
+ * `eventBridgeSuppression` hook so the bridge does not install them.
  */
 export class Konata extends BaseBot<Config> {
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: Config) {
@@ -26,11 +23,9 @@ export class Konata extends BaseBot<Config> {
         this.registerPresence();
     }
 
-    // Suppress the non-chat listeners BaseBot wires. See the class
-    // docstring for the rationale.
-    public override messageReactionAddListener = async (): Promise<void> => {};
-    public override messageReactionRemoveListener = async (): Promise<void> => {};
-    public override guildCreateListener = async (): Promise<void> => {};
+    protected override eventBridgeSuppression(): ClientEventBridgeSuppression {
+        return { reaction: true, guildCreate: true };
+    }
 
     /**
      * Without an explicit presence, Discord clients tend to render an idle bot
