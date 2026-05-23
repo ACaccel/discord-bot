@@ -27,6 +27,12 @@ D3 已落地：`src/events/` 目錄已由 C8 刪除，CJK scanner（`test/i18n/n
 
 ## 近期變更
 
+- 2026-05-24 — R4：`eslint.config.mjs` 新增 `src/handlers/**/*.ts` 的
+  `max-lines` block（max 150、`skipBlankLines: false`、`skipComments: false`、
+  違規 error）。`ignores` 顯式列入 `registry.generated.ts` 與三個框架/共用檔
+  （`command.ts` / `discord-helpers.ts` / `reply-for-error.ts`）並附 inline
+  comment 註明為 PR follow-up。CI lint 對 4 個示範 handler 由 red → green
+  (tech-debt R4)
 - 2026-05-24 — R3：`eslint.config.mjs` 新增 `src/plugins/**` 的
   `no-restricted-imports` block，禁止直接 import `core/ioc`；新增
   `test/unit/eslint/plugin-ioc-import-rule.test.ts` 程式化 ESLint

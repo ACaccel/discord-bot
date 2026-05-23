@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-05-24 — R4：過長 handler 拆分 + 150 行規範 + ESLint enforce
+
+- **元件**：C6 Handlers、C10 Quality Gates
+- **缺口**：tech-debt R4
+- **變更**：
+  - C10 — `eslint.config.mjs` 新增獨立 `src/handlers/**/*.ts` block，套用
+    `max-lines: ['error', { max: 150, skipBlankLines: false, skipComments: false }]`。
+    `ignores` 顯式列入 `registry.generated.ts` 與三個框架/共用檔
+    （`command.ts` / `discord-helpers.ts` / `reply-for-error.ts`），各筆均
+    附 inline comment 說明為 PR follow-up；頂層 `**/*.generated.ts`
+    ignore 不變。
+  - C6 — 4 個示範 handler 拆出 pure helper 至同目錄 sibling 檔：
+    - `db_list_message`(320→135 行) + 7 個 helper
+      (`parse-range.ts` / `render-reactions.ts` / `sanitize-mentions.ts` /
+      `chunk-output.ts` / `format-message-lines.ts` /
+      `build-archive-attachment.ts` / `resolve-display-name.ts`)。
+      `parseStartEnd` 加上 calendar range guard（month 1-12 / day 1-31），
+      合法輸入行為等價。
+    - `inspect_member_ids`(172→89 行) + 3 個 helper
+      (`parse-ids.ts` / `format-helpers.ts` / `format-member-fields.ts`)。
+    - `emoji_frequency`(158→121 行) + 4 個 helper
+      (`clamp-options.ts` / `aggregate-emoji-counts.ts` / `rank-emoji.ts` /
+      `format-leaderboard.ts`)。
+    - `ai_settings`(161→68 行) + 3 個 helper
+      (`provider-choices.ts` / `validate-ai-settings.ts` /
+      `build-settings-modal.ts`)。`checkAiSettingsReady` 改回傳
+      tagged union 讓 handler 可單分支挑 i18n key。
+      每個 helper 一支 unit test 於 `test/unit/handlers/<name>/`(共 17
+      helper + 17 unit test 檔)。`index.ts` 僅保留 Discord I/O + 權限 +
+      Translator 呼叫 + 回覆組裝。
+  - 規範文字 — CLAUDE.md、CONTRIBUTING.md、
+    `.claude/skills/project-conventions/SKILL.md`、
+    `.claude/skills/coding-standards/SKILL.md` 四份文件以**完全相同**
+    的繁體中文 5 點段落（「Handler 行數規範」）寫入規則（md5sum 一致）。
+- **影響**：純 internal refactor，無 Discord 指令簽名、無 i18n key、
+  無對外行為變更（`parseStartEnd` 對非法 calendar 之收斂屬於 defensive
+  validation）。CI lint 對 4 個示範 handler 由 red → green；既有 511 →
+  546 個 test 全綠（+35 unit test）。
+
+---
+
 ## 2026-05-24 — R3：plugins ↔ core/ioc 契約對齊
 
 - **元件**：C2 IoC Container、C3 Plugin Runtime、C8 Plugins、C10 Quality Gates
