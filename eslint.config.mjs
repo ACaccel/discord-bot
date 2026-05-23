@@ -125,8 +125,7 @@ export default tseslint.config(
           patterns: [
             {
               group: ['**/core/ioc', '**/core/ioc/*', '@core/ioc', '@core/ioc/*'],
-              message:
-                'Plugins must import TOKENS / ServiceToken from core/plugin, not core/ioc.',
+              message: 'Plugins must import TOKENS / ServiceToken from core/plugin, not core/ioc.',
             },
           ],
         },

@@ -26,7 +26,9 @@ const createLinter = (): ESLint =>
 describe('R3 — plugins-cannot-import-core-ioc ESLint rule', () => {
   it('flags a core/ioc import from inside src/plugins/**', async () => {
     const eslint = createLinter();
-    const [result] = await eslint.lintText(BAD_SOURCE, { filePath: FIXTURE_PATH });
+    const results = await eslint.lintText(BAD_SOURCE, { filePath: FIXTURE_PATH });
+    const result = results[0];
+    if (!result) throw new Error('ESLint returned no result for the bad fixture');
 
     const restrictedImportMessages = result.messages.filter((m) => m.ruleId === RULE_ID);
     expect(restrictedImportMessages.length).toBeGreaterThan(0);
@@ -38,7 +40,9 @@ describe('R3 — plugins-cannot-import-core-ioc ESLint rule', () => {
 
   it('accepts the same TOKENS import when routed via core/plugin', async () => {
     const eslint = createLinter();
-    const [result] = await eslint.lintText(GOOD_SOURCE, { filePath: FIXTURE_PATH });
+    const results = await eslint.lintText(GOOD_SOURCE, { filePath: FIXTURE_PATH });
+    const result = results[0];
+    if (!result) throw new Error('ESLint returned no result for the good fixture');
 
     const restrictedImportMessages = result.messages.filter((m) => m.ruleId === RULE_ID);
     expect(restrictedImportMessages).toHaveLength(0);
