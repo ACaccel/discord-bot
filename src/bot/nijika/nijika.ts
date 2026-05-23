@@ -32,8 +32,8 @@ export class Nijika extends BaseBot<NijikaConfig> {
         webhookPort: number,
     ) {
         super(client, token, mongoURI, clientId, config);
-        // help_msg is resolved from this key inside BaseBot.run() once
-        // the translator is loaded.
+        // `helpMessage` is resolved from this key inside BaseBot.run()
+        // once the translator is loaded.
         this.helpMessageKey = 'replies:nijika.help_message';
 
         // Plugin registration. `blocked_channels` flows through the
