@@ -30,6 +30,8 @@ import { buildCommandJsonBody, createCommand, localizeCommandConfig } from "@cmd
 import { loadEnv } from '@core/config';
 import { createDefaultTranslator, type Translator } from '@core/i18n';
 
+import { resolveLocalesDir } from './bot/locales-dir';
+
 type DeployArgs = {
     bot?: string;
     devGuild?: string;
@@ -114,7 +116,7 @@ function buildCommandsFromConfig(
 async function deployGlobal(botName: string): Promise<void> {
     const { token, clientId, commands } = loadBotConfig(botName);
 
-    const translator = await createDefaultTranslator();
+    const translator = await createDefaultTranslator({ localesDir: resolveLocalesDir() });
     const body = buildCommandsFromConfig(commands, translator);
     if (body.length === 0) {
         console.error("No commands to deploy (after filtering).");
@@ -137,7 +139,7 @@ async function deployGlobal(botName: string): Promise<void> {
 async function deployDevGuild(botName: string, guildId: string): Promise<void> {
     const { token, clientId, commands } = loadBotConfig(botName);
 
-    const translator = await createDefaultTranslator();
+    const translator = await createDefaultTranslator({ localesDir: resolveLocalesDir() });
     const body = buildCommandsFromConfig(commands, translator);
     if (body.length === 0) {
         console.error("No commands to deploy (after filtering).");
