@@ -50,5 +50,9 @@
   "plugin": {
     "lifecycle_phase_violation": "Plugin `{{plugin}}` 在階段 `{{phase}}` 呼叫了 registerInstance(`{{token}}`),只有 `init` 階段允許此操作。"
   },
+  "bot": {
+    "login_failed": "登入 Discord 失敗({{clientId}})。",
+    "login_no_user": "登入 Discord 後未取得 user({{clientId}})。"
+  },
   "unexpected": "指令執行時發生未預期的錯誤,管理員已收到通知(錯誤編號:{{traceId}})。"
 }

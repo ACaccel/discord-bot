@@ -35,6 +35,7 @@ import type { SSMHandler } from '@select-menu';
 import { registerSSMs } from '@select-menu';
 
 import { createBootstrapLogger, loadEnv, type Env } from '../core/config';
+import { ConfigurationError } from '../core/errors';
 import type { GuildRegistry } from '../core/guild-registry';
 import type { Translator } from '../core/i18n';
 import { createDefaultTranslator } from '../core/i18n';
@@ -590,15 +591,38 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     }
 
     /**
-     * Phase 4: Discord side of the login dance. Errors here are
-     * currently logged but do not reject — R6.2 will tighten this so
-     * `run()` rejects on a missing user.
+     * Phase 4: Discord side of the login dance.
+     *
+     * R6.2: both failure paths now raise a `ConfigurationError` and
+     * reject so `run()` aborts instead of continuing into `startAll()` /
+     * `connectGuildDB()` with a half-attached client. Treated as a
+     * startup-time configuration failure (bad token, network, or a
+     * gateway handshake that never produced a `client.user`).
      */
     private async login(): Promise<void> {
-        await this.client.login(this.token).catch(() => {
-            // logged through the structured logger below; the typed
-            // logger is bound during phase 1.
-        });
+        try {
+            await this.client.login(this.token);
+        } catch (cause) {
+            const error = new ConfigurationError({
+                code: 'BOT_LOGIN_FAILED',
+                messageKey: 'errors:bot.login_failed',
+                messageParams: { clientId: this.clientId },
+                context: { operation: 'BaseBot.login', input: { clientId: this.clientId } },
+                cause,
+            });
+            logError(this.logger, this.clientId, null, error);
+            throw error;
+        }
+        if (this.client.user === null) {
+            const error = new ConfigurationError({
+                code: 'BOT_LOGIN_NO_USER',
+                messageKey: 'errors:bot.login_no_user',
+                messageParams: { clientId: this.clientId },
+                context: { operation: 'BaseBot.login', input: { clientId: this.clientId } },
+            });
+            logError(this.logger, this.clientId, null, error);
+            throw error;
+        }
         if (this.config.admin !== undefined) {
             this.adminId = this.config.admin;
         }

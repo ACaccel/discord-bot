@@ -18,7 +18,19 @@ export type ConfigurationErrorCode =
    * composition bug, equivalent in severity to the existing
    * `INVALID_CONFIG_JSON` / `MISSING_ENV` family.
    */
-  | 'LIFECYCLE_PHASE_VIOLATION';
+  | 'LIFECYCLE_PHASE_VIOLATION'
+  /**
+   * `client.login()` rejected (invalid token, network failure, Discord
+   * outage). Raised by {@link BaseBot.login} so {@link BaseBot.run}
+   * rejects rather than silently entering a half-started state.
+   */
+  | 'BOT_LOGIN_FAILED'
+  /**
+   * `client.login()` resolved but `client.user` was still unset, meaning
+   * the gateway handshake did not complete the way Discord.js usually
+   * guarantees. Treated as a fatal startup failure.
+   */
+  | 'BOT_LOGIN_NO_USER';
 
 export class ConfigurationError<
   P extends Readonly<Record<string, string | number>> | undefined = undefined,
