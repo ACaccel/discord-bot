@@ -169,9 +169,9 @@ describe('PluginLifecycleRunner.registerInstance stage guard', () => {
     expect(reason!.phase).toBe('onReady');
     expect(reason!.error).toBeInstanceOf(ConfigurationError);
     expect((reason!.error as ConfigurationError).code).toBe('LIFECYCLE_PHASE_VIOLATION');
-    expect(
-      (reason!.error as ConfigurationError<{ phase: string }>).messageParams?.phase,
-    ).toBe('ready');
+    expect((reason!.error as ConfigurationError<{ phase: string }>).messageParams?.phase).toBe(
+      'ready',
+    );
   });
 
   it('throws LIFECYCLE_PHASE_VIOLATION when the stale ctx fires in an event hook', async () => {

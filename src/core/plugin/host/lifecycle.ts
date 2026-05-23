@@ -38,13 +38,7 @@ import { cascadeDisable } from './topology';
  * non-`'init'` phase. `'shutdown'` is set for the duration of
  * `runShutdown`.
  */
-export type LifecyclePhase =
-  | 'idle'
-  | 'init'
-  | 'start'
-  | 'ready'
-  | 'running'
-  | 'shutdown';
+export type LifecyclePhase = 'idle' | 'init' | 'start' | 'ready' | 'running' | 'shutdown';
 
 /**
  * A registered plugin together with its validated config. Mirrors the
@@ -295,10 +289,7 @@ export class PluginLifecycleRunner {
     // every call site reads the phase at *invocation* time. A plugin
     // that stashes the ctx and triggers registerInstance from `start`
     // therefore still fails the stage guard.
-    const registerInstance: RegisterInstance = <T>(
-      token: ServiceToken<T>,
-      instance: T,
-    ): void => {
+    const registerInstance: RegisterInstance = <T>(token: ServiceToken<T>, instance: T): void => {
       this.assertInitPhase(pluginId, token);
       // Wrap as a constant singleton factory so the container's existing
       // singleton cache + DuplicateRegistrationError semantics apply

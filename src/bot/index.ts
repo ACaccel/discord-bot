@@ -61,6 +61,7 @@ import {
     type ConnectionManager,
 } from '../infra/mongo/connection-manager';
 import { buildRepos, type Repos } from '../persistence/repositories';
+import type { ModelCatalog } from '../infra/llm/models-catalog';
 import type { VoiceController } from '../plugins/voice/internal';
 
 import {
@@ -156,6 +157,19 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      */
     public get voice(): VoiceController | undefined {
         return this.container.tryResolve<VoiceController>(TOKENS.VoiceController);
+    }
+
+    /**
+     * Bot-scoped LLM {@link ModelCatalog}. Resolved from the IoC
+     * container on every access (R2): `LlmChatPlugin.init` publishes
+     * it under `TOKENS.ModelCatalog` through `ctx.registerInstance`,
+     * and bots that do not register the plugin see `undefined`. The
+     * `/ai_settings` handler reaches the live model list through this
+     * getter so the prior `listProviderModels` module-global is no
+     * longer needed.
+     */
+    public get modelCatalog(): ModelCatalog | undefined {
+        return this.container.tryResolve<ModelCatalog>(TOKENS.ModelCatalog);
     }
 
     /** Bot-scoped {@link Translator}. Undefined only in the pre-`run()` window. */

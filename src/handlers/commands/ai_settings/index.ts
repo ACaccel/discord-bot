@@ -12,7 +12,7 @@ import {
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { type LLMProviderName, listProviderModels } from '../../../infra/llm';
+import { type LLMProviderName } from '../../../infra/llm';
 import { requireGuildRepos } from '../../require-guild-repos';
 
 import { logError } from '@core/logger';
@@ -69,12 +69,15 @@ export default class ai_settings extends Command {
             return;
         }
 
-        // listProviderModels is synchronous: cache hit -> live list, cache
-        // miss -> empty array (it kicks off a background SDK refresh). We
-        // never fall back to a guessed list, so the user gets an honest
-        // signal when the provider is unreachable instead of seeing stale
-        // model names treated as canonical.
-        const modelOptions = listProviderModels(provider);
+        // ModelCatalog.list is synchronous: cache hit -> live list,
+        // cache miss -> empty array (it kicks off a background SDK
+        // refresh). We never fall back to a guessed list, so the user
+        // gets an honest signal when the provider is unreachable
+        // instead of seeing stale model names treated as canonical.
+        // The catalog is published by LlmChatPlugin.init via
+        // `ctx.registerInstance`; bots without that plugin (or pre-init
+        // dispatches in tests) surface as `undefined` here.
+        const modelOptions = bot.modelCatalog?.list(provider) ?? [];
         if (modelOptions.length === 0) {
             await interaction.reply({
                 content: bot.translator?.t('replies:ai_settings.model_list_unavailable', { provider }) ?? '',
