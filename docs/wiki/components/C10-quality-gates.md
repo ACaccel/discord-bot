@@ -27,6 +27,10 @@ D3 已落地：`src/events/` 目錄已由 C8 刪除，CJK scanner（`test/i18n/n
 
 ## 近期變更
 
+- 2026-05-24 — R3：`eslint.config.mjs` 新增 `src/plugins/**` 的
+  `no-restricted-imports` block，禁止直接 import `core/ioc`；新增
+  `test/unit/eslint/plugin-ioc-import-rule.test.ts` 程式化 ESLint
+  fixture 鎖定這條規則的行為 (tech-debt R3)
 - 2026-05-21 — D3 落地：CJK scanner `SCOPED_DIRECTORIES` 與 eslint
   service-locator guard 移除已刪除的 `src/events` / `src/features` 範圍。
 - 2026-05-21 — D8 落地：strict tsconfig 涵蓋全 `src`，掃除 handler 嚴格模式違規。

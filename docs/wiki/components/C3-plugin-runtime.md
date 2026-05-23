@@ -30,8 +30,23 @@ Plugin 架構微核心：定義 `Plugin<Config>` 契約並驅動生命週期、�
   read-only 欄位，作為 runner 寫入 container 的單一通道；plugin 端
   仍只看到 typed-token resolver 與 `registerInstance` facade。
 
+## 現況補充（R3 後）
+
+- `src/core/plugin/index.ts` barrel 新增 `TOKENS` value re-export 與
+  `ServiceToken` / `Resolver` type re-export，成為 plugin 端對
+  `core/ioc` 的**唯一窗口**；`ServiceContainer` / `createContainer` /
+  `token()` factory / 容器錯誤型別**刻意不**re-export，保留為
+  composition root 專屬權限。
+- 違規由 ESLint 在 lint 階段擋下（`src/plugins/**` 的
+  `no-restricted-imports` 對 `core/ioc` 群組）。
+
 ## 近期變更
 
+- 2026-05-24 — R3：`core/plugin` barrel 新增 `TOKENS` /
+  `ServiceToken` / `Resolver` re-export；新增
+  `test/unit/core/plugin/barrel-exports.test.ts` 與
+  `test/unit/eslint/plugin-ioc-import-rule.test.ts` 為這條契約上鎖
+  (tech-debt R3)
 - 2026-05-24 — R2：`PluginInitContext.registerInstance` facade +
   `PluginLifecycleRunner` phase guard；新增
   `test/unit/core/plugin/lifecycle-guard.test.ts`（8 案例覆蓋 happy /

@@ -40,8 +40,20 @@
 - 全 repo `grep "let active" src/plugins src/infra` 為 0；
   plugin → BaseBot 通訊統一走 IoC 容器。
 
+## 現況補充（R3 後）
+
+- 8 個 `src/plugins/*/plugin.ts`（`auto-reply` / `activity` / `giveaway` /
+  `guild-events` / `llm-chat` / `message-backup` / `voice` / `earthquake`）
+  全部改 `import { TOKENS } from '../../core/plugin'`；不再有任何
+  `src/plugins/**` 對 `core/ioc` 的直接 import。
+- ESLint `src/plugins/**` block 的 `no-restricted-imports` 把
+  `**/core/ioc` 與 `@core/ioc` 列入禁區並給 plugin 專屬錯誤訊息。
+
 ## 近期變更
 
+- 2026-05-24 — R3：8 個 plugin 把 `TOKENS` import 來源切到
+  `core/plugin` barrel；新增 ESLint guard 把 `core/ioc` 對
+  `src/plugins/**` 列入禁區 (tech-debt R3)
 - 2026-05-24 — R2：voice / llm-chat 兩個 plugin 改走
   `PluginInitContext.registerInstance`；刪除 `voice/internal/
 active-controller.ts`；模組全域 `let active*` 旁路歸零

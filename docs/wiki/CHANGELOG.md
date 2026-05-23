@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-05-24 — R3：plugins ↔ core/ioc 契約對齊
+
+- **元件**：C2 IoC Container、C3 Plugin Runtime、C8 Plugins、C10 Quality Gates
+- **缺口**：tech-debt R3
+- **變更**：
+  - C3 — `src/core/plugin/index.ts` 新增 `TOKENS` value re-export
+    與 `ServiceToken` / `Resolver` type re-export；`ServiceContainer` /
+    `createContainer` / `token()` / 容器錯誤型別**刻意不**re-export，
+    保留為 composition root 專屬。
+  - C8 — 8 個 `plugin.ts`（`auto-reply` / `activity` / `giveaway` /
+    `guild-events` / `llm-chat` / `message-backup` / `voice` /
+    `earthquake`）的 `import { TOKENS } from '../../core/ioc'` 改為
+    `'../../core/plugin'`；`grep -rln "from '.*core/ioc'" src/plugins`
+    歸零。
+  - C10 — `eslint.config.mjs` 在既有 service-locator guard 之後追加
+    `src/plugins/**` 的 `no-restricted-imports` block，明確
+    block 任何 `core/ioc` import 並給 plugin 專屬錯誤訊息
+    （`Plugins must import TOKENS / ServiceToken from core/plugin, not core/ioc.`）。
+  - 規範文字 — CLAUDE.md、CONTRIBUTING.md、
+    `.claude/skills/project-conventions/SKILL.md`、
+    `.claude/skills/coding-standards/SKILL.md` 四份文件以**完全相同**
+    的繁體中文段落（「Plugin 對 IoC 的依賴契約」）寫入規則，便於日後一處改全處同步。
+  - 測試 — 新增 `test/unit/core/plugin/barrel-exports.test.ts`
+    （3 案例：TOKENS 出現、ServiceToken / Resolver 型別可賦值、寫入面
+    API 不被 re-export）與 `test/unit/eslint/plugin-ioc-import-rule.test.ts`
+    （2 案例：ESLint programmatic API 對虛擬 `src/plugins/__fixture__/`
+    路徑驗證好 / 壞案例）。
+- **影響**：純內部 import 路徑搬移；無對外契約變更、無 runtime 行為差異。
+  R2 落地的 `TOKENS.VoiceController` / `TOKENS.ModelCatalog` 透過此
+  barrel 一併曝露給 plugin。
+
+---
+
 ## 2026-05-24 — R2：消除 DI 旁路（`PluginInitContext.registerInstance`）
 
 - **元件**：C2 IoC Container、C3 Plugin Runtime、C5 Infra Adapters、C8 Plugins、C11 Bot Composition Roots

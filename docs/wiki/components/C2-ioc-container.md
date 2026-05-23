@@ -20,8 +20,22 @@
   內部仍走既有的 `registerSingleton(token, () => instance)`，
   `DuplicateRegistrationError` 自動承襲。
 
+## 現況補充（R3 後）
+
+- `core/ioc` 對 plugin 層的暴露**全部收斂**至 `core/plugin` barrel：
+  plugin 只能透過 `import { TOKENS, type ServiceToken } from
+'<path>/core/plugin'` 取得；`createContainer` / `ServiceContainer` /
+  `token()` / `ServiceResolutionError` / `DuplicateRegistrationError`
+  仍只能由 `src/bot/**` composition roots 與 `test/**` 直接 import。
+- 新 token 仍登錄在 `src/core/ioc/tokens.ts`；`core/plugin` 的 `TOKENS`
+  re-export 即時轉發，不需要再寫第二份 token 表。
+
 ## 近期變更
 
+- 2026-05-24 — R3：`core/ioc` 對 plugin 層的可見表面收斂至
+  `core/plugin` barrel；`src/plugins/**` 的 `no-restricted-imports`
+  ESLint 規則上線；CLAUDE.md / CONTRIBUTING.md / 兩份 SKILL.md 的
+  「Plugin 對 IoC 的依賴契約」段落 verbatim 同步 (tech-debt R3)
 - 2026-05-24 — R2：新增 `VoiceController` / `ModelCatalog` 兩個 token，
   作為 `PluginInitContext.registerInstance` 取代 `let active*` 旁路後的
   唯一接線點 (tech-debt R2)
