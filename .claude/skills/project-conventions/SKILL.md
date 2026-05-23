@@ -114,6 +114,26 @@ is not subclassed to carry behavior.
   run `yarn handlers:gen` after adding a handler. CI `handlers:gen:check`
   detects drift.
 
+### Handler 行數規範
+
+`src/handlers/<type>/<name>/index.ts` 必須遵守下列五點。新 handler 自第一行
+程式碼起就套用，不留「未來再說」空間。
+
+1. **`index.ts` 行數上限為 150 行**（含 import、含 JSDoc、含空行）。由
+   `eslint.config.mjs` 的 `max-lines` 規則對 `src/handlers/**/*.ts` 強制執行，違規為 error。
+2. **超出上限的 pure helper（純函式、不依賴 Discord 物件）必須抽到同目錄的獨立檔案**。
+   檔名 kebab-case（例：`parse-range.ts`、`render-reactions.ts`），具名 `export`，
+   不使用 `export default`。
+3. **不可為了壓縮行數而把 Discord I/O、權限檢查、Translator 呼叫拆出 `index.ts`**。
+   這四項是 handler 的本職：interaction input 抽取、guild / repos / 權限檢查、
+   `bot.translator.t(...)` 呼叫、把 domain 結果組裝成 Discord 回覆物件。它們必須
+   留在 `index.ts` 內。
+4. **抽出的 helper 必須有對應單元測試**，置於 `test/unit/handlers/<name>/<helper>.test.ts`。
+   純函式測試 happy path + 邊界 + error path；接受 Translator / Repos 的 helper
+   注入 in-memory fake。
+5. **helper 不可放在 `src/handlers/shared/` 或新增的共用目錄**——抽出的內容是該
+   handler 的內部實作細節；若日後有第二個 handler 需要同一邏輯，再評估是否上提。
+
 ## 8. Directory and naming
 
 - bot and handler-type directories are kebab-case; handler subdirectories are
