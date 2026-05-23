@@ -34,7 +34,7 @@ export default class ai_whitelist_remove extends Command {
         if (repos === null) return;
 
         try {
-            // G-2: an `err` is re-thrown into the surrounding catch.
+            // A repo `err` is re-thrown into the surrounding catch.
             const removedResult = await repos.userApiSetting.deleteByUserId(target.id);
             if (!removedResult.ok) throw removedResult.error;
             if (!removedResult.value) {

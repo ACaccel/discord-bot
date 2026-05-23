@@ -17,15 +17,15 @@ export default class change_avatar extends Command {
                     {
                         name: "identity",
                         required: true,
-                        // Gap D7: the identity choices are the persona names
-                        // already declared in the colocated `identity.json`
-                        // data file. Deriving them here keeps the choice
+                        // The identity choices are the persona names
+                        // declared in the colocated `identity.json` data
+                        // file. Deriving them here keeps the choice
                         // `name`/`value` CJK strings out of this `.ts`
                         // source (the i18n scanner walks `.ts` only) and
-                        // removes the duplicated hard-coded list — the JSON
-                        // is the single source of truth. The `value` stays
-                        // the persona name because `execute` matches it back
-                        // against `identity_config`.
+                        // keeps the JSON as the single source of truth.
+                        // The `value` stays the persona name because
+                        // `execute` matches it back against
+                        // `identity_config`.
                         choices: identity_config.map((identity) => ({
                             name: identity.name,
                             value: identity.name,

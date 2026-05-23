@@ -1,6 +1,6 @@
 # C7 — i18n Catalog 詳細設計
 
-> 路徑：`src/interface/locales/`
+> 路徑：`src/i18n/locales/`
 > 對應 HLD：§5 C7 ｜對應需求：REQ-E1
 
 ---
@@ -18,7 +18,7 @@ C7 是純資料元件——存放 user-facing 文案目錄。它不含程式邏�
 ### 2.1 目錄與命名空間
 
 ```
-src/interface/locales/
+src/i18n/locales/
 └── <lang>/
     ├── commands.json     # 指令名稱 / 描述（namespace: commands）
     ├── errors.json       # 錯誤訊息（namespace: errors）
@@ -103,7 +103,7 @@ C7 為純資料，無 OO pattern。設計上的要點是**外部化文案**—�
 **D7 — 僅 `zh-TW` 一個語系，`commands.json` 為空（已收斂）**：
 
 - HLD §5 C7 與 §7.1 描述 `<lang>/{commands,errors,replies}.json` 多語系結構，C1 `translator.ts` 也定義 `Locale = 'zh-TW' | 'en'`。
-- 收斂結果：`zh-TW/commands.json` 已補完每個指令的 `description`、選項 `options.<opt>.description`、以及以穩定 `value` 為 key 的 `choices`；`menu_*` context menu 指令補 `name`。`src/interface/locales/en/{commands,errors,replies}.json` 三個命名空間檔已建立，並把 `zh-TW` 全部 key 英譯。
+- 收斂結果：`zh-TW/commands.json` 已補完每個指令的 `description`、選項 `options.<opt>.description`、以及以穩定 `value` 為 key 的 `choices`；`menu_*` context menu 指令補 `name`。`src/i18n/locales/en/{commands,errors,replies}.json` 三個命名空間檔已建立，並把 `zh-TW` 全部 key 英譯。
 - catalog-completeness 測試（`yarn test:i18n`）現以 `zh-TW` / `en` 雙語系比對 key 集合與 `{{placeholder}}` 集合;`test/i18n/catalog-runtime.test.ts` 額外以實際 `loadCatalogResources` + `I18NextTranslator` 管線驗證 en 解析、跨語系零缺 key、以及缺 key 對 `zh-TW` 的優雅回退。
 - handler 端去 CJK literal（移除 `// i18n-ignore`）屬 C6 D7 範圍;C7 僅負責提供 catalog key。
 

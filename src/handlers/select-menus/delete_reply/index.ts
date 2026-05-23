@@ -15,9 +15,8 @@ export default class delete_reply extends SSMHandler {
         const repos = await requireGuildRepos(bot, interaction);
         if (repos === null) return;
 
-        // G-2: repo methods return Result<T, DatabaseError>. An `err`
-        // is re-thrown so it propagates to the dispatcher's catch
-        // exactly as a raw mongoose error did before G-2.
+        // Repo methods return Result<T, DatabaseError>. An `err` is
+        // re-thrown so it propagates to the dispatcher's catch.
         const pairResult = await repos.reply.findById(value);
         if (!pairResult.ok) throw pairResult.error;
         const pair = pairResult.value;

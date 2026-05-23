@@ -110,8 +110,8 @@ interface CascadeDisableCallbacks {
  * Disable every plugin that transitively depends on `failedId`. Pure
  * with respect to graph traversal — all state mutation is delegated to
  * {@link CascadeDisableCallbacks}, which keeps this function unit-testable
- * against fakes. Extracted from `host.ts` as the natural companion of
- * {@link buildDependentsIndex} (D6).
+ * against fakes. Lives alongside {@link buildDependentsIndex} as its
+ * natural companion.
  *
  * Returns the cascade victims that were marked `critical: true`; the
  * caller folds them into its critical-failure rethrow list.

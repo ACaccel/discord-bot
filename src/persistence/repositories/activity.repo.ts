@@ -5,7 +5,7 @@
  * usage). On schedule completion the participants list is updated and
  * the entry persists; explicit deletion comes from `deleteActivity`.
  *
- * **Error boundary (gap G-2)**: every method returns
+ * **Error boundary**: every method returns
  * `Result<T, DatabaseError>`. A mongoose failure is translated by the
  * shared `databaseErrorFrom` translator and returned as `err`; a
  * missing lookup is a success (`ok(undefined)`).

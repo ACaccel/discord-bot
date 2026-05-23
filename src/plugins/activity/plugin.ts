@@ -1,10 +1,8 @@
 /**
  * ActivityPlugin — schedules the activity-job reboot on `onReady`.
  *
- * Audit ARCH-BLOCK3 (PR-G4): the plugin now resolves its dependencies
- * through `ctx` and calls `rebootActivityJobs` directly. The previous
- * `rebootJobs` callback (which closed over the composition root's
- * `this`) is gone; composition roots no longer deep-import
+ * The plugin resolves its dependencies through `ctx` and calls
+ * `rebootActivityJobs` directly, so composition roots never deep-import
  * `./internal`.
  */
 import { TOKENS } from '../../core/ioc';

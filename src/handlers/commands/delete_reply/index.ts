@@ -33,7 +33,7 @@ export default class delete_reply extends Command {
             const key = interaction.options.get("keyword")?.value as string;
             const repos = await requireGuildRepos(bot, interaction);
             if (repos === null) return;
-            // G-2: an `err` is re-thrown into the surrounding catch.
+            // A repo `err` is re-thrown into the surrounding catch.
             const existPairResult = await repos.reply.findByInput(key);
             if (!existPairResult.ok) throw existPairResult.error;
             const existPair = existPairResult.value;

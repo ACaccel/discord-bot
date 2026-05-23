@@ -46,8 +46,8 @@ export default class todo_list extends Command {
             if (repos === null) return;
             const todos = repos.todo;
 
-            // G-2: repo methods return Result<T, DatabaseError>. An
-            // `err` is re-thrown into the surrounding catch.
+            // Repo methods return Result<T, DatabaseError>. An `err`
+            // is re-thrown into the surrounding catch.
             if (action === "add") {
                 const existPairResult = await todos.findByContent(content);
                 if (!existPairResult.ok) throw existPairResult.error;

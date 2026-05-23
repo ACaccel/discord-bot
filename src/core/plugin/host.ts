@@ -180,7 +180,7 @@ export class PluginHost {
   }
 
   // -------------------------------------------------------------------
-  // Lifecycle — thin delegation to PluginLifecycleRunner (D6 split)
+  // Lifecycle — thin delegation to PluginLifecycleRunner
   // -------------------------------------------------------------------
 
   /** Run `init` on every enabled plugin in topological order. */

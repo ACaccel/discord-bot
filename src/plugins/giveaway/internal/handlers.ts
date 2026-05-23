@@ -79,7 +79,7 @@ export const handleGiveawayCreate = async (
             return;
         }
 
-        // G-2: create returns Result<GiveawayDoc, DatabaseError>. An
+        // `create` returns Result<GiveawayDoc, DatabaseError>. An
         // `err` is re-thrown into the surrounding catch.
         const createResult = await repos.giveaway.create({
             winner_num,

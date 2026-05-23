@@ -39,7 +39,7 @@
 | C4   | Persistence           | `src/persistence/`           | [C4-persistence.md](design/C4-persistence.md)                       |
 | C5   | Infra Adapters        | `src/infra/`                 | [C5-infra-adapters.md](design/C5-infra-adapters.md)                 |
 | C6   | Handlers              | `src/handlers/`              | [C6-handlers.md](design/C6-handlers.md)                             |
-| C7   | i18n Catalog          | `src/interface/locales/`     | [C7-i18n-catalog.md](design/C7-i18n-catalog.md)                     |
+| C7   | i18n Catalog          | `src/i18n/locales/`          | [C7-i18n-catalog.md](design/C7-i18n-catalog.md)                     |
 | C8   | Plugins               | `src/plugins/`               | [C8-plugins.md](design/C8-plugins.md)                               |
 | C9   | Codegen & Scripts     | `scripts/`                   | [C9-codegen-scripts.md](design/C9-codegen-scripts.md)               |
 | C10  | Quality Gates         | CI / 設定檔                  | [C10-quality-gates.md](design/C10-quality-gates.md)                 |

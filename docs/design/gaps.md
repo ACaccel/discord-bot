@@ -213,7 +213,7 @@
 
 1. 填 `zh-TW/commands.json` 的指令名稱／描述 key（依 README 之 PR 6-3 規劃）。
 2. handler 改以 catalog key 取代 CJK literal，移除 `// i18n-ignore` 註記。
-3. 新建 `src/interface/locales/en/{commands,errors,replies}.json`，把 `zh-TW` 的全部 key 英譯（含 D9 新增之 `errors:*` 與 `replies:<feature>.failed`）。
+3. 新建 `src/i18n/locales/en/{commands,errors,replies}.json`，把 `zh-TW` 的全部 key 英譯（含 D9 新增之 `errors:*` 與 `replies:<feature>.failed`）。
 4. 確認 catalog-completeness 測試（`yarn test:i18n`）以雙語系比對——任一語系缺 key 即 fail。
 5. 確認 `I18NextTranslator` 的 fallbackLocale 對缺漏 key 仍優雅回退至 `zh-TW`。
 

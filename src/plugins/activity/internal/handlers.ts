@@ -72,7 +72,7 @@ export const handleActivityCreate = async (
             return;
         }
 
-        // G-2: create returns Result<ActivityDoc, DatabaseError>. An
+        // `create` returns Result<ActivityDoc, DatabaseError>. An
         // `err` is re-thrown into the surrounding catch.
         const createResult = await repos.activity.create({
             activity_id,
