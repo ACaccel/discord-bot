@@ -20,6 +20,8 @@ import type { GuildId } from '../ids';
 import { token, type ServiceToken } from './container';
 
 import type { ConnectionManager } from '../../infra/mongo/connection-manager';
+import type { ModelCatalog } from '../../infra/llm/models-catalog';
+import type { VoiceController } from '../../plugins/voice/internal';
 import type { Clock } from '../time';
 import type { Env } from '../config';
 import type { GuildRegistry } from '../guild-registry';
@@ -78,6 +80,20 @@ export interface Tokens {
    * without reaching into `BaseBot` internals.
    */
   readonly GuildOnboardingPort: ServiceToken<GuildOnboardingPort>;
+  /**
+   * Voice controller, published by VoicePlugin's `init` hook via
+   * {@link PluginInitContext.registerInstance}. Resolved by BaseBot's
+   * `voice` getter and any handler that needs to drive recording.
+   * Unbound for bots that do not register VoicePlugin.
+   */
+  readonly VoiceController: ServiceToken<VoiceController>;
+  /**
+   * LLM model catalog, published by LlmChatPlugin's `init` hook via
+   * {@link PluginInitContext.registerInstance}. Provides the live model
+   * list used by `/ai_settings`. Unbound for bots that do not register
+   * LlmChatPlugin.
+   */
+  readonly ModelCatalog: ServiceToken<ModelCatalog>;
 }
 
 export const TOKENS: Tokens = {
@@ -91,4 +107,6 @@ export const TOKENS: Tokens = {
   Env: token<Env>('Env'),
   JobMap: token<Map<string, Job>>('JobMap'),
   GuildOnboardingPort: token<GuildOnboardingPort>('GuildOnboardingPort'),
+  VoiceController: token<VoiceController>('VoiceController'),
+  ModelCatalog: token<ModelCatalog>('ModelCatalog'),
 };

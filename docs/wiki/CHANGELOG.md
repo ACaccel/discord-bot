@@ -5,6 +5,222 @@
 
 ---
 
+## 2026-05-24 — R6：低優先單點清理（5 子項）
+
+- **元件**：C1 Core Infrastructure、C6 Handlers、C9 Codegen / Scripts、
+  C10 Quality Gates、C11 Bot Composition Roots
+- **缺口**：tech-debt R6.1 / R6.2 / R6.3 / R6.4 / R6.5
+- **變更**：
+  - **R6.1**：`src/bot/client-event-bridge.ts` 的 router middleware 將
+    `traceId` 由 `Math.random().toString(36).slice(2,8).padStart(6,'0')`
+    換為 `randomUUID().slice(0, 8)`（8 hex chars，無生日問題碰撞）。
+    新增 `test/unit/bot/trace-id.test.ts` 驗證格式 + 1000 次無碰撞。
+  - **R6.2**：`BaseBot.login` 將 `client.login()` 失敗與 `client.user
+=== null` 兩條路徑由 silent log 升級為丟 `ConfigurationError`
+    (codes `BOT_LOGIN_FAILED` / `BOT_LOGIN_NO_USER`)，`BaseBot.run()`
+    reject 不再進入 `host.startAll()`。i18n catalogs 新增對應 keys
+    `errors:bot.login_failed` / `errors:bot.login_no_user` (zh-TW + en)。
+    新增 `test/integration/bot/login.int.test.ts` 覆蓋兩條 reject 路徑。
+  - **R6.3**：`src/` 23 處 `console.*` 全數清除——`src/deploy.ts`
+    改用 `createBootstrapLogger` 結構化輸出；`random_restaurant`
+    handler 改用 `bot.logger?.debug`；3 處 commented-out 死碼與一段
+    60-line block-commented dead canvas 預覽 block 直接刪除。ESLint
+    `no-console` 由 `warn` 提至 `error`、allowlist 縮為 `['error']`。
+  - **R6.4**：R1 已套用主要 rename；本輪修正 `src/bot/nijika/nijika.ts`
+    殘留的 `// help_msg` 註解。完整 grep 確認 `buttonHandler` /
+    `ssmHandler` / `modalHandler` / `reactionHandler` / `help_msg` /
+    `guild_num` / `debug_ch` 在 `src/` 已無殘留。
+  - **R6.5**：ESLint 加入 `'import/first': 'error'`。順手把 7 個
+    re-export-then-import 的 barrel files（`src/core/errors/index.ts`、
+    5 個 `src/handlers/*/index.ts`、`src/persistence/schemas/index.ts`）
+    重排為 `imports → re-exports → body`；三個 `vi.mock` 測試檔本地
+    `eslint-disable import/first`（vitest 會將 `vi.mock` hoist 至 import
+    之前，物理順序屬刻意決定）。
+- **影響**：對外行為不變（traceId 仍 8 字元、login 失敗仍會結束
+  process，只是改由 unhandled rejection 觸發 supervisor 重啟）。
+  ESLint 兩條新規則 (`no-console: error`、`import/first: error`) 一旦
+  破壞會在 CI 立即可見。所有 quality gates（typecheck / lint / test /
+  format / handlers:gen:check / knip）綠。
+
+---
+
+## 2026-05-24 — R5：i18n catalog 路徑反耦合
+
+- **元件**：C7 i18n Catalog、C11 Bot Composition Roots
+- **缺口**：tech-debt R5
+- **變更**：
+  - C7 — `src/core/i18n/catalog-loader.ts` 移除 `DEFAULT_LOCALES_DIR` 常數；
+    `LoadCatalogOptions.localesDir` 由 optional 改為必填，`loadCatalogResources`
+    與 `createDefaultTranslator` 不再 fallback 至內建路徑。錯誤訊息更新為
+    指向「composition root 必須注入」的修復提示。
+  - C11 — 新增 `src/bot/locales-dir.ts` 暴露 `resolveLocalesDir()`，由合成根層
+    擁有「catalog 落在 `<src>/i18n/locales`」的部署知識。`BaseBot` 建構子
+    新增 `localesDir: string = resolveLocalesDir()` 參數，`buildHost` 內
+    透過此私有欄位呼叫 `createDefaultTranslator({ localesDir })`。四個 bot
+    子類無需改 ctor 呼叫。`src/deploy.ts` 兩處 `createDefaultTranslator()`
+    亦改用同一 helper 注入路徑。
+  - 測試 — `test/i18n/catalog-runtime.test.ts` 四處 `loadCatalogResources()`
+    顯式注入 `LOCALES_DIR`（測試檔位於合成根層，已知專案佈局）；
+    `test/unit/core/i18n/catalog-loader.test.ts` 既有用法不變。
+- **影響**：對外行為等價（catalog 載入與翻譯結果不變）。介面層級為破壞性
+  變更——任何未注入 `localesDir` 的呼叫將在 `tsc` 即被擋下，無 runtime
+  fallback。`grep -n "'i18n'" src/core` 與 `grep -rn 'DEFAULT_LOCALES_DIR' src`
+  皆已清空。
+
+---
+
+## 2026-05-24 — R4：過長 handler 拆分 + 150 行規範 + ESLint enforce
+
+- **元件**：C6 Handlers、C10 Quality Gates
+- **缺口**：tech-debt R4
+- **變更**：
+  - C10 — `eslint.config.mjs` 新增獨立 `src/handlers/**/*.ts` block，套用
+    `max-lines: ['error', { max: 150, skipBlankLines: false, skipComments: false }]`。
+    `ignores` 顯式列入 `registry.generated.ts` 與三個框架/共用檔
+    （`command.ts` / `discord-helpers.ts` / `reply-for-error.ts`），各筆均
+    附 inline comment 說明為 PR follow-up；頂層 `**/*.generated.ts`
+    ignore 不變。
+  - C6 — 4 個示範 handler 拆出 pure helper 至同目錄 sibling 檔：
+    - `db_list_message`(320→135 行) + 7 個 helper
+      (`parse-range.ts` / `render-reactions.ts` / `sanitize-mentions.ts` /
+      `chunk-output.ts` / `format-message-lines.ts` /
+      `build-archive-attachment.ts` / `resolve-display-name.ts`)。
+      `parseStartEnd` 加上 calendar range guard（month 1-12 / day 1-31），
+      合法輸入行為等價。
+    - `inspect_member_ids`(172→89 行) + 3 個 helper
+      (`parse-ids.ts` / `format-helpers.ts` / `format-member-fields.ts`)。
+    - `emoji_frequency`(158→121 行) + 4 個 helper
+      (`clamp-options.ts` / `aggregate-emoji-counts.ts` / `rank-emoji.ts` /
+      `format-leaderboard.ts`)。
+    - `ai_settings`(161→68 行) + 3 個 helper
+      (`provider-choices.ts` / `validate-ai-settings.ts` /
+      `build-settings-modal.ts`)。`checkAiSettingsReady` 改回傳
+      tagged union 讓 handler 可單分支挑 i18n key。
+      每個 helper 一支 unit test 於 `test/unit/handlers/<name>/`(共 17
+      helper + 17 unit test 檔)。`index.ts` 僅保留 Discord I/O + 權限 +
+      Translator 呼叫 + 回覆組裝。
+  - 規範文字 — CLAUDE.md、CONTRIBUTING.md、
+    `.claude/skills/project-conventions/SKILL.md`、
+    `.claude/skills/coding-standards/SKILL.md` 四份文件以**完全相同**
+    的繁體中文 5 點段落（「Handler 行數規範」）寫入規則（md5sum 一致）。
+- **影響**：純 internal refactor，無 Discord 指令簽名、無 i18n key、
+  無對外行為變更（`parseStartEnd` 對非法 calendar 之收斂屬於 defensive
+  validation）。CI lint 對 4 個示範 handler 由 red → green；既有 511 →
+  546 個 test 全綠（+35 unit test）。
+
+---
+
+## 2026-05-24 — R3：plugins ↔ core/ioc 契約對齊
+
+- **元件**：C2 IoC Container、C3 Plugin Runtime、C8 Plugins、C10 Quality Gates
+- **缺口**：tech-debt R3
+- **變更**：
+  - C3 — `src/core/plugin/index.ts` 新增 `TOKENS` value re-export
+    與 `ServiceToken` / `Resolver` type re-export；`ServiceContainer` /
+    `createContainer` / `token()` / 容器錯誤型別**刻意不**re-export，
+    保留為 composition root 專屬。
+  - C8 — 8 個 `plugin.ts`（`auto-reply` / `activity` / `giveaway` /
+    `guild-events` / `llm-chat` / `message-backup` / `voice` /
+    `earthquake`）的 `import { TOKENS } from '../../core/ioc'` 改為
+    `'../../core/plugin'`；`grep -rln "from '.*core/ioc'" src/plugins`
+    歸零。
+  - C10 — `eslint.config.mjs` 在既有 service-locator guard 之後追加
+    `src/plugins/**` 的 `no-restricted-imports` block，明確
+    block 任何 `core/ioc` import 並給 plugin 專屬錯誤訊息
+    （`Plugins must import TOKENS / ServiceToken from core/plugin, not core/ioc.`）。
+  - 規範文字 — CLAUDE.md、CONTRIBUTING.md、
+    `.claude/skills/project-conventions/SKILL.md`、
+    `.claude/skills/coding-standards/SKILL.md` 四份文件以**完全相同**
+    的繁體中文段落（「Plugin 對 IoC 的依賴契約」）寫入規則，便於日後一處改全處同步。
+  - 測試 — 新增 `test/unit/core/plugin/barrel-exports.test.ts`
+    （3 案例：TOKENS 出現、ServiceToken / Resolver 型別可賦值、寫入面
+    API 不被 re-export）與 `test/unit/eslint/plugin-ioc-import-rule.test.ts`
+    （2 案例：ESLint programmatic API 對虛擬 `src/plugins/__fixture__/`
+    路徑驗證好 / 壞案例）。
+- **影響**：純內部 import 路徑搬移；無對外契約變更、無 runtime 行為差異。
+  R2 落地的 `TOKENS.VoiceController` / `TOKENS.ModelCatalog` 透過此
+  barrel 一併曝露給 plugin。
+
+---
+
+## 2026-05-24 — R2：消除 DI 旁路（`PluginInitContext.registerInstance`）
+
+- **元件**：C2 IoC Container、C3 Plugin Runtime、C5 Infra Adapters、C8 Plugins、C11 Bot Composition Roots
+- **缺口**：tech-debt R2
+- **變更**：
+  - C3 — `PluginInitContext` 增補 `registerInstance<T>(token, instance)`
+    facade，只在 `init` hook 合法（其他 lifecycle context 型別層即不
+    暴露此方法）；`PluginLifecycleRunner` 新增 phase 追蹤與
+    `assertInitPhase` guard，違規拋 `ConfigurationError` with code
+    `LIFECYCLE_PHASE_VIOLATION`、messageKey
+    `errors:plugin.lifecycle_phase_violation`。`LifecycleHost` 介面
+    新增 `container: ServiceContainer` 唯讀欄位（runner 寫入容器的
+    單一通道）。
+  - C2 — `src/core/ioc/tokens.ts` 新增 `TOKENS.VoiceController` /
+    `TOKENS.ModelCatalog`。
+  - C7 — `src/i18n/locales/{en,zh-TW}/errors.json` 新增
+    `plugin.lifecycle_phase_violation` key。
+  - C5 — `infra/llm/models-catalog.ts` 移除 `let
+activeModelCatalog`、`setActiveModelCatalog`、`getModelCatalog`、
+    `listProviderModels`；`infra/llm/index.ts` barrel 同步收斂。
+    `ModelCatalog` 類別保留為純資料持有者。
+  - C8 — `plugins/voice/`：`plugin.ts.init` 改以
+    `ctx.registerInstance(TOKENS.VoiceController, ...)`；刪除
+    `internal/active-controller.ts` 全模組；`internal/index.ts`
+    移除 `setActive*` / `getActive*` re-export。
+    `plugins/llm-chat/plugin.ts.init` 改以
+    `ctx.registerInstance(TOKENS.ModelCatalog, ...)`。
+  - C11 — `BaseBot.voice` 改為 getter
+    （`container.tryResolve(TOKENS.VoiceController)`），刪除
+    `run()` 內 `this.voice = getActiveVoiceController()` 後置同步；
+    新增 symmetric getter `modelCatalog`。`/ai_settings` handler
+    改用 `bot.modelCatalog?.list(provider)`。
+  - 測試 — 新增 `test/unit/core/plugin/lifecycle-guard.test.ts`
+    （8 案例：happy / duplicate / 4 種 phase 違規 / critical init
+    重設 / 型別層測試）、
+    `test/unit/plugins/voice/voice-plugin.test.ts`（2 案例）、
+    `test/unit/infra/llm/models-catalog.test.ts`（2 案例）。
+- **影響**：plugin → BaseBot 通訊 100% 走 IoC 容器；
+  `grep "let active" src/plugins src/infra` 為 0；
+  `grep "setActive*|getActive*" src` 為 0。
+  公開 API 對既有 handler 等價（`bot.voice?.x()` 仍可用），新增
+  `bot.modelCatalog` getter。
+
+---
+
+## 2026-05-24 — R1：拆解 `BaseBot` 為 thin lifecycle owner
+
+- **元件**：C11 Bot Composition Roots、C6 Handlers（連帶改名）
+- **缺口**：tech-debt R1（+ 隨手 R6.4 / R6.5）
+- **變更**：
+  - C11 — 新增 `src/bot/guild-registrar.ts`、`src/bot/client-event-bridge.ts`、
+    `src/bot/guild-db-connector.ts` 三個 R1 collaborator。`BaseBot`
+    （`src/bot/index.ts`）重寫為 thin lifecycle owner（1007 → 592 行），
+    8 條 raw `client.on(...)`、reaction port、reboot 訊息、guild registration、
+    per-guild Mongo fan-out 全數搬入 collaborator。新增 protected hook
+    `eventBridgeSuppression(): ClientEventBridgeSuppression`，subclass 以此
+    關閉不需要的 raw listener。
+  - C11 — `src/bot/konata/konata.ts` / `src/bot/msg-archive/msg-archive.ts`
+    由 `override interactionEventListener = () => {}` 等 listener override
+    遷移至 `protected override eventBridgeSuppression()` hook。
+  - C6 — Handler Map 改為複數命名（`buttonHandlers` / `modalHandlers` /
+    `ssmHandlers` / `reactionHandlers`），`help_msg → helpMessage`；
+    `src/handlers/{buttons,modals,select-menus,reactions}/index.ts` 與
+    `src/handlers/commands/help/index.ts` 同步更新。
+  - 測試 — 新增 `test/unit/bot/guild-registrar.test.ts`（7 案例）、
+    `test/unit/bot/client-event-bridge.test.ts`（10 案例）、
+    `test/unit/bot/guild-db-connector.test.ts`（6 案例）；
+    `test/integration/bot/run-orchestration.int.test.ts`（4 案例）與
+    `test/integration/bot/event-bridge.int.test.ts`（4 案例）作為 R1 拆解
+    前後皆綠的 contract baseline。
+- **影響**：BaseBot 對外 public surface 縮小（listener method 不再存在；
+  subclass 改用 hook）；handler 端讀 `bot.buttonHandlers` 等複數欄位
+  （連帶 R6.4）；container / lifecycle 順序契約完全不變。
+- **閘門**：typecheck / lint / test (465 cases) / format:check /
+  handlers:gen:check / knip — 全綠。
+
+---
+
 ## 2026-05-21 — `DatabaseError` messageKey 格式修正（D9 交界 bug）
 
 - **元件**：C4 Persistence、C6 Handlers、C7 i18n（交界修正，不改 task 勾選）

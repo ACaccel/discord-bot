@@ -18,7 +18,21 @@ D5（方案 A）已完成 — `ConnectionManager`（`MongoConnectionManager` / `
 
 交叉引用：`requireGuildRepos`（C6 D5）與 `BaseBot` 完整退化（C11 D5）會進一步收斂讀取來源。
 
+## 現況補充（R2 後）
+
+- `infra/llm/models-catalog.ts` 移除 `setActiveModelCatalog` /
+  `getModelCatalog` / `listProviderModels` module-global，`infra/llm`
+  barrel 同步移除對應 re-export。`ModelCatalog` 類別保留為純資料持
+  有者（cache + API key map），由 `LlmChatPlugin.init` 透過
+  `ctx.registerInstance(TOKENS.ModelCatalog, ...)` 註冊；handler 經
+  `bot.modelCatalog?.list(provider)` 取用。
+
 ## 近期變更
 
+- 2026-05-24 — R2：`models-catalog.ts` 移除 `let activeModelCatalog`
+  與 `setActive*` / `getModel*` / `listProviderModels` 全部
+  module-global；`infra/llm` barrel 同步收斂。新增
+  `test/unit/infra/llm/models-catalog.test.ts` 驗證 DI 接線
+  (tech-debt R2)
 - 2026-05-21 — D5 收斂：`ConnectionManager` retry / 降級分類 / `isDisabled()`；`isTransient` helper 落於 `persistence/error-translator.ts`；`BaseBot.disabledGuilds` 改為唯讀查詢 getter。
 - 2026-05-21 — 建立元件 wiki 頁（工程基礎建設）。

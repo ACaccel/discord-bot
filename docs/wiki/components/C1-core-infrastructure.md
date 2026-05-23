@@ -15,6 +15,12 @@ barrel `index.ts`），經 `@core/scheduling` 由 giveaway / activity plugin 共
 
 ## 近期變更
 
+- 2026-05-24 — R6.2：`ConfigurationError` 新增 codes `BOT_LOGIN_FAILED`
+  與 `BOT_LOGIN_NO_USER`，配合 `BaseBot.login` 失敗 reject。對應 i18n
+  keys `errors:bot.login_failed` / `errors:bot.login_no_user` 同步加入
+  zh-TW 與 en catalog (tech-debt R6.2)
+- 2026-05-24 — R6.3：`src/core/config/bootstrap-logger.ts` 改由
+  `src/deploy.ts` 主動取用（取代既有 23 處 `console.*` 自由輸出） (tech-debt R6.3)
 - 2026-05-21 — D4：新增 `src/core/scheduling/` 子模組，承接 `JobManager` 與
   `parseDuration`；單元測試達 core 覆蓋門檻（行 / 函式 / 敘述 / 分支皆 100%）。
 - 2026-05-21 — 建立元件 wiki 頁（工程基礎建設）。

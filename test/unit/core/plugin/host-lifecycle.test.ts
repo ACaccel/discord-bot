@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { createLogger } from '../../../../src/core/logger';
 import { systemClock } from '../../../../src/core/time';
+import { createContainer } from '../../../../src/core/ioc';
 import { EventDispatcher } from '../../../../src/core/plugin/event-dispatcher';
 import {
   PluginLifecycleRunner,
@@ -35,6 +36,7 @@ const buildHost = (plugins: readonly Plugin<unknown>[]): LifecycleHost => {
     resolve: (() => {
       throw new Error('not used');
     }) as LifecycleHost['resolve'],
+    container: createContainer(),
     dispatcher: new EventDispatcher(silent),
     logger: silent,
     translator: fakeTranslator,

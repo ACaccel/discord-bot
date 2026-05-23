@@ -10,11 +10,11 @@
  * signal instead of a stale guess.
  *
  * The cache and API keys are instance state on the `ModelCatalog`
- * class, not module-level globals: two bots in one process (the test
- * harness, a multi-tenant deploy) each get their own catalog without
- * clobbering each other. The plugin holds the instance and the
- * `/ai_settings` handler reaches it through the bot-scoped accessor —
- * per-bot isolation, explicit init order, testable.
+ * class. R2 removed the prior module-scope holder + `setActive` /
+ * `getActive` / `listProviderModels` shims: the catalog is now
+ * published by `LlmChatPlugin.init` through
+ * `ctx.registerInstance(TOKENS.ModelCatalog, ...)` and consumers
+ * (the `/ai_settings` handler) reach it via `bot.modelCatalog`.
  */
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
@@ -148,36 +148,3 @@ async function fetchGeminiModels(apiKey: string): Promise<string[]> {
 function normalizeList(list: string[]): string[] {
   return Array.from(new Set(list)).sort().slice(0, SELECT_MENU_MAX_OPTIONS);
 }
-
-/**
- * Module-level holder for the bot-scoped catalog.
- *
- * The plugin contract intentionally does not expose a way for plugins
- * to register IoC tokens (per the Service Locator anti-pattern guard
- * in eslint.config.mjs:88-112) and handlers cannot resolve from the
- * container either. The catalog therefore lives behind this thin
- * accessor pair, set once during `LlmChatPlugin.init` and read by
- * `/ai_settings` and `/ai_status` handlers via {@link
- * getModelCatalog}.
- *
- * Per-bot isolation in tests: tests construct their own ModelCatalog
- * directly (the class is exported) — they do NOT call
- * `setActiveModelCatalog`. Production has exactly one llm-chat bot.
- */
-let activeModelCatalog: ModelCatalog | undefined;
-
-export const setActiveModelCatalog = (catalog: ModelCatalog): void => {
-  activeModelCatalog = catalog;
-};
-
-export const getModelCatalog = (): ModelCatalog | undefined => activeModelCatalog;
-
-/**
- * Convenience accessor for handlers that need the live model list.
- * Returns `[]` when the catalog is not yet active (e.g. a pre-init
- * dispatch in tests). Treats a missing catalog the same as a cache
- * miss — the empty-array contract is part of the synchronous `/ai_settings`
- * Discord-reply window.
- */
-export const listProviderModels = (provider: LLMProviderName): string[] =>
-  activeModelCatalog?.list(provider) ?? [];

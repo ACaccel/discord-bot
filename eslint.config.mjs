@@ -53,7 +53,17 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'warn',
       'import/no-cycle': 'error',
       'import/no-self-import': 'error',
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      // R6.5: all `import` statements must form a single contiguous
+      // block at the top of the file. Prevents the pre-R1 pattern in
+      // `src/bot/index.ts` where module-level helpers were wedged
+      // between two import groups.
+      'import/first': 'error',
+      // R6.3: `console.*` is banned outside the test / scripts override
+      // below. `console.error` is permitted as a last-resort fallback
+      // for the deploy CLI's top-level catch and any future site where
+      // the structured logger itself is unavailable; every such call
+      // site must carry a `// last-resort` comment.
+      'no-console': ['error', { allow: ['error'] }],
       eqeqeq: ['error', 'always'],
     },
   },
@@ -107,6 +117,53 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  // R3: plugin layer must reach the IoC surface only through the
+  // `core/plugin` barrel (which re-exports TOKENS / ServiceToken /
+  // Resolver). Direct imports from `core/ioc` are blocked so the
+  // container's write-side surface stays a composition-root privilege.
+  // Kept as a separate block (rather than merged with the layered
+  // service-locator guard above) so the error message can point
+  // plugin authors at the correct alternative path.
+  {
+    files: ['src/plugins/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/core/ioc', '**/core/ioc/*', '@core/ioc', '@core/ioc/*'],
+              message: 'Plugins must import TOKENS / ServiceToken from core/plugin, not core/ioc.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // R4: Handler index files must stay readable. Cap any file under
+  // src/handlers/**/*.ts at 150 visible lines (imports + JSDoc + blanks
+  // included) to enforce the rule that pure helpers be split into
+  // sibling kebab-case files. Discord I/O, permission checks, Translator
+  // calls, and reply assembly stay in index.ts; everything else moves out.
+  {
+    files: ['src/handlers/**/*.ts'],
+    ignores: [
+      // Codegen artifact — one import per handler, naturally long.
+      'src/handlers/**/registry.generated.ts',
+      // Handler-framework base class + localizer (single function file).
+      // Tracked as R4 PR follow-up: revisit only when functional changes land.
+      'src/handlers/commands/command.ts',
+      // Shared Discord helpers used by many handlers. Follow-up: keep
+      // until a refactor extracts cohesive sub-modules.
+      'src/handlers/commands/discord-helpers.ts',
+      // Cross-handler error -> reply mapping table. Follow-up: consider
+      // splitting the map into error-reply-map.ts.
+      'src/handlers/reply-for-error.ts',
+    ],
+    rules: {
+      'max-lines': ['error', { max: 150, skipBlankLines: false, skipComments: false }],
     },
   },
   // Test files: relax some rules.

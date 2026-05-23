@@ -35,11 +35,6 @@ export { AnthropicProvider } from './anthropic-provider';
 export { GeminiProvider } from './gemini-provider';
 export { XAIProvider } from './xai-provider';
 
-export {
-  ModelCatalog,
-  setActiveModelCatalog,
-  getModelCatalog,
-  listProviderModels,
-} from './models-catalog';
+export { ModelCatalog } from './models-catalog';
 export type { LlmProviderApiKeys } from './registry';
 export { calculateCost, formatUsageFooter } from './pricing';

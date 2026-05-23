@@ -16,7 +16,7 @@
  * `ctx.resolve`. The resolver is a O(1) map lookup and avoids holding
  * mutable plugin state across the host's lifecycle.
  */
-import { TOKENS } from '../../core/ioc';
+import { TOKENS } from '../../core/plugin';
 import type { GuildRegistry } from '../../core/guild-registry';
 import type { Logger } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';

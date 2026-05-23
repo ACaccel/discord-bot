@@ -27,6 +27,22 @@ D3 已落地：`src/events/` 目錄已由 C8 刪除，CJK scanner（`test/i18n/n
 
 ## 近期變更
 
+- 2026-05-24 — R6.3 / R6.5：`eslint.config.mjs` 將 `no-console` 由
+  `['warn', { allow: ['warn', 'error'] }]` 提至 `['error', { allow:
+['error'] }]`（test / scripts override 維持 `off`），並新增
+  `'import/first': 'error'` 守住 `src/bot/index.ts` 與所有 barrel
+  files 的「imports 連續區塊」契約。三個 `vi.mock` 測試檔加 inline
+  `eslint-disable import/first` (tech-debt R6.3 / R6.5)
+- 2026-05-24 — R4：`eslint.config.mjs` 新增 `src/handlers/**/*.ts` 的
+  `max-lines` block（max 150、`skipBlankLines: false`、`skipComments: false`、
+  違規 error）。`ignores` 顯式列入 `registry.generated.ts` 與三個框架/共用檔
+  （`command.ts` / `discord-helpers.ts` / `reply-for-error.ts`）並附 inline
+  comment 註明為 PR follow-up。CI lint 對 4 個示範 handler 由 red → green
+  (tech-debt R4)
+- 2026-05-24 — R3：`eslint.config.mjs` 新增 `src/plugins/**` 的
+  `no-restricted-imports` block，禁止直接 import `core/ioc`；新增
+  `test/unit/eslint/plugin-ioc-import-rule.test.ts` 程式化 ESLint
+  fixture 鎖定這條規則的行為 (tech-debt R3)
 - 2026-05-21 — D3 落地：CJK scanner `SCOPED_DIRECTORIES` 與 eslint
   service-locator guard 移除已刪除的 `src/events` / `src/features` 範圍。
 - 2026-05-21 — D8 落地：strict tsconfig 涵蓋全 `src`，掃除 handler 嚴格模式違規。

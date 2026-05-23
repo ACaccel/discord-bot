@@ -241,6 +241,12 @@ export class PluginHost {
       disabled: this.disabled,
       dependents: this.dependents,
       resolve: this.buildResolver(),
+      // Container is exposed to the lifecycle runner so it can publish
+      // plugin-registered instances via `registerInstance`. The narrow
+      // `LifecycleHost` interface keeps this from widening any further
+      // boundary — plugins still receive only the typed-token resolver
+      // and the `registerInstance` facade, never the container itself.
+      container: this.options.container,
       dispatcher: this.dispatcher,
       logger: this.options.logger,
       translator: this.options.translator,

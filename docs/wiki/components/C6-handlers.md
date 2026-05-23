@@ -55,6 +55,25 @@ error, fallbackKey, guildId?)`:operator 通道恆記結構化 log(完整錯誤 +
 
 ## 近期變更
 
+- 2026-05-24 — R6.3 / R6.5：5 個 handler barrel (`commands` / `buttons` /
+  `modals` / `select-menus` / `reactions`) 重排為 `imports → re-exports →
+body`；`commands` barrel 移除一段註解 `console.log(info/message/err)`
+  死碼與一處 `console.log(hourTPE)`（改為 `bot.logger?.debug`）；
+  `delete_reply` 60-line block-commented 死碼直接刪除 (tech-debt R6.3 / R6.5)
+- 2026-05-24 — R4:4 個示範 handler 拆分 helper + 行數規範入文件。
+  `db_list_message`(320→135 行)、`inspect_member_ids`(172→89 行)、
+  `emoji_frequency`(158→121 行)、`ai_settings`(161→68 行)的 pure helper
+  抽到同目錄 sibling 檔(`parse-range.ts` / `render-reactions.ts` /
+  `sanitize-mentions.ts` / `chunk-output.ts` / `format-message-lines.ts` /
+  `build-archive-attachment.ts` / `resolve-display-name.ts` /
+  `parse-ids.ts` / `format-helpers.ts` / `format-member-fields.ts` /
+  `clamp-options.ts` / `aggregate-emoji-counts.ts` / `rank-emoji.ts` /
+  `format-leaderboard.ts` / `provider-choices.ts` /
+  `validate-ai-settings.ts` / `build-settings-modal.ts`),每個 helper
+  有對應 unit test 於 `test/unit/handlers/<name>/`。`index.ts` 僅留
+  Discord I/O + 權限 + Translator + 回覆組裝。`parseStartEnd` 加上
+  calendar range guard(month 1-12 / day 1-31)以提早 null,不改變對合法輸入
+  的對外行為 (tech-debt R4)
 - 2026-05-21 — D4(C6 切片):`src/utils/bot_cmd.ts` / `misc.ts` 的 handler 專用
   函式承接於 `command-builder.ts` 與 `discord-helpers.ts`(gap D4)。
 - 2026-05-21 — D5/D7/D9 收斂:`requireGuildRepos` 改讀 `ConnectionManager`;

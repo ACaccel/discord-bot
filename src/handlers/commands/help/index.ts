@@ -23,7 +23,7 @@ export default class help extends Command {
             }
 
             let  helpContent = '## Help Message\n';
-            helpContent += bot.help_msg;
+            helpContent += bot.helpMessage;
             helpContent += bot.translator?.t('replies:help.commands_header') ?? '';
             bot.commandHandlers.forEach((cmd) => {
                 if (cmd.config) {

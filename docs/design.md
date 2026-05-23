@@ -1,109 +1,91 @@
-# 詳細設計文件 — Discord Bot 架構（索引）
+# 詳細設計文件（索引）— Tech-Debt Cleanup (R1–R6)
 
-| 欄位     | 內容                                                                                   |
-| -------- | -------------------------------------------------------------------------------------- |
-| 文件類型 | 詳細設計（Detailed Design）                                                            |
-| 文件版本 | 1.0                                                                                    |
-| 最後更新 | 2026-05-20                                                                             |
-| 上游文件 | [`docs/proposal.md`](proposal.md)、[`docs/high-level-design.md`](high-level-design.md) |
-| 讀者     | 技術團隊 / 工程師 / 架構審查者                                                         |
-
----
-
-## 1. 文件目的
-
-本文件是 [`docs/high-level-design.md`](high-level-design.md)（HLD）所切分之 11 個元件（C1–C11）的**詳細設計**。HLD 描述「系統應如何被切分」，本文件則描述「每個元件內部的類別、介面、互動與測試策略」，作為實作與審查的依據。
-
-**撰寫基準**：本文件**以現況 codebase 為準**。每個元件檔逐一比對其對應的 HLD 段落，凡實作與 HLD（或 proposal）有出入者，於該檔的「§7 與 HLD 的偏差」段落明確標註，不靜默略過。
-
-**分檔組織**：每個元件一個獨立檔案，置於 [`docs/design/`](design/) 之下。各檔結構一致：
-
-1. 元件職責與邊界
-2. 類別／介面詳細設計（含 TypeScript 簽章）
-3. 類別圖（mermaid）
-4. 關鍵流程序列圖（mermaid）
-5. 採用的 design pattern 與理由
-6. 獨立性與測試策略
-7. 錯誤處理與邊界契約
-8. 與 HLD 的偏差（如有）
+| 欄位     | 內容                                                                                       |
+| -------- | ------------------------------------------------------------------------------------------ |
+| 對應需求 | [docs/proposal.md](proposal.md)                                                            |
+| 對應概要 | [docs/high-level-design.md](high-level-design.md)                                          |
+| 文件層級 | Per-R 詳細設計——含 TypeScript 介面骨架、class 骨架、採用 design pattern + 理由、測試驗收點 |
+| 組織方式 | 本檔為索引；每個 R 一份獨立詳細設計文件，可獨立 review / 實作 / 測試                       |
 
 ---
 
-## 2. 元件清單
+## 1. 詳細設計目錄
 
-| 元件 | 名稱                  | 路徑                         | 詳細設計檔                                                          |
-| ---- | --------------------- | ---------------------------- | ------------------------------------------------------------------- |
-| C1   | Core Infrastructure   | `src/core/`（除 ioc/plugin） | [C1-core-infrastructure.md](design/C1-core-infrastructure.md)       |
-| C2   | IoC Container         | `src/core/ioc/`              | [C2-ioc-container.md](design/C2-ioc-container.md)                   |
-| C3   | Plugin Runtime        | `src/core/plugin/`           | [C3-plugin-runtime.md](design/C3-plugin-runtime.md)                 |
-| C4   | Persistence           | `src/persistence/`           | [C4-persistence.md](design/C4-persistence.md)                       |
-| C5   | Infra Adapters        | `src/infra/`                 | [C5-infra-adapters.md](design/C5-infra-adapters.md)                 |
-| C6   | Handlers              | `src/handlers/`              | [C6-handlers.md](design/C6-handlers.md)                             |
-| C7   | i18n Catalog          | `src/i18n/locales/`          | [C7-i18n-catalog.md](design/C7-i18n-catalog.md)                     |
-| C8   | Plugins               | `src/plugins/`               | [C8-plugins.md](design/C8-plugins.md)                               |
-| C9   | Codegen & Scripts     | `scripts/`                   | [C9-codegen-scripts.md](design/C9-codegen-scripts.md)               |
-| C10  | Quality Gates         | CI / 設定檔                  | [C10-quality-gates.md](design/C10-quality-gates.md)                 |
-| C11  | Bot Composition Roots | `src/bot/`                   | [C11-bot-composition-roots.md](design/C11-bot-composition-roots.md) |
+| R   | 主題                                                            | 詳細設計文件                      |
+| --- | --------------------------------------------------------------- | --------------------------------- |
+| R1  | 拆解 BaseBot 為 thin lifecycle owner（3 個 collaborator）       | [docs/design/R1.md](design/R1.md) |
+| R2  | 消除 DI 旁路（PluginContext.registerInstance）                  | [docs/design/R2.md](design/R2.md) |
+| R3  | plugins ↔ core/ioc 契約對齊（core/plugin barrel 唯一窗口）      | [docs/design/R3.md](design/R3.md) |
+| R4  | 過長 handler 拆分 + 行數規範 + ESLint enforce                   | [docs/design/R4.md](design/R4.md) |
+| R5  | i18n catalog 路徑反耦合（`localesDir` 改必填）                  | [docs/design/R5.md](design/R5.md) |
+| R6  | 5 個低優先單點清理（traceId / login / console / 命名 / import） | [docs/design/R6.md](design/R6.md) |
 
 ---
 
-## 3. 元件依賴總覽
+## 2. 共通設計原則
 
-```mermaid
-flowchart TB
-    C11[C11 Bot 組裝根]
-    C8[C8 Plugins]
-    C6[C6 Handlers]
-    C7[C7 i18n Catalog]
-    C5[C5 Infra Adapters]
-    C4[C4 Persistence]
-    C3[C3 Plugin Runtime]
-    C2[C2 IoC Container]
-    C1[C1 Core Infrastructure]
-    C9[C9 Codegen]
-    C10[C10 Quality Gates]
+所有 R 詳細設計文件遵守下列共通契約，不在各文件重述：
 
-    C11 --> C8 & C6 & C3 & C5 & C4 & C2 & C1
-    C8 --> C6 & C5 & C4 & C3 & C1
-    C6 --> C4 & C5 & C7 & C1
-    C5 --> C4 & C1
-    C4 --> C1
-    C3 --> C2 & C1
-    C2 --> C1
-    C9 -.scans.-> C6
-    C10 -.gates.-> C1
-```
+### 2.1 模組獨立性
 
-依賴單向向下。`C1` 不 import `src/` 內任何其他模組，亦不依賴 Discord.js / Mongoose / LLM SDK（型別匯入除外）。注意 `C5 → C4`：`infra/mongo` 的 `ConnectionManager` 依賴 `persistence/schemas` 建構 model registry，此為 HLD 依賴圖未顯示的一條真實邊（見 C5 設計檔）。
+- 每個新類別 / 每個改寫單元都應能**獨立進行單元測試**——不依賴 Discord client 即時實體、不依賴實際 Mongo 連線、不依賴實體檔案系統（除非該類別的職責本身就是 I/O）。
+- 對外副作用（網路、I/O、時間、隨機）一律由 constructor 注入抽象 seam（`Clock`、`Logger`、`ServiceContainer`、`Translator` 等）。
+- 「獨立可測」是設計階段就要回答的問題；任何類別若無法寫出單元測試案例，視為設計缺陷。
+
+### 2.2 採用的 design pattern 速查
+
+| Pattern                     | 採用場景                                                                              | 出現的 R   |
+| --------------------------- | ------------------------------------------------------------------------------------- | ---------- |
+| Composition                 | BaseBot 由 collaborator 組成（GuildRegistrar / ClientEventBridge / GuildDbConnector） | R1         |
+| Facade                      | `ctx.registerInstance` 是 ServiceContainer 寫入面的窄面 facade                        | R2         |
+| Adapter                     | `ClientEventBridge` 把 Discord raw event 轉成 domain event                            | R1         |
+| Strategy（既有沿用）        | 既有 InteractionRouter middleware chain、LLMProvider                                  | R1（沿用） |
+| Repository（既有沿用）      | Persistence 層                                                                        | R1（沿用） |
+| Result / Either（既有沿用） | 錯誤路徑                                                                              | R1 / R6.2  |
+| Module barrel               | `core/plugin/index.ts` 為 plugin 對 IoC 的唯一公開窗口                                | R3         |
+| Guard clause                | `PluginContext.registerInstance` 的時機檢查                                           | R2         |
+
+詳細採用理由與替代方案比較寫在各 R 文件的「Pattern 採用」章節。
+
+### 2.3 命名與型別約定
+
+- 公開類別 / 介面：PascalCase。
+- 模組私有 helper：camelCase。
+- 集合命名一律用複數（R6.4 在 R1 commit 內同步落地）。
+- Result 用 `Result<T, E extends DomainError>`；error 型別以 `core/errors/` 既有 taxonomy 為準。
+- 任何 token 都在 `src/core/ioc/tokens.ts` 集中宣告；新增 token 一律走 `core/plugin` re-export 對 plugin 暴露（R3）。
+
+### 2.4 測試章節結構
+
+每份 R 文件的「測試設計」章節都按下列結構：
+
+1. **測試驗收點**：以類別為單位列出必要案例（happy path、邊界、error path）。
+2. **Fixture / Mock 策略**：哪些依賴用 fake，哪些用 mock，哪些走真實實作。
+3. **整合面**：跨類別 / 跨 R 的整合測試在哪個 spec 集中驗證。
+
+不在共通章節重述，但所有 R 文件遵守同一結構。
+
+### 2.5 文件級別的「不做」
+
+下列議題在所有 R 詳細設計中皆**不展開**（在各 R 的「不做的設計決策」章節重申其與該 R 的相關性）：
+
+- 不替換 IoC 框架。
+- 不引入 `reflect-metadata`。
+- 不為了 R 而引入新的 Design Pattern（如 Mediator、CQRS）。
+- 不修改既有 Plugin / handler 的 i18n key、catalog 結構、Discord 指令簽名。
 
 ---
 
-## 4. 元件獨立性原則
+## 3. 文件互讀順序建議
 
-本文件貫徹「component 間互相獨立、可獨立測試」的要求。獨立性透過三項機制達成，每個元件檔的 §6 會具體展開：
+對於本輪實作工程師：
 
-1. **介面優先**：跨元件依賴一律對介面（`Repos` 介面、`LLMService`、`ServiceToken<T>`、`ConnectionManager`、`Translator`、`Clock`、`Logger`），不對具體類別。
-2. **建構子注入**：分層程式碼透過建構子或工廠參數取得依賴；只有組裝根（C11）與測試可觸及 IoC 容器（由 ESLint `no-restricted-imports` 強制）。
-3. **可替換的測試替身**：每個元件提供 in-memory fake、`FakeClock`、SDK client 注入孔（nock contract test）、`StaticConnectionManager`（mongodb-memory-server）等替身接點。
+1. 先讀 [proposal.md](proposal.md)（為什麼做）
+2. 再讀 [high-level-design.md](high-level-design.md)（架構演變總覽）
+3. 依 R1 → R2 → R3 → R4 → R5 → R6 順序讀對應 design/R\*.md（實作前直接照詳細設計做）
+4. 每完成一個 R，回到 proposal §10.4 退場條件檢查清單對齊
 
----
+對於 reviewer：
 
-## 5. 已知的現況與 HLD 偏差（彙總）
-
-下列偏差於對應元件檔詳述。彙總於此供快速索引：
-
-| #   | 偏差                                                                                                                    | 涉及元件    | 詳見          |
-| --- | ----------------------------------------------------------------------------------------------------------------------- | ----------- | ------------- |
-| D1  | 不存在 guild-onboarding port；`guildCreate` 仍由 `src/events/guild_event.ts` 處理                                       | C3、C8、C11 | C3 §7、C8 §7  |
-| D2  | 不存在 `earthquake` plugin；地震速報仍是 `src/events/earthquake.ts` + `nijika/index.ts` inline 路由                     | C8、C11     | C8 §7         |
-| D3  | `src/events/` 過渡層仍存在（`earthquake.ts`、`guild_event.ts`、`index.ts`）                                             | C8          | C8 §7         |
-| D4  | `src/utils/` 仍存在（`bot_cmd.ts`、`job_manager.ts`、`misc.ts`、`index.ts`），giveaway/activity 仍 import 之            | C8、C11     | C8 §7         |
-| D5  | `ConnectionManager` 無 retry／transient-vs-persistent 分類／`disabledGuilds` map；`disabledGuilds` 追蹤實際在 `BaseBot` | C5、C11     | C5 §7、C11 §7 |
-| D6  | `host/` 僅 3 檔（`errors`、`topology`、`contributes-merger`），無 `lifecycle.ts`；lifecycle 邏輯內聯於 `host.ts`        | C3          | C3 §7         |
-| D7  | i18n catalog 僅 `zh-TW` 一個語系；`commands.json` 為空 `{}`                                                             | C7          | C7 §7         |
-| D8  | strict tsconfig（`tsconfig.strict.json`）尚未涵蓋 `src/bot/**`、`src/handlers/**`                                       | C10         | C10 §7        |
-| D9  | handler 邊界不直接 `catch (DomainError)`；採 try/catch + 硬編碼 i18n key。`DomainError.messageKey` 由 plugin 層消費     | C6          | C6 §7         |
-
-> 這些偏差代表 proposal／HLD 描述的「目標設計」尚有未落地處。本文件忠實記錄現況，並在偏差段落標示「目標 vs 現況」差距。
-
-完整的收斂工作清單（含優先級、修正步驟、待決議點）見 [`docs/design/gaps.md`](design/gaps.md)。
+- 程式碼層級評審以對應 R 的 design 文件為對照。
+- 跨 R 的整合議題以本索引 §2 的共通設計原則為對照。

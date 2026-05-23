@@ -76,7 +76,6 @@ export default class random_restaurant extends Command {
                     max_rating
                 }
             });
-            //console.log(response.data);
             const message = response.data.message;
             const address = response.data.restaurant.address;
             const phone = response.data.restaurant.phone;
@@ -99,7 +98,7 @@ export default class random_restaurant extends Command {
             const now = new Date();
             // 換算成台灣時間 (UTC+8)
             const hourTPE = (now.getUTCHours() + 8) % 24;
-            console.log(hourTPE)
+            bot.logger?.debug({ hourTPE }, 'random_restaurant: computing Taipei hour for fallback copy.');
             if (hourTPE >= 0 && hourTPE < 6) {
                 await interaction.editReply({ content: bot.translator?.t('replies:random_restaurant.midnight') ?? '' });
             } else {

@@ -47,5 +47,12 @@
   "configuration": {
     "missing_env": "The environment variable `{{envVar}}` is not set. Please contact an administrator."
   },
+  "plugin": {
+    "lifecycle_phase_violation": "Plugin `{{plugin}}` called registerInstance(`{{token}}`) during phase `{{phase}}`; only `init` is allowed."
+  },
+  "bot": {
+    "login_failed": "Failed to log in to Discord ({{clientId}}).",
+    "login_no_user": "Logged in to Discord but no user was returned ({{clientId}})."
+  },
   "unexpected": "An unexpected error occurred while running the command. An administrator has been notified (error ID: {{traceId}})."
 }

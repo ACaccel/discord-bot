@@ -9,7 +9,9 @@
  * this module from reaching into arbitrary host internals, so
  * modularity is type-enforced rather than discipline-enforced.
  */
+import { ConfigurationError } from '../../errors';
 import type { Translator } from '../../i18n';
+import type { ServiceContainer, ServiceToken } from '../../ioc';
 import type { Logger } from '../../logger';
 import type { Clock } from '../../time';
 import type { EventDispatcher } from '../event-dispatcher';
@@ -22,10 +24,21 @@ import type {
   PluginRuntimeContext,
   PluginRuntimeServices,
   PluginStartContext,
+  RegisterInstance,
   TypedResolver,
 } from '../types';
 import { CriticalPluginFailureError } from './errors';
 import { cascadeDisable } from './topology';
+
+/**
+ * Discrete lifecycle phases the runner walks through. `'idle'` is the
+ * pre-`runInit` start state; `'running'` is everything after a phase's
+ * synchronous body has returned (including the gap between phases) so
+ * late-arriving async callbacks from a finished hook still see a
+ * non-`'init'` phase. `'shutdown'` is set for the duration of
+ * `runShutdown`.
+ */
+export type LifecyclePhase = 'idle' | 'init' | 'start' | 'ready' | 'running' | 'shutdown';
 
 /**
  * A registered plugin together with its validated config. Mirrors the
@@ -55,6 +68,13 @@ export interface LifecycleHost {
   readonly dependents: ReadonlyMap<PluginId, ReadonlySet<PluginId>>;
   /** Typed-token resolver handed to plugin contexts. */
   readonly resolve: TypedResolver;
+  /**
+   * Container the runner uses to publish plugin-registered instances
+   * (see {@link RegisterInstance}). The narrow `LifecycleHost` is the
+   * single boundary through which the runner can mutate container
+   * state; no other path is exposed.
+   */
+  readonly container: ServiceContainer;
   /** Event dispatcher subscriptions are attached to after `start`. */
   readonly dispatcher: EventDispatcher;
   readonly logger: Logger;
@@ -74,15 +94,35 @@ export interface LifecycleHost {
  *  - `onShutdown` failures are always non-fatal.
  */
 export class PluginLifecycleRunner {
+  /**
+   * Current lifecycle phase. Mutated only by `runInit` / `runStart` /
+   * `runReady` / `runShutdown` (and their `finally` blocks).
+   *
+   * Captured by the `registerInstance` closure built in
+   * {@link buildInitContext} so that even a plugin which stores its
+   * init context and calls `registerInstance` from a later phase still
+   * trips the stage guard — the closure reads `this.phase` at call
+   * time, not at context-build time.
+   */
+  private phase: LifecyclePhase = 'idle';
+
   constructor(private readonly host: LifecycleHost) {}
 
   /** Run `init` on every enabled plugin in topological order. */
   public async runInit(): Promise<void> {
-    await this.runPhase('init', async (entry, ctx) => {
-      if (entry.plugin.init !== undefined) {
-        await entry.plugin.init(ctx as PluginInitContext<unknown>);
-      }
-    });
+    this.phase = 'init';
+    try {
+      await this.runPhase('init', async (entry, ctx) => {
+        if (entry.plugin.init !== undefined) {
+          await entry.plugin.init(ctx as PluginInitContext<unknown>);
+        }
+      });
+    } finally {
+      // Switch off the init guard even when a critical plugin failure
+      // bubbles up — otherwise a late-resolving async tail from inside
+      // a failed init could still sneak a registerInstance through.
+      this.phase = 'running';
+    }
   }
 
   /**
@@ -91,21 +131,31 @@ export class PluginLifecycleRunner {
    * event dispatcher.
    */
   public async runStart(): Promise<void> {
-    await this.runPhase('start', async (entry, ctx) => {
-      if (entry.plugin.start !== undefined) {
-        await entry.plugin.start(ctx as PluginStartContext);
-      }
-    });
+    this.phase = 'start';
+    try {
+      await this.runPhase('start', async (entry, ctx) => {
+        if (entry.plugin.start !== undefined) {
+          await entry.plugin.start(ctx as PluginStartContext);
+        }
+      });
+    } finally {
+      this.phase = 'running';
+    }
     this.attachEventSubscriptions();
   }
 
   /** Run `onReady` on every enabled plugin in topological order. */
   public async runReady(): Promise<void> {
-    await this.runPhase('onReady', async (entry, ctx) => {
-      if (entry.plugin.onReady !== undefined) {
-        await entry.plugin.onReady(ctx as PluginRuntimeContext);
-      }
-    });
+    this.phase = 'ready';
+    try {
+      await this.runPhase('onReady', async (entry, ctx) => {
+        if (entry.plugin.onReady !== undefined) {
+          await entry.plugin.onReady(ctx as PluginRuntimeContext);
+        }
+      });
+    } finally {
+      this.phase = 'running';
+    }
   }
 
   /**
@@ -114,6 +164,7 @@ export class PluginLifecycleRunner {
    * subscriptions are detached for every enabled plugin.
    */
   public async runShutdown(): Promise<void> {
+    this.phase = 'shutdown';
     const reverse = [...this.host.order].reverse();
     for (const id of reverse) {
       if (this.host.disabled.has(id)) continue;
@@ -233,9 +284,54 @@ export class PluginLifecycleRunner {
   }
 
   private buildInitContext(entry: RegisteredPlugin): PluginInitContext<unknown> {
+    const pluginId = entry.plugin.id;
+    // The closure captures `this` (and thereby the live `phase`) so
+    // every call site reads the phase at *invocation* time. A plugin
+    // that stashes the ctx and triggers registerInstance from `start`
+    // therefore still fails the stage guard.
+    const registerInstance: RegisterInstance = <T>(token: ServiceToken<T>, instance: T): void => {
+      this.assertInitPhase(pluginId, token);
+      // Wrap as a constant singleton factory so the container's existing
+      // singleton cache + DuplicateRegistrationError semantics apply
+      // uniformly — registerInstance is a facade, not a parallel path.
+      this.host.container.registerSingleton(token, () => instance);
+    };
     return Object.freeze({
       ...this.buildRuntimeServices(entry),
       config: entry.config,
+      registerInstance,
     }) as PluginInitContext<unknown>;
+  }
+
+  /**
+   * Stage guard for `registerInstance`. Lives on the runner — not on
+   * the per-plugin context object — so the captured closure always
+   * sees the *current* lifecycle phase, even if the plugin smuggled
+   * the init ctx into a later hook.
+   *
+   * Failure raises a {@link ConfigurationError} with code
+   * `'LIFECYCLE_PHASE_VIOLATION'` and the i18n key
+   * `errors:plugin.lifecycle_phase_violation`. The runner's existing
+   * try/catch turns this into the normal "plugin disabled" /
+   * "critical aborts the bot" flow; nothing about the error path is
+   * special-cased.
+   */
+  private assertInitPhase<T>(pluginId: PluginId, token: ServiceToken<T>): void {
+    if (this.phase === 'init') return;
+    throw new ConfigurationError({
+      code: 'LIFECYCLE_PHASE_VIOLATION',
+      messageKey: 'errors:plugin.lifecycle_phase_violation',
+      messageParams: {
+        plugin: pluginId,
+        token: token.description,
+        phase: this.phase,
+      },
+      context: {
+        operation: 'PluginLifecycleRunner.registerInstance',
+        pluginId,
+        token: token.description,
+        phase: this.phase,
+      },
+    });
   }
 }

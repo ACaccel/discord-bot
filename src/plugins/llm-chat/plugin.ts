@@ -20,14 +20,13 @@ import type { Message } from 'discord.js';
 
 import type { LlmProviderError } from '../../core/errors';
 import type { Translator } from '../../core/i18n';
-import { TOKENS } from '../../core/ioc';
+import { TOKENS } from '../../core/plugin';
 import type { Plugin } from '../../core/plugin';
 import {
   LLMService,
   ModelCatalog,
   createDefaultRegistry,
   formatUsageFooter,
-  setActiveModelCatalog,
   type LLMMessage,
   type LLMProviderName,
   type LLMResult,
@@ -163,18 +162,19 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
       const env = ctx.resolve(TOKENS.Env);
       llmService = new LLMService(createDefaultRegistry(env));
       // Build a per-bot ModelCatalog with the typed-Env-derived
-      // API-key map and publish it as the active catalog (handlers
-      // reach it through `listProviderModels`, which delegates to
-      // this instance). Encapsulating the cache + api-key map in a
-      // class keeps multiple bots in one process from clobbering each
-      // other's API keys.
+      // API-key map and publish it through the IoC container. R2
+      // replaced the prior `setActiveModelCatalog` module-global with
+      // `ctx.registerInstance` so the catalog reaches handlers via the
+      // bot's typed resolver (`bot.modelCatalog`); encapsulating the
+      // cache + api-key map in a class keeps multiple bots in one
+      // process from clobbering each other's API keys.
       const modelCatalog = new ModelCatalog({
         xai: env.XAI_API_KEY,
         openai: env.OPENAI_API_KEY,
         anthropic: env.ANTHROPIC_API_KEY,
         gemini: env.GEMINI_API_KEY,
       });
-      setActiveModelCatalog(modelCatalog);
+      ctx.registerInstance(TOKENS.ModelCatalog, modelCatalog);
       // Pre-warm each provider's live model catalog at boot. The call
       // returns a fallback sync while kicking off the SDK fetch, so by
       // the time `/ai_settings` is invoked the cache is usually warm.

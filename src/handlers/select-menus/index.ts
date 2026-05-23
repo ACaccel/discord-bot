@@ -2,9 +2,11 @@ import type {
     StringSelectMenuInteraction,
 } from 'discord.js';
 import type { BaseBot } from "@bot";
+import { logSystem } from '@core/logger';
 
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
+import { SSM_REGISTRY } from './registry.generated';
 
 //==================================================//
 // String Select Menu Custom ID: <ssm_type|ssm_value>
@@ -20,31 +22,28 @@ export const registerSSMs = async (bot: BaseBot) => {
     try {
         // todo: whether to specify handlers for each bot
         // import all string select menu handlers
-        bot.ssmHandler = createAllSSMHandlers();
+        bot.ssmHandlers = createAllSSMHandlers();
 
-        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.ssmHandler.size} string select menu handlers.`)
+        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.ssmHandlers.size} string select menu handlers.`)
     } catch (err) {
         logSystem(bot.logger, bot.clientId, `Failed to register string select menu handlers: ${err}`);
     }
 }
 
 export const executeSSM = async (interaction: StringSelectMenuInteraction, bot: BaseBot) => {
-    if (!bot.ssmHandler) {
+    if (!bot.ssmHandlers) {
         await replyTranslated(interaction, bot.translator, 'errors:command.handler_not_initialised');
         return;
     }
 
     // customId format: <ssm_type>|<ssm_value>
     const ssm_type = interaction.customId.split('|')[0] ?? '';
-    const handler = bot.ssmHandler.get(ssm_type);
+    const handler = bot.ssmHandlers.get(ssm_type);
     if (handler) {
         await handler.execute(interaction, bot);
     }
 }
 
-import { SSM_REGISTRY } from './registry.generated';
-
-import { logSystem } from '@core/logger';
 const ssmHandlerFactory = new HandlerFactory<SSMHandler>();
 ssmHandlerFactory.registerFromRegistry(SSM_REGISTRY);
 
