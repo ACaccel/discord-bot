@@ -53,6 +53,13 @@ beyond the framework rules (see [`project-conventions`]).
 - Apply least privilege; never log sensitive data (passwords, tokens, PII).
 - Keep dependencies minimal; do not add a dependency for a trivial task.
 
+> **Plugin 對 IoC 的依賴契約**：plugin 對 IoC 的依賴只能透過 `core/plugin` 取得
+> （`import { TOKENS, type ServiceToken } from '<path>/core/plugin'`）。任何 `src/plugins/**` 對
+> `core/ioc` 的直接 import 由 ESLint 在 lint 階段擋下。Plugin 可呼叫 `ctx.resolve(token)` 讀取依賴、
+> 可在 `init` hook 內呼叫 `ctx.registerInstance(token, instance)` 註冊已建構的實例；不得透過任何
+> 方式（包含對 `ctx` 強制 cast）取得 `ServiceContainer` 的寫入面 API。新 token 必須登錄在
+> `src/core/ioc/tokens.ts` 中央目錄，再由 `core/plugin` 的 `TOKENS` re-export 自動曝露給 plugin。
+
 ## 6. Error handling
 
 Error messages must be informative and actionable — an engineer reading the
