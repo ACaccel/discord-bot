@@ -2,21 +2,17 @@
  * VoicePlugin — owns the bot-scoped {@link VoiceRecorder} + the
  * per-session {@link VoiceConnection}.
  *
- * Module-holder pattern (mirrors `infra/llm/models-catalog.ts`): plugin
- * `init` constructs the controller and stores it in a module-scoped
- * holder. `BaseBot.run()` reads the holder after `host.initAll()` and
- * surfaces it on `bot.voice` so the handler access path is a single
- * field read. The handler does not construct or mutate the recorder;
- * it calls `bot.voice.start / stop / save`.
- *
- * The holder is a small compromise — the plugin contract intentionally
- * forbids re-entering the IoC container, so this is the documented
- * pattern for "plugin-built service that needs a stable cross-cut
- * lookup". See ModelCatalog for prior art.
+ * Wiring contract (R2): `init` builds the controller and publishes it
+ * under `TOKENS.VoiceController` via `ctx.registerInstance` — the
+ * narrow DI facade exposed only inside the init phase. Handlers reach
+ * the live controller through `bot.voice`, a getter that resolves the
+ * token from the IoC container. The prior module-scope holder
+ * (`internal/active-controller.ts`) has been removed; there is now
+ * exactly one path — IoC token resolution — from plugin to consumer.
  */
 import { TOKENS } from '../../core/ioc';
 import type { Plugin } from '../../core/plugin';
-import { setActiveVoiceController, VoiceController } from './internal';
+import { VoiceController } from './internal';
 
 const PLUGIN_ID = 'voice';
 const PLUGIN_VERSION = '1.0.0';
@@ -30,9 +26,9 @@ export const createVoicePlugin = (): Plugin => {
 
     async init(ctx): Promise<void> {
       const client = ctx.resolve(TOKENS.DiscordClient);
-      setActiveVoiceController(new VoiceController(client));
+      ctx.registerInstance(TOKENS.VoiceController, new VoiceController(client));
     },
   };
 };
 
-export { VoiceController, getActiveVoiceController } from './internal';
+export { VoiceController } from './internal';

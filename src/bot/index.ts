@@ -61,7 +61,7 @@ import {
     type ConnectionManager,
 } from '../infra/mongo/connection-manager';
 import { buildRepos, type Repos } from '../persistence/repositories';
-import { getActiveVoiceController, type VoiceController } from '../plugins/voice/internal';
+import type { VoiceController } from '../plugins/voice/internal';
 
 import {
     ClientEventBridge,
@@ -145,13 +145,18 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public helpMessage: string = '';
 
     /**
-     * Bot-scoped voice controller. Populated in {@link run} after
-     * `host.initAll()` returns; the VoicePlugin's `init` hook publishes
-     * the controller into a module-scoped holder we read here.
-     * Optional only to model bots that never register the plugin
-     * (e.g. msg-archive).
+     * Bot-scoped voice controller. Resolved from the IoC container on
+     * every access (R2): VoicePlugin's `init` hook publishes its
+     * controller under `TOKENS.VoiceController` through
+     * `ctx.registerInstance`, and this getter delegates to the
+     * container's `tryResolve` so a bot that never registered the
+     * plugin (e.g. msg-archive) naturally sees `undefined`. The lookup
+     * is O(1) on the singleton cache; no field-level memoisation is
+     * added because that would hide any future reload path.
      */
-    public voice?: VoiceController;
+    public get voice(): VoiceController | undefined {
+        return this.container.tryResolve<VoiceController>(TOKENS.VoiceController);
+    }
 
     /** Bot-scoped {@link Translator}. Undefined only in the pre-`run()` window. */
     public translator: Translator | undefined;
@@ -502,10 +507,10 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         host.buildEffectiveRegistries();
         this.pluginHost = host;
         await host.initAll();
-        // VoicePlugin publishes its controller into a module-scoped
-        // holder during init; surface it now so the record handler can
-        // reach it via `bot.voice`.
-        this.voice = getActiveVoiceController();
+        // VoicePlugin publishes its controller via
+        // `ctx.registerInstance(TOKENS.VoiceController, ...)`; the
+        // `bot.voice` getter resolves it on demand, so no post-init
+        // synchronisation is required here.
         return host;
     }
 
