@@ -6,6 +6,7 @@
  * and continued into `host.startAll()` / guild Mongo fan-out with a
  * half-attached client.
  */
+/* eslint-disable import/first */
 import { describe, expect, it, vi } from 'vitest';
 import type { Client } from 'discord.js';
 

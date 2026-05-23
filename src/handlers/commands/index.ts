@@ -4,9 +4,12 @@ import type {
     ContextMenuCommandInteraction,
 } from 'discord.js';
 import type { BaseBot } from "@bot";
-import { ops } from "../../core/logger";
+import { logError, logSystem, ops } from "../../core/logger";
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
+import { Command, localizeCommandConfig } from './command';
+import { buildCommandJsonBody } from './command-builder';
+import { COMMAND_REGISTRY } from './registry.generated';
 
 // Command metadata contract + i18n resolution live in `./command` so
 // this barrel (which pulls in the generated handler registry) is not a
@@ -21,9 +24,6 @@ export {
     type LocalizedCommandOption,
     type LocalizedCommandChoice,
 } from './command';
-import { Command, localizeCommandConfig } from './command';
-
-import { buildCommandJsonBody } from './command-builder';
 export { buildCommandJsonBody } from './command-builder';
 
 export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: BaseBot) => {
@@ -43,14 +43,6 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
 
 export const registerCommands = async (bot: BaseBot) => {
     logSystem(bot.logger, bot.clientId, ops.command.registerStart());
-
-    // const rest = new REST({ version: "10" }).setToken(bot.getToken());
-    // rest.on('rateLimited', (info: RateLimitData) => {
-    //     console.log(info);
-    // });
-    // rest.on('restDebug', (message: string) => {
-    //     console.log(message);
-    // });
 
     try {
         if (!bot.config.commands) {
@@ -76,22 +68,6 @@ export const registerCommands = async (bot: BaseBot) => {
             }
         });
         
-        // deprecated: use deploy.ts instead
-        // register commands to Discord API via REST (guild registration is instant)
-        // const rest_commands = getCommandJsonBody(bot.commandHandlers, bot);
-        // for (const [guildId] of Object.entries(bot.guildInfo)) {
-        //     await rest.put(
-        //         Routes.applicationGuildCommands(bot.clientId, guildId),
-        //         { body: rest_commands },
-        //     ).then(() => {
-        //         logSystem(bot.logger, bot.clientId, `Registered ${rest_commands.length} commands for guild ${guildId}`);
-        //     }).catch((err) => {
-        //         console.error(err);
-        //         logError(bot.logger, bot.clientId, guildId, `Failed to register commands for guild ${guildId}: ${err}`);
-        //     });
-        //     await new Promise(resolve => setTimeout(resolve, 60000)); // to avoid rate limit
-        // }
-
         logSystem(bot.logger, bot.clientId, ops.command.registerSuccess(bot.commandHandlers.size));
     } catch (err) {
         logSystem(bot.logger, bot.clientId, ops.command.registerFailed(String(err)));
@@ -123,9 +99,6 @@ export const executeCommand = async (interaction: ChatInputCommandInteraction | 
     }
 }
 
-import { COMMAND_REGISTRY } from './registry.generated';
-
-import { logError, logSystem } from '@core/logger';
 const commandHandlerFactory = new HandlerFactory<Command>();
 commandHandlerFactory.registerFromRegistry(COMMAND_REGISTRY);
 

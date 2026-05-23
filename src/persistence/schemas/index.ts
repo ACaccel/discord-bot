@@ -4,6 +4,14 @@
  * Each schema lives in its own file so a future change to one schema
  * does not invite drive-by edits to the others.
  */
+import { activitySchema, type ActivityDoc } from './activity.schema';
+import { fetchSchema, type FetchDoc } from './fetch.schema';
+import { giveawaySchema, type GiveawayDoc } from './giveaway.schema';
+import { messageSchema, type MessageDoc } from './message.schema';
+import { replySchema, type ReplyDoc } from './reply.schema';
+import { todoSchema, type TodoDoc } from './todo.schema';
+import { userApiSettingSchema, type UserApiSettingDoc } from './user-api-setting.schema';
+
 export { activitySchema, type ActivityDoc } from './activity.schema';
 export { fetchSchema, type FetchDoc } from './fetch.schema';
 export { giveawaySchema, type GiveawayDoc } from './giveaway.schema';
@@ -11,22 +19,6 @@ export { messageSchema, type MessageDoc } from './message.schema';
 export { replySchema, type ReplyDoc } from './reply.schema';
 export { todoSchema, type TodoDoc } from './todo.schema';
 export { userApiSettingSchema, type UserApiSettingDoc } from './user-api-setting.schema';
-
-import { activitySchema } from './activity.schema';
-import { fetchSchema } from './fetch.schema';
-import { giveawaySchema } from './giveaway.schema';
-import { messageSchema } from './message.schema';
-import { replySchema } from './reply.schema';
-import { todoSchema } from './todo.schema';
-import { userApiSettingSchema } from './user-api-setting.schema';
-
-import type { ActivityDoc } from './activity.schema';
-import type { FetchDoc } from './fetch.schema';
-import type { GiveawayDoc } from './giveaway.schema';
-import type { MessageDoc } from './message.schema';
-import type { ReplyDoc } from './reply.schema';
-import type { TodoDoc } from './todo.schema';
-import type { UserApiSettingDoc } from './user-api-setting.schema';
 
 export const SCHEMAS = {
   Fetch: fetchSchema,

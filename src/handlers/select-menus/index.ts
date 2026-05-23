@@ -2,9 +2,11 @@ import type {
     StringSelectMenuInteraction,
 } from 'discord.js';
 import type { BaseBot } from "@bot";
+import { logSystem } from '@core/logger';
 
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
+import { SSM_REGISTRY } from './registry.generated';
 
 //==================================================//
 // String Select Menu Custom ID: <ssm_type|ssm_value>
@@ -42,9 +44,6 @@ export const executeSSM = async (interaction: StringSelectMenuInteraction, bot: 
     }
 }
 
-import { SSM_REGISTRY } from './registry.generated';
-
-import { logSystem } from '@core/logger';
 const ssmHandlerFactory = new HandlerFactory<SSMHandler>();
 ssmHandlerFactory.registerFromRegistry(SSM_REGISTRY);
 

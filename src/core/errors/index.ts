@@ -7,6 +7,13 @@
  * needs to switch on `kind`. Add new subclasses to this file when they
  * land — `kind` strings must stay unique.
  */
+import type { ConfigurationError } from './configuration-error';
+import type { ConflictError } from './conflict-error';
+import type { DiscordApiError, DatabaseError, LlmProviderError } from './external-service-error';
+import type { NotFoundError } from './not-found-error';
+import type { PermissionError } from './permission-error';
+import type { ValidationError } from './validation-error';
+
 export type { ErrorContext } from './error-context';
 export { DomainError, type DomainErrorInit } from './domain-error';
 export { ValidationError, type ValidationErrorCode } from './validation-error';
@@ -24,13 +31,6 @@ export {
   LlmProviderError,
   type LlmProviderErrorCode,
 } from './external-service-error';
-
-import type { ValidationError } from './validation-error';
-import type { NotFoundError } from './not-found-error';
-import type { ConflictError } from './conflict-error';
-import type { PermissionError } from './permission-error';
-import type { ConfigurationError } from './configuration-error';
-import type { DiscordApiError, DatabaseError, LlmProviderError } from './external-service-error';
 
 /**
  * Discriminated union of every concrete `DomainError`. Use to type a

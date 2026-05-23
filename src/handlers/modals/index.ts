@@ -2,9 +2,11 @@ import type {
     ModalSubmitInteraction,
 } from 'discord.js';
 import type { BaseBot } from "@bot";
+import { logSystem } from '@core/logger';
 
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
+import { MODAL_REGISTRY } from './registry.generated';
 
 export abstract class ModalHandler {
     public abstract execute(interaction: ModalSubmitInteraction, bot: BaseBot): Promise<void>;
@@ -38,9 +40,6 @@ export const executeModal = async (interaction: ModalSubmitInteraction, bot: Bas
     }
 }
 
-import { MODAL_REGISTRY } from './registry.generated';
-
-import { logSystem } from '@core/logger';
 const modalHandlerFactory = new HandlerFactory<ModalHandler>();
 modalHandlerFactory.registerFromRegistry(MODAL_REGISTRY);
 

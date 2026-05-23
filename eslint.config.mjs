@@ -53,6 +53,11 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'warn',
       'import/no-cycle': 'error',
       'import/no-self-import': 'error',
+      // R6.5: all `import` statements must form a single contiguous
+      // block at the top of the file. Prevents the pre-R1 pattern in
+      // `src/bot/index.ts` where module-level helpers were wedged
+      // between two import groups.
+      'import/first': 'error',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       eqeqeq: ['error', 'always'],
     },

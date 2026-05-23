@@ -7,6 +7,7 @@
  * downstream calls. Locked in BEFORE the R1 decomposition so the
  * post-R1 ClientEventBridge tests have a behavioural anchor.
  */
+/* eslint-disable import/first */
 import { Events } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 import type { Client } from 'discord.js';

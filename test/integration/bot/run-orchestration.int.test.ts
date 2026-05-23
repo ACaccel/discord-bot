@@ -19,6 +19,7 @@
  * Post-R1 the same spec must still pass — that is the regression
  * anchor for the decomposition.
  */
+/* eslint-disable import/first */
 import { Events } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';
 import type { Client } from 'discord.js';

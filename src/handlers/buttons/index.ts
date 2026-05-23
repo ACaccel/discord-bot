@@ -2,9 +2,11 @@ import type {
     ButtonInteraction,
 } from 'discord.js';
 import type { BaseBot } from "@bot";
+import { logSystem } from '@core/logger';
 
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
+import { BUTTON_REGISTRY } from './registry.generated';
 
 //==================================================//
 // Button Custom ID: <button_type>|<button_value>
@@ -42,9 +44,6 @@ export const executeButton = async (interaction: ButtonInteraction, bot: BaseBot
     }
 }
 
-import { BUTTON_REGISTRY } from './registry.generated';
-
-import { logSystem } from '@core/logger';
 const buttonHandlerFactory = new HandlerFactory<ButtonHandler>();
 buttonHandlerFactory.registerFromRegistry(BUTTON_REGISTRY);
 

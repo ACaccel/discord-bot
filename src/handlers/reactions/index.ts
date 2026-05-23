@@ -1,10 +1,12 @@
-import type { 
+import type {
     MessageReaction,
     User,
 } from "discord.js";
 import type { BaseBot } from "@bot";
+import { logSystem } from '@core/logger';
 
 import { HandlerFactory } from "handlers";
+import { REACTION_REGISTRY } from './registry.generated';
 
 export abstract class ReactionHandler {
     public abstract executeAdded(reaction: MessageReaction, user: User, bot: BaseBot): Promise<void>;
@@ -48,9 +50,6 @@ export const executeReactionRemoved = async (reaction: MessageReaction, user: Us
     }
 };
 
-import { REACTION_REGISTRY } from './registry.generated';
-
-import { logSystem } from '@core/logger';
 const reactionHandlerFactory = new HandlerFactory<ReactionHandler>();
 reactionHandlerFactory.registerFromRegistry(REACTION_REGISTRY);
 
