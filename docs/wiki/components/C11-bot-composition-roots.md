@@ -37,6 +37,12 @@
 
 ## 近期變更
 
+- 2026-05-24 — R2：`BaseBot.voice` 由 public field 改為 getter，
+  經 `container.tryResolve(TOKENS.VoiceController)` 取得；新增
+  symmetric getter `modelCatalog`（`TOKENS.ModelCatalog`）。`run()`
+  內 `this.voice = getActiveVoiceController()` 後置同步刪除；
+  `bot.voice` / `bot.modelCatalog` 對 msg-archive 等不註冊對應
+  plugin 的 bot 自然回傳 `undefined` (tech-debt R2)
 - 2026-05-24 — R1：將 `BaseBot` 拆解為 thin lifecycle owner +
   `GuildRegistrar` / `ClientEventBridge` / `GuildDbConnector`；同 commit 套用
   R6.4（Handler Map 複數命名）與 R6.5（import 排序）；Konata / MsgArchive

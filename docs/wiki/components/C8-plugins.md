@@ -27,8 +27,25 @@
   `misc.ts` 的 handler 專用函式遷入 `src/handlers/commands/`，knip 死碼
   （`tts_api` / `listChannels` / `deleteJob` / `getRandomInterval`）刪除。
 
+## 現況補充（R2 後）
+
+- `plugins/voice/`：刪除 `internal/active-controller.ts` 模組全域
+  `let active`；`plugin.ts.init` 改以
+  `ctx.registerInstance(TOKENS.VoiceController, ...)` 註冊。
+  `internal/index.ts` 不再 re-export `setActive*` / `getActive*`。
+- `plugins/llm-chat/plugin.ts.init` 以
+  `ctx.registerInstance(TOKENS.ModelCatalog, ...)` 取代
+  `setActiveModelCatalog(...)`；不再 import `infra/llm` 的
+  `setActiveModelCatalog` symbol。
+- 全 repo `grep "let active" src/plugins src/infra` 為 0；
+  plugin → BaseBot 通訊統一走 IoC 容器。
+
 ## 近期變更
 
+- 2026-05-24 — R2：voice / llm-chat 兩個 plugin 改走
+  `PluginInitContext.registerInstance`；刪除 `voice/internal/
+active-controller.ts`；模組全域 `let active*` 旁路歸零
+  (tech-debt R2)
 - 2026-05-21 — D4 落地：`src/utils/` 目錄刪除；plugin internal 改用
   `@core/scheduling`，承接點分屬 C1（`core/scheduling/`）與 C6（handler 工具）。
 - 2026-05-21 — D1 + D3 落地：`guild-events` 訂閱 `guildCreate` 並經

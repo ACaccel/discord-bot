@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-05-24 — R2：消除 DI 旁路（`PluginInitContext.registerInstance`）
+
+- **元件**：C2 IoC Container、C3 Plugin Runtime、C5 Infra Adapters、C8 Plugins、C11 Bot Composition Roots
+- **缺口**：tech-debt R2
+- **變更**：
+  - C3 — `PluginInitContext` 增補 `registerInstance<T>(token, instance)`
+    facade，只在 `init` hook 合法（其他 lifecycle context 型別層即不
+    暴露此方法）；`PluginLifecycleRunner` 新增 phase 追蹤與
+    `assertInitPhase` guard，違規拋 `ConfigurationError` with code
+    `LIFECYCLE_PHASE_VIOLATION`、messageKey
+    `errors:plugin.lifecycle_phase_violation`。`LifecycleHost` 介面
+    新增 `container: ServiceContainer` 唯讀欄位（runner 寫入容器的
+    單一通道）。
+  - C2 — `src/core/ioc/tokens.ts` 新增 `TOKENS.VoiceController` /
+    `TOKENS.ModelCatalog`。
+  - C7 — `src/i18n/locales/{en,zh-TW}/errors.json` 新增
+    `plugin.lifecycle_phase_violation` key。
+  - C5 — `infra/llm/models-catalog.ts` 移除 `let
+activeModelCatalog`、`setActiveModelCatalog`、`getModelCatalog`、
+    `listProviderModels`；`infra/llm/index.ts` barrel 同步收斂。
+    `ModelCatalog` 類別保留為純資料持有者。
+  - C8 — `plugins/voice/`：`plugin.ts.init` 改以
+    `ctx.registerInstance(TOKENS.VoiceController, ...)`；刪除
+    `internal/active-controller.ts` 全模組；`internal/index.ts`
+    移除 `setActive*` / `getActive*` re-export。
+    `plugins/llm-chat/plugin.ts.init` 改以
+    `ctx.registerInstance(TOKENS.ModelCatalog, ...)`。
+  - C11 — `BaseBot.voice` 改為 getter
+    （`container.tryResolve(TOKENS.VoiceController)`），刪除
+    `run()` 內 `this.voice = getActiveVoiceController()` 後置同步；
+    新增 symmetric getter `modelCatalog`。`/ai_settings` handler
+    改用 `bot.modelCatalog?.list(provider)`。
+  - 測試 — 新增 `test/unit/core/plugin/lifecycle-guard.test.ts`
+    （8 案例：happy / duplicate / 4 種 phase 違規 / critical init
+    重設 / 型別層測試）、
+    `test/unit/plugins/voice/voice-plugin.test.ts`（2 案例）、
+    `test/unit/infra/llm/models-catalog.test.ts`（2 案例）。
+- **影響**：plugin → BaseBot 通訊 100% 走 IoC 容器；
+  `grep "let active" src/plugins src/infra` 為 0；
+  `grep "setActive*|getActive*" src` 為 0。
+  公開 API 對既有 handler 等價（`bot.voice?.x()` 仍可用），新增
+  `bot.modelCatalog` getter。
+
+---
+
 ## 2026-05-24 — R1：拆解 `BaseBot` 為 thin lifecycle owner
 
 - **元件**：C11 Bot Composition Roots、C6 Handlers（連帶改名）

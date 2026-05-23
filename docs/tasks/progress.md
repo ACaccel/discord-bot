@@ -7,7 +7,7 @@
 | 狀態  | R   | 主題                                 | 詳細任務       |
 | ----- | --- | ------------------------------------ | -------------- |
 | `[x]` | R1  | 拆解 BaseBot 為 thin lifecycle owner | [R1.md](R1.md) |
-| `[ ]` | R2  | 消除 DI 旁路                         | [R2.md](R2.md) |
+| `[x]` | R2  | 消除 DI 旁路                         | [R2.md](R2.md) |
 | `[ ]` | R3  | plugins ↔ core/ioc 契約對齊          | [R3.md](R3.md) |
 | `[ ]` | R4  | 過長 handler 拆分 + 行數規範         | [R4.md](R4.md) |
 | `[ ]` | R5  | i18n catalog 路徑反耦合              | [R5.md](R5.md) |
