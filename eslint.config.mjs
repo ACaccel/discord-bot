@@ -109,6 +109,30 @@ export default tseslint.config(
       ],
     },
   },
+  // R3: plugin layer must reach the IoC surface only through the
+  // `core/plugin` barrel (which re-exports TOKENS / ServiceToken /
+  // Resolver). Direct imports from `core/ioc` are blocked so the
+  // container's write-side surface stays a composition-root privilege.
+  // Kept as a separate block (rather than merged with the layered
+  // service-locator guard above) so the error message can point
+  // plugin authors at the correct alternative path.
+  {
+    files: ['src/plugins/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/core/ioc', '**/core/ioc/*', '@core/ioc', '@core/ioc/*'],
+              message:
+                'Plugins must import TOKENS / ServiceToken from core/plugin, not core/ioc.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // Test files: relax some rules.
   {
     files: ['test/**/*.ts', 'scripts/**/*.ts'],
