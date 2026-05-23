@@ -1,438 +1,336 @@
-# RFC: Discord Bot 架構重構工程 — 需求文件
+# 技術債修正需求規格（Tech-Debt Remediation Proposal）
 
-| 欄位     | 內容                                                                                                                      |
-| -------- | ------------------------------------------------------------------------------------------------------------------------- |
-| 文件類型 | 重構提案 / 需求規格（RFC 風格）                                                                                           |
-| 目標分支 | `refactor/architecture-overhaul` → `main`                                                                                 |
-| 文件版本 | 2.0                                                                                                                       |
-| 最後更新 | 2026-05-20                                                                                                                |
-| 讀者     | 技術團隊 / 工程師                                                                                                         |
-| 相關文件 | [`docs/high-level-design.md`](high-level-design.md)、[`CONTRIBUTING.md`](../CONTRIBUTING.md)、[`CLAUDE.md`](../CLAUDE.md) |
-
----
-
-## 1. 摘要
-
-本 RFC 定義 Discord 多人格機器人 codebase 架構重構工程的**需求內容**。
-
-此 codebase 同時託管四個 Discord 機器人人格（`nijika`、`konata`、
-`tomori`、`msg-archive`）。重構前的程式碼以 `src/db`、`src/features`、
-`src/events` 為主、bot 之間靠繼承 `BaseBot` 擴充，缺乏分層邊界、型別
-安全與品質閘門。
-
-重構工程的目標，是將其改造為一套 **Clean Architecture 分層 + Plugin
-化** 的共用核心。本文件以**需求**為主體（第 5 節），逐項定義每個重構
-需求的內容、動機與驗收標準；落地過程與排程僅作摘要記錄（第 6 節）。
+| 項目     | 內容                                                                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 目標     | 收斂 architecture-overhaul 完成後的剩餘技術債，使 codebase 達到「下一階段可長期維運」狀態                                            |
+| 範圍     | R1 拆解 BaseBot、R2 消除 DI 旁路、R3 plugins↔core/ioc 契約對齊、R4 過長 handler 拆分 + 規範、R5 i18n 路徑反耦合、R6 低優先項一次掃乾 |
+| 依據     | [docs/codebase-review-2026-05.md](codebase-review-2026-05.md) 第 2 / 6 節、[docs/revision.md](revision.md)                           |
+| 交付方式 | 單一 feature branch；R1 → R2 → R3 → R4 → R5 → R6 依序完成後，一次 PR 到 `refactor/architecture-overhaul`                             |
+| 文件層級 | 中階需求規格——說明「為何做、要達成什麼、什麼不做」；介面簽名、檔案結構、測試案例細節交給後續 design 文件                             |
 
 ---
 
-## 2. 背景與動機
+## 1. 背景與動機
 
-### 2.1 重構前的問題
+`refactor/architecture-overhaul` 分支已落地分層、Plugin host、IoC、Repository、Result、i18n 等基礎建設，並完成 TTS 移除、註解 release 化、`src/interface` → `src/i18n` 改名。對 codebase 做完整審閱（`docs/codebase-review-2026-05.md`）後仍有 6 項技術債（R1–R6）。本提案一次處理 R1–R6 全部，把架構大重構的尾巴一次掃乾，之後 `refactor/architecture-overhaul` 即可進入「對齊 main」階段。
 
-| #   | 問題                                                           | 後果                                             |
-| --- | -------------------------------------------------------------- | ------------------------------------------------ |
-| P1  | 資料存取以 `bot.guildInfo[g].db.models["X"]` 字串查表          | 無型別、IDE 無法 go-to-definition、重構易漏      |
-| P2  | 無分層邊界，業務邏輯散落 `features` / `events` / handler / bot | 跨層直接 mutation、職責不清                      |
-| P3  | bot 靠繼承 `BaseBot` 擴充                                      | 行為差異難追蹤、共用核心被污染                   |
-| P4  | infra 直接 `throw new Error()`                                 | 呼叫端無法 discriminate 錯誤，使用者只見泛用訊息 |
-| P5  | user-facing 字串為硬編碼 literal                               | 無 i18n 紀律，散落各層                           |
-| P6  | 品質閘門不完整（lint / coverage / 型別 scope 不全）            | 迴歸無自動化防護                                 |
+選擇此時一次到位的理由：
 
-### 2.2 重構所依循的兩大設計原則
-
-1. **分層架構**：每個 `src/<layer>/` 目錄單一職責，僅能依賴下層；
-   bot composition root 負責 wiring。
-2. **Plugin 化的 bot 行為**：業務功能皆為註冊到 `PluginHost` 的
-   `Plugin` 實例；每個 bot 自行挑選 plugin 集合，`BaseBot` 不再被繼承。
+- `BaseBot`（R1）已是其他重構的瓶頸——其他層的整潔度被它的肥大稀釋；R2、R3 也因 `BaseBot` 同時擁有「plugin 接點」與「raw event 接點」而難以單純化。先把 R1 做掉，後續每一輪重構的單位成本都會下降。
+- DI 旁路（R2）與 plugins↔ioc 契約不一致（R3）是同一條主軸：IoC 邊界尚未真正被守住。一併處理可在同一分支內完整對齊。
+- 過長 handler（R4）伴隨「準則 + ESLint 自動化」處理，新增 handler 將自動受規範保護，避免未來繼續累積。
+- R5 是純粹的反耦合修正、R6 是分散的小修正集合；分多輪做反而會付不成比例的 PR / review 成本，一輪做完更划算。
 
 ---
 
-## 3. 目標與非目標
+## 2. 範圍
 
-### 3.1 目標（Goals）
+### 2.1 涵蓋
 
-- 落地單向依賴的分層目錄結構。
-- 以手寫 IoC 容器取代 Service Locator。
-- 以 Plugin 契約 + PluginHost 取代 bot 繼承。
-- 以 Repository pattern 取代字串查表式資料存取。
-- 統一 LLM 存取為 Provider Strategy。
-- 落地結構化錯誤樹與 `Result` 型別。
-- 全面 i18n 路由並以 scanner 強制。
-- 建立全 repo 品質閘門。
+- **R1**：拆解 `BaseBot` 為 thin lifecycle owner，抽出三個 collaborator。
+- **R2**：消除 plugin↔BaseBot 間的 module-global holder DI 旁路。
+- **R3**：使 `src/plugins/**` 與 `core/ioc` 之間的依賴契約一致——契約、ESLint、實際 import 三者對齊。
+- **R4**：拆分 4 個過長 handler 作為示範；引入 handler 行數準則與 helper 抽離守則；以 ESLint `max-lines-per-file` 強制執行。
+- **R5**：移除 `catalog-loader.ts` 對 `src/i18n/locales` 的硬編碼路徑，改由 composition root 注入。
+- **R6**：低優先單點修正集合（`traceId` 隨機性、`login()` 失敗 reject、清除殘餘 `console.*`、`BaseBot` 命名一致化、`src/bot/index.ts` import 中間執行碼搬移）。
 
-### 3.2 非目標（Non-Goals）
+### 2.2 不涵蓋
 
-- **不**拆分獨立的 `src/domain/` 與 `src/application/` 兩層。以本專案
-  規模，每個 use case 僅被單一 plugin 消費，拆兩層徒增間接層。此決定
-  刻意為之（見 REQ-A7）。
-- **不**引入 `reflect-metadata` 或第三方 DI 框架。
-- **不**改動四個 bot 的對外行為（指令、回覆語意）；重構須行為等價。
-- **不**在此工程內新增功能性 feature；僅做結構性重構。
+- **新功能、規格變更、Design Pattern 替換**（如換 DI 框架、改 ORM、改 i18n library）——本提案只清債，不擴張。
+- **公開對外契約**（HTTP webhook 路由、Discord 指令簽名、i18n catalog key）——本提案不動。
+- **TTS 功能**——已於前一輪移除，本提案不重新引入。
+- **CI / CD pipeline 改造、依賴升級、Node 版本變更**——非本輪 scope。
 
 ---
 
-## 4. 目標架構
+## 3. 交付方式
 
-完整說明見 [`docs/high-level-design.md`](high-level-design.md)，此處摘要。
-
-```
-src/
-├── core/          # 純基礎設施（無 Discord / Mongo 依賴）
-│   config · errors · i18n · ioc · logger · plugin · result · time · ids
-├── persistence/   # Mongoose Repository pattern（schemas + repositories）
-├── infra/         # 第三方 SDK adapter（mongo · llm · discord）
-├── handlers/      # Discord interaction 進入點
-├── i18n/          # i18n locale catalog
-├── plugins/       # 註冊至 PluginHost 的功能模組
-└── bot/           # composition root（BaseBot + 各 bot wiring）
-```
-
-**依賴方向**：`bot → plugins → handlers → infra → persistence → core`，
-單向向下；`core` 不依賴任何上層或第三方 SDK。
+- 開新 feature branch：建議 `refactor/tech-debt-cleanup`（最終名稱待確認）。
+- 內部以 R1 → R2 → R3 → R4 → R5 → R6 的順序逐項實作；每項完成後執行所有 quality gates 才動下一項。
+- R6 的子項（R6.1–R6.5）可在 R6 階段平行處理，但建議拆成獨立 commit，方便日後查找。
+- 全部完成後**一次** PR 到 `refactor/architecture-overhaul`；PR description 逐項列出 R1–R6 的對應 commit。
+- 每項都應在 commit 訊息中標註對應的 R 編號（例：`refactor(R1): extract GuildRegistrar from BaseBot`、`fix(R6.1): use crypto.randomUUID for traceId`）。
 
 ---
 
-## 5. 重構需求
+## 4. R1 — 拆解 `BaseBot`
 
-本節為文件主體。需求依領域分為 7 組（A–G）。每項需求標註對應的
-audit-v2 條目編號（見[附錄 A](#附錄-a-audit-v2-與需求對照表)）。
+### 4.1 動機
 
-### 5.A 分層與架構模式
+`src/bot/index.ts` 1,018 行、約 25 個 public 成員，同時擁有生命週期編排、IoC 接線、guild 註冊、per-guild DB 連線、reboot 訊息、8 個原生 `client.on` listener、reaction 抓取與分派、InteractionRouter 組裝。其 docstring 自稱「Thin lifecycle owner」與現況背離。這是本提案對維護性最重要的單一改動，所有後續重構都會受益於它。
 
-#### REQ-A1 — 分層目錄結構
+### 4.2 要達成什麼
 
-`src/` 依 `core` / `persistence` / `infra` / `handlers` / `interface`
-/ `plugins` / `bot` 分層，每層單一職責、依賴單向向下。
+`BaseBot` 退回真正的 thin lifecycle owner；抽出三個職責清晰的 collaborator：
 
-**驗收**：每層僅 import 同層或下層；`core` 無 Discord / Mongo / 第三方
-SDK 依賴。
+| Collaborator        | 領域職責                                                               |
+| ------------------- | ---------------------------------------------------------------------- |
+| `GuildRegistrar`    | 把 `Guild` 物件 + bot 設定組裝成 `GuildInfo`、解析 channels / roles    |
+| `ClientEventBridge` | 把 Discord raw event 轉成已驗證的 domain event，交給 router / listener |
+| `GuildDbConnector`  | 控制 per-guild Mongo 連線生命週期與失敗分類                            |
 
-#### REQ-A2 — 手寫 IoC 容器
+`BaseBot` 保留：constructor、`use(plugin)`、`run()` 的三段（setupContainer / setupTranslator / startListening）、shutdown 路徑、IoC 容器存取器。
 
-以 `ServiceToken<T>` 型別化的手寫容器（約 150 行）管理依賴，取代
-Service Locator。Plugin 透過 `ctx.resolve(TOKENS.X)` 取得依賴，runtime
-hook 內不得直接觸及容器。
+`BaseBot` 對外的 public API（`bot.voice` / `bot.logger` / `bot.translator` / `bot.guildInfo` 等）**允許 breaking change**；handler / subclass / 測試端在同一個 R1 commit 內一併修正，外部不需保留相容 shim。
 
-**驗收**：無 `reflect-metadata` / DI 框架依賴；eslint rule 禁止 plugin
-runtime hook 內的 Service Locator。
+### 4.3 先決條件
 
-#### REQ-A3 — Plugin 契約 + PluginHost
+R1 開始前先補齊 `BaseBot` 的 end-to-end contract 測試作為風險緩解。基線可參考 `test/integration/interaction-router/router-dispatch.int.test.ts` 的形式；目標是在拆解前，把現有 8 條 `client.on(...)` listener 的關鍵分支都納入整合測試。具體 fixture 與案例由 R1 的 design 文件展開。
 
-每個業務功能為 `Plugin<Config>`，含 `id` / SemVer `version` / `scope`
-/ 生命週期 hook / 事件訂閱 / `contributes` 區塊。`PluginHost` 依宣告的
-依賴拓撲排序 plugin，以錯誤隔離方式驅動生命週期 hook，並合併 plugin
-貢獻的 handler 與 codegen registry。`BaseBot` 不再被繼承。
+### 4.4 不做什麼
 
-**驗收**：四個 bot 皆以 `this.use(...)` 組裝；依賴失敗的 plugin 級聯
-停用；拓撲排序 / 生命週期順序有測試覆蓋。
+- 不抽 `RouterAssembler`——InteractionRouter 組裝是一次性程序，本輪暫不獨立。日後若 router 真正長大，再列為單獨的 R 項。
+- 不換 IoC 框架；不引入 `reflect-metadata`。
+- 不改變 BaseBot 對外 lifecycle 順序（`use → run → shutdown`）的語意。
 
-#### REQ-A4 — InteractionRouter 中介層（audit 1.2）
+### 4.5 驗收（質化）
 
-`InteractionRouter` 採 Chain-of-Responsibility，作為 `BaseBot` 的主
-dispatch 路徑；blocked-channel filter、權限檢查、channel logging 等
-橫切邏輯抽為 middleware。
-
-**驗收**：至少一個 bot 以 router 為主 dispatch 路徑，非 inline
-`interactionEventListener → executeCommand`。
-
-#### REQ-A5 — `Result<T, DomainError>` 邊界型別（audit 1.1）
-
-use case 邊界以 `Result<T, DomainError>` 表達成功 / 失敗，取代散落的
-`try/catch`。
-
-**驗收**：`Result` 在 LLM service 與 repository 邊界有實際 production
-callsite，非僅存在於 `core/result/` 與測試。
-
-#### REQ-A6 — Plugin reboot self-ownership（ARCH-BLOCK3）
-
-plugin 的 reboot（重啟期間重建排程 job）邏輯由 plugin 經 typed
-dependency 自行擁有，不由外部 composition root 驅動。
-
-**驗收**：reboot 路徑無跨層驅動；plugin readyAll 順序可保證。
-
-#### REQ-A7 — 刻意不拆 domain / application 兩層（audit 1.4）
-
-不引入 `src/domain/` 與 `src/application/` 目錄；use case 邏輯內聚於
-對應 plugin。此決定須於 `docs/high-level-design.md` 明文記載，避免未來
-讀者誤判為遺漏。
-
-**驗收**：`docs/high-level-design.md` 有對應段落說明。
-
-### 5.B 資料持久層
-
-#### REQ-B1 — Repository pattern（audit 2.2）
-
-資料存取改走 `<x>.repo.ts` 介面 + `Mongo<X>Repo` 實作；`buildRepos
-(connection)` 回傳綁定特定 guild 連線的 `Repos` bundle。Plugin 與
-handler 依賴介面，測試注入 in-memory fake。所有字串查表式
-`db.models["X"]` callsite 須改為 `repos.xxx.<method>(...)`。
-
-**驗收**：`grep "guildInfo[g].db.models["` 為 0；每個 repo 有
-mongodb-memory-server integration test。
-
-#### REQ-B2 — 退場 `src/db` shim（audit 2.1 / 2.7）
-
-刪除 `src/db/` shim、`@db` path alias 與 `GuildInfo.db?: GuildDb` slot。
-
-**驗收**：`grep "from '@db'"` 為 0；`src/db/` 不存在。
-
-#### REQ-B3 — `src/features` 折進 plugins（audit 2.3）
-
-`src/features/{giveaway,activity,llm_chat}` 折進對應
-`src/plugins/<x>/internal/`；刪除 `@features` / `@llm_chat` alias。
-job-scheduling 邏輯不得雙路徑並存。
-
-**驗收**：`src/features/` 不存在；`@features` / `@llm_chat` alias 已刪。
-
-### 5.C 錯誤處理與可觀測性
-
-#### REQ-C1 — `DomainError` 錯誤樹（audit 3.2）
-
-`core/errors/` 提供 `DomainError` 與子類（`ValidationError`、
-`NotFoundError`、`ConflictError`、`PermissionError`、
-`ExternalServiceError` → `DiscordApiError` / `DatabaseError` /
-`LlmProviderError`、`ConfigurationError`）。每個錯誤帶 `code`、
-`messageKey`、`messageParams`、`cause`。infra 層丟 `DomainError` 子類，
-不得丟 raw `Error` / `TypeError`；handler catch 採 taxonomy 決定回覆。
-
-**驗收**：`src/infra` 無 `throw new Error` / `throw new TypeError`；
-handler 能依錯誤類型給出對應 `messageKey`。
-
-#### REQ-C2 — operator-facing 訊息集中化（audit 3.3）
-
-operator log 與 thrown Error message 集中為 message constant，不散落
-英文 literal；scanner 補 rule 防止漂移。
-
-**驗收**：infra / handler 層的 operator literal 走集中常數。
-
-#### REQ-C3 — 連線失敗的明確降級（audit 3.7）
-
-`connectGuildDB` 區分 transient（可重試）與 persistent 失敗；持續
-失敗的 guild 進入 `disabledGuilds` map。該 guild 的 DB-touching
-handler 回 `errors:db.guild_disabled` 並附 traceId，而非泛用
-`errors:db.not_found`。
-
-**驗收**：故意設壞測試 guild 的 Mongo URI，啟動後該 guild handler 回
-`errors:db.guild_disabled` 附 traceId。
-
-#### REQ-C4 — `requireGuildRepos` helper（audit 3.8）
-
-DB-touching handler 重複的 `repos` null-check 樣板抽為單一
-`requireGuildRepos(bot, interaction)` helper，並收斂 disabled-guild
-訊息至單一修改點。
-
-**驗收**：handler 不再複製 4 行 null-check 樣板。
-
-#### REQ-C5 — reboot 非同步正確性（audit 3.1）
-
-重啟期間重建排程 job 的迴圈不得使用 fire-and-forget `.then` /
-`forEach(async)`；改用 `await Promise.all(map(...))` 並逐項
-`try/catch` 走結構化 log。
-
-**驗收**：reboot 期間人為製造失敗應走 `logger.errorLogger`，不產生
-`unhandledRejection`；排程完成前函式不 return。
-
-### 5.D LLM 存取
-
-#### REQ-D1 — LLM Provider Strategy
-
-四家 LLM SDK（OpenAI / Anthropic / Gemini / xAI）統一藏於 typed
-interface 後，採 Strategy + Registry 模式，置於 `src/infra/llm`。
-
-**驗收**：每家 provider 有 nock contract test；handler / plugin 僅
-依賴 `LLMService` 抽象。
-
-### 5.E 國際化（i18n）
-
-#### REQ-E1 — Translator + catalog
-
-`Translator`（i18next-backed）統一 user-facing 文案；catalog 置於
-`src/i18n/locales/<lang>/{commands,errors,replies}.json`，key
-格式 `<namespace>:<feature>.<purpose>`。`src/handlers`、`src/plugins`、
-`src/bot` 零 CJK literal。
-
-**驗收**：上述目錄無 CJK literal；catalog-completeness 測試在 CI。
-
-#### REQ-E2 — CJK literal scanner（audit 3.4）
-
-scanner 以 strict mode 在 CI 強制掃描，範圍涵蓋 `src/handlers`、
-`src/plugins`、`src/bot`。`src/events/` 過渡層已於概要設計中消除
-（見 [`docs/high-level-design.md`](high-level-design.md) §9.4），
-故不在掃描範圍。
-
-**驗收**：scanner 為 CI gate；範圍含 `src/bot`。
-
-### 5.F 型別安全與品質閘門
-
-#### REQ-F1 — strict 型別涵蓋（audit 3.9）
-
-strict tsconfig 的 `include` 涵蓋 `src/handlers/**`、`src/bot/**`、
-`src/utils/**`；掃除 `any` escape，改以 `unknown` + narrowing。
-
-**驗收**：strict typecheck 涵蓋全 `src`；`any` / `as any` 降至個位數
-（intentional 處加註記）。
-
-#### REQ-F2 — lint 全 repo gate（audit 1.3）
-
-ESLint 覆蓋全 `src/**`，作為 CI gate（非僅 strict 子樹）。
-
-**驗收**：`yarn lint` 涵蓋全 `src/**` 並在 CI 執行。
-
-#### REQ-F3 — 測試覆蓋率門檻（audit 1.6）
-
-`vitest` 設定 coverage threshold（core 高標、整體有下限）；CI 新增
-`test:coverage` job 強制門檻。
-
-**驗收**：`yarn test:coverage` 為 CI gate 並通過所設門檻。
-
-#### REQ-F4 — Handler codegen + drift check
-
-`scripts/gen-registry.ts` 掃描 `src/handlers/<type>/` 產生
-`registry.generated.ts`；`handlers:gen:check` 在 CI 偵測 drift。
-
-**驗收**：drift 在 PR 時被 `handlers:gen:check` 攔住。
-
-#### REQ-F5 — 其他閘門
-
-`typecheck` / `typecheck:emit` / `format:check` / `knip` 皆為 CI gate；
-`yarn smoke` 提供四個 bot 的 pre-deploy 邊界探針。
-
-**驗收**：上述指令皆在 CI 執行且綠。
-
-### 5.G 結構整理與測試完備
-
-#### REQ-G1 — 過大檔案拆模組（audit 3.5 / 3.6）
-
-`BaseBot` 拆出 `setupContainer()` / `buildHost()` / `attachListeners()`
-等 private helper；`message-backup/plugin.ts` 拆出 `internal/` 子模組；
-`core/plugin/host.ts` 拆 `host/{lifecycle,contributes-merger,topology}.ts`。
-
-**驗收**：上述檔案行數顯著下降，既有測試維持綠。
-
-#### REQ-G2 — 退場過期 shim（audit 2.4 / 2.5 / 2.6）
-
-退場 `src/utils/logger.ts`（callsite 全遷至 `core/logger`）、
-`core/logger/from-process-env.ts`（強制走 `loadEnv`）、
-`HandlerFactory.register(dir)` 反射路徑。連帶清除 production code 內所有
-`eslint-disable` marker。
-
-**驗收**：上述 shim 不存在；production code 0 個 `eslint-disable`。
-
-#### REQ-G3 — `VoicePlugin` 抽離跨層 mutation（audit 3.10）
-
-`BaseBot.voice` 由 handler 直接寫入的跨層 mutation 抽成 `VoicePlugin`；
-`record` handler 透過 typed token resolve。
-
-**驗收**：handler 不再直接寫 `bot.voice`。
-
-#### REQ-G4 — 全域 slash command 註冊（audit 3.11）
-
-`deploy.ts` 預設以 `Routes.applicationCommands(clientId)` 全域註冊；
-保留 `--dev-guild` 供開發、`--cleanup-guild-commands` 清除舊殘留。
-
-**驗收**：加入新 guild 不需重 deploy 即可看到完整指令。
-
-#### REQ-G5 — Discord test fixtures + integration test（audit 1.5）
-
-`test/fixtures/discord/` 提供 interaction / message / guild / member
-builder 與 client fake；至少一個 `interaction → handler → use case →
-repo` 的 integration test。
-
-**驗收**：fixture builder 存在且被測試使用；有 interaction-level
-integration test。
-
-#### REQ-G6 — core facade 單元測試（audit 3.13）
-
-`core/plugin/host.ts`、`core/ioc/container.ts`、`core/result/result.ts`
-及 `persistence/repositories/*.repo.ts` 補齊 unit test，達 REQ-F3 門檻。
-
-**驗收**：`yarn test:coverage` 通過 core 門檻。
-
-#### REQ-G7 — kebab-case 目錄命名
-
-bot 與 handler-type 目錄統一 kebab-case；handler 子目錄的 snake_case
-名稱對應 Discord 指令名稱。
-
-**驗收**：目錄命名一致。
+- `BaseBot` 退回「thin lifecycle owner」的描述能對得上實際內容——任何讀過 `src/bot/index.ts` 的工程師應同意 docstring 不再說謊。
+- 三個新類別各自能用自己的測試獨立驗證；移除任一不會牽動其他兩個的測試。
+- subclass（`Nijika` / `Konata` / `Tomori` / `MsgArchive`）仍能以同一個 plugin opt-in 模式組裝；breaking change 集中在欄位名稱或取值方式，不在生命週期語意。
+- 全部既有測試（431 案）與 contract 測試新增案例皆綠。
+- `architecture-reviewer` Audit 通過，無新增分層違規。
 
 ---
 
-## 6. 落地現況與計畫
+## 5. R2 — 消除 DI 旁路
 
-> 本節為摘要，不展開逐 PR 進度。
+### 5.1 動機
 
-重構工程分兩大波次落地，皆已合併進 `refactor/architecture-overhaul`：
+`src/plugins/voice/internal/active-controller.ts` 與 `src/infra/llm/models-catalog.ts` 以 module-scope 的可變 holder（`let active*`）把 plugin `init` hook 產出的物件傳給 `BaseBot.run()` 讀取。這是繞過 IoC 的隱藏全域旁路——新進工程師追 `bot.voice` 不會在容器裡找到接線，違反「DI 是唯一接線管道」的設計承諾。`active-controller.ts` 註解自承這個 holder 之所以存在是因為「plugin 契約沒有暴露 register 介面」——真正該補的是契約。
 
-- **Wave 1 — Phase 0–7**：落地分層、IoC、Plugin host、Repository、
-  LLM Strategy、錯誤樹、i18n 與 scanner（PR #1–#26）。
-- **Wave 2 — audit-v2**：依端到端審核（見[附錄 A](#附錄-a-audit-v2-與需求對照表)）
-  補齊未落地的 pattern、退場全部 legacy shim、嚴格化型別與閘門、
-  補齊測試（PR #31–#42，base = `refactor/architecture-overhaul`）。
+### 5.2 要達成什麼
 
-**現況**：第 5 節所有需求（REQ-A1 ~ REQ-G7）對應的 audit-v2 條目均已
-落地，`refactor/architecture-overhaul` HEAD 在 PR #42。
+擴充 plugin contract，給 plugin 一條合法的「向容器註冊已建立實例」的出口：
 
-**剩餘工作**：開啟最終 `refactor/architecture-overhaul → main` PR。
-須在完整品質閘門全綠、四個 bot 的 `yarn smoke` 與 manual regression
-checklist 通過後，以 merge commit（不 squash）合併。
+- `PluginContext`（plugin 的 `init` hook 收到的 ctx）增補 `registerInstance<T>` 能力。
+- 該能力**只在 `init` hook 內合法**；在 `start` / `onReady` / event hook 等較晚階段呼叫，host 在 lifecycle runner 階段檢查並丟 `ConfigurationError`。
+- `VoicePlugin.init` 改用 `ctx.registerInstance` 註冊 `VoiceController`；`BaseBot` 從容器解析（建議 `bot.voice` 改為 getter）。
+- `models-catalog` 以同樣模式改寫；移除 `setActiveModelCatalog` / `getActiveModelCatalog` 等 module-global 函式。
 
-完整驗證指令：
+### 5.3 不做什麼
 
-```bash
-yarn typecheck && yarn typecheck:emit
-yarn lint && yarn format:check
-yarn handlers:gen:check
-yarn knip
-yarn test && yarn test:coverage
-yarn smoke --bot nijika   # konata / tomori / msg-archive 同
-```
+- 不開放 plugin 直接取得 `ServiceContainer` 原物件——`ctx.registerInstance` 是窄面契約，不暴露 `register` / `registerSingleton` 之外的容器 API。
+- 不改 plugin 既有的 `ctx.resolve(TOKENS.X)` 解析路徑。
+- 不為了統一而把所有 plugin 都改成在 `init` 註冊實例；只動有 DI 旁路的兩處。
+
+### 5.4 驗收（質化）
+
+- `src/plugins` 與 `src/infra` 樹中不再存在 module-scope 可變 holder 作為 plugin↔BaseBot 通信管道。
+- `bot.voice` / models-catalog 的 DI 路徑可由「BaseBot resolve token → plugin init 註冊 instance」一條 trace 完整對上。
+- `ctx.registerInstance` 在非 `init` hook 呼叫時的拒絕行為有單元測試覆蓋。
 
 ---
 
-## 7. 風險與緩解
+## 6. R3 — plugins ↔ core/ioc 契約對齊
 
-| 風險                                    | 影響       | 緩解                                                   |
-| --------------------------------------- | ---------- | ------------------------------------------------------ |
-| 行為等價無自動化保證，依賴 manual smoke | 上線回歸   | 最終合併前跑四 bot smoke + manual regression checklist |
-| 最終合併分支與 `main` 長期分歧          | 合併衝突   | 合併前 rebase / merge `main`，重跑完整閘門             |
-| 部分原始 Phase 0–7 計畫文件已佚失       | 需求追溯難 | 本 RFC 以 audit-v2 報告為單一事實來源（附錄 A）        |
+### 6.1 動機
+
+8 個 `src/plugins/*/plugin.ts` 都 `import { TOKENS } from '../../core/ioc'`。分層契約規定 `core/ioc` 僅供 `src/bot/**` 與 `test/**`，但 `eslint.config.mjs` 的 `no-restricted-imports` 未列入 `src/plugins/**`，造成 lint 通過卻與契約矛盾。契約、ESLint、實際 import 三者必須一致，否則任何一邊都不可信。
+
+### 6.2 要達成什麼
+
+由 `core/plugin` 模組統一對 plugin 暴露其需要的 IoC 表面：
+
+- `src/core/plugin/index.ts` 重新匯出 `TOKENS` 與 plugin 端必要的型別（如 `ServiceToken<T>`、`Resolver`）。
+- 8 個 `plugin.ts` 改 import 來源為 `core/plugin`，不再直接觸碰 `core/ioc`。
+- `eslint.config.mjs` 的 `no-restricted-imports` 把 `src/plugins/**` 加入禁止 import `core/ioc`，違規 fail。
+- CLAUDE.md、CONTRIBUTING.md、`.claude/skills/project-conventions/SKILL.md`、`.claude/skills/coding-standards/SKILL.md` 對應段落同步更新——明文寫「plugin 對 IoC 的依賴透過 `core/plugin` 唯一管道」。
+
+### 6.3 不做什麼
+
+- 不在這一項裡擴充 `TOKENS` 內容；新 token（如 R2 的 `VoiceController` token）在 R2 階段處理。
+- 不調整 plugin 的 `ctx.resolve(...)` API。
+- 不為了「巨集化」而把 TOKENS 拆成多個 sub-namespace。
+
+### 6.4 驗收（質化）
+
+- 任何 plugin 程式碼不再直接 import `core/ioc`；違規由 ESLint 在 lint 階段擋下。
+- 「plugin 對 IoC 的合法窗口」在程式碼、ESLint 規則、文件三處的描述一致。
+- 換 IoC 框架的假想實驗：若日後抽換 `core/ioc`，plugin 程式碼不需更動。
 
 ---
 
-## 附錄 A — audit-v2 與需求對照表
+## 7. R4 — 過長 handler 拆分 + 規範
 
-audit-v2 端到端審核（原始報告
-`.claude/plans/codebase-1-eventual-whale.md`）輸出 24 項修正細項，加上
-review 過程新增的 ARCH-BLOCK3，全部對應到第 5 節需求。
+### 7.1 動機
 
-| audit 條目  | 標籤  | 對應需求 |
-| ----------- | ----- | -------- |
-| 1.1         | BLOCK | REQ-A5   |
-| 1.2         | BLOCK | REQ-A4   |
-| 1.3         | BLOCK | REQ-F2   |
-| 1.4         | NOTE  | REQ-A7   |
-| 1.5         | WARN  | REQ-G5   |
-| 1.6         | WARN  | REQ-F3   |
-| 2.1 / 2.7   | BLOCK | REQ-B2   |
-| 2.2         | BLOCK | REQ-B1   |
-| 2.3         | BLOCK | REQ-B3   |
-| 2.4         | WARN  | REQ-G2   |
-| 2.5         | WARN  | REQ-G2   |
-| 2.6         | WARN  | REQ-G2   |
-| 3.1         | BLOCK | REQ-C5   |
-| 3.2         | BLOCK | REQ-C1   |
-| 3.3         | BLOCK | REQ-C2   |
-| 3.4         | WARN  | REQ-E2   |
-| 3.5         | WARN  | REQ-G1   |
-| 3.6         | WARN  | REQ-G1   |
-| 3.7         | WARN  | REQ-C3   |
-| 3.8         | WARN  | REQ-C4   |
-| 3.9         | WARN  | REQ-F1   |
-| 3.10        | WARN  | REQ-G3   |
-| 3.11        | WARN  | REQ-G4   |
-| 3.13        | NOTE  | REQ-G6   |
-| ARCH-BLOCK3 | BLOCK | REQ-A6   |
+`src/handlers/commands/db_list_message/index.ts` 322 行，把日期解析、時間運算、reaction 文字渲染、附件組裝與 command class 全塞一檔；`inspect_member_ids`(172)、`emoji_frequency`(161)、`ai_settings`(158) 也偏長。一次性全拆會做出無價值的抽取；不處理則新進 handler 會繼續仿效。本項用「示範 + 規則 + 自動化 enforce」三件套同時收斂。
 
-> 註：被 audit-v2 報告引用的原始 Phase 0–7 重構計畫（含 §1.1、§5A 等
-> 章節編號）已不在 repo。本 RFC 以 audit-v2 報告為單一事實來源。
+### 7.2 要達成什麼
+
+#### A. 4 個示範拆分
+
+對 `db_list_message` / `inspect_member_ids` / `emoji_frequency` / `ai_settings` 抽出 pure helper 至同目錄獨立模組；`index.ts` 只留 Discord I/O、權限檢查、Translator 呼叫、回覆組裝。每個抽出的 helper 應可獨立單元測試。具體模組劃分由 R4 的 design 文件決定，但成果應使這 4 個 `index.ts` 都低於下一節的行數門檻。
+
+#### B. 規範
+
+寫入以下文件：
+
+- `CLAUDE.md`
+- `CONTRIBUTING.md`
+- `.claude/skills/project-conventions/SKILL.md`
+- `.claude/skills/coding-standards/SKILL.md`
+
+規範要點：
+
+1. `src/handlers/<type>/<name>/index.ts` 行數上限 **150 行**（含 import、含 JSDoc）。
+2. 超過上限的 pure helper（純函式、不依賴 Discord 物件）必須抽到同目錄獨立檔。
+3. 不可為了壓縮行數而把 Discord I/O / 權限檢查 / Translator 呼叫拆出 `index.ts`——這些是 handler 的本職。
+4. 抽出的 helper 須有對應單元測試。
+5. 新 handler 寫作時即套用此規則，不留「未來再說」空間。
+
+#### C. ESLint enforce
+
+`eslint.config.mjs` 加 `max-lines-per-file` 規則，僅針對 `src/handlers/**/*.ts`，上限 150 行，違規 error。
+
+### 7.3 不做什麼
+
+- 不對 `src/handlers/**` 全樹做一次性掃蕩拆分；除示範的 4 個 + 任何被門檻擋下的之外，其他自然觸碰時再順手收斂。
+- 不對 plugin / core / persistence 套用同一行數門檻——這些層的「行數=複雜度」對應關係不同。
+- 不引入 cyclomatic complexity 或函式長度等其他 ESLint 規則——範圍蔓延風險。
+
+### 7.4 驗收（質化）
+
+- 4 個示範 handler 的 `index.ts` 全部低於 150 行；抽出的 helper 各自有單元測試。
+- 行為位元等價：handler 既有測試全綠。
+- `max-lines-per-file` 規則在所有現存（含未列為示範的）`src/handlers/**` 都過——若有現有超標檔，於同一輪一併處理或於 PR description 明列 follow-up。
+- 規範文字在四份文件中內容一致，未來再修一處可順手檢查其餘三處。
+
+---
+
+## 8. R5 — i18n catalog 路徑反耦合
+
+### 8.1 動機
+
+`src/core/i18n/catalog-loader.ts` 的 `DEFAULT_LOCALES_DIR` 仍以
+`path.resolve(__dirname, '..', '..', 'i18n', 'locales')` 硬編碼指向 `src/i18n/locales`。
+這代表 `core/i18n` 知道內容層（`src/i18n/locales`）的目錄位置——是 core → content 的反向耦合，違反 core 不應感知下游層的分層契約。`src/interface` → `src/i18n` 改名雖已修字面，但耦合本身未解。
+
+### 8.2 要達成什麼
+
+把「內容層在哪裡」的知識從 core 搬到 composition root：
+
+- `LoadCatalogOptions.localesDir` 改為**必填**；移除 `DEFAULT_LOCALES_DIR`。
+- `createDefaultTranslator` 簽名改為必須接收 `localesDir: string`。
+- 每個 composition root（`src/bot/{nijika,konata,tomori,msg-archive}/index.ts`）負責計算自己的 `localesDir`，以 `path.resolve(__dirname, ...)` 自行往上推到 `src/i18n/locales`。`bot/*` 屬於合成根，知道自己的部署佈局是合理的。
+- 既有 test fixture 已顯式注入 `localesDir`，不受影響。
+
+### 8.3 不做什麼
+
+- 不引入新的設定檔（如 `i18n.config.json`）來描述 locale 位置——`path.resolve` 已足夠。
+- 不改 catalog 內容、不改 catalog 結構、不改 i18next 設定。
+
+### 8.4 驗收（質化）
+
+- `grep -rn "'i18n'" src/core` 結果為空——core 不再字面提及內容層目錄。
+- `LoadCatalogOptions` 的 `localesDir` 屬性型別不再 optional；呼叫端如未注入路徑會在編譯期被擋。
+- 既有 catalog completeness 測試 / i18n 整合測試全綠。
+
+---
+
+## 9. R6 — 低優先單點清理
+
+R6 是分散的小修正集合；每一子項皆獨立可驗證、互不相依。本輪一次做完，徹底結清「審閱出來的低優先項」。
+
+### R6.1 `traceId` 隨機性升級
+
+- 位置：`src/bot/index.ts:902`（router middleware 內）。
+- 現況：`Math.random().toString(36).slice(2, 10)`。
+- 修正：`crypto.randomUUID().slice(0, 8)`（或完整 UUID，視觀感）。
+- 動機：高負載下 `Math.random()` 重複機率不可忽略，會讓 traceId 失去唯一性的本意；切換到 `crypto.randomUUID()` 是 Node 內建、零依賴。
+- 驗收：traceId 來源呼叫 `crypto.randomUUID`；既有相關測試（如 router-dispatch 整合測試）綠。
+
+### R6.2 `login()` 失敗應 reject
+
+- 位置：`src/bot/index.ts:619-634`。
+- 現況：`client.login(...).catch(err => log)`；失敗僅記錄，方法仍 resolve；`run()` 後續流程靠 `!this.client.user` guard 阻擋。
+- 修正：`await client.login(...)`，catch 改為 re-throw；`run()` 在登入失敗即中止。
+- 動機：登入失敗是不可恢復狀態；繼續走 `startAll()` 只會放大錯誤面、污染 log、留下半啟動狀態的 bot。
+- 驗收：login 失敗時 `run()` 的 promise reject；單元測試（mock client.login 失敗）覆蓋此分支。
+
+### R6.3 殘餘 `console.*` 清除
+
+- 位置：`grep -rn 'console\.' src` 仍有約 25 處。
+- 修正：改用 `bot.logger.info / warn / error`；對啟動前（logger 尚未就位）的呼叫，使用 `createBootstrapLogger()`。
+- 動機：與「結構化 logger 為唯一輸出」的標準對齊，避免日誌格式分裂。
+- 驗收：`grep -rn 'console\.' src --include='*.ts'` 結果為空（或全為刻意保留的 stderr fallback，並加上 i18n-ignore 等價的解釋註解）；`eslint` 的 `no-console` 規則對 `src/` 開為 `error`。
+
+### R6.4 `BaseBot` 命名一致化
+
+- 位置：`src/bot/index.ts` 與下游呼叫端。
+- 現況：
+  - `commandHandlers`（複數）vs `buttonHandler` / `modalHandler` / `ssmHandler` / `reactionHandler`（單數），同樣都是 `Map`。
+  - `help_msg` / `guild_num` / `debug_ch` 等 snake_case 區域 / 欄位變數混在 camelCase 中。
+- 修正：
+  - 全部 Handler Map 統一為**複數命名**（如 `buttonHandlers`、`modalHandlers`、`ssmHandlers`、`reactionHandlers`）。
+  - snake_case 變數改為 camelCase（`helpMessage`、`guildCount`、`debugChannel`）。
+- 動機：handler、subclass、test 端搜尋與閱讀的認知負擔。
+- 注意：屬 breaking change，須於 R1（同分支內）一併同步下游呼叫端；建議在 R1 commit 之後、R6.4 之前先讓 R1 落地，再做命名統一以縮小一次性 diff。
+- 驗收：所有 Handler Map 命名一致；命名規則寫入 CLAUDE.md 的「命名」段落。
+
+### R6.5 `src/bot/index.ts` import 中間夾執行碼搬移
+
+- 位置：`src/bot/index.ts:31-38`，`sharedConnectionManagers` map 與 helper 函式夾在兩段 import 之間。
+- 修正：把所有 `import` 移到檔案最上方（在 R1 拆解時順手處理）；`sharedConnectionManagers` 與 helper 放到 import 區段之後的第一個非 import 程式碼處。
+- 動機：閱讀順序符合慣例；某些工具（auto-sort、bundler）對 interleaved import 行為不穩。
+- 驗收：`eslint` 的 `import/first` 或 `import/order` 規則對 `src/bot/index.ts` pass；視覺上 import 區段連續。
+
+---
+
+## 10. 跨切議題
+
+### 10.1 測試策略
+
+- R1 開始前先補 contract / integration 測試（見 4.3）。
+- 既有 431 個測試在每一項 R 完成後皆需全綠；不允許跳過或標記 `.skip`。
+- R2 / R4 / R6.1 / R6.2 自然會新增單元測試；R3 / R5 / R6.3 / R6.4 / R6.5 不需新增（純 import 路徑替換、純 ESLint、純命名 / 排序）。
+
+### 10.2 i18n / 文件影響
+
+- R1–R6 不新增 i18n key；不刪 i18n key。
+- R3、R4、R6.4 會修 CLAUDE.md / CONTRIBUTING.md / 兩個 SKILL.md；R1 / R2 若涉及 plugin contract 變動，亦同步 SKILL.md。
+- `docs/wiki/` 在每項 R 完成後依 `update-wiki` skill 同步。
+
+### 10.3 風險與緩解
+
+| 項目 | 風險 | 緩解                                                                             |
+| ---- | ---- | -------------------------------------------------------------------------------- |
+| R1   | 高   | 4.3 的 contract 測試先補；BaseBot 改動分小步 commit；每步通過 quality gates 再續 |
+| R2   | 中   | `ctx.registerInstance` 限制只在 `init` 呼叫，搭配 host 階段檢查 + 單元測試       |
+| R3   | 低   | 純 import 替換；ESLint 一啟用即可發現遺漏                                        |
+| R4   | 低   | 純函式抽取；ESLint 門檻可在 PR 內逐檔調整                                        |
+| R5   | 低   | 介面收窄，呼叫端編譯期報錯即可發現遺漏                                           |
+| R6.1 | 低   | Node 內建；既有測試覆蓋呼叫點                                                    |
+| R6.2 | 中   | 改變 `run()` 失敗語意；須補 mock 失敗的整合測試，避免運維端錯愕                  |
+| R6.3 | 低   | 純替換；可分檔次 commit                                                          |
+| R6.4 | 中   | breaking change 面廣；搭配 R1 在同分支內一次到位，避免長期不一致                 |
+| R6.5 | 低   | 純排序                                                                           |
+
+### 10.4 退場條件
+
+- `docs/codebase-review-2026-05.md` 第 2 / 6 節列出的全部高 / 中 / 低優先項目皆畫線完成。
+- `architecture-reviewer` 對最終分支做 Audit，verdict 為 PASS。
+- `reliability-reviewer` 對 R1 / R2 / R6.2 做 Audit，verdict 為 PASS。
+- 全部 quality gate（typecheck / lint / test / format / knip / security / handlers:gen:check）綠。
+
+---
+
+## 11. 不涵蓋（明確排除）
+
+- **新功能 / 新 plugin / catalog 內容變動**。
+- **DI 框架替換、ORM 替換、i18n library 替換**——本提案不評估、不替換。
+- **CI / CD pipeline 改造、依賴升級、Node 版本變更**。
+- **公開對外契約**（HTTP webhook 路由、Discord 指令簽名 / 名稱、i18n catalog key）——本提案不動。
+- **TTS 功能**——已於前一輪移除，本提案不重新引入。
+- **將 `refactor/architecture-overhaul` 合入 `main`**——main 凍結 / branch protection 屬另一條工作流，非本輪 scope。
+
+---
+
+## 12. 後續
+
+R1–R6 完成、本提案分支合入 `refactor/architecture-overhaul` 後：
+
+1. 推進 `refactor/architecture-overhaul` 對齊 `main` 的合併策略討論（涉及 main 凍結 / branch protection）。
+2. 本提案的退場數據（`BaseBot` 最終 LOC、新增測試數、ESLint enforce 範圍、`console.*` 殘留數）寫入 `docs/wiki/CHANGELOG.md`。
+3. 評估是否啟動下一輪審閱（建議在 R1–R6 落地至少 4 週後，讓真實 maintenance / feature 工作驗證新結構），若有新技術債再行循環。

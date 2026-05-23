@@ -1,82 +1,72 @@
-# 工程任務進度總覽
+# 進度總覽 — Tech-Debt Cleanup
 
-| 欄位     | 內容                                                                        |
-| -------- | --------------------------------------------------------------------------- |
-| 文件類型 | 任務進度追蹤（Progress Tracker）                                            |
-| 來源     | [`docs/design/gaps.md`](../design/gaps.md) — 目標設計未落地缺口 D1–D9 + G-1 |
-| 任務範圍 | 僅 gaps.md 收斂工作；proposal §5 已落地之 REQ 不重列                        |
-| 最後更新 | 2026-05-21                                                                  |
+> 一個 R 全部子任務完成且 quality gates 綠後才打勾。子任務勾選狀態維護在各自的 R\<N\>.md。
 
----
+依賴順序：**R1 → R2 → R3 → R4 → R5 → R6**
 
-## 1. 說明
-
-本目錄 `docs/tasks/` 為 11 個元件（C1–C11）各安排一個任務檔，子任務以 check list
-表示完成與否。任務內容**僅涵蓋 `docs/design/gaps.md` 的收斂工作**（D1–D9、G-1）；
-proposal §5 宣稱已落地的 REQ 不再列為任務。
-
-橫跨多元件的缺口（D1、D2、D3、D4、D5）已**按元件切分子任務**，各元件任務檔只列
-自身負責的切片，並以交叉引用指向協作元件。
-
-一個元件視為「已完成」的條件：該元件任務檔內所有子任務 check 完成，且 gaps.md
-對應項目的驗收標準通過。
+| 狀態  | R   | 主題                                 | 詳細任務       |
+| ----- | --- | ------------------------------------ | -------------- |
+| `[ ]` | R1  | 拆解 BaseBot 為 thin lifecycle owner | [R1.md](R1.md) |
+| `[ ]` | R2  | 消除 DI 旁路                         | [R2.md](R2.md) |
+| `[ ]` | R3  | plugins ↔ core/ioc 契約對齊          | [R3.md](R3.md) |
+| `[ ]` | R4  | 過長 handler 拆分 + 行數規範         | [R4.md](R4.md) |
+| `[ ]` | R5  | i18n catalog 路徑反耦合              | [R5.md](R5.md) |
+| `[ ]` | R6  | 5 個低優先單點清理                   | [R6.md](R6.md) |
 
 ---
 
-## 2. 元件完成度
+## 各 R 的退場 acceptance 抹重點
 
-- [x] [C1 — Core Infrastructure](C1-core-infrastructure.md) — D4（`core/scheduling/` 承接 `JobManager` / `parseDuration`）✅
-- [x] [C2 — IoC Container](C2-ioc-container.md) — 無收斂任務
-- [x] [C3 — Plugin Runtime](C3-plugin-runtime.md) — D1（介面）、D6 ✅
-- [x] [C4 — Persistence](C4-persistence.md) — G-2（repository 邊界 `Result` 一致性）✅
-- [x] [C5 — Infra Adapters](C5-infra-adapters.md) — D5 ✅
-- [x] [C6 — Handlers](C6-handlers.md) — D5 ✅、D7 ✅、D9 ✅
-- [x] [C7 — i18n Catalog](C7-i18n-catalog.md) — D7 ✅、D9 ✅
-- [x] [C8 — Plugins](C8-plugins.md) — D1 ✅、D2 ✅、D3 ✅、D4 ✅、G-1 ✅
-- [x] [C9 — Codegen & Scripts](C9-codegen-scripts.md) — D4（`bot_cmd.ts` 承接點評估，裁定歸 C6）✅
-- [x] [C10 — Quality Gates](C10-quality-gates.md) — D8 ✅、D3 ✅
-- [x] [C11 — Bot Composition Roots](C11-bot-composition-roots.md) — D1 ✅、D2 ✅、D4 ✅、D5 ✅
+每個 R 的「全部子任務完成」之外，還需通過下列關鍵驗收才能在上表打勾。完整 acceptance 見對應 [docs/design/R\*.md](../design/) 的測試章節與 [proposal §10.4](../proposal.md#104-退場條件)。
 
-> C2、C4、C9 的設計檔 §7 判定「無實質偏差」。C2 無收斂任務（任務檔僅作存檔
-> 說明）；C9 僅在 D4 盤點後可能承接 `bot_cmd.ts`，屬條件性任務。C4 經使用者
-> 裁定，將設計檔記錄的「repository 邊界 `Result` 一致性」風格差異補列為 G-2。
+### R1 — 拆解 BaseBot
+
+- `src/bot/index.ts` 與「Thin lifecycle owner」描述相符（≤ ~400 行為參考）。
+- `GuildRegistrar` / `ClientEventBridge` / `GuildDbConnector` 各自有獨立 spec 並通過。
+- 拆解前補的 contract / integration 測試全部留下且通過。
+- `architecture-reviewer` Audit → PASS（無新增分層違規）。
+
+### R2 — DI 旁路消除
+
+- `grep -rn 'let active' src/plugins src/infra` 結果為空。
+- `bot.voice` / `models-catalog` 解析路徑能由「BaseBot resolve → plugin init 註冊」單條 trace 串起。
+- `ctx.registerInstance` 在非 `init` hook 呼叫的拒絕行為有單元測試覆蓋。
+
+### R3 — plugins ↔ core/ioc 契約對齊
+
+- `grep -rln "from '.*core/ioc'" src/plugins` 結果為空。
+- ESLint `no-restricted-imports` 對 `src/plugins/**` 違規時 fail。
+- CLAUDE.md / CONTRIBUTING.md / 兩份 SKILL.md 規範文字 verbatim 一致。
+
+### R4 — handler 拆分 + 規範
+
+- 4 個示範 handler 的 `index.ts` 全部 ≤ 150 行；helper 各有單元測試。
+- 既有 handler 測試全綠（行為位元等價）。
+- ESLint `max-lines` 在所有非 `registry.generated.ts` 的 `src/handlers/**/*.ts` 皆通過（或在 ignores 中明列豁免並有 PR follow-up）。
+- 規範文字 verbatim 在 4 份文件一致。
+
+### R5 — i18n catalog 路徑反耦合
+
+- `grep -n "'i18n'" src/core` 結果為空。
+- `LoadCatalogOptions.localesDir` 為必填（型別層強制）。
+- 既有 catalog-completeness / 既有 i18n 測試全綠；新增 catalog-load smoke 測試通過。
+
+### R6 — 低優先清理
+
+- **R6.1**：traceId 來源為 `crypto.randomUUID()`。
+- **R6.2**：`BaseBot.run()` 在 login 失敗時 promise reject 而非吞掉；對應整合測試覆蓋。
+- **R6.3**：`grep -rn 'console\.' src --include='*.ts'` 結果為空或僅剩刻意允許的 last-resort（並有對應 ESLint allowlist）。
+- **R6.4**：所有 Handler Map / 命名一致（複數 / camelCase）；handler / subclass / test 端同步修正。
+- **R6.5**：`src/bot/index.ts` import 區連續無夾雜；ESLint `import/first` 全綠。
 
 ---
 
-## 3. 缺口 → 元件對照
+## 全域退場條件
 
-| 缺口 | 標題                                              | 優先級 | 涉及元件                                              | 狀態                                    |
-| ---- | ------------------------------------------------- | ------ | ----------------------------------------------------- | --------------------------------------- |
-| D1   | guild-onboarding port 不存在                      | P1     | C3（介面）、C11（實作）、C8（消費）                   | C3 ✅；C11 切片 ✅；C8 ✅               |
-| D2   | `earthquake` plugin 不存在                        | P1     | C8（plugin）、C11（組裝）                             | C8 ✅；C11 切片 ✅                      |
-| D3   | `src/events/` 過渡層仍存在                        | P1     | C8（刪目錄/alias）、C10（scanner 範圍）               | C8 切片 ✅；C10 scanner 範圍 ✅         |
-| D4   | `src/utils/` 仍存在且被依賴                       | P2     | C8（收斂）、C11（alias/CLAUDE.md）、C1·C9（承接評估） | C8 ✅；C1 ✅；C9 ✅；C11 ✅；C6 切片 ✅ |
-| D5   | `ConnectionManager` 無 retry / 降級分類           | P1     | C5（主）、C11（查詢端）、C6（requireGuildRepos）      | C5 ✅；C6 切片 ✅；C11 切片 ✅          |
-| D6   | `host/` 無 `lifecycle.ts`                         | P2     | C3                                                    | DECIDED 方案 A+窄介面                   |
-| D7   | i18n 僅 `zh-TW`、`commands.json` 為空             | P2     | C7（catalog）、C6（handler 去 literal）               | DECIDED 方案 A                          |
-| D8   | strict tsconfig 未涵蓋 `src/bot`、`src/handlers`  | P1     | C10                                                   | C10 ✅                                  |
-| D9   | handler 不直接 catch `DomainError`                | P2     | C6（helper）、C7（文案語氣）                          | DECIDED 方案 B                          |
-| G-1  | giveaway/activity `msgReact` 用 `console.error`   | P3     | C8                                                    | OPEN                                    |
-| G-2  | repository 邊界 `Result` 一致性（任務劃分時新增） | P2     | C4（主）、C5（error-translator 落點協調）             | DONE 方案 Y                             |
+當上表所有 R 全部打勾後，再執行一次：
 
----
+```bash
+yarn typecheck && yarn lint && yarn test && yarn format:check && yarn handlers:gen:check && yarn knip && yarn security
+```
 
-## 4. 任務依賴順序
-
-下列順序為跨元件依賴，排程時須遵守：
-
-1. **D3 依賴 D1 + D2**：`src/events/` 目錄須待 `guild_event.ts`（D1）與
-   `earthquake.ts`（D2）吸收完成後才能刪除。
-2. **C10 D3 依賴 C8 D3**：CJK scanner 的 `SCOPED_DIRECTORIES` 移除 `src/events`
-   須待該目錄實際刪除後。
-3. **C1 / C9 的 D4 承接評估依賴 C8 D4 步驟 1**：`JobManager` / `bot_cmd.ts` 的
-   承接位置須待 callsite 盤點完成才能裁定。
-4. **C6 / C11 的 D5 子任務依賴 C5 D5**：`requireGuildRepos` 與 `BaseBot` 改為
-   查詢端，須待 `ConnectionManager.isDisabled(...)` 介面就緒。
-5. **C6 D7 依賴 C7 D7**：handler 去 CJK literal 須待 `commands` catalog key 就緒。
-6. **C4 G-2 與 C5 D5 共用 error-translator**：G-2 把 mongoose error-translator
-   搬至 `persistence/`，D5 在同一檔新增 `isTransient` helper。兩項須協調落點，
-   不得各自重建此檔——建議先完成 G-2 的搬遷，再由 D5 在新位置補 `isTransient`。
-
-無跨元件依賴、可立即並行開工者：C3（D1 介面、D6）、C5（D5）、C7（D7、D9）、
-C10（D8）、C8（D1 plugin 端、D2、G-1）。
+全綠後即可從 `refactor/tech-debt-cleanup` 發 PR 合入 `refactor/architecture-overhaul`。
