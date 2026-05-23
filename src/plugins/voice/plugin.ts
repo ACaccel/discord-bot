@@ -10,7 +10,7 @@
  * (`internal/active-controller.ts`) has been removed; there is now
  * exactly one path — IoC token resolution — from plugin to consumer.
  */
-import { TOKENS } from '../../core/ioc';
+import { TOKENS } from '../../core/plugin';
 import type { Plugin } from '../../core/plugin';
 import { VoiceController } from './internal';
 

@@ -20,7 +20,7 @@ import type { Message } from 'discord.js';
 
 import type { LlmProviderError } from '../../core/errors';
 import type { Translator } from '../../core/i18n';
-import { TOKENS } from '../../core/ioc';
+import { TOKENS } from '../../core/plugin';
 import type { Plugin } from '../../core/plugin';
 import {
   LLMService,

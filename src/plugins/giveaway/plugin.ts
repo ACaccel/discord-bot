@@ -5,7 +5,7 @@
  * `rebootGiveawayJobs` directly, so composition roots never deep-import
  * `./internal`.
  */
-import { TOKENS } from '../../core/ioc';
+import { TOKENS } from '../../core/plugin';
 import type { Plugin } from '../../core/plugin';
 import { type GiveawayDeps, rebootGiveawayJobs } from './internal/giveaway';
 

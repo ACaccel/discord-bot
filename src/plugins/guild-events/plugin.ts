@@ -33,7 +33,7 @@ import {
 } from 'discord.js';
 import { z } from 'zod';
 
-import { TOKENS } from '../../core/ioc';
+import { TOKENS } from '../../core/plugin';
 import type { GuildRegistry } from '../../core/guild-registry';
 import type { Plugin } from '../../core/plugin';
 import type { GuildOnboardingPort } from '../../core/plugin';

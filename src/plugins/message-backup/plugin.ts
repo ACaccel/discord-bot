@@ -18,7 +18,7 @@
  * guild-scoped variant would race against itself on the Mongo
  * connection pool.
  */
-import { TOKENS } from '../../core/ioc';
+import { TOKENS } from '../../core/plugin';
 import { logError } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
 import { performBackup } from './internal';

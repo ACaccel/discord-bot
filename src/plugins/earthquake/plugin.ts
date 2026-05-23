@@ -13,7 +13,7 @@
 import express, { type Express } from 'express';
 import type { Server } from 'node:http';
 
-import { TOKENS } from '../../core/ioc';
+import { TOKENS } from '../../core/plugin';
 import { logError, logSystem } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
 import { broadcastEarthquakeAlert } from './internal';
