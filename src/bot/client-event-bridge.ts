@@ -11,6 +11,8 @@
  * bridge per spec without leaking listeners. Re-attach without detach
  * is a contract violation and throws `ConfigurationError`.
  */
+import { randomUUID } from 'node:crypto';
+
 import { MessageFlags } from 'discord.js';
 import type {
     Client,
@@ -289,7 +291,9 @@ export class ClientEventBridge {
         }
         const rootLogger = config.container.resolve<Logger>(TOKENS.Logger);
         const clock = config.container.resolve<Clock>(TOKENS.Clock);
-        const traceId = Math.random().toString(36).slice(2, 8).padStart(6, '0');
+        // R6.1: first 8 chars of a v4 UUID — pure random, no
+        // birthday-paradox collisions like `Math.random().toString(36)`.
+        const traceId = randomUUID().slice(0, 8);
         const ctx: InteractionContext = {
             interaction,
             traceId,
