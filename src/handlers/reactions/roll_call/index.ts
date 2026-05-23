@@ -21,7 +21,6 @@ const rollCallReact = async (reaction: MessageReaction, _user: User) => {
             ? userIds.map(id => id.replace(/[<@!>]/g, ""))
             : [];
         parsedUserIds = parsedUserIds.slice(1);
-        // console.log(parsedUserIds);
 
         let msg = `${reaction.message.content.split("\n")[0]}\n`;
         let count = 1;

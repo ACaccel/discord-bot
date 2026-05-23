@@ -58,7 +58,12 @@ export default tseslint.config(
       // `src/bot/index.ts` where module-level helpers were wedged
       // between two import groups.
       'import/first': 'error',
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      // R6.3: `console.*` is banned outside the test / scripts override
+      // below. `console.error` is permitted as a last-resort fallback
+      // for the deploy CLI's top-level catch and any future site where
+      // the structured logger itself is unavailable; every such call
+      // site must carry a `// last-resort` comment.
+      'no-console': ['error', { allow: ['error'] }],
       eqeqeq: ['error', 'always'],
     },
   },

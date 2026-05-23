@@ -27,10 +27,17 @@ import path from "path";
 import dotenv from "dotenv";
 
 import { buildCommandJsonBody, createCommand, localizeCommandConfig } from "@cmd";
-import { loadEnv } from '@core/config';
+import { createBootstrapLogger, loadEnv } from '@core/config';
 import { createDefaultTranslator, type Translator } from '@core/i18n';
 
 import { resolveLocalesDir } from './bot/locales-dir';
+
+// Deploy runs before the IoC container is built, so the typed `Logger`
+// bound to `TOKENS.Logger` is not available. Use the bootstrap logger
+// (the same construct `BaseBot.run()` falls back to during phase 1)
+// so the deploy CLI still emits structured pino lines instead of raw
+// `console.*` writes.
+const logger = createBootstrapLogger({ component: 'deploy' });
 
 type DeployArgs = {
     bot?: string;
@@ -100,7 +107,7 @@ function buildCommandsFromConfig(
     for (const name of commands) {
         const instance = createCommand(name);
         if (!instance || !instance.config) {
-            console.warn(`[WARN] Command "${name}" could not be created or has no config.`);
+            logger.warn({ command: name }, 'Command could not be created or has no config.');
             continue;
         }
 
@@ -119,21 +126,22 @@ async function deployGlobal(botName: string): Promise<void> {
     const translator = await createDefaultTranslator({ localesDir: resolveLocalesDir() });
     const body = buildCommandsFromConfig(commands, translator);
     if (body.length === 0) {
-        console.error("No commands to deploy (after filtering).");
+        logger.error('No commands to deploy (after filtering).');
         process.exit(1);
     }
 
     const rest = new REST({ version: "10" }).setToken(token);
 
-    console.log(
-        `Deploying ${body.length} commands for bot "${botName}" GLOBALLY (visible in every guild after Discord propagation, typically minutes).`,
+    logger.info(
+        { bot: botName, count: body.length, scope: 'global' },
+        'Deploying commands GLOBALLY (visible in every guild after Discord propagation, typically minutes).',
     );
 
     const res = (await rest.put(Routes.applicationCommands(clientId), {
         body,
     })) as unknown as { id: string }[];
 
-    console.log(`Successfully registered ${res.length} global command(s).`);
+    logger.info({ count: res.length }, 'Successfully registered global command(s).');
 }
 
 async function deployDevGuild(botName: string, guildId: string): Promise<void> {
@@ -142,21 +150,22 @@ async function deployDevGuild(botName: string, guildId: string): Promise<void> {
     const translator = await createDefaultTranslator({ localesDir: resolveLocalesDir() });
     const body = buildCommandsFromConfig(commands, translator);
     if (body.length === 0) {
-        console.error("No commands to deploy (after filtering).");
+        logger.error('No commands to deploy (after filtering).');
         process.exit(1);
     }
 
     const rest = new REST({ version: "10" }).setToken(token);
 
-    console.log(
-        `Deploying ${body.length} commands for bot "${botName}" to dev guild ${guildId} (guild-scoped — instant propagation).`,
+    logger.info(
+        { bot: botName, count: body.length, scope: 'guild', guildId },
+        'Deploying commands to dev guild (guild-scoped — instant propagation).',
     );
 
     const res = (await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
         body,
     })) as unknown as { id: string }[];
 
-    console.log(`Successfully registered ${res.length} command(s) in dev guild.`);
+    logger.info({ count: res.length, guildId }, 'Successfully registered dev-guild command(s).');
 }
 
 /**
@@ -176,33 +185,38 @@ async function cleanupGuildCommands(botName: string): Promise<void> {
 
     const rest = new REST({ version: "10" }).setToken(token);
     rest.on('rateLimited', (info) => {
-        console.warn(
-            `[rate-limit] route=${info.route} timeout=${info.timeToReset}ms global=${info.global}`,
+        logger.warn(
+            { route: info.route, timeoutMs: info.timeToReset, global: info.global },
+            'Discord REST rate limit hit.',
         );
     });
     const guilds = (await rest.get(Routes.userGuilds())) as { id: string; name: string }[];
 
-    console.log(
-        `Cleanup mode: removing guild-scoped commands from ${guilds.length} guild(s). Global commands left untouched.`,
+    logger.info(
+        { guildCount: guilds.length },
+        'Cleanup mode: removing guild-scoped commands. Global commands left untouched.',
     );
     if (guilds.length > 50) {
-        console.warn(
-            `[warn] ${guilds.length} guilds detected. Cleanup is a one-shot migration tool; ` +
-                `consider running off-peak. Pacing at ${PER_ITER_DELAY_MS}ms between PUTs.`,
+        logger.warn(
+            { guildCount: guilds.length, perIterDelayMs: PER_ITER_DELAY_MS },
+            'Large guild count detected. Cleanup is a one-shot migration tool; consider running off-peak.',
         );
     }
 
     for (const guild of guilds) {
         try {
             await rest.put(Routes.applicationGuildCommands(clientId, guild.id), { body: [] });
-            console.log(`- Cleared guild commands: ${guild.name} (${guild.id}).`);
+            logger.info({ guildName: guild.name, guildId: guild.id }, 'Cleared guild commands.');
         } catch (err) {
-            console.error(`- Failed to clear commands for guild ${guild.id}:`, err);
+            logger.error(
+                { guildId: guild.id, err: err instanceof Error ? err : new Error(String(err)) },
+                'Failed to clear commands for guild.',
+            );
         }
         await new Promise((resolve) => setTimeout(resolve, PER_ITER_DELAY_MS));
     }
 
-    console.log("Cleanup done.");
+    logger.info('Cleanup done.');
 }
 
 async function main() {
@@ -210,11 +224,11 @@ async function main() {
     const bot = args.bot;
 
     if (!bot) {
-        console.error(
-            "Usage:\n" +
-                "  yarn deploy -t <bot_name>                          # global (default)\n" +
-                "  yarn deploy -t <bot_name> --dev-guild <guild_id>   # guild-side fast iteration\n" +
-                "  yarn deploy -t <bot_name> --cleanup-guild-commands # remove legacy guild-scoped commands",
+        logger.error(
+            'Usage:\n' +
+                '  yarn deploy -t <bot_name>                          # global (default)\n' +
+                '  yarn deploy -t <bot_name> --dev-guild <guild_id>   # guild-side fast iteration\n' +
+                '  yarn deploy -t <bot_name> --cleanup-guild-commands # remove legacy guild-scoped commands',
         );
         process.exit(1);
     }
@@ -228,7 +242,10 @@ async function main() {
             await deployGlobal(bot);
         }
     } catch (err) {
-        console.error(err);
+        logger.error(
+            { err: err instanceof Error ? err : new Error(String(err)) },
+            'Deploy CLI failed.',
+        );
         process.exit(1);
     }
 }
