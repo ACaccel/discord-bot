@@ -76,6 +76,7 @@ import type { SSMHandler } from '@select-menu';
 import { registerSSMs } from '@select-menu';
 
 import { BaseBotGuildOnboardingPort } from './guild-onboarding';
+import { GuildRegistrar } from './guild-registrar';
 import type { ReactionHandler} from "@reaction";
 import { executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
 
@@ -213,6 +214,13 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      */
     protected interactionRouter: InteractionRouter | undefined;
     private readonly pendingPlugins: Array<{ plugin: Plugin<unknown>; config: unknown }> = [];
+
+    /**
+     * R1 collaborator: assembles {@link GuildInfo} records from the
+     * live Discord cache + bot config. Built lazily on first use so
+     * the logger (which the registrar logs through) is available.
+     */
+    private guildRegistrar: GuildRegistrar | undefined;
 
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: TConfig) {
         this.token = token;
@@ -749,46 +757,18 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         await this.client.login(this.token);
     }
 
-    public registerGuild = () => {
-        logSystem(this.logger, this.clientId, "Registering guilds...");
-        try {            
-            let guild_num = 0;
-            this.client.guilds.cache.forEach((guild) => {
-                const config = this.config.guilds?.[guild.id];
-                
-                const newChannel: Record<string, Channel> = {};
-                const newRole: Record<string, Role> = {};
-                if (config) {
-                    // register channels
-                    Object.entries(config.channels).forEach(([name, id]) => {
-                        const channel = this.client.channels.cache.get(id);
-                        if (channel) {
-                            newChannel[name] = channel;
-                        }
-                    });
-    
-                    // register roles
-                    Object.entries(config.roles).forEach(([name, id]) => {
-                        const role = guild.roles.cache.get(id);
-                        newRole[name] = role as Role;
-                    });
-                }
-
-                const newGuild: GuildInfo = {
-                    bot_name: guild.members.cache.get(this.clientId)?.displayName as string,
-                    guild: guild,
-                    channels: newChannel,
-                    roles: newRole
-                };
-                this.guildInfo[guild.id] = newGuild;
-                guild_num++;
-                logSystem(this.logger, this.clientId, `${guild_num}. ${guild.id} - ${guild.name}`);
-            });
-
-            logSystem(this.logger, this.clientId, "Successfully registered all guilds.");
-        } catch (err) {
-            logSystem(this.logger, this.clientId, `Cannot register guild: ${err}`);
+    /**
+     * Build {@link GuildInfo} records for every guild in the client's
+     * cache. Delegates the assembly to the R1 {@link GuildRegistrar}
+     * collaborator; the per-guild fan-out and best-effort error
+     * handling live there.
+     */
+    public registerGuild = (): void => {
+        if (this.guildRegistrar === undefined) {
+            const log = this.logger ?? this.container.resolve<Logger>(TOKENS.Logger);
+            this.guildRegistrar = new GuildRegistrar(this.client, this.clientId, log);
         }
+        this.guildInfo = this.guildRegistrar.registerAll(this.config);
     }
 
     public connectGuildDB = async () => {
