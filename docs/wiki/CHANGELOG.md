@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-05-24 — R5：i18n catalog 路徑反耦合
+
+- **元件**：C7 i18n Catalog、C11 Bot Composition Roots
+- **缺口**：tech-debt R5
+- **變更**：
+  - C7 — `src/core/i18n/catalog-loader.ts` 移除 `DEFAULT_LOCALES_DIR` 常數；
+    `LoadCatalogOptions.localesDir` 由 optional 改為必填，`loadCatalogResources`
+    與 `createDefaultTranslator` 不再 fallback 至內建路徑。錯誤訊息更新為
+    指向「composition root 必須注入」的修復提示。
+  - C11 — 新增 `src/bot/locales-dir.ts` 暴露 `resolveLocalesDir()`，由合成根層
+    擁有「catalog 落在 `<src>/i18n/locales`」的部署知識。`BaseBot` 建構子
+    新增 `localesDir: string = resolveLocalesDir()` 參數，`buildHost` 內
+    透過此私有欄位呼叫 `createDefaultTranslator({ localesDir })`。四個 bot
+    子類無需改 ctor 呼叫。`src/deploy.ts` 兩處 `createDefaultTranslator()`
+    亦改用同一 helper 注入路徑。
+  - 測試 — `test/i18n/catalog-runtime.test.ts` 四處 `loadCatalogResources()`
+    顯式注入 `LOCALES_DIR`（測試檔位於合成根層，已知專案佈局）；
+    `test/unit/core/i18n/catalog-loader.test.ts` 既有用法不變。
+- **影響**：對外行為等價（catalog 載入與翻譯結果不變）。介面層級為破壞性
+  變更——任何未注入 `localesDir` 的呼叫將在 `tsc` 即被擋下，無 runtime
+  fallback。`grep -n "'i18n'" src/core` 與 `grep -rn 'DEFAULT_LOCALES_DIR' src`
+  皆已清空。
+
+---
+
 ## 2026-05-24 — R4：過長 handler 拆分 + 150 行規範 + ESLint enforce
 
 - **元件**：C6 Handlers、C10 Quality Gates

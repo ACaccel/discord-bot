@@ -17,6 +17,7 @@
 
 ## 近期變更
 
+- 2026-05-24 — R5：`LoadCatalogOptions.localesDir` 由 optional 收為必填、移除 `DEFAULT_LOCALES_DIR` 常數；`createDefaultTranslator` 同步要求注入路徑。`core/i18n` 不再以 `__dirname` 反向解析下游內容層位置；路徑知識由合成根（新檔 `src/bot/locales-dir.ts`）擁有並透過 BaseBot ctor 注入。`src/deploy.ts` 與 `test/i18n/catalog-runtime.test.ts` 顯式傳入 `localesDir`（tech-debt R5）。
 - 2026-05-21 — D7：填 `zh-TW/commands.json` 指令 metadata key，新建 `en/` 三個命名空間檔並英譯全部 key；新增 `test/i18n/catalog-runtime.test.ts` 覆蓋雙語系 parity 與 fallback（gap D7）。
 - 2026-05-21 — D9：每個指令 feature 補有語氣的 `replies:<feature>.failed` 回退文案並帶 `{{traceId}}`，`en/` 同步英譯；C7 設計檔與 `CONTRIBUTING.md` 明示雙語系維護負擔（gap D9）。
 - 2026-05-21 — 建立元件 wiki 頁（工程基礎建設）。
