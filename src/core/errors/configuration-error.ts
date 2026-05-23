@@ -9,7 +9,16 @@ export type ConfigurationErrorCode =
   | 'MISSING_ENV'
   | 'INVALID_ENV'
   | 'INVALID_CONFIG_JSON'
-  | 'UNSUPPORTED_FEATURE';
+  | 'UNSUPPORTED_FEATURE'
+  /**
+   * A plugin called `PluginInitContext.registerInstance` outside the
+   * `init` phase. Raised by the lifecycle runner's stage guard; see
+   * `core/plugin/host/lifecycle.ts`. Reused rather than promoted to a
+   * dedicated error subclass because the violation is a startup-time
+   * composition bug, equivalent in severity to the existing
+   * `INVALID_CONFIG_JSON` / `MISSING_ENV` family.
+   */
+  | 'LIFECYCLE_PHASE_VIOLATION';
 
 export class ConfigurationError<
   P extends Readonly<Record<string, string | number>> | undefined = undefined,

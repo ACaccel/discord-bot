@@ -20,6 +20,7 @@ export type {
   PluginRuntimeContext,
   PluginRuntimeServices,
   TypedResolver,
+  RegisterInstance,
   ContributedRegistry,
   HandlerConstructor,
   JobDescriptor,

@@ -47,5 +47,8 @@
   "configuration": {
     "missing_env": "The environment variable `{{envVar}}` is not set. Please contact an administrator."
   },
+  "plugin": {
+    "lifecycle_phase_violation": "Plugin `{{plugin}}` called registerInstance(`{{token}}`) during phase `{{phase}}`; only `init` is allowed."
+  },
   "unexpected": "An unexpected error occurred while running the command. An administrator has been notified (error ID: {{traceId}})."
 }
