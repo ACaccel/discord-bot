@@ -27,8 +27,9 @@ export default class help extends Command {
             helpContent += bot.translator?.t('replies:help.commands_header') ?? '';
             bot.commandHandlers.forEach((cmd) => {
                 if (cmd.config) {
-                    // Gap D7: descriptions are i18n keys resolved here against
-                    // the `commands` catalog instead of inline CJK literals.
+                    // Descriptions are i18n keys resolved here against
+                    // the `commands` catalog, keeping CJK literals out
+                    // of source.
                     const localized = localizeCommandConfig(cmd.config, bot.translator);
                     helpContent += `* \`/${localized.name}\` : ${localized.description}\n`;
                 }

@@ -18,12 +18,12 @@ export default class random_restaurant extends Command {
                     {
                         name: "type",
                         required: false,
-                        // Gap D7: restaurant-type choices live in the
-                        // colocated `restaurant-types.json` data file so the
-                        // CJK choice strings stay out of this `.ts` source.
-                        // `name` and `value` are kept identical because the
-                        // food API matches the request `type` parameter against
-                        // these exact strings.
+                        // Restaurant-type choices live in the colocated
+                        // `restaurant-types.json` data file so the CJK
+                        // choice strings stay out of this `.ts` source.
+                        // `name` and `value` are kept identical because
+                        // the food API matches the request `type`
+                        // parameter against these exact strings.
                         choices: restaurant_types.map((type) => ({
                             name: type,
                             value: type,

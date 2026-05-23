@@ -2,7 +2,7 @@
  * `ReplyRepo` — auto-reply pair storage. One per guild; pairs are
  * keyed by an exact-match `input` and produce a `reply` string.
  *
- * **Error boundary (gap G-2)**: every method returns
+ * **Error boundary**: every method returns
  * `Result<T, DatabaseError>`. A mongoose failure is translated by the
  * shared `databaseErrorFrom` translator and returned as `err`; a
  * missing lookup is a success (`ok(undefined)`).

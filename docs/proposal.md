@@ -83,7 +83,7 @@ src/
 ├── persistence/   # Mongoose Repository pattern（schemas + repositories）
 ├── infra/         # 第三方 SDK adapter（mongo · llm · discord）
 ├── handlers/      # Discord interaction 進入點
-├── interface/     # i18n locale catalog
+├── i18n/          # i18n locale catalog
 ├── plugins/       # 註冊至 PluginHost 的功能模組
 └── bot/           # composition root（BaseBot + 各 bot wiring）
 ```
@@ -248,7 +248,7 @@ interface 後，採 Strategy + Registry 模式，置於 `src/infra/llm`。
 #### REQ-E1 — Translator + catalog
 
 `Translator`（i18next-backed）統一 user-facing 文案；catalog 置於
-`src/interface/locales/<lang>/{commands,errors,replies}.json`，key
+`src/i18n/locales/<lang>/{commands,errors,replies}.json`，key
 格式 `<namespace>:<feature>.<purpose>`。`src/handlers`、`src/plugins`、
 `src/bot` 零 CJK literal。
 

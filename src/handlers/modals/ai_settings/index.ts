@@ -46,8 +46,8 @@ export default class ai_settings_modal extends ModalHandler {
         }
 
         try {
-            // G-2: repo methods return Result<T, DatabaseError>; an
-            // `err` is re-thrown into the surrounding catch.
+            // Repo methods return Result<T, DatabaseError>; an `err`
+            // is re-thrown into the surrounding catch.
             const docResult = await repos.userApiSetting.findByUserId(userId);
             if (!docResult.ok) throw docResult.error;
             if (!docResult.value) {

@@ -8,7 +8,7 @@
  *
  * Adding a new locale requires only:
  *   1. add a value to the `Locale` union below
- *   2. drop a parallel JSON folder under src/interface/locales/<locale>/
+ *   2. drop a parallel JSON folder under src/i18n/locales/<locale>/
  *   3. the catalog-completeness test will fail until keys match
  *
  * Application/interface code receives a `Translator` via constructor

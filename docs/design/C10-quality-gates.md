@@ -59,7 +59,7 @@ C10 以 CI gate 橫切強制全 repo 品質。它不是程式模組，而是設�
 ignore `**/*.generated.ts`、`src/bot/**/config.json`。兩條硬 `error` 規則：
 
 - **禁直接 `process.env`**：`no-restricted-syntax` 於 `src/**`+`test/**`（`src/core/config/**` 豁免）。
-- **Service-Locator 防護**：`no-restricted-imports` 於 `application`/`domain`/`interface`/`persistence`/`infra`/`handlers`/`events`/`features`/`utils` 層，封鎖 import `**/core/ioc`、`@core/ioc`。容器 import 僅限組裝根與測試。
+- **Service-Locator 防護**：`no-restricted-imports` 於 `application`/`domain`/`i18n`/`persistence`/`infra`/`handlers`/`events`/`features`/`utils` 層，封鎖 import `**/core/ioc`、`@core/ioc`。容器 import 僅限組裝根與測試。
 
 ### 2.5 Vitest 覆蓋率門檻（`vitest.config.ts`）
 

@@ -16,7 +16,7 @@
     原點分隔格式在 i18next 解析下會落空 catalog，使 D9「handler 對
     `DomainError` 依 `messageKey` 回覆」對 `DatabaseError` 退回防禦性
     per-feature `.failed` 回退;修正後改為 taxonomy-driven `errors:db.*`。
-  - C7 — `src/interface/locales/{zh-TW,en}/errors.json` 的 `db` 物件補上
+  - C7 — `src/i18n/locales/{zh-TW,en}/errors.json` 的 `db` 物件補上
     `duplicate_key` / `timeout` / `network` / `validation` 四個原本完全
     缺失的文案,以 bot 人格語氣撰寫(雙語)。`databaseErrorFrom` 不帶入
     `messageParams`,故四個新文案皆不含插值佔位符;同步移除 `db.unavailable`
@@ -214,7 +214,7 @@
 - **元件**：C7 i18n Catalog
 - **缺口**：D7、D9
 - **變更**：填 `zh-TW/commands.json` 指令 metadata key（描述 / 選項描述 /
-  穩定 value choices）;新建 `src/interface/locales/en/{commands,errors,replies}.json`
+  穩定 value choices）;新建 `src/i18n/locales/en/{commands,errors,replies}.json`
   並把 `zh-TW` 全部 key 英譯。每個指令 feature 補有語氣的
   `replies:<feature>.failed` 回退文案,一律帶 `{{traceId}}` 內插位。新增
   `test/i18n/catalog-runtime.test.ts` 以實際載入管線驗證 en 解析、雙語系零缺

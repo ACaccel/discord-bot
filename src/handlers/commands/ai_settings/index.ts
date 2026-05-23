@@ -54,9 +54,9 @@ export default class ai_settings extends Command {
         const repos = await requireGuildRepos(bot, interaction);
         if (repos === null) return;
 
-        // G-2: findByUserId returns Result<UserApiSettingDoc | undefined,
-        // DatabaseError>. An `err` keeps the original behaviour — log
-        // the failure and reply with `errors:db.operation_failed`.
+        // `findByUserId` returns Result<UserApiSettingDoc | undefined,
+        // DatabaseError>. On `err`, log the failure and reply with
+        // `errors:db.operation_failed`.
         const docResult = await repos.userApiSetting.findByUserId(userId);
         if (!docResult.ok) {
             logError(bot.logger, bot.clientId, interaction.guildId, docResult.error);

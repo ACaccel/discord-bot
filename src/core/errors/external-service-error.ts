@@ -50,9 +50,8 @@ export class DiscordApiError<
  * surfaced to the user as a generic failure.
  *
  * The mongoose-shape → sub-code translation lives in
- * `src/persistence/error-translator.ts` (per Phase-3 design: this
- * class stays free of mongoose imports; relocated from
- * `infra/mongo/` in gap G-2).
+ * `src/persistence/error-translator.ts`; this class stays free of
+ * mongoose imports so the core error layer has no driver dependency.
  */
 export type DatabaseErrorCode =
   | 'DATABASE_DUPLICATE_KEY'

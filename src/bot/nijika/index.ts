@@ -52,7 +52,6 @@ const nijika = new Nijika(
     env.PORT as number,
 );
 
-// Gap D2: the earthquake webhook server is no longer started inline
-// here — it is owned by the `earthquake` plugin's `start` hook (see
-// `Nijika`'s composition in `nijika.ts`).
+// The earthquake webhook server is owned by the `earthquake` plugin's
+// `start` hook (see `Nijika`'s composition in `nijika.ts`).
 void nijika.run();

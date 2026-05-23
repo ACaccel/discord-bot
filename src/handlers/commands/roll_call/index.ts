@@ -54,7 +54,7 @@ export default class roll_call extends Command {
                     return;
                 }
 
-                // G-2: an `err` is re-thrown into the surrounding catch.
+                // A repo `err` is re-thrown into the surrounding catch.
                 const activityResult = await repos.activity.findByActivityId(activity_id);
                 if (!activityResult.ok) throw activityResult.error;
                 const activity = activityResult.value;

@@ -1,6 +1,6 @@
 # C7 — i18n Catalog
 
-> 路徑：`src/interface/locales/` ｜詳細設計：[`docs/design/C7-i18n-catalog.md`](../../design/C7-i18n-catalog.md) ｜任務：[`docs/tasks/C7-i18n-catalog.md`](../../tasks/C7-i18n-catalog.md)
+> 路徑：`src/i18n/locales/` ｜詳細設計：[`docs/design/C7-i18n-catalog.md`](../../design/C7-i18n-catalog.md) ｜任務：[`docs/tasks/C7-i18n-catalog.md`](../../tasks/C7-i18n-catalog.md)
 
 ## 職責
 

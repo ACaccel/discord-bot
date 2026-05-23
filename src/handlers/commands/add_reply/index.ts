@@ -34,10 +34,9 @@ export default class add_reply extends Command {
 
             const repos = await requireGuildRepos(bot, interaction);
             if (repos === null) return;
-            // G-2: repo methods return Result<T, DatabaseError>. An `err`
-            // is re-thrown so the surrounding catch runs the unchanged
-            // log + failure-reply path — behaviour-equivalent to the
-            // pre-G-2 raw-mongoose-error propagation.
+            // Repo methods return Result<T, DatabaseError>. An `err` is
+            // re-thrown so the surrounding catch runs the standard log +
+            // failure-reply path.
             const existPairResult = await repos.reply.findExactPair(input, reply);
             if (!existPairResult.ok) throw existPairResult.error;
             const existPair = existPairResult.value;

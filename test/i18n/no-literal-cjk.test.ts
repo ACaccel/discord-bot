@@ -206,7 +206,7 @@ describe('CJK-literal scanner', () => {
       violations.length,
       `i18n violation count (${violations.length}) exceeds baseline (${baseline}). ` +
         'A new CJK literal was introduced. Either migrate it to a translator key in ' +
-        'src/interface/locales/zh-TW/ or annotate it with "// i18n-ignore: <reason>". ' +
+        'src/i18n/locales/zh-TW/ or annotate it with "// i18n-ignore: <reason>". ' +
         'After a migration wave drops the count, lower test/i18n/.baseline to match.',
     ).toBeLessThanOrEqual(baseline);
   });
@@ -216,7 +216,7 @@ describe('CJK-literal scanner', () => {
       expect(
         violations,
         `Expected zero CJK literals in ${SCOPED_DIRECTORIES.join(', ')} once PHASE >= ${STRICT_MODE_PHASE}. ` +
-          `Migrate each to a translator key in src/interface/locales/zh-TW/ or annotate with "// i18n-ignore: <reason>".`,
+          `Migrate each to a translator key in src/i18n/locales/zh-TW/ or annotate with "// i18n-ignore: <reason>".`,
       ).toEqual([]);
     } else {
       // Below the strict threshold: the report-only assertion above

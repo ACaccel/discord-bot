@@ -1,14 +1,14 @@
 /**
  * Filesystem-backed catalog loader.
  *
- * Reads the JSON files under `src/interface/locales/<locale>/<namespace>.json`
+ * Reads the JSON files under `src/i18n/locales/<locale>/<namespace>.json`
  * and assembles a {@link CatalogResources} blob that
  * {@link I18NextTranslator.create} accepts.
  *
  * Why filesystem and not bundler import: the bot is run via `ts-node` /
  * compiled JS without a bundler, so static `import xx from "*.json"`
  * paths would require a custom resolver. Sync `readFileSync` at bot
- * startup is one-off and keeps `src/interface/locales` as the single
+ * startup is one-off and keeps `src/i18n/locales` as the single
  * source of truth.
  *
  * Resilience: missing namespace files for a locale degrade to an empty
@@ -24,10 +24,10 @@ import { DEFAULT_LOCALE, type Locale, type Translator } from './translator';
 const NAMESPACES = ['commands', 'errors', 'replies'] as const;
 type Namespace = (typeof NAMESPACES)[number];
 
-const DEFAULT_LOCALES_DIR = path.resolve(__dirname, '..', '..', 'interface', 'locales');
+const DEFAULT_LOCALES_DIR = path.resolve(__dirname, '..', '..', 'i18n', 'locales');
 
 export interface LoadCatalogOptions {
-  /** Override the locales root; default = `<src>/interface/locales`. */
+  /** Override the locales root; default = `<src>/i18n/locales`. */
   readonly localesDir?: string;
   /** Override the fallback locale; default = {@link DEFAULT_LOCALE}. */
   readonly fallbackLocale?: Locale;

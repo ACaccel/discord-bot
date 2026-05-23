@@ -13,11 +13,9 @@ import type { ChannelId } from "../../../core/ids";
 import type { MessageDoc } from "../../../persistence/schemas/message.schema";
 
 import { replyForError } from '../../reply-for-error';
-// Audit C-1 reviewer follow-up: the local DbMessage shape was a hand-
-// maintained copy of the persistence schema. Aliasing it to the typed
-// `MessageDoc` keeps the handler reactive to schema changes — a future
-// field add becomes a compile error in the rendering code instead of a
-// silent drift between two definitions.
+// Alias the typed persistence document so the handler stays reactive
+// to schema changes — a future field add becomes a compile error in
+// the rendering code instead of silent drift between two definitions.
 type DbMessage = MessageDoc;
 
 const isValidDateString = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date);
@@ -178,7 +176,7 @@ export default class db_list_message extends Command {
 
             const { startMs, endMs } = range;
 
-            // G-2: an `err` is re-thrown into the surrounding catch.
+            // A repo `err` is re-thrown into the surrounding catch.
             const messagesResult = await repos.message.findByChannelAndTimestampRange(
                 channel.id as ChannelId,
                 startMs,

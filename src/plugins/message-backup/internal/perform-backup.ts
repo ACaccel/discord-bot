@@ -47,9 +47,8 @@ export const performBackup = async (
   try {
     const startTime = Date.now();
     let newCount = 0;
-    // G-2: repo methods return Result<T, DatabaseError>. An `err` is
-    // re-thrown so the surrounding catch writes the FATAL log line —
-    // behaviour-equivalent to the pre-G-2 raw-error propagation.
+    // Repo methods return Result<T, DatabaseError>. An `err` is
+    // re-thrown so the surrounding catch writes the FATAL log line.
     const existingCountResult = await repos.message.countAll();
     if (!existingCountResult.ok) throw existingCountResult.error;
     const existingCount = existingCountResult.value;

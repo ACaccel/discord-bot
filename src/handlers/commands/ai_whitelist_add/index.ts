@@ -35,8 +35,8 @@ export default class ai_whitelist_add extends Command {
         if (repos === null) return;
 
         try {
-            // G-2: repo methods return Result<T, DatabaseError>; an
-            // `err` is re-thrown into the surrounding catch.
+            // Repo methods return Result<T, DatabaseError>; an `err`
+            // is re-thrown into the surrounding catch.
             const existingResult = await repos.userApiSetting.findByUserId(target.id);
             if (!existingResult.ok) throw existingResult.error;
             if (existingResult.value) {

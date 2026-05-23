@@ -5,7 +5,7 @@
  * scheduler reads pending giveaways on boot, the announcement creates
  * one, and the schedule callback (or a manual cancel) deletes it.
  *
- * **Error boundary (gap G-2)**: every method returns
+ * **Error boundary**: every method returns
  * `Result<T, DatabaseError>`. A mongoose failure is translated by the
  * shared `databaseErrorFrom` translator and returned as `err`; a
  * missing lookup is a success (`ok(undefined)`).

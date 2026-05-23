@@ -21,7 +21,7 @@ export default class ai_status extends Command {
         if (repos === null) return;
 
         try {
-            // G-2: an `err` is re-thrown into the surrounding catch.
+            // A repo `err` is re-thrown into the surrounding catch.
             const docResult = await repos.userApiSetting.findByUserId(userId);
             if (!docResult.ok) throw docResult.error;
             const doc = docResult.value;

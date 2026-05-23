@@ -115,7 +115,7 @@ flowchart TB
     subgraph L5[plugins — 可插拔功能]
         C8[C8 Plugin 功能模組]
     end
-    subgraph L4[handlers + interface — Discord I/O 邊界]
+    subgraph L4[handlers + i18n — Discord I/O 邊界]
         C6[C6 Handler 進入點]
         C7[C7 i18n Catalog]
     end
@@ -156,7 +156,7 @@ flowchart TB
 | Persistence       | `src/persistence/`           | C4       |
 | Infra             | `src/infra/`                 | C5       |
 | Handlers          | `src/handlers/`              | C6       |
-| Interface         | `src/interface/`             | C7       |
+| Interface         | `src/i18n/`                  | C7       |
 | Plugins           | `src/plugins/`               | C8       |
 | Codegen / Scripts | `scripts/`                   | C9       |
 | Quality Gates     | CI / 設定檔                  | C10      |
@@ -281,7 +281,7 @@ flowchart TB
 
 ### C7 — i18n Catalog（語系目錄）
 
-> `src/interface/locales/`
+> `src/i18n/locales/`
 
 - **職責**：存放 user-facing 文案目錄
   `<lang>/{commands,errors,replies}.json`，key 格式

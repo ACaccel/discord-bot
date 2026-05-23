@@ -154,7 +154,7 @@ cases prefer `Result<T, DomainError>` (`src/core/result/`).
 ### i18n
 
 `Translator` (`src/core/i18n/`) wraps i18next. Catalogs live at
-`src/interface/locales/<lang>/{commands,errors,replies}.json`. Key
+`src/i18n/locales/<lang>/{commands,errors,replies}.json`. Key
 format: `<namespace>:<feature>.<purpose>`. Phase 6 onwards: zero CJK
 literals allowed in `src/handlers/`, `src/plugins/`, `src/events/`.
 

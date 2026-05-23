@@ -62,7 +62,7 @@ export const backupChannel = async (
   };
 
   try {
-    // G-2: repo methods return Result<T, DatabaseError>. An `err` is
+    // Repo methods return Result<T, DatabaseError>. An `err` is
     // re-thrown so the channel-level catch records it on `stats.error`.
     const fetchRecordResult = await repos.fetch.findByChannelId(ch.id);
     if (!fetchRecordResult.ok) throw fetchRecordResult.error;

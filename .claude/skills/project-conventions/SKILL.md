@@ -30,7 +30,7 @@ bot → plugins → handlers → infra → persistence → core
 | persistence | `src/persistence/` | core, mongoose, `GuildConnection`/error-translator from `infra/mongo` | discord.js, LLM SDKs |
 | infra | `src/infra/` | core, `persistence/schemas`, the SDKs | handlers, plugins, bot |
 | handlers | `src/handlers/` | core, persistence (types), infra, `@core/*`, `@bot` (type-only) | concrete bot implementations |
-| interface | `src/interface/` | nothing (pure JSON catalog) | — |
+| interface | `src/i18n/` | nothing (pure JSON catalog) | — |
 | plugins | `src/plugins/` | core, persistence, infra, handlers, `@bot` | another plugin's internals |
 | bot | `src/bot/` | all of the above (the only layer that may import `core/ioc`) | — |
 
@@ -93,7 +93,7 @@ is not subclassed to carry behavior.
 
 - User-facing text always goes through `Translator` + catalog; `src/handlers`,
   `src/plugins`, `src/bot` contain **zero CJK literals**.
-- Catalogs live at `src/interface/locales/<lang>/{commands,errors,replies}.json`
+- Catalogs live at `src/i18n/locales/<lang>/{commands,errors,replies}.json`
   with key format `<namespace>:<feature>.<purpose>`.
 - A new catalog key must be added to **every locale** (`zh-TW` and `en`),
   otherwise the catalog-completeness test fails.

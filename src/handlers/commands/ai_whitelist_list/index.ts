@@ -20,7 +20,7 @@ export default class ai_whitelist_list extends Command {
         if (repos === null) return;
 
         try {
-            // G-2: an `err` is re-thrown into the surrounding catch.
+            // A repo `err` is re-thrown into the surrounding catch.
             const docsResult = await repos.userApiSetting.listAll();
             if (!docsResult.ok) throw docsResult.error;
             const docs = docsResult.value;

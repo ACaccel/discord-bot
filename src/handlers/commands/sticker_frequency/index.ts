@@ -71,7 +71,7 @@ export default class sticker_frequency extends Command {
                 const monthEnd = new Date();
                 monthEnd.setMonth(monthEnd.getMonth() - monthOffset);
                 
-                // G-2: an `err` is re-thrown into the surrounding catch.
+                // A repo `err` is re-thrown into the surrounding catch.
                 const messagesResult = await repos.message.findByTimestampRange(
                     monthStart.getTime(),
                     monthEnd.getTime(),

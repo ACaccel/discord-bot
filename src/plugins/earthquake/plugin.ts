@@ -1,11 +1,6 @@
 /**
  * EarthquakePlugin — owns the `/discord/earthquake` HTTP webhook and
- * the per-guild earthquake-alert broadcast (D2).
- *
- * Before this plugin existed, the earthquake feature was an inline
- * `express()` server plus a free `earthquake_warning` function wired
- * directly into `src/bot/nijika/index.ts`. That coupled a business
- * feature to a bot composition root and bypassed the plugin host.
+ * the per-guild earthquake-alert broadcast.
  *
  * This is a `scope: 'bot'` plugin assembled only by `nijika`. Its
  * `start` hook stands up the Express server; `onShutdown` closes it so
