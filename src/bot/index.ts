@@ -72,6 +72,7 @@ import {
 import { GuildDbConnector } from './guild-db-connector';
 import { BaseBotGuildOnboardingPort } from './guild-onboarding';
 import { GuildRegistrar } from './guild-registrar';
+import { resolveLocalesDir } from './locales-dir';
 import {
     createChannelLoggingMiddleware,
     createDispatchMiddleware,
@@ -201,6 +202,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     // ---- private state ----
     private readonly token: string;
     private readonly mongoURI?: string;
+    private readonly localesDir: string;
     private readonly pendingPlugins: Array<{ plugin: Plugin<unknown>; config: unknown }> = [];
     private pluginHost: PluginHost | undefined;
 
@@ -215,12 +217,19 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         mongoURI: string,
         clientId: string,
         config: TConfig,
+        localesDir: string = resolveLocalesDir(),
     ) {
         this.token = token;
         this.mongoURI = mongoURI;
         this.client = client;
         this.clientId = clientId;
         this.config = config;
+        // R5: composition root injects the locales path; `core/i18n`
+        // no longer reverse-resolves it from `__dirname`. Subclasses
+        // get the canonical monorepo layout for free via the default
+        // and can override the parameter for bespoke deployments
+        // (e.g. npm-packaged bundle, alternative content root).
+        this.localesDir = localesDir;
 
         this.container = createContainer();
         // Logger is the first registration so downstream factories may
@@ -489,7 +498,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * plugins, run host `initAll()`.
      */
     private async buildHost(rootLogger: Logger): Promise<PluginHost> {
-        const translator = await createDefaultTranslator();
+        const translator = await createDefaultTranslator({ localesDir: this.localesDir });
         this.container.registerSingleton(TOKENS.Translator, () => translator);
         this.translator = translator;
         if (this.helpMessageKey !== undefined) {
