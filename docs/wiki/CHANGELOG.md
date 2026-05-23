@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-05-24 — R1：拆解 `BaseBot` 為 thin lifecycle owner
+
+- **元件**：C11 Bot Composition Roots、C6 Handlers（連帶改名）
+- **缺口**：tech-debt R1（+ 隨手 R6.4 / R6.5）
+- **變更**：
+  - C11 — 新增 `src/bot/guild-registrar.ts`、`src/bot/client-event-bridge.ts`、
+    `src/bot/guild-db-connector.ts` 三個 R1 collaborator。`BaseBot`
+    （`src/bot/index.ts`）重寫為 thin lifecycle owner（1007 → 592 行），
+    8 條 raw `client.on(...)`、reaction port、reboot 訊息、guild registration、
+    per-guild Mongo fan-out 全數搬入 collaborator。新增 protected hook
+    `eventBridgeSuppression(): ClientEventBridgeSuppression`，subclass 以此
+    關閉不需要的 raw listener。
+  - C11 — `src/bot/konata/konata.ts` / `src/bot/msg-archive/msg-archive.ts`
+    由 `override interactionEventListener = () => {}` 等 listener override
+    遷移至 `protected override eventBridgeSuppression()` hook。
+  - C6 — Handler Map 改為複數命名（`buttonHandlers` / `modalHandlers` /
+    `ssmHandlers` / `reactionHandlers`），`help_msg → helpMessage`；
+    `src/handlers/{buttons,modals,select-menus,reactions}/index.ts` 與
+    `src/handlers/commands/help/index.ts` 同步更新。
+  - 測試 — 新增 `test/unit/bot/guild-registrar.test.ts`（7 案例）、
+    `test/unit/bot/client-event-bridge.test.ts`（10 案例）、
+    `test/unit/bot/guild-db-connector.test.ts`（6 案例）；
+    `test/integration/bot/run-orchestration.int.test.ts`（4 案例）與
+    `test/integration/bot/event-bridge.int.test.ts`（4 案例）作為 R1 拆解
+    前後皆綠的 contract baseline。
+- **影響**：BaseBot 對外 public surface 縮小（listener method 不再存在；
+  subclass 改用 hook）；handler 端讀 `bot.buttonHandlers` 等複數欄位
+  （連帶 R6.4）；container / lifecycle 順序契約完全不變。
+- **閘門**：typecheck / lint / test (465 cases) / format:check /
+  handlers:gen:check / knip — 全綠。
+
+---
+
 ## 2026-05-21 — `DatabaseError` messageKey 格式修正（D9 交界 bug）
 
 - **元件**：C4 Persistence、C6 Handlers、C7 i18n（交界修正，不改 task 勾選）

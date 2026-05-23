@@ -8,10 +8,24 @@
 
 ## 現況
 
+- R1：`BaseBot` 已退回 thin lifecycle owner（592 行，3 個 collaborator）。
+  - `src/bot/guild-registrar.ts`：`GuildRegistrar` 組裝 `GuildInfo`（純 assembly，
+    不開 Mongo、不送 Discord）。
+  - `src/bot/client-event-bridge.ts`：`ClientEventBridge` 以 Adapter 將
+    `client.on(...)` raw event 翻譯為 router dispatch / EventDispatcher emit /
+    `ReactionHandlerPort` call；單一 `attach`/`detach` 入口，重複 attach
+    丟 `TypeError`（contract violation）。
+  - `src/bot/guild-db-connector.ts`：`GuildDbConnector` 控制 per-guild Mongo
+    fan-out 與失敗 normalisation；`connectAll` resilient（per-slot 失敗只 log）。
+  - Subclass 透過 protected hook `eventBridgeSuppression()` 關閉不需要的 raw
+    listener，取代過去以 `override interactionEventListener = () => {}` 抑制
+    listener 的舊作法（Konata / MsgArchive 已遷移）。
+- R6.4 / R6.5（隨 R1 commit）：Handler Map 已一律複數（`buttonHandlers` 等），
+  `help_msg → helpMessage`；`src/bot/index.ts` import 區連續無夾雜，
+  `sharedConnectionManagers` helper 搬至 import 區之後。
 - `BaseBot` 在建構子註冊 7 個 singleton 加 `GuildOnboardingPort`（D1）；
   port 實作 `BaseBotGuildOnboardingPort`（`src/bot/guild-onboarding.ts`）
   以 Adapter 模式包裝 `BaseBot`，收斂新加入 guild 的 DB 連線與 command 註冊。
-  `guildCreateListener` 改經此 port 分流，不再穿透 `detectGuildCreate`。
 - `nijika` 以 `createEarthquakePlugin({ port })` 組裝地震速報；`nijika/index.ts`
   不再 inline `app.listen()` 與 `/discord/earthquake` 路由（D2）。
 - `BaseBot` 已移除 `disabledGuilds` 唯讀 getter；disabled 狀態統一由
@@ -23,6 +37,11 @@
 
 ## 近期變更
 
+- 2026-05-24 — R1：將 `BaseBot` 拆解為 thin lifecycle owner +
+  `GuildRegistrar` / `ClientEventBridge` / `GuildDbConnector`；同 commit 套用
+  R6.4（Handler Map 複數命名）與 R6.5（import 排序）；Konata / MsgArchive
+  以 `eventBridgeSuppression()` hook 取代 listener override。新增 5 個 spec
+  共 31 案例（unit × 3 + integration × 2）(tech-debt R1)
 - 2026-05-21 — D4：移除 `@utils` alias 與 `vitest` 對映，更新 CLAUDE.md 目錄
   說明與 alias 表 (gap D4)
 
