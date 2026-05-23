@@ -89,7 +89,7 @@ export default tseslint.config(
     files: [
       'src/application/**/*.ts',
       'src/domain/**/*.ts',
-      'src/interface/**/*.ts',
+      'src/i18n/**/*.ts',
       'src/persistence/**/*.ts',
       'src/infra/**/*.ts',
       'src/handlers/**/*.ts',

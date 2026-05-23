@@ -17,19 +17,19 @@ infra → persistence → core`）。
 
 ## 元件頁
 
-| 元件 | 名稱                  | 路徑                     | 頁面                                                                               |
-| ---- | --------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
-| C1   | Core Infrastructure   | `src/core/`              | [components/C1-core-infrastructure.md](components/C1-core-infrastructure.md)       |
-| C2   | IoC Container         | `src/core/ioc/`          | [components/C2-ioc-container.md](components/C2-ioc-container.md)                   |
-| C3   | Plugin Runtime        | `src/core/plugin/`       | [components/C3-plugin-runtime.md](components/C3-plugin-runtime.md)                 |
-| C4   | Persistence           | `src/persistence/`       | [components/C4-persistence.md](components/C4-persistence.md)                       |
-| C5   | Infra Adapters        | `src/infra/`             | [components/C5-infra-adapters.md](components/C5-infra-adapters.md)                 |
-| C6   | Handlers              | `src/handlers/`          | [components/C6-handlers.md](components/C6-handlers.md)                             |
-| C7   | i18n Catalog          | `src/interface/locales/` | [components/C7-i18n-catalog.md](components/C7-i18n-catalog.md)                     |
-| C8   | Plugins               | `src/plugins/`           | [components/C8-plugins.md](components/C8-plugins.md)                               |
-| C9   | Codegen & Scripts     | `scripts/`               | [components/C9-codegen-scripts.md](components/C9-codegen-scripts.md)               |
-| C10  | Quality Gates         | CI / 設定檔              | [components/C10-quality-gates.md](components/C10-quality-gates.md)                 |
-| C11  | Bot Composition Roots | `src/bot/`               | [components/C11-bot-composition-roots.md](components/C11-bot-composition-roots.md) |
+| 元件 | 名稱                  | 路徑                | 頁面                                                                               |
+| ---- | --------------------- | ------------------- | ---------------------------------------------------------------------------------- |
+| C1   | Core Infrastructure   | `src/core/`         | [components/C1-core-infrastructure.md](components/C1-core-infrastructure.md)       |
+| C2   | IoC Container         | `src/core/ioc/`     | [components/C2-ioc-container.md](components/C2-ioc-container.md)                   |
+| C3   | Plugin Runtime        | `src/core/plugin/`  | [components/C3-plugin-runtime.md](components/C3-plugin-runtime.md)                 |
+| C4   | Persistence           | `src/persistence/`  | [components/C4-persistence.md](components/C4-persistence.md)                       |
+| C5   | Infra Adapters        | `src/infra/`        | [components/C5-infra-adapters.md](components/C5-infra-adapters.md)                 |
+| C6   | Handlers              | `src/handlers/`     | [components/C6-handlers.md](components/C6-handlers.md)                             |
+| C7   | i18n Catalog          | `src/i18n/locales/` | [components/C7-i18n-catalog.md](components/C7-i18n-catalog.md)                     |
+| C8   | Plugins               | `src/plugins/`      | [components/C8-plugins.md](components/C8-plugins.md)                               |
+| C9   | Codegen & Scripts     | `scripts/`          | [components/C9-codegen-scripts.md](components/C9-codegen-scripts.md)               |
+| C10  | Quality Gates         | CI / 設定檔         | [components/C10-quality-gates.md](components/C10-quality-gates.md)                 |
+| C11  | Bot Composition Roots | `src/bot/`          | [components/C11-bot-composition-roots.md](components/C11-bot-composition-roots.md) |
 
 ## 元件完成度
 

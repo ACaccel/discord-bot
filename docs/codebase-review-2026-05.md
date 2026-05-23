@@ -59,24 +59,21 @@
 
 ## 3. i18n 是否需要獨立拆成一個 module？
 
-**結論：不需要新增獨立 module，現行結構基本正確，只需修正一處分層耦合。**
+**結論：不需要新增獨立 module。已將原 `src/interface/` 改名為 `src/i18n/` 以反映其唯一職責。**
 
 現況：
 
-- `src/core/i18n/`：i18n **機制**（i18next 包裝、`catalog-loader`、`locale-resolver`、`bind`）——屬純基礎設施，已是一個內聚模組。
-- `src/interface/locales/`：i18n **內容**（`commands/errors/replies` 的 JSON 字典）——屬 interface 層。
+- `src/core/i18n/`：i18n **機制**（i18next 包裝、`catalog-loader`、`locale-resolver`、`bind`）——屬純基礎設施。
+- `src/i18n/locales/`：i18n **內容**（`commands/errors/replies` 的 JSON 字典）——屬內容資料層，與 core 分離。
 
-「機制在 core、內容在 interface 層」本身是合理的分層決定，不應為了「拆 module」而把字典搬進 core——那會讓 core 夾帶介面文字內容。
+「機制在 core、內容在獨立資料層」是合理的分層決定，不應為了「拆 module」而把字典搬進 core——那會讓 core 夾帶介面文字內容。
 
-真正的問題只有一個（分層 smell）：
-`src/core/i18n/catalog-loader.ts` 硬編碼 `path.resolve(__dirname, '..', '..', 'interface', 'locales')`，等於 **core 反向得知 interface 層的目錄位置**。`NAMESPACES` 常數也與 catalog 的實際命名重複。
+殘餘的分層耦合：`src/core/i18n/catalog-loader.ts` 的 `DEFAULT_LOCALES_DIR` 仍硬編碼 `path.resolve(__dirname, '..', '..', 'i18n', 'locales')`，等於 core 仍知道內容層目錄。修正方式：
 
-建議（小幅修正，非重構）：
+1. 移除 `DEFAULT_LOCALES_DIR` 預設值，改由 composition root（`bot/*/index.ts`）顯式注入 `localesDir`。
+2. 或保留預設並在文件明示這是「唯一允許的 core→content 例外」。
 
-1. 移除 `DEFAULT_LOCALES_DIR` 的硬編碼預設，改由 composition root（`bot/*/index.ts`）顯式傳入 `localesDir`——core 不再知道 interface 的佈局。
-2. 或保留預設但在文件明示這是「唯一允許的 core→interface 例外」。
-
-是否「拆成獨立 module」的更高層判斷：目前只有 2 個 locale、3 個 namespace、約 1,568 行字典，`core/i18n` 6 個檔共 348 行。規模不足以支撐獨立 package；現行 core 子模組的粒度恰當，**拆分屬過早最佳化**。
+是否「拆成獨立 package」的更高層判斷：目前只有 2 個 locale、3 個 namespace、約 1,568 行字典，`core/i18n` 6 個檔共 348 行。規模不足以支撐獨立 package；現行 core 子模組的粒度恰當，**拆分屬過早最佳化**。
 
 ---
 
@@ -119,7 +116,7 @@
 - 刪除 `test/unit/plugins/tts-reply.test.ts`。
 - `src/plugins/index.ts`：移除 `TtsReplyPlugin` 匯出。
 - `src/bot/nijika/nijika.ts`：移除 import 與 `this.use(TtsReplyPlugin)`。
-- `src/interface/locales/{en,zh-TW}/replies.json`：`nijika.help_message` 移除 tts 條目並重新編號。
+- `src/i18n/locales/{en,zh-TW}/replies.json`：`nijika.help_message` 移除 tts 條目並重新編號。
 - `src/bot/index.ts`：更新引用 `TtsReplyPlugin` 的 docstring。
 
 驗證：`yarn typecheck` 通過；`yarn test` 全綠（63 檔 / 431 測試）。

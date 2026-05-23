@@ -6,13 +6,11 @@
  * the boundary surface (types, registry), or translates upstream
  * errors into the shared domain taxonomy (`error-translator`).
  *
- * Audit C-3 / PR-E E-4 folded the LLM domain helpers (`models-catalog`,
- * `pricing`) that used to live under `src/features/llm_chat/llm/`
- * into this directory — both are pure LLM-provider knowledge and
- * have no dependency on Discord, plugins, or the bot composition
- * root. The plugin-specific `SessionManager` moved into
- * `src/plugins/llm-chat/internal/` instead because that one IS
- * plugin-shaped state.
+ * The LLM domain helpers (`models-catalog`, `pricing`) sit here too:
+ * both are pure LLM-provider knowledge with no dependency on Discord,
+ * plugins, or the bot composition root. Plugin-shaped state such as
+ * `SessionManager` belongs in `src/plugins/llm-chat/internal/`
+ * instead — that boundary keeps infra free of feature-specific state.
  */
 export {
   type LLMMessage,

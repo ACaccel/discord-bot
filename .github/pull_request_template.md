@@ -21,7 +21,7 @@ unchecked rather than deleting the line.
 - [ ] `src/handlers/` (commands / buttons / modals / select-menus / reactions)
 - [ ] `src/plugins/`
 - [ ] `src/bot/<name>/` (composition root)
-- [ ] `src/interface/locales/` (new or modified i18n keys)
+- [ ] `src/i18n/locales/` (new or modified i18n keys)
 - [ ] `package.json` / `yarn.lock` / `audit-ci.jsonc`
 - [ ] `.github/workflows/`
 - [ ] `tsconfig*` / `eslint.config.mjs` / `vitest.config.ts`

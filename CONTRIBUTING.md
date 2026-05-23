@@ -118,7 +118,7 @@ catch a violation:
 
 1. **No CJK literals in user-facing layers.** Every user-visible
    string must come from a translator key in
-   `src/interface/locales/<lang>/{commands,errors,replies}.json`.
+   `src/i18n/locales/<lang>/{commands,errors,replies}.json`.
    The scanner runs in strict mode from Phase 6 onwards; add
    `// i18n-ignore: <non-empty reason>` only when the literal is
    genuinely not user-facing (e.g. a trigger-match regex).
@@ -184,8 +184,8 @@ Discord.
 
 2. **Add the i18n keys — in every locale.** The catalog is bilingual
    (`zh-TW` and `en`). Open **both**
-   `src/interface/locales/zh-TW/replies.json` and
-   `src/interface/locales/en/replies.json` and add the same namespace
+   `src/i18n/locales/zh-TW/replies.json` and
+   `src/i18n/locales/en/replies.json` and add the same namespace
    to each:
 
    ```json

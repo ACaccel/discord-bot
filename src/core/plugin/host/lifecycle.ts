@@ -1,15 +1,13 @@
 /**
  * Plugin lifecycle runner — owns the `init` / `start` / `onReady` /
- * `onShutdown` phase execution for `PluginHost` (D6).
+ * `onShutdown` phase execution for `PluginHost`.
  *
- * Design rationale (gaps.md D6, plan A + narrow interface): the
- * lifecycle logic used to live inline in `host.ts`'s private
- * `runLifecycle`. It is extracted here so that adding / removing /
- * changing a lifecycle phase is a single-file edit and is independently
- * unit-testable. Coupling to the host is constrained by the narrow
- * {@link LifecycleHost} interface — the compiler forbids `lifecycle.ts`
- * from reaching into arbitrary host internals, so modularity is
- * type-enforced rather than discipline-enforced.
+ * Design rationale: the lifecycle phases live in their own module so
+ * adding, removing, or changing a phase is a single-file edit and is
+ * independently unit-testable. Coupling to the host is constrained by
+ * the narrow {@link LifecycleHost} interface — the compiler forbids
+ * this module from reaching into arbitrary host internals, so
+ * modularity is type-enforced rather than discipline-enforced.
  */
 import type { Translator } from '../../i18n';
 import type { Logger } from '../../logger';

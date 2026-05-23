@@ -19,7 +19,7 @@ export type CatalogResources = Readonly<
  * Default Translator implementation backed by i18next.
  *
  * Initialised from in-memory catalogs that the caller assembles from the
- * JSON files under `src/interface/locales/`. Kept intentionally small —
+ * JSON files under `src/i18n/locales/`. Kept intentionally small —
  * i18next handles interpolation, fallback, and nested key lookup.
  *
  * Placeholder syntax: i18next default `{{name}}` (NOT single-brace ICU).

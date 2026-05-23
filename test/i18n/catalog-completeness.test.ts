@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Catalog completeness check.
  *
- * - Each locale folder under src/interface/locales/ must contain the same
+ * - Each locale folder under src/i18n/locales/ must contain the same
  *   set of namespace files.
  * - Each namespace's leaf-key set must match across locales.
  * - Each leaf value's ICU placeholders (i18next {{...}} syntax) must match
@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
  * is added, but the test still runs to lock in the schema (and would catch
  * a malformed JSON file or an empty/missing namespace today).
  */
-const LOCALES_DIR = path.resolve(__dirname, '../../src/interface/locales');
+const LOCALES_DIR = path.resolve(__dirname, '../../src/i18n/locales');
 
 interface ParsedLocale {
   readonly locale: string;

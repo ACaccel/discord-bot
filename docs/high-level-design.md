@@ -156,7 +156,7 @@ flowchart TB
 | Persistence       | `src/persistence/`           | C4       |
 | Infra             | `src/infra/`                 | C5       |
 | Handlers          | `src/handlers/`              | C6       |
-| Interface         | `src/interface/`             | C7       |
+| Interface         | `src/i18n/`                  | C7       |
 | Plugins           | `src/plugins/`               | C8       |
 | Codegen / Scripts | `scripts/`                   | C9       |
 | Quality Gates     | CI / 設定檔                  | C10      |
@@ -281,7 +281,7 @@ flowchart TB
 
 ### C7 — i18n Catalog（語系目錄）
 
-> `src/interface/locales/`
+> `src/i18n/locales/`
 
 - **職責**：存放 user-facing 文案目錄
   `<lang>/{commands,errors,replies}.json`，key 格式

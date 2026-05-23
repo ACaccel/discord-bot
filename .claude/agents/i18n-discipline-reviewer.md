@@ -13,7 +13,7 @@ user-facing text is fully externalised and the catalogs stay complete.
 - All user-facing text routes through the `Translator` (`I18NextTranslator`,
   i18next-backed). `src/handlers`, `src/plugins`, `src/bot` contain **zero CJK
   literals**.
-- Catalogs: `src/interface/locales/<lang>/{commands,errors,replies}.json`.
+- Catalogs: `src/i18n/locales/<lang>/{commands,errors,replies}.json`.
   Call-site key format `<namespace>:<feature>.<purpose>`; in-file the key is
   `<feature>.<purpose>` (namespace = filename).
 - `errors.json` keys are the targets of `DomainError.messageKey`; top-level

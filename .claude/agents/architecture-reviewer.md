@@ -31,7 +31,7 @@ persistence → core`. No reverse edges, no layer-skipping.
   the SDKs, core, and `persistence/schemas`.
 - `src/handlers/**` — Discord interaction entry points (class-based, codegen
   registries). May import core, persistence (types), infra, `@bot` (type-only).
-- `src/interface/**` — i18n locale catalogs only (pure JSON). NOT Discord
+- `src/i18n/**` — i18n locale catalogs only (pure JSON). NOT Discord
   entry points.
 - `src/plugins/**` — business feature modules; all business behavior lives
   here. May import core, persistence, infra, handlers, `@bot`.
