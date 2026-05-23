@@ -77,6 +77,7 @@ import { registerSSMs } from '@select-menu';
 
 import { BaseBotGuildOnboardingPort } from './guild-onboarding';
 import { GuildRegistrar } from './guild-registrar';
+import { GuildDbConnector } from './guild-db-connector';
 import type { ReactionHandler} from "@reaction";
 import { executeReactionAdded, executeReactionRemoved, registerReactions } from "@reaction";
 
@@ -222,6 +223,13 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      */
     private guildRegistrar: GuildRegistrar | undefined;
 
+    /**
+     * R1 collaborator: owns per-guild Mongo connection fan-out and
+     * failure normalisation. Built lazily on first use so the logger
+     * (which the connector logs through) is available.
+     */
+    private guildDbConnector: GuildDbConnector | undefined;
+
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: TConfig) {
         this.token = token;
         this.mongoURI = mongoURI;
@@ -337,47 +345,36 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * Reused by the startup loop in {@link connectGuildDB} and by the
      * new-guild-join path via {@link BaseBotGuildOnboardingPort}.
      */
+    /**
+     * Open (or reuse) the per-guild MongoDB connection and populate
+     * `guildInfo[g].repos`. Delegates to the {@link GuildDbConnector}
+     * R1 collaborator; the per-guild connection lifecycle, failure
+     * normalisation, and `traceId` correlation log live there.
+     *
+     * Re-throws on failure so existing callers (the `connectGuildDB`
+     * fan-out and the {@link BaseBotGuildOnboardingPort}) keep their
+     * prior control-flow semantics.
+     */
     public connectOneGuild = async (guildId: string): Promise<void> => {
         const slot = this.guildInfo[guildId];
         if (slot === undefined) {
             logSystem(this.logger, this.clientId, ops.guildDb.slotMissing(guildId));
             return;
         }
-        const branded = asGuildId(guildId);
-        try {
-            // Resolve the typed repository bag BEFORE touching `slot`
-            // so a partial connect cannot leave a half-baked state.
-            // The shared ConnectionManager primes its per-guild pool
-            // inside reposFactory — including transient-failure retry
-            // and persistent-failure disabling.
-            const reposFactory = this.container.resolve<ReposFactory>(TOKENS.ReposFactory);
-            const repos = await reposFactory(branded);
-            // Single mutation — atomic from the handlers' point of view.
-            slot.repos = repos;
-        } catch (err) {
-            // The ConnectionManager has already classified the
-            // failure, exhausted any transient retries, and (on a
-            // persistent / exhausted failure) recorded the guild as
-            // disabled with a stable `traceId`. The manager owns that
-            // disabled set; BaseBot only surfaces the manager's
-            // `traceId` on the structured boot log so the user-facing
-            // `errors:db.guild_disabled` message can be grep-correlated.
-            const normalised =
-                err instanceof Error
-                    ? err
-                    : new Error(typeof err === 'string' ? err : 'connectOneGuild failed');
-            const cm = this.container.tryResolve<ConnectionManager>(TOKENS.ConnectionManager);
-            const traceId = cm?.isDisabled(branded)?.traceId ?? 'unknown';
-            logSystem(
-                this.logger,
+        await this.ensureDbConnector().connectOne(guildId, slot);
+    }
+
+    private ensureDbConnector(): GuildDbConnector {
+        if (this.guildDbConnector === undefined) {
+            const log = this.logger ?? this.container.resolve<Logger>(TOKENS.Logger);
+            this.guildDbConnector = new GuildDbConnector(
+                this.container,
+                this.mongoURI,
                 this.clientId,
-                ops.guildDb.connectFailed(guildId, traceId, normalised.message),
+                log,
             );
-            // Re-throw so existing callers (connectGuildDB and the
-            // GuildOnboardingPort) keep their previous control-flow
-            // semantics.
-            throw normalised;
         }
+        return this.guildDbConnector;
     }
 
     /**
@@ -771,30 +768,12 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         this.guildInfo = this.guildRegistrar.registerAll(this.config);
     }
 
-    public connectGuildDB = async () => {
-        logSystem(this.logger, this.clientId, ops.guildDb.poolStart());
-        if (!this.mongoURI) {
-            logSystem(this.logger, this.clientId, ops.guildDb.uriMissing());
-            return;
-        }
-
-        try {
-            await Promise.all(Object.entries(this.guildInfo).map(async ([guild_id, guild]) => {
-                try {
-                    await this.connectOneGuild(guild_id);
-                    logSystem(this.logger, this.clientId, ops.guildDb.connectSuccess(guild_id, guild.guild.name));
-                } catch {
-                    // connectOneGuild already logged with the
-                    // ConnectionManager's traceId; the manager owns the
-                    // disabled-guild record. Swallow here so one bad
-                    // guild does not abort the fan-out — the manager's
-                    // disabled set is the durable record handlers
-                    // consult via `bot.connectionManager.isDisabled`.
-                }
-            }));
-        } catch (err) {
-            logSystem(this.logger, this.clientId, ops.guildDb.poolStartFailed(String(err)));
-        }
+    /**
+     * Fan-out per-guild Mongo connect across `guildInfo`. Delegates to
+     * the {@link GuildDbConnector} collaborator (R1).
+     */
+    public connectGuildDB = async (): Promise<void> => {
+        await this.ensureDbConnector().connectAll(this.guildInfo);
     }
 
     public rebootMessage = async (): Promise<void> => {
