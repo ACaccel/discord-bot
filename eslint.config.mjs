@@ -132,6 +132,30 @@ export default tseslint.config(
       ],
     },
   },
+  // R4: Handler index files must stay readable. Cap any file under
+  // src/handlers/**/*.ts at 150 visible lines (imports + JSDoc + blanks
+  // included) to enforce the rule that pure helpers be split into
+  // sibling kebab-case files. Discord I/O, permission checks, Translator
+  // calls, and reply assembly stay in index.ts; everything else moves out.
+  {
+    files: ['src/handlers/**/*.ts'],
+    ignores: [
+      // Codegen artifact — one import per handler, naturally long.
+      'src/handlers/**/registry.generated.ts',
+      // Handler-framework base class + localizer (single function file).
+      // Tracked as R4 PR follow-up: revisit only when functional changes land.
+      'src/handlers/commands/command.ts',
+      // Shared Discord helpers used by many handlers. Follow-up: keep
+      // until a refactor extracts cohesive sub-modules.
+      'src/handlers/commands/discord-helpers.ts',
+      // Cross-handler error -> reply mapping table. Follow-up: consider
+      // splitting the map into error-reply-map.ts.
+      'src/handlers/reply-for-error.ts',
+    ],
+    rules: {
+      'max-lines': ['error', { max: 150, skipBlankLines: false, skipComments: false }],
+    },
+  },
   // Test files: relax some rules.
   {
     files: ['test/**/*.ts', 'scripts/**/*.ts'],
