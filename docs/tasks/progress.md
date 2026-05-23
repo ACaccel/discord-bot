@@ -11,7 +11,7 @@
 | `[x]` | R3  | plugins ↔ core/ioc 契約對齊          | [R3.md](R3.md) |
 | `[x]` | R4  | 過長 handler 拆分 + 行數規範         | [R4.md](R4.md) |
 | `[x]` | R5  | i18n catalog 路徑反耦合              | [R5.md](R5.md) |
-| `[ ]` | R6  | 5 個低優先單點清理                   | [R6.md](R6.md) |
+| `[x]` | R6  | 5 個低優先單點清理                   | [R6.md](R6.md) |
 
 ---
 

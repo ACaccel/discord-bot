@@ -55,6 +55,11 @@ error, fallbackKey, guildId?)`:operator 通道恆記結構化 log(完整錯誤 +
 
 ## 近期變更
 
+- 2026-05-24 — R6.3 / R6.5：5 個 handler barrel (`commands` / `buttons` /
+  `modals` / `select-menus` / `reactions`) 重排為 `imports → re-exports →
+body`；`commands` barrel 移除一段註解 `console.log(info/message/err)`
+  死碼與一處 `console.log(hourTPE)`（改為 `bot.logger?.debug`）；
+  `delete_reply` 60-line block-commented 死碼直接刪除 (tech-debt R6.3 / R6.5)
 - 2026-05-24 — R4:4 個示範 handler 拆分 helper + 行數規範入文件。
   `db_list_message`(320→135 行)、`inspect_member_ids`(172→89 行)、
   `emoji_frequency`(158→121 行)、`ai_settings`(161→68 行)的 pure helper

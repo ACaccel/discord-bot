@@ -5,6 +5,45 @@
 
 ---
 
+## 2026-05-24 — R6：低優先單點清理（5 子項）
+
+- **元件**：C1 Core Infrastructure、C6 Handlers、C9 Codegen / Scripts、
+  C10 Quality Gates、C11 Bot Composition Roots
+- **缺口**：tech-debt R6.1 / R6.2 / R6.3 / R6.4 / R6.5
+- **變更**：
+  - **R6.1**：`src/bot/client-event-bridge.ts` 的 router middleware 將
+    `traceId` 由 `Math.random().toString(36).slice(2,8).padStart(6,'0')`
+    換為 `randomUUID().slice(0, 8)`（8 hex chars，無生日問題碰撞）。
+    新增 `test/unit/bot/trace-id.test.ts` 驗證格式 + 1000 次無碰撞。
+  - **R6.2**：`BaseBot.login` 將 `client.login()` 失敗與 `client.user
+=== null` 兩條路徑由 silent log 升級為丟 `ConfigurationError`
+    (codes `BOT_LOGIN_FAILED` / `BOT_LOGIN_NO_USER`)，`BaseBot.run()`
+    reject 不再進入 `host.startAll()`。i18n catalogs 新增對應 keys
+    `errors:bot.login_failed` / `errors:bot.login_no_user` (zh-TW + en)。
+    新增 `test/integration/bot/login.int.test.ts` 覆蓋兩條 reject 路徑。
+  - **R6.3**：`src/` 23 處 `console.*` 全數清除——`src/deploy.ts`
+    改用 `createBootstrapLogger` 結構化輸出；`random_restaurant`
+    handler 改用 `bot.logger?.debug`；3 處 commented-out 死碼與一段
+    60-line block-commented dead canvas 預覽 block 直接刪除。ESLint
+    `no-console` 由 `warn` 提至 `error`、allowlist 縮為 `['error']`。
+  - **R6.4**：R1 已套用主要 rename；本輪修正 `src/bot/nijika/nijika.ts`
+    殘留的 `// help_msg` 註解。完整 grep 確認 `buttonHandler` /
+    `ssmHandler` / `modalHandler` / `reactionHandler` / `help_msg` /
+    `guild_num` / `debug_ch` 在 `src/` 已無殘留。
+  - **R6.5**：ESLint 加入 `'import/first': 'error'`。順手把 7 個
+    re-export-then-import 的 barrel files（`src/core/errors/index.ts`、
+    5 個 `src/handlers/*/index.ts`、`src/persistence/schemas/index.ts`）
+    重排為 `imports → re-exports → body`；三個 `vi.mock` 測試檔本地
+    `eslint-disable import/first`（vitest 會將 `vi.mock` hoist 至 import
+    之前，物理順序屬刻意決定）。
+- **影響**：對外行為不變（traceId 仍 8 字元、login 失敗仍會結束
+  process，只是改由 unhandled rejection 觸發 supervisor 重啟）。
+  ESLint 兩條新規則 (`no-console: error`、`import/first: error`) 一旦
+  破壞會在 CI 立即可見。所有 quality gates（typecheck / lint / test /
+  format / handlers:gen:check / knip）綠。
+
+---
+
 ## 2026-05-24 — R5：i18n catalog 路徑反耦合
 
 - **元件**：C7 i18n Catalog、C11 Bot Composition Roots

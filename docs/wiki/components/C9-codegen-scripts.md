@@ -16,6 +16,9 @@ command 註冊路徑消費，且其輸入型別 `LocalizedCommandConfig` 屬 han
 
 ## 近期變更
 
+- 2026-05-24 — R6.3：`src/deploy.ts` 全面改用 `createBootstrapLogger`
+  發送結構化 pino 行（含 status / warn / error / fatal 路徑），取代
+  既有 15 處 `console.*` 自由文字輸出 (tech-debt R6.3)
 - 2026-05-21 — D4：評估 `bot_cmd.ts` 承接點，裁定歸 C6 handlers（runtime 消費），
   `scripts/` 不承接;此元件 D4 子任務標記為「評估完成、不適用遷入」。
 - 2026-05-21 — 建立元件 wiki 頁（工程基礎建設）。

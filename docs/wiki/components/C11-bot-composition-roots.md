@@ -37,6 +37,12 @@
 
 ## 近期變更
 
+- 2026-05-24 — R6：`BaseBot.login` 兩條失敗路徑改丟 `ConfigurationError`
+  (codes `BOT_LOGIN_FAILED` / `BOT_LOGIN_NO_USER`)，`run()` 不再以
+  half-attached client 繼續走 `host.startAll()`；`ClientEventBridge`
+  router middleware 的 `traceId` 換為 `randomUUID().slice(0, 8)`；
+  `nijika.ts` 殘留 `// help_msg` 註解修正為 `helpMessage`；ESLint
+  `import/first` 與 `no-console: error` 兩條規則加入 (tech-debt R6.1–R6.5)
 - 2026-05-24 — R5：新增 `src/bot/locales-dir.ts`（`resolveLocalesDir()` 合成根 helper）；`BaseBot` 建構子新增 `localesDir: string = resolveLocalesDir()` 參數並保存為私有欄位，`buildHost` 內以 `createDefaultTranslator({ localesDir: this.localesDir })` 取代無參數呼叫。`src/deploy.ts` 透過同一 helper 注入路徑。四個 bot 子類 ctor 呼叫不需改動（既有 `super(...)` 走預設值）(tech-debt R5)
 - 2026-05-24 — R2：`BaseBot.voice` 由 public field 改為 getter，
   經 `container.tryResolve(TOKENS.VoiceController)` 取得；新增

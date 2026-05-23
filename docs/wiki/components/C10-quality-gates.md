@@ -27,6 +27,12 @@ D3 已落地：`src/events/` 目錄已由 C8 刪除，CJK scanner（`test/i18n/n
 
 ## 近期變更
 
+- 2026-05-24 — R6.3 / R6.5：`eslint.config.mjs` 將 `no-console` 由
+  `['warn', { allow: ['warn', 'error'] }]` 提至 `['error', { allow:
+['error'] }]`（test / scripts override 維持 `off`），並新增
+  `'import/first': 'error'` 守住 `src/bot/index.ts` 與所有 barrel
+  files 的「imports 連續區塊」契約。三個 `vi.mock` 測試檔加 inline
+  `eslint-disable import/first` (tech-debt R6.3 / R6.5)
 - 2026-05-24 — R4：`eslint.config.mjs` 新增 `src/handlers/**/*.ts` 的
   `max-lines` block（max 150、`skipBlankLines: false`、`skipComments: false`、
   違規 error）。`ignores` 顯式列入 `registry.generated.ts` 與三個框架/共用檔
