@@ -89,10 +89,44 @@ export interface PluginRuntimeServices {
   readonly resolve: TypedResolver;
 }
 
+/**
+ * Narrow write surface handed to a plugin's `init` hook. Allows the
+ * plugin to publish a pre-built instance under a typed token so the
+ * rest of the bot can resolve it through normal DI instead of a
+ * module-scope holder (the pattern R2 replaces).
+ *
+ * Legal **only inside `init`**. The host's lifecycle runner captures
+ * the current phase in a closure when it builds the init context, so a
+ * plugin that stashes the context object and calls `registerInstance`
+ * later (from `start`, `onReady`, `onShutdown`, an event hook, a
+ * scheduled job, or an interaction handler) still trips the guard and
+ * receives a {@link ConfigurationError} with code
+ * `'LIFECYCLE_PHASE_VIOLATION'`. Type-level: the other lifecycle
+ * contexts deliberately omit this method, so the obvious misuses do
+ * not even compile.
+ *
+ * Idempotency: re-registering the same token in the same init pass
+ * (or across two plugins) surfaces the container's existing
+ * `DuplicateRegistrationError`. The host does not catch and rephrase
+ * it — a token collision is a composition bug, not a runtime error.
+ *
+ * Width: only register a *built* instance. Factories and lazy
+ * singletons are deliberately not exposed; opening that surface would
+ * turn `PluginContext` into a service-locator registrar, which the
+ * plugin contract docstring (`types.ts` header) explicitly forbids.
+ */
+export type RegisterInstance = <T>(token: ServiceToken<T>, instance: T) => void;
+
 /** Context handed to `Plugin.init`. */
 export interface PluginInitContext<Config> extends PluginRuntimeServices {
   /** Validated config — fully typed thanks to `configSchema`. */
   readonly config: Config;
+  /**
+   * Publish a pre-built instance under a typed token. See
+   * {@link RegisterInstance} for the full contract. Calling this
+   * outside the synchronous body of `init` throws.
+   */
+  readonly registerInstance: RegisterInstance;
 }
 
 /** Context handed to `Plugin.start` (Discord login done, ready event pending). */
