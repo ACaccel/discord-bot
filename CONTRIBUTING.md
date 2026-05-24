@@ -1,23 +1,22 @@
 # Contributing
 
 Thanks for working on this codebase. This guide covers local setup,
-the test workflow, and step-by-step recipes for the two most common
-extensions: adding a slash command and adding a plugin.
+the quality gates that must pass before review, and step-by-step
+recipes for the two most common extensions: adding a slash command
+and adding a plugin.
 
-See [`docs/high-level-design.md`](docs/high-level-design.md) for the
-layered architecture overview and why things are arranged the way they
-are.
+See [`docs/architecture.md`](docs/architecture.md) for the layered
+architecture overview and why things are arranged the way they are.
 
 ## Local setup
 
 Prerequisites:
 
-- Node.js 20+ (the CI matrix runs 20)
-- Yarn classic (`yarn install --frozen-lockfile`)
-- MongoDB connection string for development (a free Atlas cluster
-  works; integration tests use `mongodb-memory-server` and do not need
-  a live database)
-- `ffmpeg` if you plan to run voice features (`sudo apt install ffmpeg`)
+- Node.js **>= 22.13** (see [`.nvmrc`](.nvmrc))
+- Yarn 1 (classic) — `yarn install --frozen-lockfile`
+- MongoDB for development (a free Atlas cluster works; integration
+  tests use `mongodb-memory-server` and do not need a live database)
+- `ffmpeg` on `PATH` if you plan to run the voice plugin
 
 ```bash
 git clone git@github.com:ACaccel/discord-bot.git
@@ -25,20 +24,29 @@ cd discord-bot
 yarn install --frozen-lockfile
 ```
 
-Each bot under `src/bot/<name>/` needs its own `config.json` (copy
-`config.example.json`) and `.env` file. Required keys: `TOKEN`,
-`CLIENT_ID`. Optional keys: `MONGO_URI` (omit for bots that do not
-talk to MongoDB), `PORT` (Nijika's earthquake webhook), and any
-LLM provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
-`GEMINI_API_KEY`, `XAI_API_KEY`) for LLM-chat-enabled bots. The full
+Each personality under `src/bot/<name>/` ships a checked-in
+`config.example.json`. Copy it and create the matching `.env`:
+
+```bash
+cp src/bot/nijika/config.example.json src/bot/nijika/config.json
+# then write src/bot/nijika/.env (TOKEN, CLIENT_ID, ...)
+```
+
+Required env keys: `TOKEN`, `CLIENT_ID`. Optional: `MONGO_URI` (omit
+for personalities that do not talk to Mongo), `PORT` (nijika's
+earthquake webhook), and any LLM provider keys (`OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`). The full
 schema lives in [`src/core/config/env.ts`](src/core/config/env.ts).
 
-Run a bot in development:
+Run a personality in development:
 
 ```bash
 yarn nijika          # or konata / tomori / msg-archive
+```
 
-# Slash-command registration (audit B-5 / 3.11):
+Register slash commands with Discord (run after editing commands):
+
+```bash
 yarn deploy -t nijika                          # GLOBAL — visible in every guild after Discord propagation (~minutes, up to 1h)
 yarn deploy -t nijika --dev-guild <guild_id>   # guild-scoped fast iteration (instant)
 yarn deploy -t nijika --cleanup-guild-commands # one-shot: remove legacy guild-scoped registrations
@@ -53,78 +61,36 @@ through the default global path.
 
 All gates run in CI; please run them locally before opening a PR.
 
-| Command                   | What it checks                                                                                                                                                                                                                                                          |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `yarn typecheck`          | Strict TypeScript (`tsconfig.strict.json`) — `any`, `as any`, un-narrowed `unknown`, etc. fail                                                                                                                                                                          |
-| `yarn lint`               | ESLint on every strict-mode directory                                                                                                                                                                                                                                   |
-| `yarn format:check`       | Prettier (use `yarn format` to fix)                                                                                                                                                                                                                                     |
-| `yarn handlers:gen:check` | Codegen registries match the on-disk handler layout                                                                                                                                                                                                                     |
-| `yarn test:unit`          | Unit tests (Vitest project `unit`)                                                                                                                                                                                                                                      |
-| `yarn test:int`           | Integration tests with mongodb-memory-server                                                                                                                                                                                                                            |
-| `yarn test:contract`      | LLM provider contract tests via nock                                                                                                                                                                                                                                    |
-| `yarn test:i18n`          | Catalog parity + CJK-literal scanner                                                                                                                                                                                                                                    |
-| `yarn test`               | All four test projects                                                                                                                                                                                                                                                  |
-| `yarn security`           | `yarn npm audit` + `gitleaks detect`                                                                                                                                                                                                                                    |
-| `yarn knip`               | Unused files / dependencies / unlisted imports (errors); unused exports / types (warns; tracked for A.1 / A.2 / A.5).                                                                                                                                                   |
-| `yarn typecheck:emit`     | `tsc -p tsconfig.build.json` — emit-mode compile of the whole `src/` tree; catches broken imports outside the strict-tsconfig include scope. NOT a deploy build (runtime is `ts-node` from source; dist retains path aliases and does not bundle config / locale JSON). |
-| `yarn smoke`              | Pre-deploy boundary probe: `.env` load + Mongo admin.ping + Discord login until `ready`. Manual; not in the CI matrix.                                                                                                                                                  |
-
-A handful of legacy directories (`src/handlers/`, `src/plugins/`,
-`src/bot/`) are not yet on the strict tsconfig — they still pass
-`yarn typecheck` because the strict project narrows its `include` to
-the migrated layers. New code outside those legacy directories should
-land strict-compliant.
-
-### Required status checks
-
-Merging a PR into `refactor/architecture-overhaul` is gated by branch
-protection — all ten CI jobs must report success before the PR can
-merge:
-
-`lint`, `typecheck`, `typecheck-emit`, `test-unit`, `test-coverage`,
-`test-int`, `test-contract`, `knip`, `security`, and `analyze` (CodeQL).
-
-No human review is required on this integration branch; the status
-checks are the gate. This keeps the autonomous gap-remediation
-engineering (the `engineering-orchestrator` agent) able to open and
-merge PRs without a person in the loop, while still blocking any red
-gate. `yarn smoke` is a manual pre-deploy probe and is intentionally
-not a required check.
-
-**Auto-merge is the default merge method.** The repository has GitHub
-auto-merge enabled; land a PR with `gh pr merge <n> --auto --merge` and
-GitHub completes the merge automatically once all ten required checks
-pass. Auto-merge cannot bypass branch protection — it only releases the
-merge after the gate is green. A PR that should not merge unattended is
-simply not opted into auto-merge (review it, then merge by hand).
-
-Auto-merge fires **only on success**: if a required check fails, the PR
-stays open and unmerged. It is not fire-and-forget — the author must
-still confirm the PR reached `MERGED`. Fix a failed check by pushing to
-the same PR branch; auto-merge stays armed and re-triggers when the new
-run is green. Treat anything that depends on a PR as blocked until that
-PR is actually merged, not merely opened.
-
-Note: the `main` branch protection still lists two stale check
-contexts (`test-integration`, `audit`) that predate a CI job rename
-(now `test-int` and `security`); they must be corrected before work
-targets `main` again.
+| Command                   | What it checks                                                                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `yarn typecheck`          | Strict TypeScript (`tsconfig.strict.json`) over the whole `src/`                                                                               |
+| `yarn typecheck:emit`     | Emit-mode compile (`tsconfig.build.json`); catches broken imports outside the strict include scope. Not a deploy build (runtime is `ts-node`). |
+| `yarn lint`               | ESLint                                                                                                                                         |
+| `yarn format:check`       | Prettier (use `yarn format` to fix)                                                                                                            |
+| `yarn handlers:gen:check` | Codegen registries match the on-disk handler layout                                                                                            |
+| `yarn test:unit`          | Unit tests (Vitest project `unit`)                                                                                                             |
+| `yarn test:int`           | Integration tests with `mongodb-memory-server`                                                                                                 |
+| `yarn test:contract`      | LLM provider contract tests via `nock`                                                                                                         |
+| `yarn test:i18n`          | Catalog parity + CJK-literal scanner                                                                                                           |
+| `yarn test`               | All four test projects                                                                                                                         |
+| `yarn security`           | `yarn npm audit` + `gitleaks detect`                                                                                                           |
+| `yarn knip`               | Unused files / dependencies / unlisted imports (errors); unused exports / types (warns)                                                        |
+| `yarn smoke`              | Pre-deploy boundary probe: `.env` load + Mongo `admin.ping` + Discord login until `ready`. Manual; not in the CI matrix.                       |
 
 ## Architectural rules
 
-The full list is in [`docs/high-level-design.md`](docs/high-level-design.md).
-Three rules are load-bearing and a CI gate or a reviewer agent will
-catch a violation:
+The full picture is in [`docs/architecture.md`](docs/architecture.md).
+Three rules are load-bearing — a CI gate or a reviewer will catch
+violations:
 
 1. **No CJK literals in user-facing layers.** Every user-visible
    string must come from a translator key in
-   `src/i18n/locales/<lang>/{commands,errors,replies}.json`.
-   The scanner runs in strict mode from Phase 6 onwards; add
+   `src/i18n/locales/<lang>/{commands,errors,replies}.json`. Add
    `// i18n-ignore: <non-empty reason>` only when the literal is
    genuinely not user-facing (e.g. a trigger-match regex).
-2. **No `process.env.X` outside `src/core/config/env.ts`.** Env access
-   goes through the zod-parsed `Env` object so missing variables
-   fail at boot, not at the first request.
+2. **No `process.env.X` outside `src/core/config/env.ts`.** Env
+   access goes through the zod-parsed `Env` object so missing
+   variables fail at boot, not at the first request.
 3. **No new handler/plugin without a test.** New public functions in
    `core/` and `plugins/` need at least one happy-path and one
    error-path test; new repository methods need an integration test
@@ -207,8 +173,7 @@ Discord.
    Rules the `yarn test:i18n` catalog-completeness gate enforces:
    - **Every key must exist in both locales.** A key added to one
      locale only fails the cross-locale parity check.
-   - **`{{placeholder}}` sets must match across locales** for the same
-     key.
+   - **`{{placeholder}}` sets must match across locales** for the same key.
    - The per-command `replies:<feature>.failed` fallback string must
      carry a `{{traceId}}` interpolation slot — `replyForError` uses it
      to surface a trace code for non-`DomainError` failures.
@@ -238,31 +203,36 @@ Discord.
    shared `mongodb-memory-server` started in `test/integration/setup.ts`).
 
 6. **Register with Discord.** `yarn deploy -t <bot-name>` after the bot
-   has been started at least once (so the slash command registration
-   token cache is populated). Default is global registration — new
-   guilds the bot joins later see the command without re-running
-   deploy. Use `--dev-guild <id>` only for fast iteration on a single
-   test guild.
+   has been started at least once. Default is global; `--dev-guild <id>`
+   is for fast iteration on a single test guild.
 
-### Handler 行數規範
+### Handler 150-line cap
 
-`src/handlers/<type>/<name>/index.ts` 必須遵守下列五點。新 handler 自第一行
-程式碼起就套用，不留「未來再說」空間。
+Every `src/handlers/<type>/<name>/index.ts` must follow these five
+rules. New handlers apply them from line one — no "future cleanup"
+deferrals.
 
-1. **`index.ts` 行數上限為 150 行**（含 import、含 JSDoc、含空行）。由
-   `eslint.config.mjs` 的 `max-lines` 規則對 `src/handlers/**/*.ts` 強制執行，違規為 error。
-2. **超出上限的 pure helper（純函式、不依賴 Discord 物件）必須抽到同目錄的獨立檔案**。
-   檔名 kebab-case（例：`parse-range.ts`、`render-reactions.ts`），具名 `export`，
-   不使用 `export default`。
-3. **不可為了壓縮行數而把 Discord I/O、權限檢查、Translator 呼叫拆出 `index.ts`**。
-   這四項是 handler 的本職：interaction input 抽取、guild / repos / 權限檢查、
-   `bot.translator.t(...)` 呼叫、把 domain 結果組裝成 Discord 回覆物件。它們必須
-   留在 `index.ts` 內。
-4. **抽出的 helper 必須有對應單元測試**，置於 `test/unit/handlers/<name>/<helper>.test.ts`。
-   純函式測試 happy path + 邊界 + error path；接受 Translator / Repos 的 helper
-   注入 in-memory fake。
-5. **helper 不可放在 `src/handlers/shared/` 或新增的共用目錄**——抽出的內容是該
-   handler 的內部實作細節；若日後有第二個 handler 需要同一邏輯，再評估是否上提。
+1. **`index.ts` is capped at 150 lines** (imports, JSDoc, and blank
+   lines all count). Enforced by the `max-lines` rule in
+   [`eslint.config.mjs`](eslint.config.mjs); a violation is an ESLint
+   error, not a warning.
+2. **Overflow goes to sibling files in the same directory.** Pure
+   helpers (anything that does not touch Discord objects) move to
+   kebab-cased files (e.g. `parse-range.ts`, `render-reactions.ts`)
+   with **named** exports. Do not use `export default`.
+3. **Do NOT extract Discord I/O, permission checks, or `Translator`
+   calls to compress the line count.** Those four belong in
+   `index.ts`: interaction input extraction; guild / repos / permission
+   checks; `bot.translator.t(...)` calls; assembling the domain result
+   into a Discord reply. They are the handler's job.
+4. **Extracted helpers must have unit tests** under
+   `test/unit/handlers/<name>/<helper>.test.ts`. Test happy path,
+   boundary, and error path for pure functions; inject in-memory fakes
+   for `Translator` / `Repos` consumers.
+5. **Helpers stay in the handler's own directory.** Do not put them in
+   `src/handlers/shared/` or a new common folder; they are
+   implementation details of this handler. Promote only when a second
+   handler legitimately needs the same logic.
 
 ## Adding a plugin
 
@@ -279,10 +249,8 @@ listeners, etc.
      index.ts    # re-exports the factory + the inferred config type
    ```
 
-   None of the existing plugins (`auto-reply`, `tts-reply`, `llm-chat`,
-   `giveaway`, `activity`, `guild-events`, `message-backup`) split the
-   schema into its own file — keep it inside `plugin.ts` so the
-   factory, the schema, and the inferred config type stay co-located.
+   Keep the schema inside `plugin.ts` so the factory, the schema, and
+   the inferred config type stay co-located.
 
 2. **Implement the contract** (see `src/core/plugin/types.ts` for
    `Plugin`, `PluginRuntimeContext`, and friends):
@@ -290,8 +258,7 @@ listeners, etc.
    ```ts
    // src/plugins/<plugin-name>/plugin.ts
    import { z } from 'zod';
-   import type { Plugin } from '../../core/plugin';
-   import { TOKENS } from '../../core/ioc';
+   import { type Plugin, TOKENS } from '../../core/plugin';
 
    const PLUGIN_ID = 'xxx';
    const PLUGIN_VERSION = '1.0.0';
@@ -306,10 +273,7 @@ listeners, etc.
 
    /**
     * The factory parses `rawConfig` up front so the returned Plugin
-    * object can close over a fully-typed `config`. The host does NOT
-    * re-validate at register time when the plugin omits the
-    * `configSchema` field — this is how every existing plugin works
-    * (see `guild-events/plugin.ts`).
+    * object can close over a fully-typed `config`.
     */
    export const createXxxPlugin = (rawConfig: unknown): Plugin => {
      const config: XxxConfig = ConfigSchema.parse(rawConfig);
@@ -318,21 +282,14 @@ listeners, etc.
      return {
        id: PLUGIN_ID,
        version: PLUGIN_VERSION,
-       scope: 'bot', // 'guild' is reserved for Phase 4b
+       scope: 'bot',
        critical: false, // false = soft-disable on init/start failure
 
        events: {
-         // The host always passes the runtime context as the first
-         // argument, then the discord.js event arguments verbatim.
-         // Every call is wrapped in try/catch so one failure does not
-         // break later dispatches.
          messageCreate: async (ctx, message): Promise<void> => {
            if (message.guildId === null) return;
            if (isBlocked(message.channelId)) return;
 
-           // Resolve dependencies via the typed accessor — never reach
-           // into the raw container. `ctx.resolve` is an O(1) map
-           // lookup; calling it per event is the established pattern.
            const registry = ctx.resolve(TOKENS.GuildRegistry);
            ctx.logger.debug(
              { guildId: message.guildId, channelId: message.channelId },
@@ -346,15 +303,12 @@ listeners, etc.
    ```
 
    `init` / `start` / `onReady` / `onShutdown` are all optional. Add
-   them only when the plugin has actual setup work — `auto-reply`,
-   `tts-reply`, and `guild-events` ship without any lifecycle hook,
-   while `giveaway` and `activity` use `onReady` to re-schedule jobs.
+   them only when the plugin has actual setup work.
 
-   Tip: if your plugin needs to contribute slash commands or other
-   handlers, `Plugin.contributes.<type>` is a
-   `Record<string, HandlerConstructor>` keyed by the handler name (not
-   an array). Most plugins do not use this field — handlers live under
-   `src/handlers/` and are picked up by the codegen registry.
+   Tip: if your plugin contributes slash commands or other handlers,
+   `Plugin.contributes.<type>` is a `Record<string, HandlerConstructor>`
+   keyed by the handler name. Most plugins do not use this — handlers
+   live under `src/handlers/` and are picked up by the codegen registry.
 
 3. **Export the factory.**
 
@@ -383,22 +337,36 @@ listeners, etc.
    ```
 
    `this.use(...)` is fluent (returns `this`), so multiple registrations
-   can chain if you prefer.
+   can chain.
 
-6. **Add tests.** The plugin's pure logic gets unit tests; the wiring
-   (event subscriptions, lifecycle hooks if any) gets a plugin-level
-   test that constructs a fake `PluginEventContext` /
-   `PluginRuntimeContext`. See `test/unit/plugins/` for the established
-   shape — `auto-reply.test.ts` is the most representative example.
+6. **Add tests.** Pure logic gets unit tests; the wiring (event
+   subscriptions, lifecycle hooks if any) gets a plugin-level test
+   that constructs a fake `PluginEventContext` / `PluginRuntimeContext`.
+   See `test/unit/plugins/` for the established shape.
 
-### Plugin ↔ IoC 契約
+### Plugin ↔ IoC contract
 
-> **Plugin 對 IoC 的依賴契約**：plugin 對 IoC 的依賴只能透過 `core/plugin` 取得
-> （`import { TOKENS, type ServiceToken } from '<path>/core/plugin'`）。任何 `src/plugins/**` 對
-> `core/ioc` 的直接 import 由 ESLint 在 lint 階段擋下。Plugin 可呼叫 `ctx.resolve(token)` 讀取依賴、
-> 可在 `init` hook 內呼叫 `ctx.registerInstance(token, instance)` 註冊已建構的實例；不得透過任何
-> 方式（包含對 `ctx` 強制 cast）取得 `ServiceContainer` 的寫入面 API。新 token 必須登錄在
-> `src/core/ioc/tokens.ts` 中央目錄，再由 `core/plugin` 的 `TOKENS` re-export 自動曝露給 plugin。
+A plugin's only legal channel to the IoC container is the
+`@core/plugin` barrel:
+
+```ts
+import { TOKENS, type ServiceToken } from '../../core/plugin';
+```
+
+Any direct import of `@core/ioc` from `src/plugins/**` is rejected by
+ESLint at lint time. From `init`, `start`, `onReady`, `onShutdown`,
+and event handlers, plugins:
+
+- **Read** dependencies with `ctx.resolve(token)`.
+- **Publish** instances with `ctx.registerInstance(token, instance)` —
+  permitted **only inside `init`**.
+
+There is no escape hatch to the `ServiceContainer`'s write face. Do
+not cast `ctx` to gain access; tests and review will catch it.
+
+New tokens go in [`src/core/ioc/tokens.ts`](src/core/ioc/tokens.ts);
+the `@core/plugin` barrel re-exports `TOKENS`, so a token registered
+in the central directory is automatically visible to plugins.
 
 ## Pre-deploy smoke
 
@@ -423,8 +391,7 @@ What the script verifies, in order:
    touching any guild database.
 3. **Discord login + `clientReady`** — logs the bot in with TOKEN,
    waits for the ready event, and asserts the bot's user id matches
-   `CLIENT_ID`. Catches token/id mismatches a deploy might otherwise
-   only surface mid-traffic.
+   `CLIENT_ID`.
 
 Each step is timeboxed (default 30 s, override via `SMOKE_TIMEOUT_MS`).
 The script does NOT register slash commands, start plugins, or open
@@ -436,22 +403,14 @@ is printed to stderr).
 
 The Git history follows a `<type>(<scope>): <subject>` pattern where
 `<type>` is `feat`, `fix`, `refactor`, `chore`, `docs`, or `test`, and
-`<scope>` matches the area being touched (`phase-7-pr-1`, `llm-chat`,
-`scanner`, etc.). Multi-line bodies are encouraged for non-trivial
-changes — describe the _why_, not the _what_.
-
-Commits get co-authored with the AI assistant that helped via
-`Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>`.
+`<scope>` matches the area being touched (`llm-chat`, `scanner`,
+etc.). Multi-line bodies are encouraged for non-trivial changes —
+describe the _why_, not the _what_.
 
 ## Submitting a PR
 
-1. Branch off `refactor/architecture-overhaul` (until that lands on
-   `main`) or `main` (after).
-2. Run the full local gate suite.
-3. Fill in the PR template — it asks for a summary, gate evidence, and
-   a rollback plan.
-4. The same reviewer agents listed in plan §7A will run on the PR:
-   `architecture-reviewer`, `type-system-reviewer`,
-   `reliability-reviewer`, `test-architect`,
-   `config-and-security-reviewer`, and `i18n-discipline-reviewer`. A
-   `BLOCK` verdict from any of them must be addressed before merge.
+1. Branch off `main`.
+2. Run the full local gate suite (see the Quality gates table).
+3. Fill in the PR template — it asks for a summary, gate evidence,
+   and a rollback plan.
+4. A maintainer will review. CI must be green before merge.
