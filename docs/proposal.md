@@ -1,336 +1,413 @@
-# 技術債修正需求規格（Tech-Debt Remediation Proposal）
+# 正式發行版整備計畫（Release Readiness Proposal）
 
-| 項目     | 內容                                                                                                                                 |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 目標     | 收斂 architecture-overhaul 完成後的剩餘技術債，使 codebase 達到「下一階段可長期維運」狀態                                            |
-| 範圍     | R1 拆解 BaseBot、R2 消除 DI 旁路、R3 plugins↔core/ioc 契約對齊、R4 過長 handler 拆分 + 規範、R5 i18n 路徑反耦合、R6 低優先項一次掃乾 |
-| 依據     | [docs/codebase-review-2026-05.md](codebase-review-2026-05.md) 第 2 / 6 節、[docs/revision.md](revision.md)                           |
-| 交付方式 | 單一 feature branch；R1 → R2 → R3 → R4 → R5 → R6 依序完成後，一次 PR 到 `refactor/architecture-overhaul`                             |
-| 文件層級 | 中階需求規格——說明「為何做、要達成什麼、什麼不做」；介面簽名、檔案結構、測試案例細節交給後續 design 文件                             |
+**狀態：** 草案，待審閱。
+**目標 branch：** `refactor/architecture-overhaul`（已合併 `refactor/tech-debt-cleanup` 的 R1–R6 成果）。
+**發行型態：** 公開 OSS 發行（v1.0.0）。
+**本文件產出：** 將 codebase 落地為首版公開發行的範圍化行動計畫——涵蓋程式碼品質、文件清理、`README.md` / `CONTRIBUTING.md` / `CLAUDE.md` 三份文件重寫、補齊 OSS 標準附屬文件，以及 `.claude/` agents 與 skills 的發行版改寫。
 
----
-
-## 1. 背景與動機
-
-`refactor/architecture-overhaul` 分支已落地分層、Plugin host、IoC、Repository、Result、i18n 等基礎建設，並完成 TTS 移除、註解 release 化、`src/interface` → `src/i18n` 改名。對 codebase 做完整審閱（`docs/codebase-review-2026-05.md`）後仍有 6 項技術債（R1–R6）。本提案一次處理 R1–R6 全部，把架構大重構的尾巴一次掃乾，之後 `refactor/architecture-overhaul` 即可進入「對齊 main」階段。
-
-選擇此時一次到位的理由：
-
-- `BaseBot`（R1）已是其他重構的瓶頸——其他層的整潔度被它的肥大稀釋；R2、R3 也因 `BaseBot` 同時擁有「plugin 接點」與「raw event 接點」而難以單純化。先把 R1 做掉，後續每一輪重構的單位成本都會下降。
-- DI 旁路（R2）與 plugins↔ioc 契約不一致（R3）是同一條主軸：IoC 邊界尚未真正被守住。一併處理可在同一分支內完整對齊。
-- 過長 handler（R4）伴隨「準則 + ESLint 自動化」處理，新增 handler 將自動受規範保護，避免未來繼續累積。
-- R5 是純粹的反耦合修正、R6 是分散的小修正集合；分多輪做反而會付不成比例的 PR / review 成本，一輪做完更划算。
+本文件為**規劃文件**，不含任何程式碼或檔案修改。
 
 ---
 
-## 2. 範圍
+## 1. 審閱結果
 
-### 2.1 涵蓋
+### 1.1 模組化、物件導向與 design pattern — 判定：PASS
 
-- **R1**：拆解 `BaseBot` 為 thin lifecycle owner，抽出三個 collaborator。
-- **R2**：消除 plugin↔BaseBot 間的 module-global holder DI 旁路。
-- **R3**：使 `src/plugins/**` 與 `core/ioc` 之間的依賴契約一致——契約、ESLint、實際 import 三者對齊。
-- **R4**：拆分 4 個過長 handler 作為示範；引入 handler 行數準則與 helper 抽離守則；以 ESLint `max-lines-per-file` 強制執行。
-- **R5**：移除 `catalog-loader.ts` 對 `src/i18n/locales` 的硬編碼路徑，改由 composition root 注入。
-- **R6**：低優先單點修正集合（`traceId` 隨機性、`login()` 失敗 reject、清除殘餘 `console.*`、`BaseBot` 命名一致化、`src/bot/index.ts` import 中間執行碼搬移）。
+Codebase 已達且多處超出商業標準。R1–R6 技術債清理（已併入 `architecture-overhaul`）強化了 architecture overhaul 階段建立的分層。
 
-### 2.2 不涵蓋
+已正確套用的 pattern 與代表位置：
 
-- **新功能、規格變更、Design Pattern 替換**（如換 DI 框架、改 ORM、改 i18n library）——本提案只清債，不擴張。
-- **公開對外契約**（HTTP webhook 路由、Discord 指令簽名、i18n catalog key）——本提案不動。
-- **TTS 功能**——已於前一輪移除，本提案不重新引入。
-- **CI / CD pipeline 改造、依賴升級、Node 版本變更**——非本輪 scope。
+| Pattern                              | 位置                                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Clean / 分層架構                     | `core → persistence/infra → handlers/plugins → bot`，ESLint 強制依賴方向                                            |
+| 手寫 IoC container（typed tokens）   | [src/core/ioc/container.ts](../src/core/ioc/container.ts)（約 280 行，無 `reflect-metadata`）                        |
+| Plugin / Host（lifecycle + dispatcher）| [src/core/plugin/](../src/core/plugin/) — 拓樸序註冊、`Promise.allSettled` 事件隔離                                |
+| Chain of Responsibility（middleware）| [src/core/plugin/interaction-router.ts](../src/core/plugin/interaction-router.ts) + [src/bot/middlewares.ts](../src/bot/middlewares.ts) |
+| Strategy（LLM providers）            | [src/infra/llm/](../src/infra/llm/) — OpenAI / Anthropic / Gemini / xAI 共用單一介面                                |
+| Repository pattern                   | [src/persistence/repositories/](../src/persistence/repositories/) — interface + `Mongo<X>Repo`                      |
+| Adapter                              | [src/bot/client-event-bridge.ts](../src/bot/client-event-bridge.ts) — discord.js 事件 → router / dispatcher         |
+| Factory（plugin / repo bundle）      | `createXxxPlugin(rawConfig)`、`buildRepos(connection)`                                                              |
+| Result / Either                      | [src/core/result/](../src/core/result/)                                                                             |
+| Branded primitive types              | [src/core/ids.ts](../src/core/ids.ts)（GuildId、ChannelId 等）                                                       |
+| 結構化錯誤樹                         | [src/core/errors/](../src/core/errors/) — `DomainError` taxonomy 並以 `messageKey` 串接 i18n                        |
+| Singleton pool                       | Process 範圍 `MongoConnectionManager`，以 URI 為 key（[src/bot/index.ts:88](../src/bot/index.ts#L88)）                |
 
----
+**程式碼層級的小幅改善**列於 §4，皆為選擇性；無一項阻擋發行。
 
-## 3. 交付方式
+### 1.2 商業標準 / 易讀性 / 安全 / 簡潔 — 判定：PASS（含少量必修）
 
-- 開新 feature branch：建議 `refactor/tech-debt-cleanup`（最終名稱待確認）。
-- 內部以 R1 → R2 → R3 → R4 → R5 → R6 的順序逐項實作；每項完成後執行所有 quality gates 才動下一項。
-- R6 的子項（R6.1–R6.5）可在 R6 階段平行處理，但建議拆成獨立 commit，方便日後查找。
-- 全部完成後**一次** PR 到 `refactor/architecture-overhaul`；PR description 逐項列出 R1–R6 的對應 commit。
-- 每項都應在 commit 訊息中標註對應的 R 編號（例：`refactor(R1): extract GuildRegistrar from BaseBot`、`fix(R6.1): use crypto.randomUUID for traceId`）。
+現況已具備：
 
----
+- **嚴格 TypeScript**——`tsconfig.strict.json` 覆蓋整個 `src/`，`any`、`as any`、未收斂的 `unknown` 一律失敗。
+- **CI 品質閘**——十條必過 status checks（`lint`、`typecheck`、`typecheck-emit`、`test-unit`、`test-coverage`、`test-int`、`test-contract`、`knip`、`security`、CodeQL `analyze`），加上 i18n 對齊與 CJK literal 掃描。
+- **安全**——`audit-ci` 含 allowlist、`gitleaks`、`core/config/env.ts` 以外不得 `process.env` 直接讀（ESLint 強制）、無硬編碼 secret、Mongoose 參數化查詢、[src/core/config/redact.ts](../src/core/config/redact.ts) 與 [src/core/logger/](../src/core/logger/) 提供 redaction。
+- **結構化 logging**——pino 帶 bot / guild / trace context；`src/` 內 `console.*` 為 `error` 等級禁用（R6.3）。
+- **測試金字塔**——unit / integration / contract / i18n 共 103 個測試檔。
+- **Codegen 漂移閘**——`yarn handlers:gen:check` 擋下 handler 目錄與生成 registry 不一致的 PR。
+- **Process safety nets**——`installProcessHandlers` 連結 `SIGINT` / `SIGTERM` / `unhandledRejection` 至 graceful shutdown。
 
-## 4. R1 — 拆解 `BaseBot`
+公開發行前的必修項（完整清單見 §4）：
 
-### 4.1 動機
+1. `README.md` 為 refactor 前版本，描述已不存在的 `commands/` 目錄結構，誤導性高，必須重寫。
+2. `CONTRIBUTING.md` 引用內部工程產物（`engineering-orchestrator`、gap-remediation、auto-merge 政策、`refactor/architecture-overhaul` branch protection），對外部貢獻者無意義。
+3. `CLAUDE.md` 圍繞 R1–R6 工程組織，指向 `docs/tasks/`、`docs/design/` 與內部 agents，需改寫為「協助社群貢獻者的 AI 助理視角」。
+4. 缺少 `SECURITY.md`、`CODE_OF_CONDUCT.md`、頂層 `CHANGELOG.md`，皆為標準 OSS 預期。
+5. `CLAUDE.md` 與 `CONTRIBUTING.md` 嵌入兩段中文（Handler 行數規範、Plugin ↔ IoC 契約），對外發行版需翻成英文。
+6. `package.json` `description: ""`，`version: 1.0.0` 但尚未建立對應 tag，`engines.node`（`>=22.13.0`）與 `CONTRIBUTING.md`（「Node 20+」）不一致。需擇一為準並對齊。
+7. `lint:legacy` / `typecheck:legacy` npm scripts 已成為死碼（strict mode 已覆蓋整個 `src/`），應移除。
 
-`src/bot/index.ts` 1,018 行、約 25 個 public 成員，同時擁有生命週期編排、IoC 接線、guild 註冊、per-guild DB 連線、reboot 訊息、8 個原生 `client.on` listener、reaction 抓取與分派、InteractionRouter 組裝。其 docstring 自稱「Thin lifecycle owner」與現況背離。這是本提案對維護性最重要的單一改動，所有後續重構都會受益於它。
+### 1.3 過去修改紀錄 — 判定：發行前刪除
 
-### 4.2 要達成什麼
-
-`BaseBot` 退回真正的 thin lifecycle owner；抽出三個職責清晰的 collaborator：
-
-| Collaborator        | 領域職責                                                               |
-| ------------------- | ---------------------------------------------------------------------- |
-| `GuildRegistrar`    | 把 `Guild` 物件 + bot 設定組裝成 `GuildInfo`、解析 channels / roles    |
-| `ClientEventBridge` | 把 Discord raw event 轉成已驗證的 domain event，交給 router / listener |
-| `GuildDbConnector`  | 控制 per-guild Mongo 連線生命週期與失敗分類                            |
-
-`BaseBot` 保留：constructor、`use(plugin)`、`run()` 的三段（setupContainer / setupTranslator / startListening）、shutdown 路徑、IoC 容器存取器。
-
-`BaseBot` 對外的 public API（`bot.voice` / `bot.logger` / `bot.translator` / `bot.guildInfo` 等）**允許 breaking change**；handler / subclass / 測試端在同一個 R1 commit 內一併修正，外部不需保留相容 shim。
-
-### 4.3 先決條件
-
-R1 開始前先補齊 `BaseBot` 的 end-to-end contract 測試作為風險緩解。基線可參考 `test/integration/interaction-router/router-dispatch.int.test.ts` 的形式；目標是在拆解前，把現有 8 條 `client.on(...)` listener 的關鍵分支都納入整合測試。具體 fixture 與案例由 R1 的 design 文件展開。
-
-### 4.4 不做什麼
-
-- 不抽 `RouterAssembler`——InteractionRouter 組裝是一次性程序，本輪暫不獨立。日後若 router 真正長大，再列為單獨的 R 項。
-- 不換 IoC 框架；不引入 `reflect-metadata`。
-- 不改變 BaseBot 對外 lifecycle 順序（`use → run → shutdown`）的語意。
-
-### 4.5 驗收（質化）
-
-- `BaseBot` 退回「thin lifecycle owner」的描述能對得上實際內容——任何讀過 `src/bot/index.ts` 的工程師應同意 docstring 不再說謊。
-- 三個新類別各自能用自己的測試獨立驗證；移除任一不會牽動其他兩個的測試。
-- subclass（`Nijika` / `Konata` / `Tomori` / `MsgArchive`）仍能以同一個 plugin opt-in 模式組裝；breaking change 集中在欄位名稱或取值方式，不在生命週期語意。
-- 全部既有測試（431 案）與 contract 測試新增案例皆綠。
-- `architecture-reviewer` Audit 通過，無新增分層違規。
+以下為 architecture overhaul 與 R1–R6 清理的工程進行中產物，不適合保留於公開發行版。完整清單與理由見 §3。
 
 ---
 
-## 5. R2 — 消除 DI 旁路
+## 2. 目標
 
-### 5.1 動機
+將 `refactor/architecture-overhaul` 合併至 `main`，作為專案的 v1.0.0 OSS 發行版，達成：
 
-`src/plugins/voice/internal/active-controller.ts` 與 `src/infra/llm/models-catalog.ts` 以 module-scope 的可變 holder（`let active*`）把 plugin `init` hook 產出的物件傳給 `BaseBot.run()` 讀取。這是繞過 IoC 的隱藏全域旁路——新進工程師追 `bot.voice` 不會在容器裡找到接線，違反「DI 是唯一接線管道」的設計承諾。`active-controller.ts` 註解自承這個 holder 之所以存在是因為「plugin 契約沒有暴露 register 介面」——真正該補的是契約。
-
-### 5.2 要達成什麼
-
-擴充 plugin contract，給 plugin 一條合法的「向容器註冊已建立實例」的出口：
-
-- `PluginContext`（plugin 的 `init` hook 收到的 ctx）增補 `registerInstance<T>` 能力。
-- 該能力**只在 `init` hook 內合法**；在 `start` / `onReady` / event hook 等較晚階段呼叫，host 在 lifecycle runner 階段檢查並丟 `ConfigurationError`。
-- `VoicePlugin.init` 改用 `ctx.registerInstance` 註冊 `VoiceController`；`BaseBot` 從容器解析（建議 `bot.voice` 改為 getter）。
-- `models-catalog` 以同樣模式改寫；移除 `setActiveModelCatalog` / `getActiveModelCatalog` 等 module-global 函式。
-
-### 5.3 不做什麼
-
-- 不開放 plugin 直接取得 `ServiceContainer` 原物件——`ctx.registerInstance` 是窄面契約，不暴露 `register` / `registerSingleton` 之外的容器 API。
-- 不改 plugin 既有的 `ctx.resolve(TOKENS.X)` 解析路徑。
-- 不為了統一而把所有 plugin 都改成在 `init` 註冊實例；只動有 DI 旁路的兩處。
-
-### 5.4 驗收（質化）
-
-- `src/plugins` 與 `src/infra` 樹中不再存在 module-scope 可變 holder 作為 plugin↔BaseBot 通信管道。
-- `bot.voice` / models-catalog 的 DI 路徑可由「BaseBot resolve token → plugin init 註冊 instance」一條 trace 完整對上。
-- `ctx.registerInstance` 在非 `init` hook 呼叫時的拒絕行為有單元測試覆蓋。
+- 純英文、面向貢獻者、反映**當下程式碼**（而非 refactor 歷史）的文件。
+- repo 內無任何內部工程產物。
+- 標準 OSS 檔案齊備（`README`、`CONTRIBUTING`、`LICENSE`、`CHANGELOG`、`SECURITY`、`CODE_OF_CONDUCT`）。
+- 程式碼品質至少不低於現況；含小幅低風險清理（§4）。
+- `.claude/` 之 agents 與 skills 改寫為通用、可長期沿用的發行版規範。
 
 ---
 
-## 6. R3 — plugins ↔ core/ioc 契約對齊
+## 3. 檔案系統異動
 
-### 6.1 動機
+### 3.1 應刪除的文件
 
-8 個 `src/plugins/*/plugin.ts` 都 `import { TOKENS } from '../../core/ioc'`。分層契約規定 `core/ioc` 僅供 `src/bot/**` 與 `test/**`，但 `eslint.config.mjs` 的 `no-restricted-imports` 未列入 `src/plugins/**`，造成 lint 通過卻與契約矛盾。契約、ESLint、實際 import 三者必須一致，否則任何一邊都不可信。
+`docs/` 之下：
 
-### 6.2 要達成什麼
+| 路徑                                  | 理由                                                                       |
+| ------------------------------------- | -------------------------------------------------------------------------- |
+| `docs/proposal.md`（舊版）            | Architecture overhaul 需求規格——已被本文件與新版發行文件取代               |
+| `docs/high-level-design.md`           | Refactor 演進敘事——重點蒸餾為新版 `docs/architecture.md`                   |
+| `docs/design.md`                      | `docs/design/R*.md` 的索引——已過時                                         |
+| `docs/design/`（整個目錄）            | R1–R6 實作骨架與 `gaps.md`——純內部工程                                     |
+| `docs/tasks/`（整個目錄）             | R1–R6 task checklist 與 `progress.md`——純內部工程                          |
+| `docs/codebase-review-2026-05.md`     | 啟動本次清理的審閱報告——歷史性                                             |
+| `docs/revision.md`                    | 階段性修訂計畫——歷史性                                                     |
 
-由 `core/plugin` 模組統一對 plugin 暴露其需要的 IoC 表面：
+Wiki 清理（`docs/wiki/`）：
 
-- `src/core/plugin/index.ts` 重新匯出 `TOKENS` 與 plugin 端必要的型別（如 `ServiceToken<T>`、`Resolver`）。
-- 8 個 `plugin.ts` 改 import 來源為 `core/plugin`，不再直接觸碰 `core/ioc`。
-- `eslint.config.mjs` 的 `no-restricted-imports` 把 `src/plugins/**` 加入禁止 import `core/ioc`，違規 fail。
-- CLAUDE.md、CONTRIBUTING.md、`.claude/skills/project-conventions/SKILL.md`、`.claude/skills/coding-standards/SKILL.md` 對應段落同步更新——明文寫「plugin 對 IoC 的依賴透過 `core/plugin` 唯一管道」。
+| 路徑                          | 動作                                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `docs/wiki/CHANGELOG.md`      | 改寫為以發行版為錨點的 changelog（`v1.0.0 — initial public release`），刪除目前全部 24 筆 R / D / G 標籤條目              |
+| `docs/wiki/Home.md`           | 改寫：移除指向 `docs/tasks/README.md`、`docs/design/gaps.md`、`engineering-orchestrator` 的連結與「元件完成度」表，保留元件地圖 |
+| `docs/wiki/components/C*.md`  | 逐頁審視，移除進行中工程、R 標籤、agent 名稱等引用，重新聚焦於「該元件當下做什麼」                                          |
 
-### 6.3 不做什麼
+### 3.2 應重寫的文件
 
-- 不在這一項裡擴充 `TOKENS` 內容；新 token（如 R2 的 `VoiceController` token）在 R2 階段處理。
-- 不調整 plugin 的 `ctx.resolve(...)` API。
-- 不為了「巨集化」而把 TOKENS 拆成多個 sub-namespace。
+| 路徑              | 改寫範圍                                                                                                                |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `README.md`       | 全面重寫——見 §3.4。目前內容描述 refactor 前的 `commands/` 結構，具誤導性                                                |
+| `CONTRIBUTING.md` | 大幅重寫——見 §3.5。移除 R 標籤、`engineering-orchestrator`、auto-merge 政策、`refactor/architecture-overhaul` 相關內容，中文段落英譯 |
+| `CLAUDE.md`       | 重新定位為「協助社群貢獻者的 AI 助理視角」——見 §3.6。刪除整段「Active engineering: Tech-Debt Cleanup (R1–R6)」與文件鏈引用 |
 
-### 6.4 驗收（質化）
+### 3.3 應新增的 OSS 標準文件
 
-- 任何 plugin 程式碼不再直接 import `core/ioc`；違規由 ESLint 在 lint 階段擋下。
-- 「plugin 對 IoC 的合法窗口」在程式碼、ESLint 規則、文件三處的描述一致。
-- 換 IoC 框架的假想實驗：若日後抽換 `core/ioc`，plugin 程式碼不需更動。
+| 路徑                    | 用途                                                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `CHANGELOG.md`（根目錄）| Keep-a-Changelog 格式。`v1.0.0 — YYYY-MM-DD` 含特性摘要                                                                       |
+| `SECURITY.md`（根目錄） | 支援版本、漏洞通報管道（建議採 GitHub Security Advisory）、責任揭露時程                                                       |
+| `CODE_OF_CONDUCT.md`    | Contributor Covenant 2.1——標準 OSS 預期                                                                                       |
+| `docs/architecture.md`  | 取代 `high-level-design.md`。單頁架構總覽：分層、關鍵抽象、request flow、plugin lifecycle。讀者＝評估或擴充本 bot 的開發者     |
+
+### 3.4 `README.md` 改寫大綱
+
+目標讀者：在 GitHub 上看到 repo、正在決定要使用 / fork / 貢獻的開發者。
+
+章節順序：
+
+1. **一行描述 + badges**——CI 狀態、license、Node 版本。
+2. **這是什麼**——TypeScript / Discord.js / MongoDB 多人格 bot framework，重點：分層架構、plugin system、i18n、嚴格 TypeScript。
+3. **內建 bots**——短表：`nijika`（web-facing + 地震 webhook）、`konata`、`tomori`、`msg-archive`（worker-style 備份）。
+4. **特性**——對使用者列出 bullet：slash commands、reactions、modals、scheduled jobs、多 provider LLM chat（OpenAI / Anthropic / Gemini / xAI）、雙語（zh-TW + en）、語音錄製、訊息備份、giveaway、活躍度追蹤、地震播報。
+5. **快速開始**——`git clone`、`yarn install --frozen-lockfile`、每 bot 的 `.env` + `config.json` 設定、`yarn <bot-name>`。
+6. **設定**——指向 [src/core/config/env.ts](../src/core/config/env.ts) 的 zod schema，簡述每個必需與選擇性 env var。
+7. **新增 bot / command / plugin**——各一句帶過，連結至 `CONTRIBUTING.md`。
+8. **架構總覽**——5–10 行，連結至 `docs/architecture.md`。
+9. **開發**——`yarn typecheck`、`yarn lint`、`yarn test`。
+10. **貢獻**——連結至 `CONTRIBUTING.md` 與 `CODE_OF_CONDUCT.md`。
+11. **安全**——連結至 `SECURITY.md`。
+12. **授權**——MIT，連結至 `LICENSE`。
+
+### 3.5 `CONTRIBUTING.md` 改寫大綱
+
+保留實質工程指引，移除進行中內部工程片段。
+
+**保留**（重新潤飾、僅英文）：
+
+- Local setup（Node 版本、Yarn classic、MongoDB、ffmpeg）。
+- Quality gates 表——十條閘全留。
+- 三條 load-bearing 架構規則：no CJK literals、`process.env` 限 `core/config`、無測試不得新增 handler / plugin。
+- 「Adding a slash command」recipe。
+- 「Adding a plugin」recipe。
+- 「Handler 150-line cap」——現有中文段落英譯為 bullet 形式。
+- 「Plugin ↔ IoC contract」——現有中文段落英譯。
+- `yarn smoke` 說明。
+- Commit conventions（移除 `Co-Authored-By: Claude` 強制行，那是專案所有者的個人慣例，非外部貢獻者要求）。
+
+**刪除**：
+
+- `refactor/architecture-overhaul` 專屬的必過 status checks 清單（branch protection 將在發行後改套用至 `main`）。
+- Auto-merge 預設與自主合併政策（純內部）。
+- `engineering-orchestrator` agent 與 PR template reviewer agents 引用。
+- 「Branch off `refactor/architecture-overhaul`（until that lands on `main`）」——發行後過時。
+
+### 3.6 `CLAUDE.md` 改寫大綱
+
+目標讀者：在乾淨 checkout 上協助貢獻者的 AI 助理。檔案應精簡（目前 13 KB → 目標 ≤ 7 KB）。
+
+**保留**（壓縮）：
+
+- 一段專案摘要。
+- 目錄結構表。
+- Path aliases。
+- 關鍵抽象（BaseBot、Plugin contract、Repository、Error tree、i18n、IoC）——刪除 R1 / R2 / R3 等標籤註解，只描述當下狀態。
+- Quality gates 指令清單。
+- 三條架構規則（與 `CONTRIBUTING.md` 一致）。
+- 指向 `docs/architecture.md` 與 `CONTRIBUTING.md`。
+
+**完全刪除**：
+
+- 「Active engineering: Tech-Debt Cleanup (R1–R6)」段與文件鏈。
+- 「Agents and skills」段——其中內部專用 agent 不對外曝光；保留的部分以 §3.7 為準重新撰寫。
+- 「Commit + PR conventions」中引用 `refactor/tech-debt-cleanup` → `refactor/architecture-overhaul` 的句子。
+
+### 3.7 `.claude/` agents 與 skills 發行版改寫
+
+專案於 `.claude/` 提供 8 個 agents 與 4 個 skills。其中數個與 R1–R6 清理強耦合（指向特定文件、特定流程），合併後無存在意義；其餘為通用 reviewer / 規範工具集，對任何使用 Claude Code 的貢獻者皆有價值。按下列方式拆分。
+
+**應刪除的 agents**（R 清理專用，無通用價值）：
+
+| 路徑                                          | 理由                                                                                                                          |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/agents/tech-debt-orchestrator.md`    | R1–R6 領隊 agent；引用 `docs/tasks/progress.md` 與 `r-implementer`。發行後 repo 無對應流程。                                  |
+| `.claude/agents/r-implementer.md`             | R item worker agent；讀取 `docs/tasks/R<N>.md`（將刪）與 `docs/design/R<N>.md`（將刪），無法獨立運作。                       |
+
+**應保留並改寫的 agents**（6 個 reviewer agents——對 repo 任何 PR 審查皆適用）：
+
+| 路徑                                                   | 改寫要點                                                                                                                    |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/agents/architecture-reviewer.md`              | 移除「for the discord-bot refactor」框架，改為描述**當下**的 layer contract（不再寫「R1 decomposes…」）；保留 Consult / Review / Audit 三模式 |
+| `.claude/agents/type-system-reviewer.md`               | 刪除「Heavy use on C1 / C2 / C4 / C5」等 gap tag；保留 strict mode / generics / Result / discriminated union 重點             |
+| `.claude/agents/reliability-reviewer.md`               | 刪除「Heavy use on C5（D5 …）、C8（reboot async correctness）、C3（plugin lifecycle ordering）」；改述為「適用於任何牽涉 retry / lifecycle / partial failure 的變更」 |
+| `.claude/agents/test-architect.md`                     | 刪除 R / D / G 引用；改述為當下 test project 布局（unit / integration / contract / i18n）                                     |
+| `.claude/agents/config-and-security-reviewer.md`       | 刪除「silent-pass detection」等審計期語言；保留 audit-ci / gitleaks / secret-redaction 範疇                                  |
+| `.claude/agents/i18n-discipline-reviewer.md`           | 刪除「Heavy use on C6 / C7（gaps D7、D9）」；改述為「永久啟用的 CJK scanner + 雙語 catalog 不變式」                          |
+
+六個 reviewer 共同要求：
+
+- 內文一律英文。
+- 移除任何 gap code 引用（`R1`、`R2`…、`D7`、`D9`、`G-1`、`G-2`、元件代號 `C1`–`C11`）。
+- 移除「Will be the primary reviewer for the X work」這類句型，改為「Applies when changing X」的分層描述。
+- 僅引用公開文件（`README.md`、`CONTRIBUTING.md`、`docs/architecture.md`、`docs/wiki/components/`），不引用 `docs/tasks/`、`docs/design/`。
+
+**應刪除的 skills**：
+
+| 路徑                                         | 理由                                                                                                                          |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/skills/r-task-workflow/SKILL.md`    | 整個 skill 描述如何執行 `docs/tasks/R<N>.md` 任務；發行後無 R 任務存在                                                       |
+
+**應保留並改寫的 skills**：
+
+| 路徑                                            | 改寫要點                                                                                                                    |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/skills/project-conventions/SKILL.md`   | 移除「post-refactor」語感（這就是架構，不是後遺症）；移除 R / D / G 自檢項；加入 `CONTRIBUTING.md` 三條 load-bearing 規則    |
+| `.claude/skills/coding-standards/SKILL.md`      | 已大致通用；修剪指向被刪 `CLAUDE.md`「tech-debt cleanup」段的引用                                                            |
+| `.claude/skills/update-wiki/SKILL.md`           | 刪除「每個 R 完成後」觸發；改述為「任何新增 / 刪除 / 修改程式碼或文件後」；刪除 R 標籤範例                                  |
+
+**應新增的 skill**（取代被刪的 `r-task-workflow`）：
+
+| 路徑                                           | 用途                                                                                                                          |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/skills/contribute-change/SKILL.md`    | 任意變更的通用貢獻流程：理解區域 → 規劃 → 實作 → 對 `coding-standards` + `project-conventions` 自檢 → 跑 quality gates → 更新 wiki + changelog → commit。對應 `CONTRIBUTING.md` 但以 skill 形式存在，Claude Code 於貢獻者開始工作時按需載入 |
+
+**應新增的 agent**（取代被刪的 `r-implementer`，提供長期可用的「增刪修改」實作 subagent）：
+
+| 路徑                                       | 用途                                                                                                                          |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/agents/change-implementer.md`     | 通用實作 agent。接受任意「新增 / 刪除 / 修改」任務（handler、plugin、core、infra、persistence、docs、設定），無領域綁定。內部由載入的 `contribute-change` skill 驅動流程，並依改動所在層挑選相應 reviewer agent（architecture / type-system / reliability / test / config-and-security / i18n）做 Consult / Review。 |
+
+`change-implementer` 規格要點：
+
+- **觸發**：由主 agent（或使用者）派工，給定一段 task description；agent 不接「整批 R 列表」這種多任務工作流。
+- **輸入合約**：一段自然語言任務 + 必要時的具體檔案 / 路徑指引；無外部 `docs/tasks/*.md` 依賴。
+- **工作流**：載入 `contribute-change` skill → 用 `Read` / `Grep` / `Glob` 理解相關區域 → 列計畫 → 實作 → 對 `coding-standards` 與 `project-conventions` 自檢 → 視動到的層派出對應 reviewer 做 Review → 跑 quality gates 直到全綠 → 視需要更新 wiki / changelog → 產生 commit message → 回報。
+- **Reviewer 派遣表**（agent 內建決策樹，避免主 agent 重複決定）：
+
+  | 改動位置                                            | 必呼叫 reviewer                       |
+  | --------------------------------------------------- | ------------------------------------- |
+  | `src/core/` / `src/bot/` 或新增 / 刪除模組          | architecture-reviewer                 |
+  | 任何 TypeScript 型別、generics、Result、union 改動  | type-system-reviewer                  |
+  | 牽涉 retry、lifecycle、async、partial failure       | reliability-reviewer                  |
+  | 新增 / 修改測試或 quality gate                      | test-architect                        |
+  | `package.json` / CI / ESLint / tsconfig / secret    | config-and-security-reviewer          |
+  | `src/i18n/locales/` 或 user-facing 字串            | i18n-discipline-reviewer              |
+
+- **Tools**：`Read, Write, Edit, Bash, Grep, Glob, Agent`（與 `r-implementer` 同等，去掉 R-specific 依賴）。
+- **Model**：`opus`。
+- **不做的事**：不規劃多任務或排程；不接「請完成 R6」式的清單；不自行決定何時 merge / push。這些屬於上游決策。
+
+發行版 agents 與 skills 的 **frontmatter 規範**（以呈現為一套對外可用的精緻 catalogue，而非工程日誌）：
+
+- `name:`——kebab-case，描述角色，不加專案前綴。
+- `description:`——首句說明用途，末句說明何時呼叫；無 R / D / G 代碼；≤ 280 字。
+- `tools:`——最小必要集合。Reviewer agents 一律唯讀（`Read, Grep, Glob, Bash`）；skills 不宣告 tools。
+- `model:`——reviewer agents 保留 `opus`；skills 不寫 `model`。
+- 本文——英文、現在式、無「本 skill 建立於 X 階段」歷史敘述；讀起來像文件，不像日誌。
+
+### 3.8 應刪除的 branches
+
+`refactor/architecture-overhaul` 合併至 `main` 之後：
+
+- `refactor/tech-debt-cleanup`（local + `origin/`）——已完全合併。
+- `refactor/release-comments-and-tts-removal`（local + `origin/`）——已完全合併。
+- `refactor/architecture-overhaul`（local + `origin/`）——合併完成後刪除。
+
+對遠端為破壞性動作，列為合併後最終步驟並需明確再確認方可執行。
 
 ---
 
-## 7. R4 — 過長 handler 拆分 + 規範
+## 4. 程式碼層級異動
 
-### 7.1 動機
+全為選擇性與低風險，每項皆可獨立 revert，無一改變終端使用者可見行為。
 
-`src/handlers/commands/db_list_message/index.ts` 322 行，把日期解析、時間運算、reaction 文字渲染、附件組裝與 command class 全塞一檔；`inspect_member_ids`(172)、`emoji_frequency`(161)、`ai_settings`(158) 也偏長。一次性全拆會做出無價值的抽取；不處理則新進 handler 會繼續仿效。本項用「示範 + 規則 + 自動化 enforce」三件套同時收斂。
+### 4.1 必做的程式 / 設定清理
 
-### 7.2 要達成什麼
+下列為發行前必須完成的處理，與文件改寫同層級，不可省略。每項皆為小幅、低風險、可獨立 revert。
 
-#### A. 4 個示範拆分
+1. **移除已死的 `lint:legacy` / `typecheck:legacy` scripts**（`package.json`）——strict 模式已覆蓋全 `src/`，legacy gate 純為噪音。
+2. **對齊 Node 版本至 `>=22.13.0`**——以 `.nvmrc` 為唯一權威：`package.json` `engines.node` 已是 `>=22.13.0`，需將 `CONTRIBUTING.md` 與其餘文件文字一併對齊；CI workflow 若有 `node-version: 20` 殘留亦需修正。
+3. **填寫 `package.json` `description`**——目前為 `""`；以一行說明專案性質（例：`Multi-bot Discord framework on TypeScript, Discord.js and MongoDB, with a layered plugin architecture and bilingual i18n.`）。
+4. **顯式採用 SemVer 發行**——本次刻意將 `version` 升為 `1.0.0` 並建立對應 `v1.0.0` git tag；目前 `1.0.0` 但無 tag。tag 於合併至 `main` 後同 commit 內建立。
+5. **`package.json` 補上 `keywords`**——`discord-bot`、`discord.js`、`typescript`、`mongodb`、`plugin-architecture`、`i18n`、`llm`、`openai`、`anthropic`、`gemini`。即使不發佈至 npm，亦有助 GitHub topics 自動填入。
+6. **每個 bot 確認 `config.example.json` 存在**——`src/bot/<name>/`（`nijika` / `konata` / `tomori` / `msg-archive`）之下皆需提供範例設定；真實 `config.json` 維持 `.gitignore`。範例需涵蓋 `guilds`、`channels`、`roles`、`commands` 四欄並以假 ID 填充。`README.md` 與 `CONTRIBUTING.md` 的快速開始皆需指向此範例檔。
 
-對 `db_list_message` / `inspect_member_ids` / `emoji_frequency` / `ai_settings` 抽出 pure helper 至同目錄獨立模組；`index.ts` 只留 Discord I/O、權限檢查、Translator 呼叫、回覆組裝。每個抽出的 helper 應可獨立單元測試。具體模組劃分由 R4 的 design 文件決定，但成果應使這 4 個 `index.ts` 都低於下一節的行數門檻。
+7. **`BaseBot.guildInfo` 收斂為唯讀 API**——v1.0.0 為首次公開發行，趁此一次完成 API 收斂，避免發行後再做 breaking change。
 
-#### B. 規範
+   **設計**：
 
-寫入以下文件：
+   - 將 [src/bot/index.ts](../src/bot/index.ts) 內的 `public guildInfo: Record<string, GuildInfo> = {}` 替換為私有 `#guildInfo: Map<string, GuildInfo>`（class field 私有語法，TS 對外即不可見）。
+   - 新增三個公開 getter，作為唯一對外讀取面：
 
-- `CLAUDE.md`
-- `CONTRIBUTING.md`
-- `.claude/skills/project-conventions/SKILL.md`
-- `.claude/skills/coding-standards/SKILL.md`
+     ```ts
+     /** Look up one guild's info. Returns undefined when unregistered. */
+     public getGuildInfo(guildId: string): Readonly<GuildInfo> | undefined;
 
-規範要點：
+     /** Readonly view over every registered guild. */
+     public getAllGuildInfo(): ReadonlyMap<string, Readonly<GuildInfo>>;
 
-1. `src/handlers/<type>/<name>/index.ts` 行數上限 **150 行**（含 import、含 JSDoc）。
-2. 超過上限的 pure helper（純函式、不依賴 Discord 物件）必須抽到同目錄獨立檔。
-3. 不可為了壓縮行數而把 Discord I/O / 權限檢查 / Translator 呼叫拆出 `index.ts`——這些是 handler 的本職。
-4. 抽出的 helper 須有對應單元測試。
-5. 新 handler 寫作時即套用此規則，不留「未來再說」空間。
+     /** Convenience accessor for the common case of just needing repos. */
+     public getRepos(guildId: string): Repos | undefined;
+     ```
 
-#### C. ESLint enforce
+     回傳型別以 `Readonly<GuildInfo>` 與 `ReadonlyMap` 阻擋外部寫入。
+   - [src/bot/index.ts](../src/bot/index.ts) 內的 `GuildInfo` interface 全欄位加上 `readonly`：
 
-`eslint.config.mjs` 加 `max-lines-per-file` 規則，僅針對 `src/handlers/**/*.ts`，上限 150 行，違規 error。
+     ```ts
+     export interface GuildInfo {
+         readonly bot_name: string;
+         readonly guild: Guild;
+         readonly channels?: Readonly<Record<string, Channel>>;
+         readonly roles?: Readonly<Record<string, Role>>;
+         readonly repos?: Repos;
+     }
+     ```
 
-### 7.3 不做什麼
+     `Repos` 由 `buildRepos(connection)` 產生且本身為 readonly bundle，自然滿足條件。
+   - 寫入面僅留給 `BaseBot` 自身：新增私有 method `#setGuildInfo(guildId, info)` 與 `#attachRepos(guildId, repos)`，供 `handleClientReady`（吸收 `GuildRegistrar.registerAll` 結果）與 `GuildDbConnector` 寫回 repos 使用。`GuildDbConnector.connectOne` 由原本「直接 mutate `slot.repos`」改為「回傳 `Repos`，由 BaseBot 透過 `#attachRepos` 寫入」，保持 R1 collaborator 的單一職責邊界。
+   - `GuildRegistrar.registerAll` 維持回傳 `Record<string, GuildInfo>`（或改為 `Map`，依實作便利擇一），BaseBot 在 `handleClientReady` 將其重灌入私有 Map。
+   - [src/core/guild-registry.ts](../src/core/guild-registry.ts) 的 `getRepos` / `getChannel` / `getRole` / `listGuildIds` 改建構於新的 readonly 視圖之上。對 plugin 端無 API 變動（plugin 一向透過 `GuildRegistry` 取資料）。
 
-- 不對 `src/handlers/**` 全樹做一次性掃蕩拆分；除示範的 4 個 + 任何被門檻擋下的之外，其他自然觸碰時再順手收斂。
-- 不對 plugin / core / persistence 套用同一行數門檻——這些層的「行數=複雜度」對應關係不同。
-- 不引入 cyclomatic complexity 或函式長度等其他 ESLint 規則——範圍蔓延風險。
+   **Callsite 遷移**：
 
-### 7.4 驗收（質化）
+   - 以 `grep -rE "bot\.guildInfo(\[|\.)" src/ test/` 列出所有讀取點，逐一改為對應 getter：
+     - `bot.guildInfo[guildId]` → `bot.getGuildInfo(guildId)`
+     - `bot.guildInfo[guildId]?.repos` → `bot.getRepos(guildId)`
+     - `Object.keys(bot.guildInfo)` / `Object.values(...)` → `bot.getAllGuildInfo().keys()` / `.values()`
+     - `for...in bot.guildInfo` → `for (const [guildId, info] of bot.getAllGuildInfo())`
+   - 主要影響檔案預估：`src/handlers/commands/**`（registries、權限檢查）、`src/bot/client-event-bridge.ts`、`src/bot/guild-onboarding.ts`、`src/handlers/require-guild-repos.ts`。TS strict mode 會把所有殘留點亮出來，不靠 grep 也可完整定位。
+   - `test/` 內以 mock 方式構造 BaseBot 的 fixture 一併更新（多半位於 [test/integration/bot/](../test/integration/bot/) 與 [test/unit/handlers/](../test/unit/handlers/)）。
 
-- 4 個示範 handler 的 `index.ts` 全部低於 150 行；抽出的 helper 各自有單元測試。
-- 行為位元等價：handler 既有測試全綠。
-- `max-lines-per-file` 規則在所有現存（含未列為示範的）`src/handlers/**` 都過——若有現有超標檔，於同一輪一併處理或於 PR description 明列 follow-up。
-- 規範文字在四份文件中內容一致，未來再修一處可順手檢查其餘三處。
+   **不留 deprecation alias**——v1.0.0 為首次公開發行，無外部既存使用者，舊欄位直接移除；不在 BaseBot 上保留 `get guildInfo()` 的相容性 getter（避免兩套 API 並存增加維護面）。
 
----
+   **`CHANGELOG.md` 紀錄**——於 `v1.0.0` 條目以「Initial public release」框架描述當下 API 即可；不需特別標註 breaking，因不存在「之前的公開版本」。
 
-## 8. R5 — i18n catalog 路徑反耦合
+   **測試**——新增 `test/unit/bot/guild-info-accessors.test.ts`，覆蓋三條 getter 的 hit / miss 路徑與唯讀型別簽章；既有 integration 測試依新 API 改寫。
 
-### 8.1 動機
+   **預估規模**——約 15–25 個 callsite，集中於 `src/handlers/` 與 `src/bot/`；單一 PR 可完成。reviewer 派遣：architecture-reviewer（API 表面變動）+ type-system-reviewer（readonly 型別正確性）+ test-architect（測試覆蓋）。
 
-`src/core/i18n/catalog-loader.ts` 的 `DEFAULT_LOCALES_DIR` 仍以
-`path.resolve(__dirname, '..', '..', 'i18n', 'locales')` 硬編碼指向 `src/i18n/locales`。
-這代表 `core/i18n` 知道內容層（`src/i18n/locales`）的目錄位置——是 core → content 的反向耦合，違反 core 不應感知下游層的分層契約。`src/interface` → `src/i18n` 改名雖已修字面，但耦合本身未解。
+### 4.2 防衛性審視（僅調查，不承諾修改）
 
-### 8.2 要達成什麼
+下列項目在發行前再看一眼；若調查確認無問題，記錄判定後即可。
 
-把「內容層在哪裡」的知識從 core 搬到 composition root：
+1. **`BaseBot` 644 行**（[src/bot/index.ts](../src/bot/index.ts)）——尚在專業範圍內但已接近邊界。候選抽出：IoC bootstrap 段（行 235–290 + `setupContainer`）改為 `BaseBotContainerBootstrap` collaborator。判定：除非檔案再長，否則維持現狀；記錄此門檻。
+2. **`MongoConnectionManager` 496 行**（[src/infra/mongo/connection-manager.ts](../src/infra/mongo/connection-manager.ts)）——涵蓋連線、retry / backoff、降級、lifecycle。檢查各責任的測試是否覆蓋公開合約；若再長則拆出 retry policy。判定：v1.0.0 不動。
+3. ~~`bot.guildInfo[guildId].repos` API 收斂~~——**已升至 §4.1 第 7 點，納入 v1.0.0 範圍**。
+4. **`src/` 內三處 `any` 使用**——
+   - [src/infra/llm/error-translator.ts:74](../src/infra/llm/error-translator.ts#L74) — 收斂外部 SDK 錯誤；合法。
+   - [src/core/plugin/event-dispatcher.ts:76](../src/core/plugin/event-dispatcher.ts#L76) — 出現在註解內，非程式碼。
+   - [src/plugins/llm-chat/plugin.ts:121](../src/plugins/llm-chat/plugin.ts#L121) — `type AnyLlmProviderError = LlmProviderError<any>` 作為 supertype；合法。確認無誤後可補上 `// eslint-disable-line @typescript-eslint/no-explicit-any` 與理由註解。
+5. **`docs/wiki/components/` 內容漂移**——頁面於 R 工作期間由 `update-wiki` skill 更新，發行前掃一遍，確保描述當下行為而非歷史快照。
 
-- `LoadCatalogOptions.localesDir` 改為**必填**；移除 `DEFAULT_LOCALES_DIR`。
-- `createDefaultTranslator` 簽名改為必須接收 `localesDir: string`。
-- 每個 composition root（`src/bot/{nijika,konata,tomori,msg-archive}/index.ts`）負責計算自己的 `localesDir`，以 `path.resolve(__dirname, ...)` 自行往上推到 `src/i18n/locales`。`bot/*` 屬於合成根，知道自己的部署佈局是合理的。
-- 既有 test fixture 已顯式注入 `localesDir`，不受影響。
+### 4.3 不在範圍內
 
-### 8.3 不做什麼
-
-- 不引入新的設定檔（如 `i18n.config.json`）來描述 locale 位置——`path.resolve` 已足夠。
-- 不改 catalog 內容、不改 catalog 結構、不改 i18next 設定。
-
-### 8.4 驗收（質化）
-
-- `grep -rn "'i18n'" src/core` 結果為空——core 不再字面提及內容層目錄。
-- `LoadCatalogOptions` 的 `localesDir` 屬性型別不再 optional；呼叫端如未注入路徑會在編譯期被擋。
-- 既有 catalog completeness 測試 / i18n 整合測試全綠。
-
----
-
-## 9. R6 — 低優先單點清理
-
-R6 是分散的小修正集合；每一子項皆獨立可驗證、互不相依。本輪一次做完，徹底結清「審閱出來的低優先項」。
-
-### R6.1 `traceId` 隨機性升級
-
-- 位置：`src/bot/index.ts:902`（router middleware 內）。
-- 現況：`Math.random().toString(36).slice(2, 10)`。
-- 修正：`crypto.randomUUID().slice(0, 8)`（或完整 UUID，視觀感）。
-- 動機：高負載下 `Math.random()` 重複機率不可忽略，會讓 traceId 失去唯一性的本意；切換到 `crypto.randomUUID()` 是 Node 內建、零依賴。
-- 驗收：traceId 來源呼叫 `crypto.randomUUID`；既有相關測試（如 router-dispatch 整合測試）綠。
-
-### R6.2 `login()` 失敗應 reject
-
-- 位置：`src/bot/index.ts:619-634`。
-- 現況：`client.login(...).catch(err => log)`；失敗僅記錄，方法仍 resolve；`run()` 後續流程靠 `!this.client.user` guard 阻擋。
-- 修正：`await client.login(...)`，catch 改為 re-throw；`run()` 在登入失敗即中止。
-- 動機：登入失敗是不可恢復狀態；繼續走 `startAll()` 只會放大錯誤面、污染 log、留下半啟動狀態的 bot。
-- 驗收：login 失敗時 `run()` 的 promise reject；單元測試（mock client.login 失敗）覆蓋此分支。
-
-### R6.3 殘餘 `console.*` 清除
-
-- 位置：`grep -rn 'console\.' src` 仍有約 25 處。
-- 修正：改用 `bot.logger.info / warn / error`；對啟動前（logger 尚未就位）的呼叫，使用 `createBootstrapLogger()`。
-- 動機：與「結構化 logger 為唯一輸出」的標準對齊，避免日誌格式分裂。
-- 驗收：`grep -rn 'console\.' src --include='*.ts'` 結果為空（或全為刻意保留的 stderr fallback，並加上 i18n-ignore 等價的解釋註解）；`eslint` 的 `no-console` 規則對 `src/` 開為 `error`。
-
-### R6.4 `BaseBot` 命名一致化
-
-- 位置：`src/bot/index.ts` 與下游呼叫端。
-- 現況：
-  - `commandHandlers`（複數）vs `buttonHandler` / `modalHandler` / `ssmHandler` / `reactionHandler`（單數），同樣都是 `Map`。
-  - `help_msg` / `guild_num` / `debug_ch` 等 snake_case 區域 / 欄位變數混在 camelCase 中。
-- 修正：
-  - 全部 Handler Map 統一為**複數命名**（如 `buttonHandlers`、`modalHandlers`、`ssmHandlers`、`reactionHandlers`）。
-  - snake_case 變數改為 camelCase（`helpMessage`、`guildCount`、`debugChannel`）。
-- 動機：handler、subclass、test 端搜尋與閱讀的認知負擔。
-- 注意：屬 breaking change，須於 R1（同分支內）一併同步下游呼叫端；建議在 R1 commit 之後、R6.4 之前先讓 R1 落地，再做命名統一以縮小一次性 diff。
-- 驗收：所有 Handler Map 命名一致；命名規則寫入 CLAUDE.md 的「命名」段落。
-
-### R6.5 `src/bot/index.ts` import 中間夾執行碼搬移
-
-- 位置：`src/bot/index.ts:31-38`，`sharedConnectionManagers` map 與 helper 函式夾在兩段 import 之間。
-- 修正：把所有 `import` 移到檔案最上方（在 R1 拆解時順手處理）；`sharedConnectionManagers` 與 helper 放到 import 區段之後的第一個非 import 程式碼處。
-- 動機：閱讀順序符合慣例；某些工具（auto-sort、bundler）對 interleaved import 行為不穩。
-- 驗收：`eslint` 的 `import/first` 或 `import/order` 規則對 `src/bot/index.ts` pass；視覺上 import 區段連續。
+- 不做架構重構。架構本身即為交付物。
+- 不加新特性。
+- 不升 dependency。發行後另開維運 PR 處理。
+- 不擴充 i18n locale（維持現有 `zh-TW` + `en`）。
 
 ---
 
-## 10. 跨切議題
+## 5. 風險與 rollback
 
-### 10.1 測試策略
+| 風險                                                | 緩解                                                                                                                              |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 文件改寫與程式碼行為脫節                            | `README.md` / `CONTRIBUTING.md` 中每項主張皆引用具體程式路徑，並對照 live tree 審視                                               |
+| 刪除 `docs/design/` 流失設計理據                    | 將 load-bearing 理據蒸餾至 `docs/architecture.md`。R / D / G 對應表本身為內部使用，對使用者非 load-bearing                        |
+| Branch 刪除不可逆                                   | 列為 merge 至 `main` 後最終步驟，並需明確再確認；確認前遠端 branch 不動                                                            |
+| `package.json` `engines` 變更影響下游               | engines 維持 `>=22.13.0`；僅修正 `CONTRIBUTING.md` 文字                                                                            |
+| GitHub Wiki 已有的外部連結因 `docs/wiki/` 改寫而斷  | `docs/wiki/` 落在 repo 內，同 PR 一併更新內部連結                                                                                  |
 
-- R1 開始前先補 contract / integration 測試（見 4.3）。
-- 既有 431 個測試在每一項 R 完成後皆需全綠；不允許跳過或標記 `.skip`。
-- R2 / R4 / R6.1 / R6.2 自然會新增單元測試；R3 / R5 / R6.3 / R6.4 / R6.5 不需新增（純 import 路徑替換、純 ESLint、純命名 / 排序）。
-
-### 10.2 i18n / 文件影響
-
-- R1–R6 不新增 i18n key；不刪 i18n key。
-- R3、R4、R6.4 會修 CLAUDE.md / CONTRIBUTING.md / 兩個 SKILL.md；R1 / R2 若涉及 plugin contract 變動，亦同步 SKILL.md。
-- `docs/wiki/` 在每項 R 完成後依 `update-wiki` skill 同步。
-
-### 10.3 風險與緩解
-
-| 項目 | 風險 | 緩解                                                                             |
-| ---- | ---- | -------------------------------------------------------------------------------- |
-| R1   | 高   | 4.3 的 contract 測試先補；BaseBot 改動分小步 commit；每步通過 quality gates 再續 |
-| R2   | 中   | `ctx.registerInstance` 限制只在 `init` 呼叫，搭配 host 階段檢查 + 單元測試       |
-| R3   | 低   | 純 import 替換；ESLint 一啟用即可發現遺漏                                        |
-| R4   | 低   | 純函式抽取；ESLint 門檻可在 PR 內逐檔調整                                        |
-| R5   | 低   | 介面收窄，呼叫端編譯期報錯即可發現遺漏                                           |
-| R6.1 | 低   | Node 內建；既有測試覆蓋呼叫點                                                    |
-| R6.2 | 中   | 改變 `run()` 失敗語意；須補 mock 失敗的整合測試，避免運維端錯愕                  |
-| R6.3 | 低   | 純替換；可分檔次 commit                                                          |
-| R6.4 | 中   | breaking change 面廣；搭配 R1 在同分支內一次到位，避免長期不一致                 |
-| R6.5 | 低   | 純排序                                                                           |
-
-### 10.4 退場條件
-
-- `docs/codebase-review-2026-05.md` 第 2 / 6 節列出的全部高 / 中 / 低優先項目皆畫線完成。
-- `architecture-reviewer` 對最終分支做 Audit，verdict 為 PASS。
-- `reliability-reviewer` 對 R1 / R2 / R6.2 做 Audit，verdict 為 PASS。
-- 全部 quality gate（typecheck / lint / test / format / knip / security / handlers:gen:check）綠。
+Rollback：所有變更皆為 branch 上的一般 git commit。無任何行為性改動會在缺乏對應測試通過的情況下提交。回滾以 `git revert <sha>` 即可。
 
 ---
 
-## 11. 不涵蓋（明確排除）
+## 6. 執行計畫（本 proposal 通過後）
 
-- **新功能 / 新 plugin / catalog 內容變動**。
-- **DI 框架替換、ORM 替換、i18n library 替換**——本提案不評估、不替換。
-- **CI / CD pipeline 改造、依賴升級、Node 版本變更**。
-- **公開對外契約**（HTTP webhook 路由、Discord 指令簽名 / 名稱、i18n catalog key）——本提案不動。
-- **TTS 功能**——已於前一輪移除，本提案不重新引入。
-- **將 `refactor/architecture-overhaul` 合入 `main`**——main 凍結 / branch protection 屬另一條工作流，非本輪 scope。
+依序排列，每步綠燈後再進下一步：
+
+1. **刪除內部工程文件**（`docs/tasks/`、`docs/design/`、`docs/design.md`、`docs/codebase-review-2026-05.md`、`docs/revision.md`、舊版 `docs/proposal.md` 已由本文件覆寫、舊版 `docs/high-level-design.md`）。
+2. **撰寫 `docs/architecture.md`**（取代 `high-level-design.md`）。
+3. **重寫 `README.md`** 依 §3.4。
+4. **重寫 `CONTRIBUTING.md`** 依 §3.5。
+5. **重寫 `CLAUDE.md`** 依 §3.6。
+6. **更新 `docs/wiki/Home.md` + `docs/wiki/CHANGELOG.md` + `docs/wiki/components/*.md`**。
+7. **新增 `SECURITY.md`、`CODE_OF_CONDUCT.md`、`CHANGELOG.md`（根目錄）**。
+8. **改寫 `.claude/` agents 與 skills** 依 §3.7——刪除 `tech-debt-orchestrator.md`、`r-implementer.md`、`r-task-workflow` skill；改寫六個 reviewer agents 與三個保留 skills；新增 `contribute-change` skill 與 `change-implementer` agent。
+9. **執行 §4.1 程式碼清理**（含第 7 項 `BaseBot.guildInfo` 收斂為唯讀 API 的全 callsite 遷移與測試更新）。
+10. **跑完整 quality-gate suite**（`yarn typecheck && yarn lint && yarn test && yarn format:check && yarn handlers:gen:check && yarn knip && yarn security`），全綠。
+11. **將 `refactor/architecture-overhaul` 合併至 `main` 作為 v1.0.0**，打 release tag。
+12. **刪除過時 branches**（§3.8），於明確再確認後執行。
+
+每個步驟為獨立 commit；步驟 1–8 可由審閱者裁量併入單一 PR 或拆為小 PR 序列。
 
 ---
 
-## 12. 後續
+## 7. 決議事項
 
-R1–R6 完成、本提案分支合入 `refactor/architecture-overhaul` 後：
+審閱階段已確認的決定：
 
-1. 推進 `refactor/architecture-overhaul` 對齊 `main` 的合併策略討論（涉及 main 凍結 / branch protection）。
-2. 本提案的退場數據（`BaseBot` 最終 LOC、新增測試數、ESLint enforce 範圍、`console.*` 殘留數）寫入 `docs/wiki/CHANGELOG.md`。
-3. 評估是否啟動下一輪審閱（建議在 R1–R6 落地至少 4 週後，讓真實 maintenance / feature 工作驗證新結構），若有新技術債再行循環。
+| 項目                          | 決議                                                                                                                          |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `package.json` `author`       | **維持** `"ACaccel, rbt4168"`，不於 v1.0.0 更動                                                                              |
+| `SECURITY.md` 通報管道        | **採 GitHub Security Advisory（GHSA）**——於 SECURITY.md 提供 GHSA 開單連結與 72 小時初步回應 / 90 天責任揭露時程             |
+| 是否發佈至 npm                | **不發佈**——`package.json` 維持 `"private": true`，發行型態僅為 GitHub source release + git tag                              |
+| Voice + ffmpeg 拆 optional peer | **延後**——v1.0.0 不動 `dependencies`；列入發行後待辦，於下一個 minor 評估                                                 |
+| 公開文件語言                  | **頂層文件統一英文**——`README.md` / `CONTRIBUTING.md` / `CLAUDE.md` / `docs/architecture.md` / `SECURITY.md` / `CODE_OF_CONDUCT.md` / `CHANGELOG.md` / `docs/wiki/**` / `.claude/agents/**` / `.claude/skills/**` 皆英文撰寫；不維護中文鏡像 |
+
+i18n catalog（`src/i18n/locales/zh-TW/`、`en/`）為**程式產品內容**而非文件，仍維持雙語並由 i18n parity gate 把關，不在「文件統一英文」範圍內。
