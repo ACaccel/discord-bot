@@ -17,20 +17,20 @@ Codebase 已達且多處超出商業標準。R1–R6 技術債清理（已併入
 
 已正確套用的 pattern 與代表位置：
 
-| Pattern                              | 位置                                                                                                                |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| Clean / 分層架構                     | `core → persistence/infra → handlers/plugins → bot`，ESLint 強制依賴方向                                            |
-| 手寫 IoC container（typed tokens）   | [src/core/ioc/container.ts](../src/core/ioc/container.ts)（約 280 行，無 `reflect-metadata`）                        |
-| Plugin / Host（lifecycle + dispatcher）| [src/core/plugin/](../src/core/plugin/) — 拓樸序註冊、`Promise.allSettled` 事件隔離                                |
-| Chain of Responsibility（middleware）| [src/core/plugin/interaction-router.ts](../src/core/plugin/interaction-router.ts) + [src/bot/middlewares.ts](../src/bot/middlewares.ts) |
-| Strategy（LLM providers）            | [src/infra/llm/](../src/infra/llm/) — OpenAI / Anthropic / Gemini / xAI 共用單一介面                                |
-| Repository pattern                   | [src/persistence/repositories/](../src/persistence/repositories/) — interface + `Mongo<X>Repo`                      |
-| Adapter                              | [src/bot/client-event-bridge.ts](../src/bot/client-event-bridge.ts) — discord.js 事件 → router / dispatcher         |
-| Factory（plugin / repo bundle）      | `createXxxPlugin(rawConfig)`、`buildRepos(connection)`                                                              |
-| Result / Either                      | [src/core/result/](../src/core/result/)                                                                             |
-| Branded primitive types              | [src/core/ids.ts](../src/core/ids.ts)（GuildId、ChannelId 等）                                                       |
-| 結構化錯誤樹                         | [src/core/errors/](../src/core/errors/) — `DomainError` taxonomy 並以 `messageKey` 串接 i18n                        |
-| Singleton pool                       | Process 範圍 `MongoConnectionManager`，以 URI 為 key（[src/bot/index.ts:88](../src/bot/index.ts#L88)）                |
+| Pattern                                 | 位置                                                                                                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Clean / 分層架構                        | `core → persistence/infra → handlers/plugins → bot`，ESLint 強制依賴方向                                                                |
+| 手寫 IoC container（typed tokens）      | [src/core/ioc/container.ts](../src/core/ioc/container.ts)（約 280 行，無 `reflect-metadata`）                                           |
+| Plugin / Host（lifecycle + dispatcher） | [src/core/plugin/](../src/core/plugin/) — 拓樸序註冊、`Promise.allSettled` 事件隔離                                                     |
+| Chain of Responsibility（middleware）   | [src/core/plugin/interaction-router.ts](../src/core/plugin/interaction-router.ts) + [src/bot/middlewares.ts](../src/bot/middlewares.ts) |
+| Strategy（LLM providers）               | [src/infra/llm/](../src/infra/llm/) — OpenAI / Anthropic / Gemini / xAI 共用單一介面                                                    |
+| Repository pattern                      | [src/persistence/repositories/](../src/persistence/repositories/) — interface + `Mongo<X>Repo`                                          |
+| Adapter                                 | [src/bot/client-event-bridge.ts](../src/bot/client-event-bridge.ts) — discord.js 事件 → router / dispatcher                             |
+| Factory（plugin / repo bundle）         | `createXxxPlugin(rawConfig)`、`buildRepos(connection)`                                                                                  |
+| Result / Either                         | [src/core/result/](../src/core/result/)                                                                                                 |
+| Branded primitive types                 | [src/core/ids.ts](../src/core/ids.ts)（GuildId、ChannelId 等）                                                                          |
+| 結構化錯誤樹                            | [src/core/errors/](../src/core/errors/) — `DomainError` taxonomy 並以 `messageKey` 串接 i18n                                            |
+| Singleton pool                          | Process 範圍 `MongoConnectionManager`，以 URI 為 key（[src/bot/index.ts:88](../src/bot/index.ts#L88)）                                  |
 
 **程式碼層級的小幅改善**列於 §4，皆為選擇性；無一項阻擋發行。
 
@@ -80,40 +80,40 @@ Codebase 已達且多處超出商業標準。R1–R6 技術債清理（已併入
 
 `docs/` 之下：
 
-| 路徑                                  | 理由                                                                       |
-| ------------------------------------- | -------------------------------------------------------------------------- |
-| `docs/proposal.md`（舊版）            | Architecture overhaul 需求規格——已被本文件與新版發行文件取代               |
-| `docs/high-level-design.md`           | Refactor 演進敘事——重點蒸餾為新版 `docs/architecture.md`                   |
-| `docs/design.md`                      | `docs/design/R*.md` 的索引——已過時                                         |
-| `docs/design/`（整個目錄）            | R1–R6 實作骨架與 `gaps.md`——純內部工程                                     |
-| `docs/tasks/`（整個目錄）             | R1–R6 task checklist 與 `progress.md`——純內部工程                          |
-| `docs/codebase-review-2026-05.md`     | 啟動本次清理的審閱報告——歷史性                                             |
-| `docs/revision.md`                    | 階段性修訂計畫——歷史性                                                     |
+| 路徑                              | 理由                                                         |
+| --------------------------------- | ------------------------------------------------------------ |
+| `docs/proposal.md`（舊版）        | Architecture overhaul 需求規格——已被本文件與新版發行文件取代 |
+| `docs/high-level-design.md`       | Refactor 演進敘事——重點蒸餾為新版 `docs/architecture.md`     |
+| `docs/design.md`                  | `docs/design/R*.md` 的索引——已過時                           |
+| `docs/design/`（整個目錄）        | R1–R6 實作骨架與 `gaps.md`——純內部工程                       |
+| `docs/tasks/`（整個目錄）         | R1–R6 task checklist 與 `progress.md`——純內部工程            |
+| `docs/codebase-review-2026-05.md` | 啟動本次清理的審閱報告——歷史性                               |
+| `docs/revision.md`                | 階段性修訂計畫——歷史性                                       |
 
 Wiki 清理（`docs/wiki/`）：
 
-| 路徑                          | 動作                                                                                                                       |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `docs/wiki/CHANGELOG.md`      | 改寫為以發行版為錨點的 changelog（`v1.0.0 — initial public release`），刪除目前全部 24 筆 R / D / G 標籤條目              |
-| `docs/wiki/Home.md`           | 改寫：移除指向 `docs/tasks/README.md`、`docs/design/gaps.md`、`engineering-orchestrator` 的連結與「元件完成度」表，保留元件地圖 |
-| `docs/wiki/components/C*.md`  | 逐頁審視，移除進行中工程、R 標籤、agent 名稱等引用，重新聚焦於「該元件當下做什麼」                                          |
+| 路徑                         | 動作                                                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/wiki/CHANGELOG.md`     | 改寫為以發行版為錨點的 changelog（`v1.0.0 — initial public release`），刪除目前全部 24 筆 R / D / G 標籤條目                    |
+| `docs/wiki/Home.md`          | 改寫：移除指向 `docs/tasks/README.md`、`docs/design/gaps.md`、`engineering-orchestrator` 的連結與「元件完成度」表，保留元件地圖 |
+| `docs/wiki/components/C*.md` | 逐頁審視，移除進行中工程、R 標籤、agent 名稱等引用，重新聚焦於「該元件當下做什麼」                                              |
 
 ### 3.2 應重寫的文件
 
-| 路徑              | 改寫範圍                                                                                                                |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `README.md`       | 全面重寫——見 §3.4。目前內容描述 refactor 前的 `commands/` 結構，具誤導性                                                |
+| 路徑              | 改寫範圍                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `README.md`       | 全面重寫——見 §3.4。目前內容描述 refactor 前的 `commands/` 結構，具誤導性                                                             |
 | `CONTRIBUTING.md` | 大幅重寫——見 §3.5。移除 R 標籤、`engineering-orchestrator`、auto-merge 政策、`refactor/architecture-overhaul` 相關內容，中文段落英譯 |
-| `CLAUDE.md`       | 重新定位為「協助社群貢獻者的 AI 助理視角」——見 §3.6。刪除整段「Active engineering: Tech-Debt Cleanup (R1–R6)」與文件鏈引用 |
+| `CLAUDE.md`       | 重新定位為「協助社群貢獻者的 AI 助理視角」——見 §3.6。刪除整段「Active engineering: Tech-Debt Cleanup (R1–R6)」與文件鏈引用           |
 
 ### 3.3 應新增的 OSS 標準文件
 
-| 路徑                    | 用途                                                                                                                          |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `CHANGELOG.md`（根目錄）| Keep-a-Changelog 格式。`v1.0.0 — YYYY-MM-DD` 含特性摘要                                                                       |
-| `SECURITY.md`（根目錄） | 支援版本、漏洞通報管道（建議採 GitHub Security Advisory）、責任揭露時程                                                       |
-| `CODE_OF_CONDUCT.md`    | Contributor Covenant 2.1——標準 OSS 預期                                                                                       |
-| `docs/architecture.md`  | 取代 `high-level-design.md`。單頁架構總覽：分層、關鍵抽象、request flow、plugin lifecycle。讀者＝評估或擴充本 bot 的開發者     |
+| 路徑                     | 用途                                                                                                                       |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `CHANGELOG.md`（根目錄） | Keep-a-Changelog 格式。`v1.0.0 — YYYY-MM-DD` 含特性摘要                                                                    |
+| `SECURITY.md`（根目錄）  | 支援版本、漏洞通報管道（建議採 GitHub Security Advisory）、責任揭露時程                                                    |
+| `CODE_OF_CONDUCT.md`     | Contributor Covenant 2.1——標準 OSS 預期                                                                                    |
+| `docs/architecture.md`   | 取代 `high-level-design.md`。單頁架構總覽：分層、關鍵抽象、request flow、plugin lifecycle。讀者＝評估或擴充本 bot 的開發者 |
 
 ### 3.4 `README.md` 改寫大綱
 
@@ -183,21 +183,21 @@ Wiki 清理（`docs/wiki/`）：
 
 **應刪除的 agents**（R 清理專用，無通用價值）：
 
-| 路徑                                          | 理由                                                                                                                          |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `.claude/agents/tech-debt-orchestrator.md`    | R1–R6 領隊 agent；引用 `docs/tasks/progress.md` 與 `r-implementer`。發行後 repo 無對應流程。                                  |
-| `.claude/agents/r-implementer.md`             | R item worker agent；讀取 `docs/tasks/R<N>.md`（將刪）與 `docs/design/R<N>.md`（將刪），無法獨立運作。                       |
+| 路徑                                       | 理由                                                                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `.claude/agents/tech-debt-orchestrator.md` | R1–R6 領隊 agent；引用 `docs/tasks/progress.md` 與 `r-implementer`。發行後 repo 無對應流程。           |
+| `.claude/agents/r-implementer.md`          | R item worker agent；讀取 `docs/tasks/R<N>.md`（將刪）與 `docs/design/R<N>.md`（將刪），無法獨立運作。 |
 
 **應保留並改寫的 agents**（6 個 reviewer agents——對 repo 任何 PR 審查皆適用）：
 
-| 路徑                                                   | 改寫要點                                                                                                                    |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `.claude/agents/architecture-reviewer.md`              | 移除「for the discord-bot refactor」框架，改為描述**當下**的 layer contract（不再寫「R1 decomposes…」）；保留 Consult / Review / Audit 三模式 |
-| `.claude/agents/type-system-reviewer.md`               | 刪除「Heavy use on C1 / C2 / C4 / C5」等 gap tag；保留 strict mode / generics / Result / discriminated union 重點             |
-| `.claude/agents/reliability-reviewer.md`               | 刪除「Heavy use on C5（D5 …）、C8（reboot async correctness）、C3（plugin lifecycle ordering）」；改述為「適用於任何牽涉 retry / lifecycle / partial failure 的變更」 |
-| `.claude/agents/test-architect.md`                     | 刪除 R / D / G 引用；改述為當下 test project 布局（unit / integration / contract / i18n）                                     |
-| `.claude/agents/config-and-security-reviewer.md`       | 刪除「silent-pass detection」等審計期語言；保留 audit-ci / gitleaks / secret-redaction 範疇                                  |
-| `.claude/agents/i18n-discipline-reviewer.md`           | 刪除「Heavy use on C6 / C7（gaps D7、D9）」；改述為「永久啟用的 CJK scanner + 雙語 catalog 不變式」                          |
+| 路徑                                             | 改寫要點                                                                                                                                                              |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/agents/architecture-reviewer.md`        | 移除「for the discord-bot refactor」框架，改為描述**當下**的 layer contract（不再寫「R1 decomposes…」）；保留 Consult / Review / Audit 三模式                         |
+| `.claude/agents/type-system-reviewer.md`         | 刪除「Heavy use on C1 / C2 / C4 / C5」等 gap tag；保留 strict mode / generics / Result / discriminated union 重點                                                     |
+| `.claude/agents/reliability-reviewer.md`         | 刪除「Heavy use on C5（D5 …）、C8（reboot async correctness）、C3（plugin lifecycle ordering）」；改述為「適用於任何牽涉 retry / lifecycle / partial failure 的變更」 |
+| `.claude/agents/test-architect.md`               | 刪除 R / D / G 引用；改述為當下 test project 布局（unit / integration / contract / i18n）                                                                             |
+| `.claude/agents/config-and-security-reviewer.md` | 刪除「silent-pass detection」等審計期語言；保留 audit-ci / gitleaks / secret-redaction 範疇                                                                           |
+| `.claude/agents/i18n-discipline-reviewer.md`     | 刪除「Heavy use on C6 / C7（gaps D7、D9）」；改述為「永久啟用的 CJK scanner + 雙語 catalog 不變式」                                                                   |
 
 六個 reviewer 共同要求：
 
@@ -208,29 +208,29 @@ Wiki 清理（`docs/wiki/`）：
 
 **應刪除的 skills**：
 
-| 路徑                                         | 理由                                                                                                                          |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `.claude/skills/r-task-workflow/SKILL.md`    | 整個 skill 描述如何執行 `docs/tasks/R<N>.md` 任務；發行後無 R 任務存在                                                       |
+| 路徑                                      | 理由                                                                   |
+| ----------------------------------------- | ---------------------------------------------------------------------- |
+| `.claude/skills/r-task-workflow/SKILL.md` | 整個 skill 描述如何執行 `docs/tasks/R<N>.md` 任務；發行後無 R 任務存在 |
 
 **應保留並改寫的 skills**：
 
-| 路徑                                            | 改寫要點                                                                                                                    |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `.claude/skills/project-conventions/SKILL.md`   | 移除「post-refactor」語感（這就是架構，不是後遺症）；移除 R / D / G 自檢項；加入 `CONTRIBUTING.md` 三條 load-bearing 規則    |
-| `.claude/skills/coding-standards/SKILL.md`      | 已大致通用；修剪指向被刪 `CLAUDE.md`「tech-debt cleanup」段的引用                                                            |
-| `.claude/skills/update-wiki/SKILL.md`           | 刪除「每個 R 完成後」觸發；改述為「任何新增 / 刪除 / 修改程式碼或文件後」；刪除 R 標籤範例                                  |
+| 路徑                                          | 改寫要點                                                                                                                  |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/skills/project-conventions/SKILL.md` | 移除「post-refactor」語感（這就是架構，不是後遺症）；移除 R / D / G 自檢項；加入 `CONTRIBUTING.md` 三條 load-bearing 規則 |
+| `.claude/skills/coding-standards/SKILL.md`    | 已大致通用；修剪指向被刪 `CLAUDE.md`「tech-debt cleanup」段的引用                                                         |
+| `.claude/skills/update-wiki/SKILL.md`         | 刪除「每個 R 完成後」觸發；改述為「任何新增 / 刪除 / 修改程式碼或文件後」；刪除 R 標籤範例                                |
 
 **應新增的 skill**（取代被刪的 `r-task-workflow`）：
 
-| 路徑                                           | 用途                                                                                                                          |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `.claude/skills/contribute-change/SKILL.md`    | 任意變更的通用貢獻流程：理解區域 → 規劃 → 實作 → 對 `coding-standards` + `project-conventions` 自檢 → 跑 quality gates → 更新 wiki + changelog → commit。對應 `CONTRIBUTING.md` 但以 skill 形式存在，Claude Code 於貢獻者開始工作時按需載入 |
+| 路徑                                        | 用途                                                                                                                                                                                                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/skills/contribute-change/SKILL.md` | 任意變更的通用貢獻流程：理解區域 → 規劃 → 實作 → 對 `coding-standards` + `project-conventions` 自檢 → 跑 quality gates → 更新 wiki + changelog → commit。對應 `CONTRIBUTING.md` 但以 skill 形式存在，Claude Code 於貢獻者開始工作時按需載入 |
 
 **應新增的 agent**（取代被刪的 `r-implementer`，提供長期可用的「增刪修改」實作 subagent）：
 
-| 路徑                                       | 用途                                                                                                                          |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `.claude/agents/change-implementer.md`     | 通用實作 agent。接受任意「新增 / 刪除 / 修改」任務（handler、plugin、core、infra、persistence、docs、設定），無領域綁定。內部由載入的 `contribute-change` skill 驅動流程，並依改動所在層挑選相應 reviewer agent（architecture / type-system / reliability / test / config-and-security / i18n）做 Consult / Review。 |
+| 路徑                                   | 用途                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/agents/change-implementer.md` | 通用實作 agent。接受任意「新增 / 刪除 / 修改」任務（handler、plugin、core、infra、persistence、docs、設定），無領域綁定。內部由載入的 `contribute-change` skill 驅動流程，並依改動所在層挑選相應 reviewer agent（architecture / type-system / reliability / test / config-and-security / i18n）做 Consult / Review。 |
 
 `change-implementer` 規格要點：
 
@@ -239,14 +239,14 @@ Wiki 清理（`docs/wiki/`）：
 - **工作流**：載入 `contribute-change` skill → 用 `Read` / `Grep` / `Glob` 理解相關區域 → 列計畫 → 實作 → 對 `coding-standards` 與 `project-conventions` 自檢 → 視動到的層派出對應 reviewer 做 Review → 跑 quality gates 直到全綠 → 視需要更新 wiki / changelog → 產生 commit message → 回報。
 - **Reviewer 派遣表**（agent 內建決策樹，避免主 agent 重複決定）：
 
-  | 改動位置                                            | 必呼叫 reviewer                       |
-  | --------------------------------------------------- | ------------------------------------- |
-  | `src/core/` / `src/bot/` 或新增 / 刪除模組          | architecture-reviewer                 |
-  | 任何 TypeScript 型別、generics、Result、union 改動  | type-system-reviewer                  |
-  | 牽涉 retry、lifecycle、async、partial failure       | reliability-reviewer                  |
-  | 新增 / 修改測試或 quality gate                      | test-architect                        |
-  | `package.json` / CI / ESLint / tsconfig / secret    | config-and-security-reviewer          |
-  | `src/i18n/locales/` 或 user-facing 字串            | i18n-discipline-reviewer              |
+  | 改動位置                                           | 必呼叫 reviewer              |
+  | -------------------------------------------------- | ---------------------------- |
+  | `src/core/` / `src/bot/` 或新增 / 刪除模組         | architecture-reviewer        |
+  | 任何 TypeScript 型別、generics、Result、union 改動 | type-system-reviewer         |
+  | 牽涉 retry、lifecycle、async、partial failure      | reliability-reviewer         |
+  | 新增 / 修改測試或 quality gate                     | test-architect               |
+  | `package.json` / CI / ESLint / tsconfig / secret   | config-and-security-reviewer |
+  | `src/i18n/locales/` 或 user-facing 字串            | i18n-discipline-reviewer     |
 
 - **Tools**：`Read, Write, Edit, Bash, Grep, Glob, Agent`（與 `r-implementer` 同等，去掉 R-specific 依賴）。
 - **Model**：`opus`。
@@ -290,7 +290,6 @@ Wiki 清理（`docs/wiki/`）：
 7. **`BaseBot.guildInfo` 收斂為唯讀 API**——v1.0.0 為首次公開發行，趁此一次完成 API 收斂，避免發行後再做 breaking change。
 
    **設計**：
-
    - 將 [src/bot/index.ts](../src/bot/index.ts) 內的 `public guildInfo: Record<string, GuildInfo> = {}` 替換為私有 `#guildInfo: Map<string, GuildInfo>`（class field 私有語法，TS 對外即不可見）。
    - 新增三個公開 getter，作為唯一對外讀取面：
 
@@ -306,25 +305,26 @@ Wiki 清理（`docs/wiki/`）：
      ```
 
      回傳型別以 `Readonly<GuildInfo>` 與 `ReadonlyMap` 阻擋外部寫入。
+
    - [src/bot/index.ts](../src/bot/index.ts) 內的 `GuildInfo` interface 全欄位加上 `readonly`：
 
      ```ts
      export interface GuildInfo {
-         readonly bot_name: string;
-         readonly guild: Guild;
-         readonly channels?: Readonly<Record<string, Channel>>;
-         readonly roles?: Readonly<Record<string, Role>>;
-         readonly repos?: Repos;
+       readonly bot_name: string;
+       readonly guild: Guild;
+       readonly channels?: Readonly<Record<string, Channel>>;
+       readonly roles?: Readonly<Record<string, Role>>;
+       readonly repos?: Repos;
      }
      ```
 
      `Repos` 由 `buildRepos(connection)` 產生且本身為 readonly bundle，自然滿足條件。
+
    - 寫入面僅留給 `BaseBot` 自身：新增私有 method `#setGuildInfo(guildId, info)` 與 `#attachRepos(guildId, repos)`，供 `handleClientReady`（吸收 `GuildRegistrar.registerAll` 結果）與 `GuildDbConnector` 寫回 repos 使用。`GuildDbConnector.connectOne` 由原本「直接 mutate `slot.repos`」改為「回傳 `Repos`，由 BaseBot 透過 `#attachRepos` 寫入」，保持 R1 collaborator 的單一職責邊界。
    - `GuildRegistrar.registerAll` 維持回傳 `Record<string, GuildInfo>`（或改為 `Map`，依實作便利擇一），BaseBot 在 `handleClientReady` 將其重灌入私有 Map。
    - [src/core/guild-registry.ts](../src/core/guild-registry.ts) 的 `getRepos` / `getChannel` / `getRole` / `listGuildIds` 改建構於新的 readonly 視圖之上。對 plugin 端無 API 變動（plugin 一向透過 `GuildRegistry` 取資料）。
 
    **Callsite 遷移**：
-
    - 以 `grep -rE "bot\.guildInfo(\[|\.)" src/ test/` 列出所有讀取點，逐一改為對應 getter：
      - `bot.guildInfo[guildId]` → `bot.getGuildInfo(guildId)`
      - `bot.guildInfo[guildId]?.repos` → `bot.getRepos(guildId)`
@@ -365,13 +365,13 @@ Wiki 清理（`docs/wiki/`）：
 
 ## 5. 風險與 rollback
 
-| 風險                                                | 緩解                                                                                                                              |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| 文件改寫與程式碼行為脫節                            | `README.md` / `CONTRIBUTING.md` 中每項主張皆引用具體程式路徑，並對照 live tree 審視                                               |
-| 刪除 `docs/design/` 流失設計理據                    | 將 load-bearing 理據蒸餾至 `docs/architecture.md`。R / D / G 對應表本身為內部使用，對使用者非 load-bearing                        |
-| Branch 刪除不可逆                                   | 列為 merge 至 `main` 後最終步驟，並需明確再確認；確認前遠端 branch 不動                                                            |
-| `package.json` `engines` 變更影響下游               | engines 維持 `>=22.13.0`；僅修正 `CONTRIBUTING.md` 文字                                                                            |
-| GitHub Wiki 已有的外部連結因 `docs/wiki/` 改寫而斷  | `docs/wiki/` 落在 repo 內，同 PR 一併更新內部連結                                                                                  |
+| 風險                                               | 緩解                                                                                                       |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 文件改寫與程式碼行為脫節                           | `README.md` / `CONTRIBUTING.md` 中每項主張皆引用具體程式路徑，並對照 live tree 審視                        |
+| 刪除 `docs/design/` 流失設計理據                   | 將 load-bearing 理據蒸餾至 `docs/architecture.md`。R / D / G 對應表本身為內部使用，對使用者非 load-bearing |
+| Branch 刪除不可逆                                  | 列為 merge 至 `main` 後最終步驟，並需明確再確認；確認前遠端 branch 不動                                    |
+| `package.json` `engines` 變更影響下游              | engines 維持 `>=22.13.0`；僅修正 `CONTRIBUTING.md` 文字                                                    |
+| GitHub Wiki 已有的外部連結因 `docs/wiki/` 改寫而斷 | `docs/wiki/` 落在 repo 內，同 PR 一併更新內部連結                                                          |
 
 Rollback：所有變更皆為 branch 上的一般 git commit。無任何行為性改動會在缺乏對應測試通過的情況下提交。回滾以 `git revert <sha>` 即可。
 
@@ -402,12 +402,12 @@ Rollback：所有變更皆為 branch 上的一般 git commit。無任何行為�
 
 審閱階段已確認的決定：
 
-| 項目                          | 決議                                                                                                                          |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `package.json` `author`       | **維持** `"ACaccel, rbt4168"`，不於 v1.0.0 更動                                                                              |
-| `SECURITY.md` 通報管道        | **採 GitHub Security Advisory（GHSA）**——於 SECURITY.md 提供 GHSA 開單連結與 72 小時初步回應 / 90 天責任揭露時程             |
-| 是否發佈至 npm                | **不發佈**——`package.json` 維持 `"private": true`，發行型態僅為 GitHub source release + git tag                              |
-| Voice + ffmpeg 拆 optional peer | **延後**——v1.0.0 不動 `dependencies`；列入發行後待辦，於下一個 minor 評估                                                 |
-| 公開文件語言                  | **頂層文件統一英文**——`README.md` / `CONTRIBUTING.md` / `CLAUDE.md` / `docs/architecture.md` / `SECURITY.md` / `CODE_OF_CONDUCT.md` / `CHANGELOG.md` / `docs/wiki/**` / `.claude/agents/**` / `.claude/skills/**` 皆英文撰寫；不維護中文鏡像 |
+| 項目                            | 決議                                                                                                                                                                                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package.json` `author`         | **維持** `"ACaccel, rbt4168"`，不於 v1.0.0 更動                                                                                                                                                                                              |
+| `SECURITY.md` 通報管道          | **採 GitHub Security Advisory（GHSA）**——於 SECURITY.md 提供 GHSA 開單連結與 72 小時初步回應 / 90 天責任揭露時程                                                                                                                             |
+| 是否發佈至 npm                  | **不發佈**——`package.json` 維持 `"private": true`，發行型態僅為 GitHub source release + git tag                                                                                                                                              |
+| Voice + ffmpeg 拆 optional peer | **延後**——v1.0.0 不動 `dependencies`；列入發行後待辦，於下一個 minor 評估                                                                                                                                                                    |
+| 公開文件語言                    | **頂層文件統一英文**——`README.md` / `CONTRIBUTING.md` / `CLAUDE.md` / `docs/architecture.md` / `SECURITY.md` / `CODE_OF_CONDUCT.md` / `CHANGELOG.md` / `docs/wiki/**` / `.claude/agents/**` / `.claude/skills/**` 皆英文撰寫；不維護中文鏡像 |
 
 i18n catalog（`src/i18n/locales/zh-TW/`、`en/`）為**程式產品內容**而非文件，仍維持雙語並由 i18n parity gate 把關，不在「文件統一英文」範圍內。
