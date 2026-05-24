@@ -1,52 +1,27 @@
 # C10 — Quality Gates
 
-> 路徑：`CI workflow + tsconfig / eslint / vitest / package.json` ｜詳細設計：[`docs/design/C10-quality-gates.md`](../../design/C10-quality-gates.md) ｜任務：[`docs/tasks/C10-quality-gates.md`](../../tasks/C10-quality-gates.md)
+## Responsibility
 
-## 職責
+Cross-cutting CI enforcement of repo-wide quality. Every gate is non-negotiable: no `--no-verify`, no skipped tests, no loosened assertions. A failing gate is root-caused, not bypassed.
 
-以 CI gate 橫切強制全 repo 品質：typecheck、lint、format、codegen drift、knip、test、coverage、CJK scanner、security、smoke。
+## The gates
 
-## 現況
+| Gate              | Command                   | Enforces                                                                                                                                                                                            |
+| ----------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Typecheck         | `yarn typecheck`          | Strict TypeScript over the whole `src/` tree (`tsconfig.strict.json` includes `src/**/*`, all path aliases populated).                                                                              |
+| Typecheck (emit)  | `yarn typecheck:emit`     | Verifies emit-mode typecheck stays green for the deploy build path.                                                                                                                                 |
+| Lint              | `yarn lint`               | ESLint, including the `src/handlers/**` 150-line `max-lines` cap, `src/plugins/**` ban on importing `core/ioc`, `no-console: error` (test / scripts overrides to `off`), and `import/first: error`. |
+| Format            | `yarn format:check`       | Prettier.                                                                                                                                                                                           |
+| Codegen drift     | `yarn handlers:gen:check` | Re-runs `scripts/gen-registry.ts` and fails if any `registry.generated.ts` differs from the committed version.                                                                                      |
+| Knip              | `yarn knip`               | Unused exports / files / dependencies.                                                                                                                                                              |
+| Unit tests        | `yarn test:unit`          | Fast, hermetic.                                                                                                                                                                                     |
+| Integration tests | `yarn test:int`           | Mongo and Discord adapter integration.                                                                                                                                                              |
+| Contract tests    | `yarn test:contract`      | Plugin and repository contract conformance.                                                                                                                                                         |
+| i18n tests        | `yarn test:i18n`          | Catalog parity, placeholder parity, and the CJK literal scanner over `src/handlers/`, `src/plugins/`, `src/bot/`.                                                                                   |
+| Coverage          | `yarn test:coverage`      | Coverage thresholds per layer.                                                                                                                                                                      |
+| Security          | `yarn security`           | Dependency advisories.                                                                                                                                                                              |
+| Smoke             | `yarn smoke`              | Manual pre-deploy probe (env, catalogs, command payload). Not part of CI.                                                                                                                           |
 
-`refactor/architecture-overhaul` 已設 branch protection：全部 10 個 CI job
-（`lint`、`typecheck`、`typecheck-emit`、`test-unit`、`test-coverage`、
-`test-int`、`test-contract`、`knip`、`security`、`analyze`）為 required
-status check；`strict: false`、不要求人工 review。repo 已啟用 GitHub
-auto-merge，並以 `gh pr merge --auto --merge` 為**預設合併方式**。詳見設計檔
-§2.8。
+## Notes
 
-D8 已落地：`tsconfig.strict.json` 的 `include` 改為 `src/**/*`，strict
-typecheck 涵蓋全 `src` 樹（含 `src/bot`、`src/handlers`、`src/plugins`、
-`src/infra/discord`）；path alias 已補入 strict 設定。納入過程修正 `src/handlers`
-的 `noUncheckedIndexedAccess` / `noUnusedParameters` 違規（行為等價）。
-
-D3 已落地：`src/events/` 目錄已由 C8 刪除，CJK scanner（`test/i18n/no-literal-cjk.test.ts`）
-的 `SCOPED_DIRECTORIES` 移除 `src/events` entry，現掃描 `src/handlers`、
-`src/plugins`、`src/bot` 三目錄；`eslint.config.mjs` 的 service-locator guard
-亦移除 stale 的 `src/events/**`、`src/features/**` glob。
-
-## 近期變更
-
-- 2026-05-24 — R6.3 / R6.5：`eslint.config.mjs` 將 `no-console` 由
-  `['warn', { allow: ['warn', 'error'] }]` 提至 `['error', { allow:
-['error'] }]`（test / scripts override 維持 `off`），並新增
-  `'import/first': 'error'` 守住 `src/bot/index.ts` 與所有 barrel
-  files 的「imports 連續區塊」契約。三個 `vi.mock` 測試檔加 inline
-  `eslint-disable import/first` (tech-debt R6.3 / R6.5)
-- 2026-05-24 — R4：`eslint.config.mjs` 新增 `src/handlers/**/*.ts` 的
-  `max-lines` block（max 150、`skipBlankLines: false`、`skipComments: false`、
-  違規 error）。`ignores` 顯式列入 `registry.generated.ts` 與三個框架/共用檔
-  （`command.ts` / `discord-helpers.ts` / `reply-for-error.ts`）並附 inline
-  comment 註明為 PR follow-up。CI lint 對 4 個示範 handler 由 red → green
-  (tech-debt R4)
-- 2026-05-24 — R3：`eslint.config.mjs` 新增 `src/plugins/**` 的
-  `no-restricted-imports` block，禁止直接 import `core/ioc`；新增
-  `test/unit/eslint/plugin-ioc-import-rule.test.ts` 程式化 ESLint
-  fixture 鎖定這條規則的行為 (tech-debt R3)
-- 2026-05-21 — D3 落地：CJK scanner `SCOPED_DIRECTORIES` 與 eslint
-  service-locator guard 移除已刪除的 `src/events` / `src/features` 範圍。
-- 2026-05-21 — D8 落地：strict tsconfig 涵蓋全 `src`，掃除 handler 嚴格模式違規。
-- 2026-05-21 — 啟用 GitHub auto-merge 並定為預設合併方式（工程基礎建設）。
-- 2026-05-21 — `refactor/architecture-overhaul` 加上 branch protection，
-  10 個 CI job 設為 required status check（工程基礎建設）。
-- 2026-05-21 — 建立元件 wiki 頁（工程基礎建設）。
+The CJK scanner (`test/i18n/no-literal-cjk.test.ts`) only scans `src/handlers/`, `src/plugins/`, and `src/bot/`. Catalog JSON files under `src/i18n/locales/` are content and are deliberately out of scope.

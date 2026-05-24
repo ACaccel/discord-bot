@@ -1,57 +1,32 @@
 # C3 — Plugin Runtime
 
-> 路徑：`src/core/plugin/（含 host/）` ｜詳細設計：[`docs/design/C3-plugin-runtime.md`](../../design/C3-plugin-runtime.md) ｜任務：[`docs/tasks/C3-plugin-runtime.md`](../../tasks/C3-plugin-runtime.md)
+## Responsibility
 
-## 職責
+The plugin micro-kernel. Defines the `Plugin<Config>` contract and drives plugin lifecycle, event dispatch, and interaction routing. Plugins describe themselves declaratively; the runtime decides when to call them.
 
-Plugin 架構微核心：定義 `Plugin<Config>` 契約並驅動生命週期、事件分派、InteractionRouter 路由。
+## The `Plugin<Config>` contract
 
-## 現況
+Defined in `src/core/plugin/types.ts`. Each plugin declares:
 
-- D1（介面）已落地：`src/core/plugin/guild-onboarding-port.ts` 定義
-  `GuildOnboardingPort`，封裝「連線新 guild DB」「註冊該 guild command」兩項能力；
-  `TOKENS.GuildOnboardingPort` 已登錄。`BaseBot` 實作見 C11、plugin 消費見 C8。
-- D6 已落地：lifecycle 邏輯抽至 `host/lifecycle.ts` 的 `PluginLifecycleRunner`，
-  經窄介面 `LifecycleHost` 注入；`cascadeDisable` 移至 `host/topology.ts` 為純函式；
-  `host.ts` 的 `initAll`/`startAll`/`readyAll`/`shutdownAll` 改為薄委派。
+- `id` (stable string), SemVer `version`, `scope` (`'bot'` or `'guild'`), optional `critical` flag, optional dependency list.
+- Optional zod `configSchema` validated on load.
+- Lifecycle hooks: `init`, `start`, `ready`, `shutdown`.
+- `events` — subscriptions to dispatcher events (e.g. `events.guildCreate`).
+- `contributes` — commands, buttons, modals, select-menus, reactions, jobs, and locale namespaces the plugin adds to the bot.
 
-## 現況補充（R2 後）
+Plugins call `ctx.resolve(TOKENS.X)` to read dependencies. During `init` only, they may call `ctx.registerInstance(token, instance)` to publish a singleton; the type system hides that method from `start` / runtime / event contexts.
 
-- `PluginInitContext` 增補 `registerInstance<T>(token, instance)`
-  facade，只在 `init` hook 合法；其他 lifecycle context（start /
-  runtime / event）型別層即不暴露此方法。
-- `PluginLifecycleRunner` 新增 `phase` 追蹤（`'idle' | 'init' |
-'start' | 'ready' | 'running' | 'shutdown'`），`buildInitContext`
-  的 `registerInstance` 閉包讀取執行時的 phase，使 plugin 偷藏 init
-  ctx 到後續階段呼叫亦會被擋；違規拋 `ConfigurationError` with
-  code `LIFECYCLE_PHASE_VIOLATION` + messageKey
-  `errors:plugin.lifecycle_phase_violation`。
-- `LifecycleHost` 介面新增唯一一條 `container: ServiceContainer`
-  read-only 欄位，作為 runner 寫入 container 的單一通道；plugin 端
-  仍只看到 typed-token resolver 與 `registerInstance` facade。
+## Key files
 
-## 現況補充（R3 後）
+- `src/core/plugin/types.ts` — `Plugin<Config>`, lifecycle context types, contribution shapes.
+- `src/core/plugin/index.ts` — public barrel. Re-exports `TOKENS` (value) plus `ServiceToken` and `Resolver` (types) so plugins never need to reach into `@core/ioc`. The container constructors and error types are intentionally not re-exported.
+- `src/core/plugin/host.ts` — `PluginHost`: thin delegation surface (`initAll`, `startAll`, `readyAll`, `shutdownAll`).
+- `src/core/plugin/host/lifecycle.ts` — `PluginLifecycleRunner`. Tracks the current phase (`'idle' | 'init' | 'start' | 'ready' | 'running' | 'shutdown'`) and rejects `registerInstance` calls outside `init` with `ConfigurationError(code: 'LIFECYCLE_PHASE_VIOLATION')`.
+- `src/core/plugin/host/topology.ts` — `cascadeDisable` pure function for dependency-aware disable propagation.
+- `src/core/plugin/dispatcher.ts` — `EventDispatcher` for plugin-to-plugin and Discord-event fan-out.
+- `src/core/plugin/router.ts` — `InteractionRouter` matching Discord interactions to plugin contributions.
+- `src/core/plugin/guild-onboarding-port.ts` — `GuildOnboardingPort` interface: connect a new guild's DB and register its commands. Implemented by `BaseBot`, consumed by the `guild-events` plugin.
 
-- `src/core/plugin/index.ts` barrel 新增 `TOKENS` value re-export 與
-  `ServiceToken` / `Resolver` type re-export，成為 plugin 端對
-  `core/ioc` 的**唯一窗口**；`ServiceContainer` / `createContainer` /
-  `token()` factory / 容器錯誤型別**刻意不**re-export，保留為
-  composition root 專屬權限。
-- 違規由 ESLint 在 lint 階段擋下（`src/plugins/**` 的
-  `no-restricted-imports` 對 `core/ioc` 群組）。
+## Notes
 
-## 近期變更
-
-- 2026-05-24 — R3：`core/plugin` barrel 新增 `TOKENS` /
-  `ServiceToken` / `Resolver` re-export；新增
-  `test/unit/core/plugin/barrel-exports.test.ts` 與
-  `test/unit/eslint/plugin-ioc-import-rule.test.ts` 為這條契約上鎖
-  (tech-debt R3)
-- 2026-05-24 — R2：`PluginInitContext.registerInstance` facade +
-  `PluginLifecycleRunner` phase guard；新增
-  `test/unit/core/plugin/lifecycle-guard.test.ts`（8 案例覆蓋 happy /
-  duplicate / 4 種 phase 違規 / critical init 重設 / 型別測試）
-  (tech-debt R2)
-- 2026-05-21 — D1 介面 + D6 落地：新增 guild-onboarding port、`host/lifecycle.ts`
-  `PluginLifecycleRunner`（窄介面 `LifecycleHost`）、`cascadeDisable` 純函式化。
-- 2026-05-21 — 建立元件 wiki 頁（工程基礎建設）。
+`LifecycleHost` (the runner's inward-facing interface) exposes exactly one writable surface — `container: ServiceContainer` — through which `registerInstance` is implemented. Plugins themselves only see the typed-token resolver and the `registerInstance` facade.
