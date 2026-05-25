@@ -80,6 +80,7 @@
     // Remediation plan: track discord.js v15 / @sapphire/shapeshift v5
     // for a dependency swap; revisit at every discord.js minor bump.
     // -------------------------------------------------------------------
-    "GHSA-r5fr-rjxr-66jc|discord.js>@discordjs/builders>@sapphire/shapeshift>lodash"
+    "GHSA-r5fr-rjxr-66jc|discord.js>@discordjs/builders>@sapphire/shapeshift>lodash",
+    "GHSA-r5fr-rjxr-66jc|@discordjs/builders>@sapphire/shapeshift>lodash"
   ]
 }
