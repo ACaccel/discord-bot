@@ -1,7 +1,19 @@
 {
   "name": "discord-bot",
   "version": "1.0.0",
-  "description": "",
+  "description": "Multi-personality Discord bot framework on TypeScript, discord.js and MongoDB, with a layered plugin architecture and bilingual i18n.",
+  "keywords": [
+    "discord-bot",
+    "discord.js",
+    "typescript",
+    "mongodb",
+    "plugin-architecture",
+    "i18n",
+    "llm",
+    "openai",
+    "anthropic",
+    "gemini"
+  ],
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -14,9 +26,7 @@
     "msg-archive": "ts-node src/bot/msg-archive/index.ts",
     "konata": "ts-node src/bot/konata/index.ts",
     "typecheck": "tsc -p tsconfig.strict.json",
-    "typecheck:legacy": "tsc --noEmit",
     "lint": "eslint src scripts test eslint.config.mjs vitest.config.ts",
-    "lint:legacy": "eslint .",
     "lint:fix": "eslint src scripts test --fix",
     "format": "prettier --write src/core src/persistence src/infra scripts test eslint.config.mjs vitest.config.ts tsconfig.strict.json tsconfig.build.json knip.json *.md docs",
     "format:check": "prettier --check src/core src/persistence src/infra scripts test eslint.config.mjs vitest.config.ts tsconfig.strict.json tsconfig.build.json knip.json *.md docs",
