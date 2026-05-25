@@ -7,24 +7,31 @@ import type { BaseBot } from "@bot";
 import { logError, logSystem, ops } from "../../core/logger";
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
+// `./command` and `./command-builder` are imported BEFORE
+// `./registry.generated` so that the `Command` class binding lands on
+// `module.exports` before the generated registry pulls in handler
+// subclasses (which import `Command` back through this barrel). Using
+// `import { X } from './command'; export { X };` rather than
+// `export { X } from './command'` ensures the export getter is emitted
+// at the import location, not at the source position of the re-export
+// statement (which would place it after the registry require call).
 import { Command, localizeCommandConfig } from './command';
 import { buildCommandJsonBody } from './command-builder';
 import { COMMAND_REGISTRY } from './registry.generated';
 
-// Command metadata contract + i18n resolution live in `./command` so
-// this barrel (which pulls in the generated handler registry) is not a
-// dependency of every handler module.
 export {
     Command,
     localizeCommandConfig,
-    type CommandConfig,
-    type CommandOption,
-    type CommandChoice,
-    type LocalizedCommandConfig,
-    type LocalizedCommandOption,
-    type LocalizedCommandChoice,
+    buildCommandJsonBody,
+};
+export type {
+    CommandConfig,
+    CommandOption,
+    CommandChoice,
+    LocalizedCommandConfig,
+    LocalizedCommandOption,
+    LocalizedCommandChoice,
 } from './command';
-export { buildCommandJsonBody } from './command-builder';
 
 export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: BaseBot) => {
     const rest_commands: ApplicationCommandDataResolvable[] = Array.from(commandHandlers.values())

@@ -6,15 +6,18 @@ import { logSystem } from '@core/logger';
 
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
+// `./button-handler` is imported BEFORE `./registry.generated` so the
+// abstract class is on `module.exports` by the time the generated
+// registry pulls in handler subclasses (which import the class back
+// through this barrel). See `button-handler.ts`.
+import { ButtonHandler } from './button-handler';
 import { BUTTON_REGISTRY } from './registry.generated';
+
+export { ButtonHandler };
 
 //==================================================//
 // Button Custom ID: <button_type>|<button_value>
-//==================================================// 
-
-export abstract class ButtonHandler {
-    public abstract execute(interaction: ButtonInteraction, bot: BaseBot): Promise<void>;
-}
+//==================================================//
 
 export const registerButtons = async (bot: BaseBot) => {
     logSystem(bot.logger, bot.clientId, "Registering button handlers...");

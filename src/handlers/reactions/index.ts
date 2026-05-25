@@ -6,12 +6,13 @@ import type { BaseBot } from "@bot";
 import { logSystem } from '@core/logger';
 
 import { HandlerFactory } from "handlers";
+// `./reaction-handler` is imported BEFORE `./registry.generated` so
+// the abstract class is on `module.exports` by the time the generated
+// registry pulls in handler subclasses. See `reaction-handler.ts`.
+import { ReactionHandler } from './reaction-handler';
 import { REACTION_REGISTRY } from './registry.generated';
 
-export abstract class ReactionHandler {
-    public abstract executeAdded(reaction: MessageReaction, user: User, bot: BaseBot): Promise<void>;
-    public abstract executeRemoved(reaction: MessageReaction, user: User, bot: BaseBot): Promise<void>;
-}
+export { ReactionHandler };
 
 export const registerReactions = async (bot: BaseBot) => {
     logSystem(bot.logger, bot.clientId, "Registering reaction handlers...");
