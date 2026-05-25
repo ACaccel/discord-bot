@@ -41,7 +41,6 @@ export const broadcastEarthquakeAlert = async (
   registry: GuildRegistry,
   translator: Translator | undefined,
   logger: Logger | undefined,
-  clientId: string,
 ): Promise<void> => {
   const guildIds = [...client.guilds.cache.keys()];
   await Promise.all(
@@ -52,7 +51,7 @@ export const broadcastEarthquakeAlert = async (
         if (channel === undefined || role === undefined) return;
         await sendEarthquakeAlert(channel, role.id, translator);
       } catch (err: unknown) {
-        logError(logger, clientId, guildId, err);
+        logError(logger, guildId, err);
       }
     }),
   );

@@ -56,7 +56,7 @@ const replyOrEdit = async (
             // nothing else we can tell the user, and re-throwing would
             // just walk into the dispatcher's catch and try the same
             // reply again. The structured log preserves the trail.
-            logSystem(bot.logger, bot.clientId, ops.router.replySkipped(err.code));
+            logSystem(bot.logger, ops.router.replySkipped(err.code));
             return;
         }
         throw err;

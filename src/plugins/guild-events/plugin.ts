@@ -54,13 +54,6 @@ const ConfigSchema = z
      * silenced too. Empty = mirror everything.
      */
     blockedChannels: z.array(z.string()).default([]),
-    /**
-     * The host bot's Discord client id. Required because the
-     * audit-log path tags every line with the emitting bot. Passed in
-     * by the composition root rather than resolved at runtime so the
-     * plugin stays decoupled from BaseBot.
-     */
-    clientId: z.string().min(1),
   })
   .strict();
 
@@ -98,15 +91,14 @@ const resolveEventChannel = (
  * follow. Without the swallow, a Discord-side rejection here would
  * abort the surrounding handler before the audit-log writes ran.
  *
- * `clientId` is threaded in so the structured error line is tagged
- * with the originating bot, matching the rest of this plugin's audit
- * surface.
+ * The bot tag on the structured error line is ambient via the
+ * logger's base bindings (`createBootstrapLogger` attaches `{ bot }`),
+ * so no `clientId` parameter is threaded through.
  */
 const safeSendEmbed = async (
   channel: TextChannel,
   embed: EmbedBuilder,
   logger: Logger | undefined,
-  clientId: string,
   guildId: string,
   context: string,
 ): Promise<void> => {
@@ -115,7 +107,6 @@ const safeSendEmbed = async (
   } catch (err: unknown) {
     logError(
       logger,
-      clientId,
       guildId,
       new Error(`guild-events: failed to mirror ${context} embed: ${String(err)}`),
     );
@@ -146,7 +137,6 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
           ctx.resolve(TOKENS.GuildRegistry),
           ctx.resolve(TOKENS.Logger),
           config.blockedChannels,
-          config.clientId,
           oldMessage,
           newMessage,
         );
@@ -156,7 +146,6 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
           ctx.resolve(TOKENS.GuildRegistry),
           ctx.resolve(TOKENS.Logger),
           config.blockedChannels,
-          config.clientId,
           message,
         );
       },
@@ -164,7 +153,6 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
         await handleGuildCreate(
           ctx.resolve(TOKENS.GuildOnboardingPort),
           ctx.resolve(TOKENS.Logger),
-          config.clientId,
           guild,
         );
       },
@@ -205,13 +193,12 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
               },
             )
             .setTimestamp();
-          await safeSendEmbed(eventChannel, embed, logger, config.clientId, guildId, 'guild_member_update');
+          await safeSendEmbed(eventChannel, embed, logger, guildId, 'guild_member_update');
         }
         // Audit-log line, decoupled from the embed write so a missing
         // `event` channel does not suppress the audit trail.
         logGuildEvent(
           logger,
-          config.clientId,
           guildId,
           'guild_member_update',
           {
@@ -230,7 +217,6 @@ const handleMessageUpdate = async (
   registry: GuildRegistry,
   logger: Logger | undefined,
   blockedChannels: readonly string[],
-  clientId: string,
   oldMessage: Message | PartialMessage,
   newMessage: Message | PartialMessage,
 ): Promise<void> => {
@@ -265,7 +251,7 @@ const handleMessageUpdate = async (
         { name: 'new message', value: truncate(newMessage.content), inline: false },
       )
       .setTimestamp();
-    await safeSendEmbed(eventChannel, embed, logger, clientId, newMessage.guildId, 'message_update');
+    await safeSendEmbed(eventChannel, embed, logger, newMessage.guildId, 'message_update');
   }
 
   // Audit-log side effect — emitted independently of the embed so a
@@ -274,7 +260,6 @@ const handleMessageUpdate = async (
   const channelName = newMessage.guild.channels.cache.get(newMessage.channel.id)?.name;
   logGuildEvent(
     logger,
-    clientId,
     newMessage.guildId,
     'message_update',
     {
@@ -291,7 +276,6 @@ const handleMessageDelete = async (
   registry: GuildRegistry,
   logger: Logger | undefined,
   blockedChannels: readonly string[],
-  clientId: string,
   message: Message | PartialMessage,
 ): Promise<void> => {
   const parentId = (message.channel as TextChannel).parentId;
@@ -331,7 +315,7 @@ const handleMessageDelete = async (
         }
       });
     }
-    await safeSendEmbed(eventChannel, embed, logger, clientId, message.guildId, 'message_delete');
+    await safeSendEmbed(eventChannel, embed, logger, message.guildId, 'message_delete');
   }
 
   // Forensic attachment download — runs for every attachment,
@@ -356,7 +340,7 @@ const handleMessageDelete = async (
   if (attachmentUrls.length > 0) {
     details['attachments'] = attachmentUrls;
   }
-  logGuildEvent(logger, clientId, message.guildId, 'message_delete', details, message.guild.name);
+  logGuildEvent(logger, message.guildId, 'message_delete', details, message.guild.name);
 };
 
 /**
@@ -376,7 +360,6 @@ const handleMessageDelete = async (
 const handleGuildCreate = async (
   onboardingPort: GuildOnboardingPort,
   logger: Logger | undefined,
-  clientId: string,
   guild: Guild,
 ): Promise<void> => {
   try {
@@ -386,7 +369,6 @@ const handleGuildCreate = async (
     // directory — the line is per-guild by definition.
     logGuildEvent(
       logger,
-      clientId,
       guild.id,
       'guild_create',
       {
@@ -399,7 +381,6 @@ const handleGuildCreate = async (
   } catch (err: unknown) {
     logSystem(
       logger,
-      clientId,
       `guild-events: failed to onboard guild ${guild.name} (${guild.id}): ${String(err)}`,
     );
   }

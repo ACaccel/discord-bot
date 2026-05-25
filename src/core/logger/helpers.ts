@@ -1,24 +1,23 @@
 /**
  * Handler-facing structured-log helpers — the canonical facade over the
- * typed {@link Logger} for handler / plugin / event callsites that log
- * with the positional `(clientId, guildId, err)` shape.
+ * typed {@link Logger} for handler / plugin / event callsites.
  *
- * The shape exists because:
- *   - handler callsites do not carry a constructor-injected logger
- *   - the bot scope (`{ bot: clientId }`) + guild scope (`{ guildId }`)
- *     bindings are the same on every line, so pre-composing them at the
- *     helper keeps callsites short
- *   - all output is pino JSON; ops dashboards consume the stream directly
+ * Invariant: the {@link Logger} passed in MUST already carry `bot` in
+ * its base bindings. `createBootstrapLogger` (the only production
+ * Logger factory) attaches `{ bot: <clientId> }` via pino's `base`, so
+ * every child inherits it. These helpers therefore do not re-bind
+ * `bot` themselves — the prior `child({ bot: clientId, ... })` shape
+ * produced JSON records with two `bot` fields per line, and pino's
+ * pretty printer / `jq` consumers had to ignore the duplicate. The
+ * `clientId` parameter is gone (no compatibility shim) so callsites
+ * shrink and there is no longer a way to drift the duplicate binding
+ * back in.
  *
  * Layer purity: this module deliberately depends only on the
  * {@link Logger} interface. Helpers that touch discord.js / axios / fs
  * (Discord-channel mirror, attachment archival) live under
  * `src/infra/discord/` so `core/**` stays free of third-party SDK
  * imports per the architecture contract.
- *
- * History: previously named `legacy.ts` during the pino migration.
- * Renamed because these helpers are the canonical handler-side logging
- * entry points, not legacy code.
  */
 import type { Logger } from './logger';
 
@@ -32,15 +31,14 @@ import type { Logger } from './logger';
  */
 export const logError = (
   logger: Logger | undefined,
-  clientId: string,
   guildId: string | null | undefined,
   err: unknown,
 ): void => {
   if (logger === undefined) return;
   const child =
     guildId === null || guildId === undefined || guildId === ''
-      ? logger.child({ bot: clientId })
-      : logger.child({ bot: clientId, guildId });
+      ? logger
+      : logger.child({ guildId });
   if (err instanceof Error) {
     child.error({ err }, 'errorLogger');
   } else {
@@ -57,10 +55,11 @@ export const logError = (
  * overrode the literal headline and the pretty output lost the
  * operator-supplied text. Passing `msg` positionally avoids the
  * collision and keeps the headline visible in both pretty and JSON
- * sinks.
+ * sinks. `bot` is ambient via the logger's base bindings, so there is
+ * no `child({ bot })` rebind here.
  */
-export const logSystem = (logger: Logger | undefined, clientId: string, msg: string): void => {
-  logger?.child({ bot: clientId }).info(msg);
+export const logSystem = (logger: Logger | undefined, msg: string): void => {
+  logger?.info(msg);
 };
 
 /**
@@ -73,18 +72,16 @@ export const logSystem = (logger: Logger | undefined, clientId: string, msg: str
  * pretty consoles read like `MESSAGE_UPDATE`. Newlines inside any
  * string field are preserved verbatim — JSON.stringify escapes them
  * in the file sink, and pretty rendering shows them on one line per
- * field via the multi-line formatter.
+ * field via the multi-line formatter. `bot` is ambient via the
+ * logger's base bindings; only `guildId` / `guildName` are bound here.
  */
 export const logGuildEvent = (
   logger: Logger | undefined,
-  clientId: string,
   guildId: string,
   eventType: string,
   details: Readonly<Record<string, unknown>>,
   guildName: string,
 ): void => {
   const headline = eventType.toUpperCase();
-  logger
-    ?.child({ bot: clientId, guildId, guildName })
-    .info({ eventType: headline, ...details }, headline);
+  logger?.child({ guildId, guildName }).info({ eventType: headline, ...details }, headline);
 };

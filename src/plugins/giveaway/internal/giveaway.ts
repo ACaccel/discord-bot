@@ -51,7 +51,6 @@ export interface GiveawayDeps {
   readonly registry: GuildRegistry;
   readonly jobMap: Map<string, Job>;
   readonly logger: Logger;
-  readonly clientId: string;
   readonly translator: Translator | undefined;
 }
 
@@ -231,18 +230,18 @@ export const rebootGiveawayJobs = async (deps: GiveawayDeps): Promise<void> => {
               await rebootRetry(() => deleteGiveaway(deps, guildId, g.message_id));
             }
           } catch (rowErr) {
-            logError(deps.logger, deps.clientId, guildId, rowErr);
+            logError(deps.logger, guildId, rowErr);
           }
         }
       } catch (err) {
-        logError(deps.logger, deps.clientId, guildId, err);
+        logError(deps.logger, guildId, err);
         const debugCh = deps.registry.getChannel(guildId, 'debug');
         if (debugCh?.isSendable()) {
           await debugCh
             .send(
               `[ ops ] giveaway reboot listAll failed for guild ${guildId} after ${REBOOT_MAX_ATTEMPTS} attempts; scheduled jobs may be missing until next restart.`,
             )
-            .catch((sendErr) => logError(deps.logger, deps.clientId, guildId, sendErr));
+            .catch((sendErr) => logError(deps.logger, guildId, sendErr));
         }
       }
     }),

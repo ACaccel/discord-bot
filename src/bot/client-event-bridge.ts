@@ -95,14 +95,12 @@ interface Subscription {
 
 export class ClientEventBridge {
     private readonly client: Client;
-    private readonly clientId: string;
     private readonly logger: Logger;
     private config: ClientEventBridgeConfig | undefined;
     private readonly subscriptions: Subscription[] = [];
 
-    public constructor(client: Client, clientId: string, logger: Logger) {
+    public constructor(client: Client, logger: Logger) {
         this.client = client;
-        this.clientId = clientId;
         this.logger = logger;
     }
 
@@ -165,7 +163,7 @@ export class ClientEventBridge {
                     if (message.length === 0) return;
                     await debugChannel.send(message);
                 } catch (err) {
-                    logError(this.logger, this.clientId, slot.guild.id, err);
+                    logError(this.logger, slot.guild.id, err);
                 }
             }),
         );
@@ -182,7 +180,7 @@ export class ClientEventBridge {
         if (suppress.interaction !== true) {
             this.on(Events.InteractionCreate, async (interaction: Interaction) => {
                 await this.onInteraction(interaction).catch((err) => {
-                    logError(this.logger, this.clientId, interaction.guildId ?? null, err);
+                    logError(this.logger, interaction.guildId ?? null, err);
                 });
             });
         }
@@ -198,12 +196,7 @@ export class ClientEventBridge {
                 Events.MessageReactionAdd,
                 async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
                     await this.onReactionAdd(reaction, user).catch((err) => {
-                        logError(
-                            this.logger,
-                            this.clientId,
-                            reaction.message.guildId ?? null,
-                            err,
-                        );
+                        logError(this.logger, reaction.message.guildId ?? null, err);
                     });
                 },
             );
@@ -211,12 +204,7 @@ export class ClientEventBridge {
                 Events.MessageReactionRemove,
                 async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
                     await this.onReactionRemove(reaction, user).catch((err) => {
-                        logError(
-                            this.logger,
-                            this.clientId,
-                            reaction.message.guildId ?? null,
-                            err,
-                        );
+                        logError(this.logger, reaction.message.guildId ?? null, err);
                     });
                 },
             );
@@ -232,7 +220,7 @@ export class ClientEventBridge {
         if (suppress.guildCreate !== true && !this.dispatcherSubscribesTo(Events.GuildCreate)) {
             this.on(Events.GuildCreate, async (guild: Guild) => {
                 await this.onGuildCreate(guild).catch((err) => {
-                    logError(this.logger, this.clientId, guild.id ?? null, err);
+                    logError(this.logger, guild.id ?? null, err);
                 });
             });
         }
@@ -319,7 +307,7 @@ export class ClientEventBridge {
             // A dispatch-chain throw must still produce a user-visible
             // reply. Surface the traceId so support tickets correlate
             // to the structured log line.
-            logError(this.logger, this.clientId, interaction.guildId, err);
+            logError(this.logger, interaction.guildId, err);
             if (interaction.isRepliable()) {
                 const content =
                     translator.t('errors:unexpected', { traceId }) ??
@@ -331,11 +319,7 @@ export class ClientEventBridge {
                         await interaction.reply({ content, flags: MessageFlags.Ephemeral });
                     }
                 } catch (replyErr) {
-                    logSystem(
-                        this.logger,
-                        this.clientId,
-                        ops.router.replySkipped(String(replyErr)),
-                    );
+                    logSystem(this.logger, ops.router.replySkipped(String(replyErr)));
                 }
             }
         }
@@ -378,7 +362,6 @@ export class ClientEventBridge {
         // a failed connect surfaces as a separate `logError` upstream.
         logGuildEvent(
             this.logger,
-            this.clientId,
             guild.id,
             'guild_create',
             {

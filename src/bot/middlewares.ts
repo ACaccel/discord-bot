@@ -105,7 +105,6 @@ export const createChannelLoggingMiddleware = (
                         '<unknown>';
                     logGuildEvent(
                         bot.logger,
-                        bot.clientId,
                         interaction.guild.id,
                         'interaction_create',
                         {

@@ -26,7 +26,6 @@ export const createActivityPlugin = (): Plugin => ({
         registry: ctx.resolve(TOKENS.GuildRegistry),
         jobMap: ctx.resolve(TOKENS.JobMap),
         logger: ctx.logger,
-        clientId: client.user?.id ?? 'unknown',
         translator: ctx.translator,
       };
       await rebootActivityJobs(deps);

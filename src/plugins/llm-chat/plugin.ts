@@ -123,12 +123,11 @@ type AnyLlmProviderError = LlmProviderError<any>;
 const handleChatError = async (
   llmErr: AnyLlmProviderError,
   logger: Logger | undefined,
-  clientId: string,
   guildId: string | null,
   placeholder: Message,
   translator: Translator,
 ): Promise<void> => {
-  logError(logger, clientId, guildId, llmErr);
+  logError(logger, guildId, llmErr);
   const content = translator.t(
     llmErr.messageKey,
     llmErr.messageParams as Record<string, string | number> | undefined,
@@ -228,7 +227,6 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
             sessions,
             llmService,
             logger,
-            config.clientId,
             ctx.translator,
           );
         }
@@ -261,7 +259,7 @@ const handleNewSession = async (
 
   const chatResult = await llmService.chat([userMsg], settings);
   if (!chatResult.ok) {
-    await handleChatError(chatResult.error, logger, clientId, message.guildId, placeholder, translator);
+    await handleChatError(chatResult.error, logger, message.guildId, placeholder, translator);
     return;
   }
   const result: LLMResult = chatResult.value;
@@ -289,7 +287,6 @@ const handleContinueSession = async (
   sessions: SessionManager,
   llmService: LLMService,
   logger: Logger | undefined,
-  clientId: string,
   translator: Translator,
 ): Promise<void> => {
   const session = sessions.resolveSessionByBotMessage(refBotMessageId);
@@ -308,7 +305,7 @@ const handleContinueSession = async (
 
   const chatResult = await llmService.chat(history, settings);
   if (!chatResult.ok) {
-    await handleChatError(chatResult.error, logger, clientId, message.guildId, placeholder, translator);
+    await handleChatError(chatResult.error, logger, message.guildId, placeholder, translator);
     return;
   }
   const result: LLMResult = chatResult.value;

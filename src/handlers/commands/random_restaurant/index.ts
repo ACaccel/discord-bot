@@ -93,7 +93,7 @@ export default class random_restaurant extends Command {
                 }),
             });
         } catch (error) {
-            logError(bot.logger, bot.clientId, interaction.guild?.id, error);
+            logError(bot.logger, interaction.guild?.id, error);
 
             const now = new Date();
             // 換算成台灣時間 (UTC+8)

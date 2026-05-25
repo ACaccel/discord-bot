@@ -68,13 +68,7 @@ describe('broadcastEarthquakeAlert', () => {
       getRole: (guildId: string) => (guildId === 'a' ? ({ id: 'role-a' } as never) : undefined),
     } as unknown as GuildRegistry;
 
-    await broadcastEarthquakeAlert(
-      buildClient(['a', 'b']),
-      registry,
-      fakeTranslator,
-      silent,
-      'bot-1',
-    );
+    await broadcastEarthquakeAlert(buildClient(['a', 'b']), registry, fakeTranslator, silent);
     expect(sendA).toHaveBeenCalledOnce();
   });
 
@@ -95,13 +89,7 @@ describe('broadcastEarthquakeAlert', () => {
     } as unknown as GuildRegistry;
 
     await expect(
-      broadcastEarthquakeAlert(
-        buildClient(['bad', 'good']),
-        registry,
-        fakeTranslator,
-        silent,
-        'bot-1',
-      ),
+      broadcastEarthquakeAlert(buildClient(['bad', 'good']), registry, fakeTranslator, silent),
     ).resolves.toBeUndefined();
     expect(sendOk).toHaveBeenCalledOnce();
   });

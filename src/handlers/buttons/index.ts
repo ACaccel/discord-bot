@@ -20,16 +20,16 @@ export { ButtonHandler };
 //==================================================//
 
 export const registerButtons = async (bot: BaseBot) => {
-    logSystem(bot.logger, bot.clientId, "Registering button handlers...");
+    logSystem(bot.logger, "Registering button handlers...");
 
     try {
         // todo: whether to specify handlers for each bot
         // import all button handlers
         bot.buttonHandlers = createAllButtonHandlers();
 
-        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.buttonHandlers.size} button handlers.`)
+        logSystem(bot.logger, `Successfully register ${bot.buttonHandlers.size} button handlers.`)
     } catch (err) {
-        logSystem(bot.logger, bot.clientId, `Failed to register button handlers: ${err}`);
+        logSystem(bot.logger, `Failed to register button handlers: ${err}`);
     }
 }
 

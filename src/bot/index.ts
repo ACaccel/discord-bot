@@ -349,13 +349,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         // single-sourced.
         const bootstrapLogger = this.container.resolve<Logger>(TOKENS.Logger);
         this.guildRegistrar = new GuildRegistrar(this.client, this.clientId, bootstrapLogger);
-        this.clientEventBridge = new ClientEventBridge(this.client, this.clientId, bootstrapLogger);
-        this.guildDbConnector = new GuildDbConnector(
-            this.container,
-            this.mongoURI,
-            this.clientId,
-            bootstrapLogger,
-        );
+        this.clientEventBridge = new ClientEventBridge(this.client, bootstrapLogger);
+        this.guildDbConnector = new GuildDbConnector(this.container, this.mongoURI, bootstrapLogger);
     }
 
     // ---- typed accessors handlers read through ----
@@ -660,11 +655,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 try {
                     await this.pluginHost.readyAll();
                 } catch (readyErr: unknown) {
-                    logError(this.logger, this.clientId, null, readyErr);
+                    logError(this.logger, null, readyErr);
                 }
             }
         } catch (err) {
-            logError(this.logger, this.clientId, null, err);
+            logError(this.logger, null, err);
         }
     }
 
@@ -688,7 +683,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 context: { operation: 'BaseBot.login', input: { clientId: this.clientId } },
                 cause,
             });
-            logError(this.logger, this.clientId, null, error);
+            logError(this.logger, null, error);
             throw error;
         }
         if (this.client.user === null) {
@@ -698,7 +693,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
                 messageParams: { clientId: this.clientId },
                 context: { operation: 'BaseBot.login', input: { clientId: this.clientId } },
             });
-            logError(this.logger, this.clientId, null, error);
+            logError(this.logger, null, error);
             throw error;
         }
         if (this.config.admin !== undefined) {

@@ -21,7 +21,6 @@ export const performBackup = async (
   guildId: string,
   registry: GuildRegistry,
   client: Client,
-  clientId: string,
   pluginLogger: Logger,
 ): Promise<void> => {
   const guild = client.guilds.cache.get(guildId);
@@ -31,13 +30,13 @@ export const performBackup = async (
   }
   const repos = registry.getRepos(guildId);
   if (repos === undefined) {
-    logError(pluginLogger, clientId, guildId, 'Repos not available for guild');
+    logError(pluginLogger, guildId, 'Repos not available for guild');
     return;
   }
 
   const debugCh = registry.getChannel(guildId, 'debug');
   if (debugCh === undefined || !debugCh.isSendable()) {
-    logError(pluginLogger, clientId, guildId, 'Debug channel not sendable');
+    logError(pluginLogger, guildId, 'Debug channel not sendable');
     return;
   }
 
@@ -57,7 +56,7 @@ export const performBackup = async (
       `[ SYSTEM ] Backup started. DB contains ${existingCount} messages.`,
     );
 
-    const { channels, liveChannelIds } = await collectChannels(guild, clientId, pluginLogger);
+    const { channels, liveChannelIds } = await collectChannels(guild, pluginLogger);
 
     log.writeln('=== MSG ARCHIVE BACKUP ===');
     log.writeln(`Guild:    ${guildId}`);
@@ -76,7 +75,7 @@ export const performBackup = async (
     const allStats: ChannelBackupStats[] = [];
     for (let i = 0; i < channels.length; i += 1) {
       const channel = channels[i]!;
-      const { added, stats } = await backupChannel(channel, repos, guildId, clientId, pluginLogger, async () => {
+      const { added, stats } = await backupChannel(channel, repos, guildId, pluginLogger, async () => {
         await statusMsg
           .edit(
             `[ SYSTEM ] Backup in progress. DB now contains (${existingCount}+${newCount}) messages.`,
@@ -162,7 +161,7 @@ export const performBackup = async (
           : ''),
     );
   } catch (err: unknown) {
-    logError(pluginLogger, clientId, guildId, err);
+    logError(pluginLogger, guildId, err);
     log.writeln(`FATAL ERROR: ${String(err)}`);
   } finally {
     log.close();

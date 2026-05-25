@@ -15,21 +15,21 @@ import { REACTION_REGISTRY } from './registry.generated';
 export { ReactionHandler };
 
 export const registerReactions = async (bot: BaseBot) => {
-    logSystem(bot.logger, bot.clientId, "Registering reaction handlers...");
+    logSystem(bot.logger, "Registering reaction handlers...");
     try {
         // todo: whether to specify handlers for each bot
         // import all reaction handlers
         bot.reactionHandlers = createAllReactionHandlers();
 
-        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.reactionHandlers.size} reaction handlers.`);
+        logSystem(bot.logger, `Successfully register ${bot.reactionHandlers.size} reaction handlers.`);
     } catch (err) {
-        logSystem(bot.logger, bot.clientId, `Failed to register reaction handlers: ${err}`);
+        logSystem(bot.logger, `Failed to register reaction handlers: ${err}`);
     }
 }
 
 export const executeReactionAdded = async (reaction: MessageReaction, user: User, bot: BaseBot) => {
     if (!bot.reactionHandlers) {
-        logSystem(bot.logger, bot.clientId, "Reaction handler not found.");
+        logSystem(bot.logger, "Reaction handler not found.");
         return;
     }
 
@@ -41,7 +41,7 @@ export const executeReactionAdded = async (reaction: MessageReaction, user: User
 
 export const executeReactionRemoved = async (reaction: MessageReaction, user: User, bot: BaseBot) => {
     if (!bot.reactionHandlers) {
-        logSystem(bot.logger, bot.clientId, "Reaction handler not found.");
+        logSystem(bot.logger, "Reaction handler not found.");
         return;
     }
 

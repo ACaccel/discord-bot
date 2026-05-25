@@ -50,22 +50,16 @@ export const createMessageBackupPlugin = (
     async onReady(ctx): Promise<void> {
       const registry = ctx.resolve(TOKENS.GuildRegistry);
       const client = ctx.resolve(TOKENS.DiscordClient);
-      const clientId = client.user?.id ?? 'unknown';
 
       const runOnce = async (): Promise<void> => {
         for (const guildId of config.backupServers) {
           if (running.has(guildId)) {
-            logError(
-              ctx.logger,
-              clientId,
-              guildId,
-              'Backup already running, skipping this tick',
-            );
+            logError(ctx.logger, guildId, 'Backup already running, skipping this tick');
             continue;
           }
           running.add(guildId);
           try {
-            await performBackup(guildId, registry, client, clientId, ctx.logger);
+            await performBackup(guildId, registry, client, ctx.logger);
           } finally {
             running.delete(guildId);
           }

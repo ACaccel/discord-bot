@@ -27,43 +27,46 @@ describe('logError', () => {
   });
 
   it('no-ops when logger is undefined (pre-run() window)', () => {
-    expect(() => logError(undefined, 'bot-1', 'g-1', new Error('boom'))).not.toThrow();
+    expect(() => logError(undefined, 'g-1', new Error('boom'))).not.toThrow();
   });
 
-  it('binds bot scope only when guildId is null/undefined/empty', () => {
-    logError(fake as unknown as Logger, 'bot-1', null, new Error('x'));
-    expect(fake.child).toHaveBeenCalledWith({ bot: 'bot-1' });
+  it('does not call child when guildId is null/undefined/empty (bot is ambient via base bindings)', () => {
+    logError(fake as unknown as Logger, null, new Error('x'));
+    expect(fake.child).not.toHaveBeenCalled();
+    expect(fake.error).toHaveBeenCalledWith({ err: expect.any(Error) }, 'errorLogger');
 
     fake.child.mockClear();
-    logError(fake as unknown as Logger, 'bot-1', '', new Error('x'));
-    expect(fake.child).toHaveBeenCalledWith({ bot: 'bot-1' });
+    fake.error.mockClear();
+    logError(fake as unknown as Logger, '', new Error('x'));
+    expect(fake.child).not.toHaveBeenCalled();
+    expect(fake.error).toHaveBeenCalledWith({ err: expect.any(Error) }, 'errorLogger');
   });
 
-  it('binds bot + guild scope when guildId is present', () => {
-    logError(fake as unknown as Logger, 'bot-1', 'g-1', new Error('x'));
-    expect(fake.child).toHaveBeenCalledWith({ bot: 'bot-1', guildId: 'g-1' });
+  it('binds only guildId when present (bot is ambient via base bindings)', () => {
+    logError(fake as unknown as Logger, 'g-1', new Error('x'));
+    expect(fake.child).toHaveBeenCalledWith({ guildId: 'g-1' });
   });
 
   it('uses `err` key for Error instances and `raw` for primitives', () => {
     const err = new Error('boom');
-    logError(fake as unknown as Logger, 'bot-1', 'g-1', err);
+    logError(fake as unknown as Logger, 'g-1', err);
     expect(fake.error).toHaveBeenCalledWith({ err }, 'errorLogger');
 
     fake.error.mockClear();
-    logError(fake as unknown as Logger, 'bot-1', 'g-1', 'string-error');
+    logError(fake as unknown as Logger, 'g-1', 'string-error');
     expect(fake.error).toHaveBeenCalledWith({ raw: 'string-error' }, 'errorLogger');
   });
 });
 
 describe('logSystem', () => {
   it('no-ops when logger is undefined', () => {
-    expect(() => logSystem(undefined, 'bot-1', 'hi')).not.toThrow();
+    expect(() => logSystem(undefined, 'hi')).not.toThrow();
   });
 
-  it('binds bot scope and emits msg as the pino headline (no msg-binding collision)', () => {
+  it('emits msg as the pino headline without rebinding bot (ambient via base bindings)', () => {
     const fake = makeFake();
-    logSystem(fake as unknown as Logger, 'bot-1', 'hello');
-    expect(fake.child).toHaveBeenCalledWith({ bot: 'bot-1' });
+    logSystem(fake as unknown as Logger, 'hello');
+    expect(fake.child).not.toHaveBeenCalled();
     // The headline must be passed positionally — the old shape
     // `{ msg }` collided with pino's `messageKey` default and silently
     // dropped the headline. See helpers.ts comment.
@@ -72,18 +75,16 @@ describe('logSystem', () => {
 });
 
 describe('logGuildEvent', () => {
-  it('binds bot/guild/name and splats structured details onto the record', () => {
+  it('binds guild/name (bot is ambient) and splats structured details onto the record', () => {
     const fake = makeFake();
     logGuildEvent(
       fake as unknown as Logger,
-      'bot-1',
       'g-1',
       'interaction_create',
       { command: '/talk', user: 'DCaccel', channel: 'general' },
       'GuildName',
     );
     expect(fake.child).toHaveBeenCalledWith({
-      bot: 'bot-1',
       guildId: 'g-1',
       guildName: 'GuildName',
     });
@@ -102,7 +103,6 @@ describe('logGuildEvent', () => {
     const fake = makeFake();
     logGuildEvent(
       fake as unknown as Logger,
-      'bot-1',
       'g-1',
       'message_update',
       { user: 'u', channel: 'c', oldMessage: 'a', newMessage: 'b' },
@@ -117,7 +117,6 @@ describe('logGuildEvent', () => {
     const fake = makeFake();
     logGuildEvent(
       fake as unknown as Logger,
-      'bot-1',
       'g-1',
       'guild_member_update',
       { user: 'u', added: ['<@&1>'], removed: [] },
@@ -135,8 +134,6 @@ describe('logGuildEvent', () => {
   });
 
   it('no-ops when logger is undefined', () => {
-    expect(() =>
-      logGuildEvent(undefined, 'bot-1', 'g-1', 'x', { a: 1 }, 'GuildName'),
-    ).not.toThrow();
+    expect(() => logGuildEvent(undefined, 'g-1', 'x', { a: 1 }, 'GuildName')).not.toThrow();
   });
 });
