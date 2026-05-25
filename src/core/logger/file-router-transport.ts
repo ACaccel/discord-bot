@@ -39,6 +39,8 @@ import { createWriteStream, mkdirSync, type WriteStream } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { Writable } from 'node:stream';
 
+import type { StreamEntry } from 'pino';
+
 export interface FileRouterOptions {
   /** Root directory under which `<botId>[/<guildId>]/<date>.log` lives. */
   readonly rootDir: string;
@@ -208,3 +210,22 @@ export const createFileRouterStream = (options: FileRouterOptions): Writable => 
     },
   });
 };
+
+/**
+ * Composition-root-facing factory. Build a {@link StreamEntry} suitable
+ * for `createLogger({ extraStreams: [createFileSink({ rootDir, level })] })`.
+ *
+ * Kept separate from {@link createFileRouterStream} so the composition
+ * root has a single, opt-in entry point that returns the exact shape
+ * `createLogger` expects (a `StreamEntry`, not a bare `Writable`).
+ * `core/logger/logger.ts` does NOT import this — callers wire it from
+ * outside the logger module so `createLogger` itself stays free of
+ * file-system concerns.
+ */
+export const createFileSink = (options: {
+  readonly rootDir: string;
+  readonly level: StreamEntry['level'];
+}): StreamEntry => ({
+  level: options.level,
+  stream: createFileRouterStream({ rootDir: options.rootDir }),
+});

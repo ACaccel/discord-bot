@@ -1,4 +1,11 @@
-export { createLogger, type Logger, type LogLevel, type CreateLoggerInput } from './logger';
+export {
+  createLogger,
+  type Logger,
+  type LogLevel,
+  type CreateLoggerInput,
+  type StreamEntry,
+} from './logger';
+export { createFileSink, createFileRouterStream } from './file-router-transport';
 export {
   installProcessHandlers,
   getUnhandledRejectionCount,

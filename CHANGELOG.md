@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `createLogger` no longer builds the file-router transport. The sink
+  is now exposed via a separate `createFileSink({ rootDir, level })`
+  factory in `src/core/logger/file-router-transport.ts` and wired in
+  by `createBootstrapLogger` via the new `extraStreams` option, so
+  `core/logger/logger.ts` is free of file-system concerns. Tests build
+  loggers via plain `createLogger` (no `extraStreams`) and therefore
+  never open files, removing the prior `NODE_ENV === 'test'` branch
+  inside `createBootstrapLogger`.
 - `logSystem` now passes `msg` as the pino headline (positional
   argument) rather than under a `msg` binding, fixing a
   `messageKey` collision that silently dropped the operator-supplied

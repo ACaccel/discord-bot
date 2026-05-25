@@ -31,8 +31,9 @@ import pino, {
   type StreamEntry,
 } from 'pino';
 import { buildPinoRedactPaths } from '../config/redact';
-import { createFileRouterStream } from './file-router-transport';
 import { scrubForLog } from './scrub-for-log';
+
+export type { StreamEntry } from 'pino';
 
 /**
  * Application-facing logger surface. A subset of pino's API — keeping
@@ -69,12 +70,15 @@ export interface CreateLoggerInput {
   /** Bound on every line (e.g. `{ env: 'production', service: 'discord-bot' }`). */
   readonly base?: Readonly<Record<string, unknown>>;
   /**
-   * When defined, install the file-router transport with this directory
-   * as its root. Records are written as JSON Lines under
-   * `<fileRootDir>/<botId>[/<guildId>]/<localDate>.log`. Pass
-   * `undefined` to disable file output entirely (e.g. unit tests).
+   * Additional pino multistream sinks layered on top of the (optional)
+   * pretty console. Each entry filters by `level` independently. The
+   * file-router transport lives behind {@link createFileSink} in the
+   * sibling `file-router-transport` module — wire it through this
+   * option from the composition root (`createBootstrapLogger` does this
+   * for production). Leaving this empty (the default) yields a logger
+   * with no file output, which is what unit tests want.
    */
-  readonly fileRootDir?: string;
+  readonly extraStreams?: readonly StreamEntry[];
 }
 
 /**
@@ -92,13 +96,14 @@ export const createLogger = (input: CreateLoggerInput): Logger => {
     },
     timestamp: pino.stdTimeFunctions.isoTime,
   };
-  // Pretty + file sinks are stacked through `pino.multistream` rather
-  // than `transport.targets`. Multistream keeps every sink in-process
-  // (no worker thread, no `require.resolve` of a TypeScript entry
-  // point) which is what makes the file router work cleanly under
-  // both `ts-node` and compiled JS. Each entry filters by `level`
-  // independently so the pretty console can stay at `info` while the
-  // file router captures `trace` for later forensics.
+  // Pretty + caller-supplied sinks (typically the file-router) are
+  // stacked through `pino.multistream` rather than `transport.targets`.
+  // Multistream keeps every sink in-process (no worker thread, no
+  // `require.resolve` of a TypeScript entry point) which is what makes
+  // the file router work cleanly under both `ts-node` and compiled JS.
+  // Each entry filters by `level` independently so the pretty console
+  // can stay at `info` while the file router captures `trace` for
+  // later forensics.
   const streams: StreamEntry[] = [];
   // `silent` shortcircuits every sink — pino's own `level: 'silent'`
   // already drops the record before it reaches a stream, but we also
@@ -122,11 +127,10 @@ export const createLogger = (input: CreateLoggerInput): Logger => {
       });
       streams.push({ level: streamLevel, stream: prettyStream });
     }
-    if (input.fileRootDir !== undefined && input.fileRootDir.length > 0) {
-      streams.push({
-        level: streamLevel,
-        stream: createFileRouterStream({ rootDir: input.fileRootDir }),
-      });
+    if (input.extraStreams !== undefined) {
+      for (const entry of input.extraStreams) {
+        streams.push(entry);
+      }
     }
   }
   const root: PinoLogger = streams.length > 0 ? pino(options, multistream(streams)) : pino(options);

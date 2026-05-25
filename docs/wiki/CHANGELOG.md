@@ -16,7 +16,11 @@ at the repository root.
   the logger refactor. The `logs/` tree is now per-bot / per-guild with
   local-time daily rotation; the helper file was renamed from
   `legacy.ts` to `helpers.ts` to reflect that it is the canonical
-  handler-side logging API.
+  handler-side logging API. Follow-up: split the file-router wiring out
+  of `createLogger` into a separate `createFileSink` factory consumed
+  by `createBootstrapLogger`, dropped the `_unbound` fallback bucket in
+  favour of a hard `bot`-binding contract, and stopped audit-logging
+  reaction events (too high frequency).
 
 ## v1.0.0 — Initial public release
 
