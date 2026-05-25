@@ -23,6 +23,15 @@ import path from 'path';
  * tests can import the handler barrels (which carry `@bot` / `@cmd` /
  * `handlers` imports).
  */
+/**
+ * Force the bootstrap logger's file sink off for every test process.
+ * `createBootstrapLogger` (in `src/core/config/`) reads `LOG_DIR` at
+ * call time and disables the file router when the value is empty; this
+ * keeps integration tests that spin up `BaseBot` from writing a real
+ * `logs/<botId>/<date>.log` tree into the working directory.
+ */
+const testEnv = { LOG_DIR: '' } as const;
+
 const aliases = {
   '@core': path.resolve(__dirname, 'src/core'),
   '@bot': path.resolve(__dirname, 'src/bot/index'),
@@ -41,6 +50,7 @@ export default defineWorkspace([
       name: 'unit',
       include: ['test/unit/**/*.test.ts'],
       environment: 'node',
+      env: testEnv,
     },
     resolve: { alias: aliases },
   },
@@ -49,6 +59,7 @@ export default defineWorkspace([
       name: 'integration',
       include: ['test/integration/**/*.test.ts'],
       environment: 'node',
+      env: testEnv,
       globalSetup: ['./test/integration/setup.ts'],
       // The integration project shares one mongodb-memory-server
       // (started by globalSetup). Parallel test files race on the
@@ -69,6 +80,7 @@ export default defineWorkspace([
       name: 'contract',
       include: ['test/contract/**/*.test.ts'],
       environment: 'node',
+      env: testEnv,
     },
     resolve: { alias: aliases },
   },
@@ -77,6 +89,7 @@ export default defineWorkspace([
       name: 'i18n',
       include: ['test/i18n/**/*.test.ts'],
       environment: 'node',
+      env: testEnv,
     },
     resolve: { alias: aliases },
   },
