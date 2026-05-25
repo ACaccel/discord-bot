@@ -6,15 +6,17 @@ import { logSystem } from '@core/logger';
 
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
+// `./ssm-handler` is imported BEFORE `./registry.generated` so the
+// abstract class is on `module.exports` by the time the generated
+// registry pulls in handler subclasses. See `ssm-handler.ts`.
+import { SSMHandler } from './ssm-handler';
 import { SSM_REGISTRY } from './registry.generated';
+
+export { SSMHandler };
 
 //==================================================//
 // String Select Menu Custom ID: <ssm_type|ssm_value>
-//==================================================// 
-
-export abstract class SSMHandler {
-    public abstract execute(interaction: StringSelectMenuInteraction, bot: BaseBot): Promise<void>;
-}
+//==================================================//
 
 export const registerSSMs = async (bot: BaseBot) => {
     logSystem(bot.logger, bot.clientId, "Registering string select menu handlers...");

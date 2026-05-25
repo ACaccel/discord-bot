@@ -6,11 +6,13 @@ import { logSystem } from '@core/logger';
 
 import { HandlerFactory } from "handlers";
 import { replyTranslated } from "../reply-translated";
+// `./modal-handler` is imported BEFORE `./registry.generated` so the
+// abstract class is on `module.exports` by the time the generated
+// registry pulls in handler subclasses. See `modal-handler.ts`.
+import { ModalHandler } from './modal-handler';
 import { MODAL_REGISTRY } from './registry.generated';
 
-export abstract class ModalHandler {
-    public abstract execute(interaction: ModalSubmitInteraction, bot: BaseBot): Promise<void>;
-}
+export { ModalHandler };
 
 export const registerModals = async (bot: BaseBot) => {
     logSystem(bot.logger, bot.clientId, "Registering modal handlers...");
