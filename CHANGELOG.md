@@ -24,6 +24,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- File-router transport now strips the `bot` field from each JSON
+  record before writing. The parent directory (`logs/<bot>/...`)
+  already names the owning bot, so the in-record `bot` field was dead
+  weight that bloated disk usage and `jq` output. `guildId` stays in
+  the record — downstream aggregators (cross-guild dashboards,
+  archival pipelines) need it as a join key when the file path is not
+  available.
+- `logSystem` / `logError` / `logGuildEvent` no longer take a
+  `clientId` parameter and no longer re-bind `{ bot: clientId }` on
+  every call. `createBootstrapLogger` attaches `{ bot }` via pino's
+  `base` so the binding is ambient on every child; the duplicate
+  binding the helpers produced caused two `bot` fields per JSON line.
+  Every callsite is updated to the new shape.
 - `createLogger` no longer builds the file-router transport. The sink
   is now exposed via a separate `createFileSink({ rootDir, level })`
   factory in `src/core/logger/file-router-transport.ts` and wired in

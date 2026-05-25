@@ -29,6 +29,15 @@
  * deliberately no `_unbound` fallback file because silently shuttling
  * mis-bound lines into a junk directory hides the underlying mistake.
  *
+ * `bot` is path-encoded only, not field-encoded: the routing step
+ * extracts `bot` to choose the file path, then strips it from the
+ * record before serialising. Every line under `logs/<bot>/...` already
+ * names the owning bot via its parent directory, so re-stating it
+ * inside each JSON object is dead weight that bloats both disk usage
+ * and `jq` output. `guildId` is left in the record on purpose —
+ * downstream aggregators (cross-guild dashboards, archival pipelines)
+ * use it as a join key without access to the originating file path.
+ *
  * Layer purity: only Node built-ins (`fs`, `path`, `stream`). No
  * discord.js / mongoose / our own infra — `core/**` stays clean. The
  * `time` field on each record is left as pino's UTC ISO so the file
@@ -146,7 +155,17 @@ export const createFileRouterStream = (options: FileRouterOptions): Writable => 
     }
     const guildId = typeof obj['guildId'] === 'string' ? (obj['guildId'] as string) : undefined;
     const cached = openOrRefresh(botId, guildId);
-    cached.stream.write(`${line}\n`);
+    // `bot` is path-encoded (the parent directory names the bot), so
+    // strip it from the JSON record before serialising. `guildId` stays
+    // — cross-guild aggregators key on it without seeing the file path.
+    // Re-serialising rather than string-splicing the original `line`
+    // is the only correct path: pino emits records with no canonical
+    // field order, and JSON.parse + JSON.stringify is the
+    // straightforward way to drop a key without writing a fragile
+    // regex over the source string.
+    const { bot: _stripped, ...rest } = obj;
+    void _stripped;
+    cached.stream.write(`${JSON.stringify(rest)}\n`);
   };
 
   const openOrRefresh = (botId: string, guildId: string | undefined): CachedStream => {

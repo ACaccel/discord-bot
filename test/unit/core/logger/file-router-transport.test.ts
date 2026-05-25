@@ -64,11 +64,12 @@ describe('file-router stream', () => {
     expect(existsSync(expected)).toBe(true);
     const contents = readFileSync(expected, 'utf8').trim().split('\n');
     expect(contents).toHaveLength(1);
-    expect(JSON.parse(contents[0]!)).toMatchObject({
-      bot: 'bot-A',
-      guildId: 'guild-1',
-      msg: 'hello',
-    });
+    const parsed = JSON.parse(contents[0]!) as Record<string, unknown>;
+    // `bot` is path-encoded only (parent directory `bot-A`); the field
+    // is stripped from the JSON record before serialising. `guildId`
+    // stays in-record so downstream aggregators can still key on it.
+    expect(parsed).toMatchObject({ guildId: 'guild-1', msg: 'hello' });
+    expect(parsed).not.toHaveProperty('bot');
   });
 
   it('routes a record without guildId to <root>/<bot>/<date>.log', async () => {
@@ -84,7 +85,9 @@ describe('file-router stream', () => {
     expect(existsSync(expected)).toBe(true);
     const contents = readFileSync(expected, 'utf8').trim().split('\n');
     expect(contents).toHaveLength(1);
-    expect(JSON.parse(contents[0]!)).toMatchObject({ msg: 'system line' });
+    const parsed = JSON.parse(contents[0]!) as Record<string, unknown>;
+    expect(parsed).toMatchObject({ msg: 'system line' });
+    expect(parsed).not.toHaveProperty('bot');
   });
 
   it('throws inside the write path when `bot` binding is missing (no _unbound fallback)', async () => {
