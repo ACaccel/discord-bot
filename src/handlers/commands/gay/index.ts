@@ -1,33 +1,41 @@
-import { 
-    ChatInputCommandInteraction,
-} from 'discord.js';
-import { BaseBot } from '@bot';
+import type { ChatInputCommandInteraction } from 'discord.js';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-export default class gay extends Command {
-    constructor() {
-        super();
-        this.setConfig({
-            name: "gay",
-            description: "是不是給",
-            options: {
-                user: [
-                    {
-                        name: "user",
-                        description: "選擇對象",
-                        required: true
-                    }
-                ]
-            }
-        });
-    }
+const IS_GAY_PROBABILITY = 0.95;
 
-    public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
-        const user = interaction.options.get("user")?.value;
-        if (interaction.guild?.members.cache.has(user as string)) {
-            const target = interaction.guild?.members.cache.get(user as string);
-            const res = `${target?.displayName} ${(Math.random() > 0.05 ? "是" : "不是")} gay`;
-            await interaction.reply({ content: res });
-        }
-    }
+export default class gay extends Command {
+  constructor() {
+    super();
+    this.setConfig({
+      name: 'gay',
+      options: {
+        user: [
+          {
+            name: 'user',
+            required: true,
+          },
+        ],
+      },
+    });
+  }
+
+  public override async execute(
+    interaction: ChatInputCommandInteraction,
+    bot: BaseBot,
+  ): Promise<void> {
+    const userId = interaction.options.get('user')?.value;
+    if (!interaction.guild?.members.cache.has(userId as string)) return;
+
+    const target = interaction.guild.members.cache.get(userId as string);
+    const t = bot.translator;
+    // Defensive guard for the pre-run() window: the translator field is
+    // only set once `run()` resolves. The early-return keeps the strict
+    // typecheck honest and silently no-ops when the target is unknown.
+    if (t === undefined || target === undefined) return;
+
+    const key =
+      Math.random() < IS_GAY_PROBABILITY ? 'replies:gay.is_gay' : 'replies:gay.is_not_gay';
+    await interaction.reply({ content: t.t(key, { name: target.displayName }) });
+  }
 }

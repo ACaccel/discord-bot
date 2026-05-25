@@ -1,30 +1,28 @@
-import { 
-    ChatInputCommandInteraction,
+import type { 
+    ChatInputCommandInteraction} from 'discord.js';
+import {
     EmbedBuilder,
 } from 'discord.js';
 import axios from 'axios';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { replyForError } from '../../reply-for-error';
 export default class search_anime_scene extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "search_anime_scene",
-            description: "搜尋動漫截圖來源",
             options: {
                 attachment: [
                     {
                         name: "image",
-                        description: "動漫截圖",
                         required: true
                     }
                 ],
                 number: [
                     {
                         name: "display_num",
-                        description: "顯示幾筆搜尋結果 (optional)",
                         required: false
                     }
                 ]
@@ -37,7 +35,7 @@ export default class search_anime_scene extends Command {
         try {
             const image = interaction.options.get("image")?.attachment;
             if (!image) {
-                await interaction.editReply({ content: "請上傳圖片" });
+                await interaction.editReply({ content: bot.translator?.t('replies:search_anime_scene.upload_image') ?? '' });
                 return;
             }
 
@@ -53,7 +51,7 @@ export default class search_anime_scene extends Command {
                         video: string;
                         image: string;
                     }
-                    let embedarr: EmbedBuilder[] = [];
+                    const embedarr: EmbedBuilder[] = [];
                     const result = response.data.result as IResult[];
                     const num_results = interaction.options.get("display_num")?.value ?
                         interaction.options.get("display_num")?.value as number > result.length ? 
@@ -73,12 +71,17 @@ export default class search_anime_scene extends Command {
                         const embedMsg = new EmbedBuilder()
                             .setTitle(filename)
                             .setURL(video)
-                            .setDescription(`第 ${episode} 集, 
-                                相似度：${similarity.toFixed(2)}%
-                                時間：${(from/60).toFixed(0)}:${(from%60).toFixed(2)} - ${(to/60).toFixed(0)}:${(to%60).toFixed(2)}`)
+                            .setDescription(bot.translator?.t('replies:search_anime_scene.description', {
+                                episode,
+                                similarity: similarity.toFixed(2),
+                                fromMin: (from / 60).toFixed(0),
+                                fromSec: (from % 60).toFixed(2),
+                                toMin: (to / 60).toFixed(0),
+                                toSec: (to % 60).toFixed(2),
+                            }) ?? '')
                             .setImage(image)
                             .setTimestamp()
-                            .setFooter({ text: `第 ${i + 1} 筆結果` });
+                            .setFooter({ text: bot.translator?.t('replies:search_anime_scene.footer', { index: i + 1 }) ?? '' });
                         embedarr.push(embedMsg);
                     });
 
@@ -86,8 +89,7 @@ export default class search_anime_scene extends Command {
                 }
             })
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法搜尋動畫截圖" });
+            await replyForError(interaction, bot, error, 'replies:search_anime_scene.failed', interaction.guild?.id);
         }
     }
 }

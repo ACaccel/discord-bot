@@ -1,21 +1,19 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { replyForError } from '../../reply-for-error';
 export default class change_nickname extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "change_nickname",
-            description: "更改bot暱稱",
             options: {
                 string: [
                     {
                         name: "nickname",
-                        description: "新暱稱",
                         required: true
                     }
                 ]
@@ -28,22 +26,21 @@ export default class change_nickname extends Command {
         try {
             const guild = interaction.guild;
             if (!guild) {
-                await interaction.editReply({ content: "找不到伺服器"});
+                await interaction.editReply({ content: bot.translator?.t('errors:command.guild_not_found') ?? ''});
                 return;
             }
     
             const newName = interaction.options.get("nickname")?.value as string;
             const userBot = guild.members.cache.get(bot.client.user?.id as string);
             if (!userBot) {
-                await interaction.editReply({ content: "找不到機器人"});
+                await interaction.editReply({ content: bot.translator?.t('errors:command.bot_not_found') ?? ''});
                 return;
             }
             await userBot.setNickname(newName);
     
-            await interaction.editReply({ content: `已更改暱稱為：${newName}` });
+            await interaction.editReply({ content: bot.translator?.t('replies:change_nickname.changed', { newName }) ?? '' });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "更改失敗"});
+            await replyForError(interaction, bot, error, 'replies:change_nickname.failed', interaction.guild?.id);
         }
     }
 }

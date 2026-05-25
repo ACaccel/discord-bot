@@ -1,0 +1,345 @@
+{
+  "base_bot": {
+    "reboot_notice": "{{botName}} has rebooted!"
+  },
+  "nijika": {
+    "help_message": "### Currently supported features:\n1. auto reply: the bot replies based on message pairs in the database\n2. roll dice: example input -> `2d5`, randomly picks two numbers between 1 and 5\n"
+  },
+  "konata": {
+    "presence_text": "Small breasts are a status symbol, a rare commodity!"
+  },
+  "llm_chat": {
+    "thinking": "🤔 Thinking...",
+    "api_error": "An error occurred while calling the AI API. Please try again later.",
+    "missing_api_key": "The API key for provider `{{provider}}` is not set (please set `{{envVar}}` in .env)."
+  },
+  "menu_get_avatar": {
+    "avatar_url_field": "Avatar URL",
+    "failed": "Hmm... I couldn't grab this user's avatar. Give it another try later! (error code: {{traceId}})",
+    "title": "{{user}}'s avatar URL"
+  },
+  "menu_get_sticker": {
+    "not_found": "This message has no sticker or single emoji.",
+    "failed": "Hmm... I couldn't grab that sticker/emoji. Give it another try later! (error code: {{traceId}})"
+  },
+  "auto_reply": {
+    "goodnight_reply": "Not good for your health! <:ave_mortis_bad_for_health:1333052644368846878>",
+    "fatcat_line": "Fat cat is so gay",
+    "mubaimu_line": "Haruto Jay",
+    "long_hair_line": "Go to the spa"
+  },
+  "gay": {
+    "is_gay": "{{name}} is gay",
+    "is_not_gay": "{{name}} is not gay",
+    "failed": "Hmm... the verdict failed this time. Give it another try later! (error code: {{traceId}})"
+  },
+  "pin_message": {
+    "not_in_thread": "This command can only be used in a thread.",
+    "not_thread_owner": "You are not the thread owner.",
+    "unpinned": "Message unpinned.",
+    "pinned": "Message pinned.",
+    "invalid_action": "Invalid action.",
+    "operation_failed": "Could not pin the message.",
+    "failed": "Hmm... the pin operation failed. Give it another try later! (error code: {{traceId}})"
+  },
+  "add_reply": {
+    "added": "Added input: {{input}} reply: {{reply}}!",
+    "already_exists": "The pair input: {{input}} reply: {{reply}} already exists!",
+    "failed": "Hmm... adding it failed. Give it another try later! (error code: {{traceId}})"
+  },
+  "ai_whitelist": {
+    "empty": "The whitelist is currently empty.",
+    "header": "**AI whitelist ({{count}} users):**",
+    "already_in": "{{user}} is already on the whitelist.",
+    "added": "Added {{user}} to the whitelist (default provider: openai).",
+    "not_in": "{{user}} is not on the whitelist.",
+    "removed": "Removed {{user}} from the whitelist.",
+    "failed": "Hmm... the whitelist operation failed. Give it another try later! (error code: {{traceId}})"
+  },
+  "ai_settings": {
+    "modal_id_error": "Modal identification error. Please run /ai_settings again.",
+    "missing_model_or_web_search": "Please select both the Model and Web Search fields.",
+    "invalid_temperature": "Temperature must be a number between 0.0 and 2.0.",
+    "select_model_placeholder": "Select a model",
+    "web_search_placeholder": "Web search",
+    "toggle_on": "On",
+    "toggle_off": "Off",
+    "system_prompt_placeholder": "(Optional) Set a role or rules for the AI",
+    "model_list_unavailable": "The available model list for `{{provider}}` cannot be retrieved right now. Possible causes: the API key is not set, a temporary network failure, or the service is still loading after startup. Please wait a moment and try again.",
+    "modal_title": "AI settings — {{provider}}",
+    "system_prompt_preview": "`{{preview}}…` ({{length}} characters total, truncated)",
+    "system_prompt_not_set": "(not set)",
+    "updated_header": "✅ AI settings updated:",
+    "modal_system_prompt_preview": "\n```\n{{preview}}\n…({{length}} characters total, truncated)\n```",
+    "web_search_status": "• Web Search: {{value}}",
+    "failed": "Hmm... updating the AI settings failed. Give it another try later! (error code: {{traceId}})"
+  },
+  "ai_status": {
+    "system_prompt_preview": "`{{preview}}…` ({{length}} characters total, truncated)",
+    "system_prompt_not_set": "(not set)",
+    "web_search_status": "**Web Search:** {{value}}",
+    "failed": "Hmm... reading the AI settings failed. Give it another try later! (error code: {{traceId}})"
+  },
+  "ban_user": {
+    "cannot_get_votes": "Could not get the vote count.",
+    "cannot_ban_bot": "You want to ban a bot, huh?",
+    "cannot_timeout": "Lady Sakiko cannot time them out, but they shall be sentenced to endless deletion, judged at once!",
+    "failed": "Could not time out the user. (error code: {{traceId}})",
+    "vote_call": "**{{initiator}}** has called a trial!\nTime out **{{target}}** for {{duration}} minutes?\nIf **{{threshold}}** votes accumulate within **{{judgeTime}}** minutes they will be timed out. <@&{{role}}>, show them the darkness of the Toyokawa family!",
+    "timed_out": "{{user}} has been timed out by Lady Sakiko for {{duration}} minutes.",
+    "vote_failed": "{{count}} votes — the timeout threshold of {{threshold}} votes was not reached.",
+    "timeout_reason": "Lady Sakiko's timeout verdict!"
+  },
+  "bubble_wrap": {
+    "too_long": "The string is too long. Please shorten it to within 64 characters.",
+    "failed": "Hmm... generating the bubble wrap failed. Give it another try later! (error code: {{traceId}})"
+  },
+  "bug_report": {
+    "empty_content": "Please enter some content.",
+    "failed": "Could not report the bug. (error code: {{traceId}})",
+    "reported": "Bug reported! Content: {{content}}"
+  },
+  "change_avatar": {
+    "no_role_config": "No role configuration found.",
+    "new_role_not_found": "New identity not found.",
+    "failed": "Change failed. (error code: {{traceId}})",
+    "changed": "{{oldName}} is gone; now is the time for {{newName}} to reclaim the throne."
+  },
+  "change_nickname": {
+    "failed": "Change failed. (error code: {{traceId}})",
+    "changed": "Nickname changed to: {{newName}}"
+  },
+  "db_list_message": {
+    "not_text_channel": "This channel is not a text channel/thread and cannot be queried.",
+    "invalid_args": "Invalid argument format: use YYYY-MM-DD for date, and 0-23 for hour (if provided).",
+    "failed": "Could not list the message records. (error code: {{traceId}})",
+    "no_messages": "No message records found in <#{{channelId}}> for {{scopeText}}.",
+    "scope_full_day": "{{date}} all day",
+    "scope_hour": "{{date}} {{hour}}:00",
+    "range_full_day": "{{date}} 00:00 - next day 00:00",
+    "no_output_channel": "No usable output channel found (the slash command channel).",
+    "found_split": "Found {{count}} messages ({{rangeText}}, <#{{channelId}}>); they will be sent across {{chunks}} messages.",
+    "found": "Found {{count}} messages ({{rangeText}}, <#{{channelId}}>)."
+  },
+  "delete_reply": {
+    "failed": "Could not delete the auto-reply pair. (error code: {{traceId}})",
+    "record_not_found": "That reply record was not found.",
+    "select_placeholder": "Select the reply to delete",
+    "image_preview_header": "Image preview:\n",
+    "deleted": "Deleted reply: {{key}} => {{reply}}"
+  },
+  "emoji_frequency": {
+    "done": "Processing complete!",
+    "failed": "Could not get the emoji usage frequency. (error code: {{traceId}})",
+    "progress": "Processing month {{current}} / {{total}}...",
+    "header": "The {{top}} {{kind}} emojis with the {{direction}} usage frequency in the past {{months}} months:\n",
+    "line": "{{rank}}. {{emoji}} - total: {{total}} times, in text: {{text}} times, as reaction: {{reaction}} times\n",
+    "direction_lowest": "lowest",
+    "direction_highest": "highest",
+    "kind_animated": "animated",
+    "kind_static": "static"
+  },
+  "get_avatar": {
+    "failed": "Could not get the avatar. (error code: {{traceId}})"
+  },
+  "help": {
+    "no_commands": "No command list available.",
+    "failed": "Could not get the command list. (error code: {{traceId}})",
+    "commands_header": "### Currently supported slash commands:\n"
+  },
+  "inspect_member_ids": {
+    "no_valid_id": "No valid ID found. Please enter Discord IDs of 17-20 digits.",
+    "embed_failed": "Could not build the inspection result.",
+    "failed": "Suspicious ID inspection failed. (error code: {{traceId}})",
+    "not_in_guild_line": "**In this server**: No",
+    "user_not_found_line": "**User info**: No data (may not exist, not cached, or inaccessible)",
+    "parse_failed_line": "**Status**: Could not parse user data",
+    "profile_link_line": "**Clickable profile**: [Open Profile](https://discord.com/users/{{id}})",
+    "in_guild_line": "**In this server**: {{value}}",
+    "account_type_line": "**Account type**: {{value}}",
+    "created_at_line": "**Account created at**: {{value}}",
+    "system_user_line": "**System User**: {{value}}",
+    "joined_at_line": "**Joined server at**: {{value}}",
+    "display_name_line": "**Display Name**: {{value}}",
+    "timed_out_line": "**Timed Out**: {{value}}",
+    "timeout_until_line": "**Timeout expires**: {{value}}",
+    "pending_line": "**Pending member verification**: {{value}}",
+    "highest_role_line": "**Highest role**: {{value}}",
+    "role_count_line": "**Role count**: {{value}}",
+    "top_roles_line": "**Top 10 roles**: {{value}}",
+    "boost_since_line": "**Boosting since**: {{value}}",
+    "kickable_line": "**Kickable**: {{value}}",
+    "bannable_line": "**Bannable**: {{value}}",
+    "yes": "Yes",
+    "no": "No",
+    "title": "Suspicious ID inspection {{current}}/{{total}}",
+    "exceeds_max": "Up to {{max}} entries can be checked at once; {{dropped}} were ignored."
+  },
+  "level_detail": {
+    "too_long": "Too long... please choose a shorter range.",
+    "failed": "Could not get the level details. (error code: {{traceId}})",
+    "message_count": "**Total messages:** {{count}} ",
+    "current_xp": "**Current XP:** {{userXp}} / {{levelXp}} ",
+    "total_xp": "**Total XP:** {{totalXp}} ",
+    "average_xp": "**Average XP:** {{averageXp}} \n\n"
+  },
+  "list_guild_members": {
+    "empty": "There are no members to list right now.",
+    "failed": "Failed to get the member list. (error code: {{traceId}})",
+    "title": "{{name}} member list",
+    "total": "Total: {{total}} (users: {{users}}, bots: {{bots}})",
+    "footer": "{{totalText}}|Page {{current}}/{{total}}"
+  },
+  "list_reply": {
+    "failed": "Could not list the auto-reply pairs. (error code: {{traceId}})",
+    "not_found": "No replies found for input: {{keyword}}!",
+    "header": "Replies for input: {{keyword}}:\n"
+  },
+  "random_restaurant": {
+    "midnight": "It's the middle of the night — the restaurants are all closed 🈹",
+    "no_match": "No restaurants found matching your criteria.",
+    "no_description": "No description.",
+    "description": "\"{{message}}\"\n\n{{priceLine}}{{addressLine}}{{phoneLine}}{{mapLine}}",
+    "price_line": "Price: {{price}}\n",
+    "address_line": "Address: {{address}}\n",
+    "phone_line": "Phone: {{phone}}\n",
+    "map_line": "Map: {{map}}",
+    "failed": "Hmm... the restaurant pick failed. Give it another try later! (error code: {{traceId}})"
+  },
+  "record": {
+    "join_voice_first": "Please join a voice channel first.",
+    "cannot_join_voice": "Could not join the voice channel.",
+    "started": "Recording started.",
+    "no_recording": "There is no recording in progress.",
+    "stopped": "Recording stopped.",
+    "no_audio": "No audio received; the recording will not be saved.",
+    "invalid_action": "Invalid action.",
+    "failed": "Could not record. (error code: {{traceId}})",
+    "saved": "Saved the last {{duration}} minutes of the recording."
+  },
+  "role_message": {
+    "no_permission": "You do not have permission to send a role-claim message.",
+    "format_error": "Format error! regex: match(/^<@&\\d+>(\\s*<@&\\d+>)*$/)",
+    "no_valid_id": "Please provide at least one valid role ID.",
+    "prompt": "Please choose the roles you want to claim:",
+    "failed": "Could not send the role-claim message. (error code: {{traceId}})",
+    "role_not_found": "No role found with ID {{id}}. Please verify the ID is correct."
+  },
+  "roll_call": {
+    "missing_target": "Please provide the users to call (users) or an activity ID (activity_id).",
+    "no_participants": "That activity currently has no participants.",
+    "format_error": "Format error! regex: match(/^<@\\d+>(\\s*<@\\d+>)*$/)",
+    "no_valid_id": "Please provide at least one valid user ID.",
+    "sent": "Roll call sent!",
+    "failed": "Could not run the roll call. (error code: {{traceId}})",
+    "activity_not_found": "No activity found with ID {{id}}.",
+    "activity_already_consumed": "Activity {{id}} has already been consumed by another roll-call command.",
+    "user_not_found": "No user found with ID {{id}}. Please verify the ID is correct.",
+    "announcement_header": "Lady Sakiko's roll-call list: <@{{userId}}> has started a roll call!\n",
+    "activity_id_line": "(Activity ID: {{id}})\n",
+    "trigger_prefix": "Lady Sakiko's roll-call list"
+  },
+  "search_anime_scene": {
+    "upload_image": "Please upload an image.",
+    "failed": "Could not search for the anime scene. (error code: {{traceId}})",
+    "description": "Episode {{episode}},\nsimilarity: {{similarity}}%\ntime: {{fromMin}}:{{fromSec}} - {{toMin}}:{{toSec}}",
+    "footer": "Result {{index}}"
+  },
+  "sticker_frequency": {
+    "failed": "Could not get the sticker usage frequency. (error code: {{traceId}})",
+    "progress": "Processing month {{current}} / {{total}}...",
+    "header": "The {{top}} stickers with the {{direction}} usage frequency in the past {{months}} months:\n",
+    "line": "{{rank}}. {{sticker}} - {{count}} times\n",
+    "chart_label": "{{rank}}: {{count}} times",
+    "direction_lowest": "lowest",
+    "direction_highest": "highest"
+  },
+  "talk": {
+    "missing_args": "Please enter a channel and content.",
+    "send_failed": "Could not send the message.",
+    "tag_warning": "{{user}}, you naughty one — I caught you tagging everyone.",
+    "failed": "Hmm... the message couldn't be sent. Give it another try later! (error code: {{traceId}})"
+  },
+  "talk_signed": {
+    "missing_args": "Please enter some content.",
+    "member_not_found": "Could not get the member information.",
+    "send_failed": "Could not send the message.",
+    "tag_warning": "{{displayName}} ({{username}}), you naughty one — I caught you tagging everyone.",
+    "failed": "Hmm... the message couldn't be sent. Give it another try later! (error code: {{traceId}})"
+  },
+  "todo_list": {
+    "missing_content": "Please enter the to-do item content.",
+    "expect_number": "Please enter a number.",
+    "failed": "Could not change the to-do item. (error code: {{traceId}})",
+    "added": "Added to-do item: {{content}}",
+    "already_exists": "This to-do item: {{content}} already exists!",
+    "not_found": "To-do item not found: {{content}}",
+    "deleted": "Deleted to-do item: {{content}}",
+    "header": "To-do list:\n"
+  },
+  "update_role": {
+    "no_config": "No level role configuration found in the config file.",
+    "done": "Update complete.",
+    "failed": "Could not update the roles. (error code: {{traceId}})",
+    "removed": "[ SYSTEM ] {{name}}, removed: {{role}}",
+    "granted": "[ SYSTEM ] {{name}}, gained: {{role}}"
+  },
+  "weather_forecast": {
+    "failed": "Could not get the weather forecast. (error code: {{traceId}})",
+    "unavailable": "The weather forecast service is temporarily unavailable (ACCUWEATHER_KEY is not set).",
+    "header": "Hourly weather forecast:\n",
+    "forecast_time": "- Forecast time: {{value}}\n",
+    "weather_status": "- Weather: {{value}}\n",
+    "precipitation": "- Precipitation chance: {{value}}%\n",
+    "thunderstorm": "- Thunderstorm chance: {{value}}%\n",
+    "temperature": "- Outdoor temperature: {{value}}°C\n",
+    "real_feel": "- RealFeel temperature: {{value}}°C\n",
+    "humidity": "- Relative humidity: {{value}}%\n"
+  },
+  "earthquake": {
+    "alert": "# <@&{{role}}> Taipei strong earthquake alert!!! (intensity 4 or above)\n> Why must there be an earthquake!?"
+  },
+  "common": {
+    "empty_value": "None"
+  },
+  "giveaway": {
+    "missing_required_fields": "Please enter the duration, number of winners, and prize.",
+    "channel_not_configured": "The giveaway channel is not configured.",
+    "invalid_duration": "Invalid duration.",
+    "create_announce_failed": "Could not create the giveaway.",
+    "create_failed": "Could not run the giveaway.",
+    "create_success": "Giveaway created! It will end at {{endTime}}.",
+    "missing_message_id": "Please provide the giveaway message ID.",
+    "delete_failed_with_reason": "Could not delete the giveaway: {{reason}}",
+    "delete_success": "Giveaway deleted.",
+    "delete_failed": "Could not delete the giveaway.",
+    "announce_title": "🎉 Giveaway: {{prize}}",
+    "announce_field_owner": "🎁 Prize provider",
+    "announce_field_winners": "👤 Number of winners",
+    "announce_field_endtime": "⏰ Giveaway ends at",
+    "announce_field_description": "📌 Notes",
+    "announce_footer": "Click the 🎉 emoji to enter the giveaway!",
+    "result_with_winners": "🎉 **Giveaway ended!** 🎉\n\n**Prize: {{prize}}**\n\n🏆 **Winners:**\n{{winners}}\n\nCongratulations to the winners above! Please contact <@{{ownerId}}> to claim your prize!",
+    "result_no_participants": "🎉 **Giveaway ended!** 🎉\n\n**Prize: {{prize}}**\n\n😢 **No one entered the giveaway**",
+    "failed": "Hmm... the giveaway operation failed. Give it another try later! (error code: {{traceId}})"
+  },
+  "activity": {
+    "missing_required_fields": "Please enter the activity title and duration.",
+    "invalid_duration": "Invalid duration.",
+    "create_announce_failed": "Could not create the activity.",
+    "create_failed": "Could not create the activity.",
+    "create_success": "Activity created!\n**Activity ID**: {{activityId}}\nIt will end at {{endTime}}.",
+    "missing_activity_id": "Please provide the activity ID.",
+    "delete_failed_with_reason": "Could not delete the activity: {{reason}}",
+    "delete_success": "Activity deleted.",
+    "delete_failed": "Could not delete the activity.",
+    "announce_title": "📢 Activity: {{title}}",
+    "announce_field_id": "🆔 Activity ID",
+    "announce_field_description": "📌 Description",
+    "announce_field_endtime": "⏰ Activity ends at",
+    "announce_footer": "Click the ✅ emoji to join the activity!",
+    "result_with_participants": "📢 **Activity ended!** 📢\n\n**Activity: {{title}}**\n\n✅ **Participants:**\n{{participants}}\n\n{{count}} people joined the activity!",
+    "result_no_participants": "📢 **Activity ended!** 📢\n\n**Activity: {{title}}**\n\n😢 **No one joined the activity**",
+    "failed": "Hmm... the activity operation failed. Give it another try later! (error code: {{traceId}})"
+  }
+}

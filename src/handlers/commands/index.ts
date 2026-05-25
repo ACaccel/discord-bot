@@ -1,88 +1,52 @@
-import { 
+import type {
     ApplicationCommandDataResolvable,
     ChatInputCommandInteraction,
     ContextMenuCommandInteraction,
-    ContextMenuCommandType,
-    REST,
-    Routes,
-    RateLimitData,
-    MessageFlags,
 } from 'discord.js';
-import { BaseBot } from "@bot";
-import { logger, bot_cmd } from "@utils";
+import type { BaseBot } from "@bot";
+import { logError, logSystem, ops } from "../../core/logger";
 import { HandlerFactory } from "handlers";
+import { replyTranslated } from "../reply-translated";
+import { Command, localizeCommandConfig } from './command';
+import { buildCommandJsonBody } from './command-builder';
+import { COMMAND_REGISTRY } from './registry.generated';
 
-export interface CommandConfig {
-    name: string;   // command name for handler lookup and display
-    description: string;
-    type?: ContextMenuCommandType;   // for context menu commands, default is Chat Input
-    options?: {
-        string?: CommandOption[];
-        number?: CommandOption[];
-        float?: CommandOption[];
-        user?: CommandOption[];
-        channel?: CommandOption[];
-        attachment?: CommandOption[];
-    };
-}
-
-interface CommandOption {
-    name: string;
-    description: string;
-    required: boolean;
-    choices?: CommandChoice[];
-    /** Minimum numeric value (only applies to `number` and `float` options). */
-    min?: number;
-    /** Maximum numeric value (only applies to `number` and `float` options). */
-    max?: number;
-}
-
-interface CommandChoice {
-    name: string;
-    value: string;
-}
-
-export abstract class Command {
-    public config: CommandConfig;
-
-    public constructor() {
-        this.config = { name: "", description: "" };
-    }
-
-    public setConfig(config: CommandConfig): void {
-        this.config = config;
-    }
-
-    public abstract execute(interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot): Promise<void>;
-}
+// Command metadata contract + i18n resolution live in `./command` so
+// this barrel (which pulls in the generated handler registry) is not a
+// dependency of every handler module.
+export {
+    Command,
+    localizeCommandConfig,
+    type CommandConfig,
+    type CommandOption,
+    type CommandChoice,
+    type LocalizedCommandConfig,
+    type LocalizedCommandOption,
+    type LocalizedCommandChoice,
+} from './command';
+export { buildCommandJsonBody } from './command-builder';
 
 export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: BaseBot) => {
     const rest_commands: ApplicationCommandDataResolvable[] = Array.from(commandHandlers.values())
         .filter((cmd: Command) => {
             if (!cmd.config) {
-                logger.errorLogger(bot.clientId, null, `Command ${cmd} has no config.`);
+                logError(bot.logger, bot.clientId, null, ops.command.handlerMissingConfig(String(cmd)));
                 return false;
             }
             return true;
         })
-        .map((cmd: Command) => bot_cmd.buildCommandJsonBody(cmd.config));
+        .map((cmd: Command) =>
+            buildCommandJsonBody(localizeCommandConfig(cmd.config, bot.translator)),
+        );
     return rest_commands;
 }
 
 export const registerCommands = async (bot: BaseBot) => {
-    logger.systemLogger(bot.clientId, "Registering commands...");
-
-    // const rest = new REST({ version: "10" }).setToken(bot.getToken());
-    // rest.on('rateLimited', (info: RateLimitData) => {
-    //     console.log(info);
-    // });
-    // rest.on('restDebug', (message: string) => {
-    //     console.log(message);
-    // });
+    logSystem(bot.logger, bot.clientId, ops.command.registerStart());
 
     try {
         if (!bot.config.commands) {
-            logger.systemLogger(bot.clientId, "No commands to register.");
+            logSystem(bot.logger, bot.clientId, ops.command.registerEmpty());
             return;
         }
 
@@ -90,39 +54,40 @@ export const registerCommands = async (bot: BaseBot) => {
         bot.config.commands.forEach((name) => {
             const newCommand = createCommand(name);
             if (newCommand) {
-                bot.commandHandlers.set(newCommand.config.name, newCommand);    // use config name rather than class name as the key
+                // Key by the *localised* command name so the map key
+                // matches the name Discord registers and echoes back as
+                // `interaction.commandName`. For chat-input commands the
+                // localised name equals `config.name` (a lowercase-ASCII
+                // id); for context-menu commands it is the catalog
+                // display name.
+                const registeredName = localizeCommandConfig(
+                    newCommand.config,
+                    bot.translator,
+                ).name;
+                bot.commandHandlers.set(registeredName, newCommand);
             }
         });
         
-        // deprecated: use deploy.ts instead
-        // register commands to Discord API via REST (guild registration is instant)
-        // const rest_commands = getCommandJsonBody(bot.commandHandlers, bot);
-        // for (const [guildId] of Object.entries(bot.guildInfo)) {
-        //     await rest.put(
-        //         Routes.applicationGuildCommands(bot.clientId, guildId),
-        //         { body: rest_commands },
-        //     ).then(() => {
-        //         logger.systemLogger(bot.clientId, `Registered ${rest_commands.length} commands for guild ${guildId}`);
-        //     }).catch((err) => {
-        //         console.error(err);
-        //         logger.errorLogger(bot.clientId, guildId, `Failed to register commands for guild ${guildId}: ${err}`);
-        //     });
-        //     await new Promise(resolve => setTimeout(resolve, 60000)); // to avoid rate limit
-        // }
-
-        logger.systemLogger(bot.clientId, `Successfully register ${bot.commandHandlers.size} application (/) commands.`)
+        logSystem(bot.logger, bot.clientId, ops.command.registerSuccess(bot.commandHandlers.size));
     } catch (err) {
-        logger.systemLogger(bot.clientId, `Failed to register commands: ${err}`);
+        logSystem(bot.logger, bot.clientId, ops.command.registerFailed(String(err)));
     }
 }
 
-export const executeCommand = async (interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot, blocked_channels?: string[]) => {
+/**
+ * Dispatch a slash-command / context-menu interaction to its handler.
+ *
+ * This function is purely concerned with handler lookup. Channel and
+ * guild logging policy lives in `createChannelLoggingMiddleware` at the
+ * composition root, keeping the dispatcher free of policy concerns.
+ */
+export const executeCommand = async (interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction, bot: BaseBot) => {
     if (!bot.config.commands) {
-        interaction.reply({ content: "Config of commands not found.", flags: MessageFlags.Ephemeral });
+        await replyTranslated(interaction, bot.translator, 'errors:command.config_missing');
         return;
     }
     if (!bot.commandHandlers) {
-        interaction.reply({ content: "Command handler not found.", flags: MessageFlags.Ephemeral });
+        await replyTranslated(interaction, bot.translator, 'errors:command.handler_not_initialised');
         return;
     }
 
@@ -130,23 +95,12 @@ export const executeCommand = async (interaction: ChatInputCommandInteraction | 
     if (handler) {
         await handler.execute(interaction, bot);
     } else {
-        interaction.reply({ content: "Command not found.", flags: MessageFlags.Ephemeral });
-    }
-    
-    const parentId = interaction.channel && 'parentId' in interaction.channel ? interaction.channel.parentId : null;
-    if (!(blocked_channels && (blocked_channels.includes(interaction.channelId) || (parentId && blocked_channels.includes(parentId))))) {
-        const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channelId}>`;
-        logger.channelLogger(bot.guildInfo[interaction.guildId as string]?.channels?.debug, undefined, channel_log);
-    }
-    if (interaction.guild) {
-        const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
-        logger.guildLogger(bot.clientId, interaction.guild.id, 'interaction_create', guild_log, interaction.guild?.name as string);
+        await replyTranslated(interaction, bot.translator, 'errors:command.not_found', { name: interaction.commandName });
     }
 }
 
 const commandHandlerFactory = new HandlerFactory<Command>();
-const commandsDir = __dirname;
-commandHandlerFactory.register(commandsDir);
+commandHandlerFactory.registerFromRegistry(COMMAND_REGISTRY);
 
 export const getSlashCommandClass = (name: string) => commandHandlerFactory.getConstructor(name);
 export const createCommand = (name: string) => commandHandlerFactory.create(name);

@@ -1,12 +1,13 @@
-import {
+import type {
     ChatInputCommandInteraction,
-    EmbedBuilder,
-    GuildMember,
+    GuildMember} from "discord.js";
+import {
+    EmbedBuilder
 } from "discord.js";
-import { BaseBot } from "@bot";
+import type { BaseBot } from "@bot";
 import { Command } from "@cmd";
-import { logger } from "@utils";
 
+import { replyForError } from '../../reply-for-error';
 const MAX_DESCRIPTION_LENGTH = 3800;
 
 const chunkLines = (lines: string[], maxLength: number): string[] => {
@@ -48,7 +49,6 @@ export default class list_guild_members extends Command {
         super();
         this.setConfig({
             name: "list_guild_members",
-            description: "列出目前伺服器所有成員（含機器人）",
         });
     }
 
@@ -58,7 +58,7 @@ export default class list_guild_members extends Command {
         try {
             const guild = interaction.guild;
             if (!guild) {
-                await interaction.editReply({ content: "找不到伺服器資訊" });
+                await interaction.editReply({ content: bot.translator?.t('errors:command.guild_info_not_found') ?? '' });
                 return;
             }
 
@@ -72,36 +72,41 @@ export default class list_guild_members extends Command {
                 });
 
             if (members.length === 0) {
-                await interaction.editReply({ content: "目前沒有可列出的成員" });
+                await interaction.editReply({ content: bot.translator?.t('replies:list_guild_members.empty') ?? '' });
                 return;
             }
 
             const lines = members.map(buildMemberLine);
             const chunks = chunkLines(lines, MAX_DESCRIPTION_LENGTH);
 
-            const title = `${guild.name} 成員清單`;
-            const totalText = `總數：${members.length}（使用者：${members.filter((m) => !m.user.bot).length}、機器人：${members.filter((m) => m.user.bot).length}）`;
+            const t = (key: string, params?: Record<string, string | number>): string =>
+                bot.translator?.t(key, params) ?? '';
+            const title = t('replies:list_guild_members.title', { name: guild.name });
+            const totalText = t('replies:list_guild_members.total', {
+                total: members.length,
+                users: members.filter((m) => !m.user.bot).length,
+                bots: members.filter((m) => m.user.bot).length,
+            });
 
             const firstEmbed = new EmbedBuilder()
                 .setTitle(title)
-                .setDescription(chunks[0])
+                .setDescription(chunks[0] ?? null)
                 .setColor(0x5865F2)
-                .setFooter({ text: `${totalText}｜第 1/${chunks.length} 頁` });
+                .setFooter({ text: t('replies:list_guild_members.footer', { totalText, current: 1, total: chunks.length }) });
 
             await interaction.editReply({ embeds: [firstEmbed] });
 
             for (let i = 1; i < chunks.length; i++) {
                 const pageEmbed = new EmbedBuilder()
                     .setTitle(title)
-                    .setDescription(chunks[i])
+                    .setDescription(chunks[i] ?? null)
                     .setColor(0x5865F2)
-                    .setFooter({ text: `${totalText}｜第 ${i + 1}/${chunks.length} 頁` });
+                    .setFooter({ text: t('replies:list_guild_members.footer', { totalText, current: i + 1, total: chunks.length }) });
 
                 await interaction.followUp({ embeds: [pageEmbed] });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "取得成員清單失敗" });
+            await replyForError(interaction, bot, error, 'replies:list_guild_members.failed', interaction.guild?.id);
         }
     }
 }

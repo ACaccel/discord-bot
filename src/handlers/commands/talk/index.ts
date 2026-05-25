@@ -1,30 +1,28 @@
-import {
+import type {
     ChatInputCommandInteraction,
-    Guild,
+    Guild} from 'discord.js';
+import {
     MessageFlags,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { replyForError } from '../../reply-for-error';
 export default class talk extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "talk",
-            description: "讓機器人說話",
             options: {
                 channel: [
                     {
                         name: "channel",
-                        description: "選擇頻道",
                         required: true
                     }
                 ],
                 string: [
                     {
                         name: "content",
-                        description: "就是內容",
                         required: true
                     }
                 ]
@@ -34,18 +32,18 @@ export default class talk extends Command {
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         try {
-            let ch = interaction.options.get("channel")?.value as string;
-            let content = interaction.options.get("content")?.value as string;
+            const ch = interaction.options.get("channel")?.value as string;
+            const content = interaction.options.get("content")?.value as string;
             if (!ch || !content) {
-                await interaction.reply({ content: "請輸入頻道和內容", flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('replies:talk.missing_args') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
             
             // check existance of channel
-            let guild = interaction.guild as Guild;
-            let channel = guild.channels.cache.get(ch);
+            const guild = interaction.guild as Guild;
+            const channel = guild.channels.cache.get(ch);
             if (!channel?.isSendable()) {
-                await interaction.reply({ content: "頻道不存在或無法傳送訊息", flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('errors:command.channel_not_sendable') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
             
@@ -53,14 +51,13 @@ export default class talk extends Command {
             await interaction.deferReply();
             await interaction.deleteReply();
             if (content.includes("@everyone") || content.includes("@here")) {
-                const tagMessage = `${interaction.user.username}好壞喔被我抓到你在 tag 所有人`;
+                const tagMessage = bot.translator?.t('replies:talk.tag_warning', { user: interaction.user.username }) ?? '';
                 await channel.send(tagMessage);
             } else {
                 await channel.send(content);
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: "無法傳送訊息", flags: MessageFlags.Ephemeral });
+            await replyForError(interaction, bot, error, 'replies:talk.failed', interaction.guild?.id);
         }
     }
 }

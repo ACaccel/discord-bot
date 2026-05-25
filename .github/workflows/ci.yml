@@ -1,0 +1,182 @@
+name: CI
+
+on:
+  # PR branches are exercised by `pull_request`; the `push` trigger
+  # stays scoped to `main` so a push to a PR branch does not fire
+  # both events back-to-back (the duplicate doubled CI cost without
+  # adding any signal — the PR run already covers the same commit).
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - run: yarn lint
+      - run: yarn format:check
+      - run: yarn handlers:gen:check
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      # `tsconfig.strict.json` includes the whole `src/` tree (gap D8),
+      # so `yarn typecheck` now compiles `src/bot/<name>/index.ts`,
+      # which `import`s the gitignored per-bot `config.json`. Seed it
+      # so type resolution succeeds — same reason as `typecheck-emit`.
+      - uses: ./.github/actions/seed-bot-config
+      - run: yarn typecheck
+
+  test-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - run: yarn test:unit
+      - run: yarn test:i18n
+
+  test-coverage:
+    # Plan §5.1 floors (`src/core/**` ≥ 90%, overall ≥ baseline). The
+    # thresholds live in vitest.config.ts; this job is the gate. Raise
+    # the overall floor inside PR-C once legacy `src/features/*` +
+    # `src/utils/*` are folded into plugins and start carrying tests.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - run: yarn test:coverage
+
+  test-int:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      # Run integration tests with JSON reporter so the next step can
+      # verify the project actually loaded files (no silent green). As
+      # of Phase 2, `test:int` no longer passes `--passWithNoTests`, so
+      # vitest itself exits nonzero on a glob-mismatch; the JSON guard
+      # below is defense-in-depth for the case where vitest discovers
+      # suites but every test inside them is skipped.
+      - name: Run integration tests
+        run: yarn test:int --reporter=json --outputFile=.vitest-int.json
+      # Empty-project guard: while .github/PHASE < 2 a zero-file integration
+      # set is intentional. From phase 2 onward, zero files means the
+      # vitest project glob is broken — fail the build.
+      - name: Empty-project guard
+        run: |
+          set -euo pipefail
+          phase="$(tr -d '[:space:]' < .github/PHASE)"
+          if [ -f .vitest-int.json ]; then
+            suites="$(jq '.numTotalTestSuites // 0' .vitest-int.json)"
+          else
+            # Vitest exits 0 under --passWithNoTests without writing the
+            # report file when zero suites match — that is the very state
+            # this guard exists to catch.
+            suites=0
+          fi
+          echo "::notice::Phase=$phase  numTotalTestSuites=$suites"
+          if [ "$suites" -gt 0 ]; then
+            echo "Integration test suites present; guard satisfied."
+            exit 0
+          fi
+          if [ "$phase" -le 1 ]; then
+            echo "Phase $phase: empty integration set is intentional; guard PASSES."
+            exit 0
+          fi
+          echo "::error::Phase $phase requires at least one integration test suite, but vitest reported 0."
+          exit 1
+
+  test-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - name: Run contract tests
+        run: yarn test:contract --reporter=json --outputFile=.vitest-contract.json
+      # Contract test layer arrives in Phase 5 (LLM provider adapters).
+      # Until then, zero contract suites are intentional.
+      - name: Empty-project guard
+        run: |
+          set -euo pipefail
+          phase="$(tr -d '[:space:]' < .github/PHASE)"
+          if [ -f .vitest-contract.json ]; then
+            suites="$(jq '.numTotalTestSuites // 0' .vitest-contract.json)"
+          else
+            suites=0
+          fi
+          echo "::notice::Phase=$phase  numTotalTestSuites=$suites (contract)"
+          if [ "$suites" -gt 0 ]; then exit 0; fi
+          if [ "$phase" -le 4 ]; then exit 0; fi
+          echo "::error::Phase $phase requires at least one contract test suite, but vitest reported 0."
+          exit 1
+
+  knip:
+    # Plan §5.5 / §5.8: detects unused exports / files / dependencies.
+    #
+    # Today's `knip.json` rules table errors on file / dep drift but
+    # downgrades the per-symbol checks (`exports`, `types`,
+    # `nsExports`, `nsTypes`, `enumMembers`, `classMembers`) to `warn`.
+    # The unused-export findings overlap exactly with audit items A.1
+    # (Result<T,E> orphan), A.2 (DomainError barely used), and A.5
+    # (`src/features/` residual). Each of those waves' DoD includes
+    # flipping the matching rule(s) to `error` in the SAME commit that
+    # closes the wave — see CONTRIBUTING.md "Quality gates" and
+    # `.claude/plans/codebase-1-eventual-whale.md` Wave 3 #12-14.
+    #
+    # If you find this comment six months from now and the rules still
+    # say `warn`, that is the signal that the audit waves never closed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - run: yarn knip
+
+  typecheck-emit:
+    # Plan §5.8: confirm `tsc -p tsconfig.build.json` actually
+    # compiles outside the strict-tsconfig include scope. `yarn
+    # typecheck` runs noEmit on the strict project; this job runs the
+    # whole src/ tree through emit-mode tsc so a broken `import`
+    # outside the strict scope is caught at PR time, not runtime.
+    #
+    # NOTE: this is NOT a deploy build. Runtime is `ts-node` from
+    # source (see `yarn nijika` etc. in package.json). The emitted
+    # `dist/` retains TS path aliases (`require("@utils")`) and does
+    # not bundle non-TS assets (config.json / locale JSON), so
+    # invoking `node dist/...` would fail. The artifact-presence
+    # check that used to live here was misleading and was removed
+    # — the only signal this job carries is whether tsc emits
+    # cleanly.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - uses: ./.github/actions/seed-bot-config
+      - run: yarn typecheck:emit
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks needs full history
+      - uses: ./.github/actions/yarn-install
+      - name: audit-ci (HIGH+ with documented allowlist)
+        run: yarn security --output-format=json | tee audit-ci-report.json
+      - name: Archive audit report + allowlist
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-ci-report-${{ github.run_id }}
+          path: |
+            audit-ci-report.json
+            audit-ci.jsonc
+          retention-days: 90
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

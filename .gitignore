@@ -1,8 +1,15 @@
 /node_modules
+/dist
 /logs
 /errors
 /data
 *.log
+
+# Personal Claude Code settings (machine-specific allowlists, paths).
+# `.claude/agents/` IS tracked — those are shared dev tooling.
+.claude/settings.json
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 .env
 config.json
@@ -11,4 +18,5 @@ avatar_url_list.txt
 remove_list.txt
 snippet.ts
 debug.sh
-CLAUDE.md
+/coverage
+

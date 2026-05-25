@@ -1,41 +1,35 @@
-import { ChatInputCommandInteraction, MessageFlags } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { ChatInputCommandInteraction} from 'discord.js';
+import { MessageFlags } from 'discord.js';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { requireGuildRepos } from '../../require-guild-repos';
+
+import { replyForError } from '../../reply-for-error';
 export default class ai_whitelist_list extends Command {
     constructor() {
         super();
         this.setConfig({
             name: 'ai_whitelist_list',
-            description: '列出目前 AI 白名單的所有用戶',
         });
     }
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        const guildId = interaction.guildId;
-        if (!guildId) {
-            await interaction.editReply({ content: '此指令只能在伺服器中使用。' });
-            return;
-        }
-
-        const UserApiSetting = bot.guildInfo[guildId]?.db?.models['UserApiSetting'];
-        if (!UserApiSetting) {
-            await interaction.editReply({ content: '資料庫連線異常，請稍後再試。' });
-            return;
-        }
+        const repos = await requireGuildRepos(bot, interaction);
+        if (repos === null) return;
 
         try {
-            const docs = await UserApiSetting.find({}, 'userId provider model').lean() as unknown as Array<{
-                userId: string; provider: string; model: string;
-            }>;
+            // A repo `err` is re-thrown into the surrounding catch.
+            const docsResult = await repos.userApiSetting.listAll();
+            if (!docsResult.ok) throw docsResult.error;
+            const docs = docsResult.value;
             if (docs.length === 0) {
-                await interaction.editReply({ content: '白名單目前為空。' });
+                await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.empty') ?? '' });
                 return;
             }
 
-            const header = `**AI 白名單（${docs.length} 位用戶）：**`;
+            const header = bot.translator?.t('replies:ai_whitelist.header', { count: docs.length }) ?? '';
             const lines = docs.map((d) => `<@${d.userId}> — \`${d.provider}\` / \`${d.model}\``);
 
             // Build pages that stay within Discord's 2000-character limit.
@@ -58,8 +52,7 @@ export default class ai_whitelist_list extends Command {
                 await interaction.followUp({ content: pages[i]!, flags: MessageFlags.Ephemeral });
             }
         } catch (err) {
-            logger.errorLogger(bot.clientId, guildId, err);
-            await interaction.editReply({ content: '資料庫操作失敗，請稍後再試。' });
+            await replyForError(interaction, bot, err, 'replies:ai_whitelist.failed', interaction.guildId);
         }
     }
 }

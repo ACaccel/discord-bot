@@ -1,10 +1,12 @@
-import { 
+import type {
     ButtonInteraction,
-    MessageFlags,
 } from 'discord.js';
-import { BaseBot } from "@bot";
-import { logger } from "@utils";
+import type { BaseBot } from "@bot";
+import { logSystem } from '@core/logger';
+
 import { HandlerFactory } from "handlers";
+import { replyTranslated } from "../reply-translated";
+import { BUTTON_REGISTRY } from './registry.generated';
 
 //==================================================//
 // Button Custom ID: <button_type>|<button_value>
@@ -15,36 +17,35 @@ export abstract class ButtonHandler {
 }
 
 export const registerButtons = async (bot: BaseBot) => {
-    logger.systemLogger(bot.clientId, "Registering button handlers...");
+    logSystem(bot.logger, bot.clientId, "Registering button handlers...");
 
     try {
         // todo: whether to specify handlers for each bot
         // import all button handlers
-        bot.buttonHandler = createAllButtonHandlers();
+        bot.buttonHandlers = createAllButtonHandlers();
 
-        logger.systemLogger(bot.clientId, `Successfully register ${bot.buttonHandler.size} button handlers.`)
+        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.buttonHandlers.size} button handlers.`)
     } catch (err) {
-        logger.systemLogger(bot.clientId, `Failed to register button handlers: ${err}`);
+        logSystem(bot.logger, bot.clientId, `Failed to register button handlers: ${err}`);
     }
 }
 
 export const executeButton = async (interaction: ButtonInteraction, bot: BaseBot) => {
-    if (!bot.buttonHandler) {
-        interaction.reply({ content: "Button handler not found.", flags: MessageFlags.Ephemeral });
+    if (!bot.buttonHandlers) {
+        await replyTranslated(interaction, bot.translator, 'errors:command.handler_not_initialised');
         return;
     }
 
     // customId format: <button_type>|<button_value>
-    const button_type = interaction.customId.split('|')[0];
-    const handler = bot.buttonHandler.get(button_type);
+    const button_type = interaction.customId.split('|')[0] ?? '';
+    const handler = bot.buttonHandlers.get(button_type);
     if (handler) {
         await handler.execute(interaction, bot);
     }
 }
 
 const buttonHandlerFactory = new HandlerFactory<ButtonHandler>();
-const buttonDir = __dirname;
-buttonHandlerFactory.register(buttonDir);
+buttonHandlerFactory.registerFromRegistry(BUTTON_REGISTRY);
 
 export const getButtonHandlerClass = (name: string) => buttonHandlerFactory.getConstructor(name);
 export const createButtonHandler = (name: string) => buttonHandlerFactory.create(name);

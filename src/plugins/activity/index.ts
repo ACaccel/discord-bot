@@ -1,0 +1,1 @@
+export { createActivityPlugin } from './plugin';

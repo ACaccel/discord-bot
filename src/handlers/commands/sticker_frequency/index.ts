@@ -1,36 +1,33 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger, misc } from '@utils';
+import { listInOneImage, type CanvasContent } from '../discord-helpers';
 
+import { replyForError } from '../../reply-for-error';
 export default class sticker_frequency extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "sticker_frequency",
-            description: "統計貼圖使用頻率",
             options: {
                 string: [
                     {
                         name: "frequency",
-                        description: "頻率順序 (optional)",
                         required: false,
                         choices: [
-                            { name: "前n低頻率", value: "asc" },
-                            { name: "前n高頻率", value: "desc" }
+                            { value: "asc" },
+                            { value: "desc" }
                         ]
                     }
                 ],
                 number: [
                     {
                         name: "top_n",
-                        description: "前n名 (optional, max: 30)",
                         required: false
                     },{
                         name: "last_n_months",
-                        description: "搜尋過去n個月 (optional, max: 24)",
                         required: false
                     }
                 ]
@@ -46,12 +43,12 @@ export default class sticker_frequency extends Command {
             let last_n_months = interaction.options.get("last_n_months")?.value as number || 1;
             const guild = interaction.guild;
             if (!guild) {
-                await interaction.editReply({ content: "找不到伺服器" });
+                await interaction.editReply({ content: bot.translator?.t('errors:command.guild_not_found') ?? '' });
                 return;
             }
-            const db = bot.guildInfo[guild.id].db;
-            if (!db) {
-                await interaction.editReply({ content: "請先設定資料庫" });
+            const repos = bot.getRepos(guild.id);
+            if (!repos) {
+                await interaction.editReply({ content: bot.translator?.t('errors:db.not_configured') ?? '' });
                 return;
             }
     
@@ -74,55 +71,59 @@ export default class sticker_frequency extends Command {
                 const monthEnd = new Date();
                 monthEnd.setMonth(monthEnd.getMonth() - monthOffset);
                 
-                const messages = await db.models['Message'].find({
-                $expr: {
-                    $and: [
-                    { $gte: [{ $toLong: "$timestamp" }, monthStart.getTime()] },
-                    { $lt: [{ $toLong: "$timestamp" }, monthEnd.getTime()] }
-                    ]
-                }
-                });
-                
+                // A repo `err` is re-thrown into the surrounding catch.
+                const messagesResult = await repos.message.findByTimestampRange(
+                    monthStart.getTime(),
+                    monthEnd.getTime(),
+                );
+                if (!messagesResult.ok) throw messagesResult.error;
+                const messages = messagesResult.value;
+
                 messages.forEach((message) => {
-                const stickers: any[] = message.stickers || [];
-                stickers.forEach((sticker) => {
-                    if (stickerMap.has(sticker.name)) {
-                    stickerMap.set(sticker.name, (stickerMap.get(sticker.name) || 0) + 1);
-                    }
-                });
+                    const stickers = message.stickers ?? [];
+                    stickers.forEach((sticker) => {
+                        const name = sticker.name;
+                        if (typeof name === 'string' && stickerMap.has(name)) {
+                            stickerMap.set(name, (stickerMap.get(name) ?? 0) + 1);
+                        }
+                    });
                 });
                 
                 // update progress
-                await interaction.editReply({ content: `正在處理第 ${monthOffset + 1} / ${last_n_months} 個月的資料...` });
+                await interaction.editReply({ content: bot.translator?.t('replies:sticker_frequency.progress', { current: monthOffset + 1, total: last_n_months }) ?? '' });
             }
-    
+
             const sortedStickers = Array.from(stickerMap.entries())
                 .sort((a, b) => frequency === "asc" ? a[1] - b[1] : b[1] - a[1])
                 .slice(0, top_n);
-    
-            let content = `最近${last_n_months}個月內使用頻率${frequency === "asc" ? "最低" : "最高"}的 ${top_n} 個貼圖：\n`;
+
+            const t = (key: string, params?: Record<string, string | number>): string =>
+                bot.translator?.t(key, params) ?? '';
+            const direction = frequency === "asc"
+                ? t('replies:sticker_frequency.direction_lowest')
+                : t('replies:sticker_frequency.direction_highest');
+            let content = t('replies:sticker_frequency.header', { months: last_n_months, direction, top: top_n });
             sortedStickers.forEach(([sticker, count], index) => {
-                content += `${index + 1}. ${sticker} - ${count} 次\n`;
+                content += t('replies:sticker_frequency.line', { rank: index + 1, sticker, count });
             });
-    
+
             // create a preview image
-            let canvasContent: misc.CanvasContent[] = [];
+            const canvasContent: CanvasContent[] = [];
             for (let i = 0; i < sortedStickers.length; i++) {
-                const [stickerName, count] = sortedStickers[i];
+                const [stickerName, count] = sortedStickers[i] as [string, number];
                 const sticker = guild.stickers.cache.find(s => s.name === stickerName);
                 if (sticker) {
                     canvasContent.push({
                         url: sticker.url,
-                        text: `${i + 1}: ${count}次`
+                        text: t('replies:sticker_frequency.chart_label', { rank: i + 1, count }),
                     });
                 }
             }
-            const attachment = await misc.listInOneImage(canvasContent);
+            const attachment = await listInOneImage(canvasContent);
     
             await interaction.editReply({ content: content, files: attachment ? [attachment] : [] });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得貼圖使用頻率" });
+            await replyForError(interaction, bot, error, 'replies:sticker_frequency.failed', interaction.guild?.id);
         }
     }
 }

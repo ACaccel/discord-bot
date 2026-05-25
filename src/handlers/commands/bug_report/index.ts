@@ -1,22 +1,21 @@
-import { 
-    ChatInputCommandInteraction,
+import type { 
+    ChatInputCommandInteraction} from 'discord.js';
+import {
     MessageFlags,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { replyForError } from '../../reply-for-error';
 export default class bug_report extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "bug_report",
-            description: "回報問題",
             options: {
                 string: [
                     {
                         name: "content",
-                        description: "問題描述",
                         required: true
                     }
                 ]
@@ -26,9 +25,9 @@ export default class bug_report extends Command {
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         try {
-            let content = interaction.options.get("content")?.value as string;
+            const content = interaction.options.get("content")?.value as string;
             if (!content) {
-                await interaction.reply({ content: "請輸入內容", flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('replies:bug_report.empty_content') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
     
@@ -40,13 +39,12 @@ export default class bug_report extends Command {
             const admin = await bot.client.users.fetch(bot.adminId);
             if (admin) {
                 await admin.send(`Bug Report from ${interaction.user.username}：${content}`);
-                await interaction.reply({ content: `問題已回報! 內容: ${content}`, flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: bot.translator?.t('replies:bug_report.reported', { content }) ?? '', flags: MessageFlags.Ephemeral });
             } else {
                 throw new Error("Admin not found");
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.reply({ content: "無法回報問題", flags: MessageFlags.Ephemeral });
+            await replyForError(interaction, bot, error, 'replies:bug_report.failed', interaction.guild?.id);
         }
     }
 }

@@ -1,19 +1,21 @@
+import type {
+    ContextMenuCommandType,
+    UserContextMenuCommandInteraction} from 'discord.js';
 import {
     EmbedBuilder,
-    ApplicationCommandType,
-    ContextMenuCommandType,
-    UserContextMenuCommandInteraction,
+    ApplicationCommandType
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { replyForError } from '../../reply-for-error';
 export default class menu_get_avatar extends Command {
     constructor() {
         super();
         this.setConfig({
-            name: "取得用戶頭像連結",
-            description: "取得用戶的頭像 URL",
+            // Stable ASCII id; the user-facing Discord name is resolved
+            // from `commands:menu_get_avatar.name`.
+            name: "menu_get_avatar",
             type: ApplicationCommandType.User as ContextMenuCommandType,
         });
     }
@@ -25,18 +27,17 @@ export default class menu_get_avatar extends Command {
             const avatarUrl = user.displayAvatarURL({ extension: 'png', size: 1024 });
 
             const embed = new EmbedBuilder()
-                .setTitle(`${user.username} 的頭像 URL`)
+                .setTitle(bot.translator?.t('replies:menu_get_avatar.title', { user: user.username }) ?? '')
                 .setColor(0x5865F2)
                 .setImage(avatarUrl)
                 .addFields({
-                    name: "頭像連結",
-                    value: avatarUrl
+                    name: bot.translator?.t('replies:menu_get_avatar.avatar_url_field') ?? '',
+                    value: avatarUrl,
                 });
 
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得用戶頭像" });
+            await replyForError(interaction, bot, error, 'replies:menu_get_avatar.failed', interaction.guild?.id);
         }
     }
 }

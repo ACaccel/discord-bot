@@ -1,10 +1,11 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
 import Mee6LevelsApi from 'mee6-levels-api';
-import { BaseBot, Config } from '@bot';
+import type { BaseBot, Config } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
+
+import { replyForError } from '../../reply-for-error';
 // import { Nijika } from 'bot/nijika/nijika';
 
 interface UpdateRoleConfig extends Config {
@@ -17,7 +18,6 @@ export default class update_role extends Command {
         super();
         this.setConfig({
             name: "update_role",
-            description: "更新Mee6等級身分組"
         });
     }
 
@@ -26,28 +26,28 @@ export default class update_role extends Command {
         try {
             // if (!(bot instanceof Nijika)) return;
             // if (!bot.config.level_roles) {
-            //     await interaction.editReply({ content: "設定檔中未找到等級身分組配置" });
+            //     await interaction.editReply({ content: bot.translator?.t('replies:update_role.no_config') ?? '' });
             //     return;
             // }
             let botConfig: UpdateRoleConfig;
             if ('level_roles' in bot.config) {
                 botConfig = bot.config as UpdateRoleConfig;
             } else {
-                await interaction.editReply({ content: "設定檔中未找到等級身分組配置" });
+                await interaction.editReply({ content: bot.translator?.t('replies:update_role.no_config') ?? '' });
                 return;
             }
 
-            let leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
-            let guild = bot.guildInfo[interaction.guild?.id as string].guild;
+            const leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
+            const guild = bot.getGuildInfo(interaction.guild?.id as string)!.guild;
             const channel = interaction.channel;
             if (!channel?.isSendable()) return;
             // let alive_role = guild.roles.cache.find(role => role.name === "活人");
     
             await Promise.all(leaderboard.map(async (member) => {
-                let { id, level } = member;
-                let guildMember = guild.members.cache.get(id);
+                const { id, level } = member;
+                const guildMember = guild.members.cache.get(id);
     
-                if (guildMember) { } else return;
+                if (!guildMember) return;
                 // live people role.
                 // if(level >= 6) {
                 // 	if (!guildMember.roles.cache.some(role => role.name === "活人")) {
@@ -59,8 +59,8 @@ export default class update_role extends Command {
                 // find corresponding role
                 let roleToAssign = "";
                 for (const roleLevel in botConfig.level_roles) {
-                    if (level >= parseInt(roleLevel.split('_')[1])) {
-                        roleToAssign = botConfig.level_roles[roleLevel];
+                    if (level >= parseInt(roleLevel.split('_')[1] ?? '0')) {
+                        roleToAssign = botConfig.level_roles[roleLevel] ?? '';
                     } else {
                         break;
                     }
@@ -76,18 +76,17 @@ export default class update_role extends Command {
                     
                     if (guildMember.roles.cache.has(removedRole.id) && removedRole.name !== roleToAssign) {
                         await guildMember.roles.remove(removedRole);
-                        await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 移除: ${botConfig.level_roles[roleLevel]}`);
+                        await channel.send(bot.translator?.t('replies:update_role.removed', { name: guildMember.user.displayName, role: botConfig.level_roles[roleLevel] ?? '' }) ?? '');
                     }
                 }
                 if (addedRole && !hasRoleToAssign) {
                     await guildMember.roles.add(addedRole);
-                    await channel.send(`[ SYSTEM ] ${guildMember.user.displayName}, 獲得: ${roleToAssign}`);
+                    await channel.send(bot.translator?.t('replies:update_role.granted', { name: guildMember.user.displayName, role: roleToAssign }) ?? '');
                 }
             }));
-            await interaction.editReply({ content: "更新完成" });
+            await interaction.editReply({ content: bot.translator?.t('replies:update_role.done') ?? '' });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法更新身份組" });
+            await replyForError(interaction, bot, error, 'replies:update_role.failed', interaction.guild?.id);
         }
     }
 }

@@ -1,21 +1,14 @@
-import { 
-    Client,
-    Message,
-    PartialMessage,
-    Interaction,
-    MessageFlags,
-} from 'discord.js';
-import { BaseBot, Config } from '@bot';
-import { 
-    auto_reply,
-    detectMessageDelete, 
-    detectMessageUpdate, 
-    tts_reply,
-} from '@event';
-import { executeCommand } from '@cmd';
-import { executeButton } from '@button';
-import { executeModal } from '@modal';
-import { executeSSM } from '@ssm';
+import type { Client } from 'discord.js';
+import type { Config } from '@bot';
+import { BaseBot } from '@bot';
+import {
+    AutoReplyPlugin,
+    createActivityPlugin,
+    createEarthquakePlugin,
+    createGiveawayPlugin,
+    createGuildEventsPlugin,
+    createVoicePlugin,
+} from '@plugins';
 
 interface NijikaConfig extends Config {
     blocked_channels: string[];
@@ -23,47 +16,46 @@ interface NijikaConfig extends Config {
 }
 
 export class Nijika extends BaseBot<NijikaConfig> {
-    public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: NijikaConfig) {
+    /**
+     * @param webhookPort - TCP port for the earthquake-alert webhook
+     *   server. Sourced from the validated `Env.PORT` in `index.ts`;
+     *   passed through the constructor (rather than read from
+     *   `process.env` here) so the composition root stays the single
+     *   place that touches the environment.
+     */
+    public constructor(
+        client: Client,
+        token: string,
+        mongoURI: string,
+        clientId: string,
+        config: NijikaConfig,
+        webhookPort: number,
+    ) {
         super(client, token, mongoURI, clientId, config);
-        this.help_msg = '### 目前支援的功能：\n' +
-                        '1. tts: 回覆一則訊息並輸入tts，bot會產生該訊息的語音檔\n' +
-                        '2. auto reply: bot會根據資料庫的message pair回覆訊息\n' + 
-                        '3. roll dice: 輸入範例-> `2d5`, 在1~5隨機選擇兩個數字\n';
+        // `helpMessage` is resolved from this key inside BaseBot.run()
+        // once the translator is loaded.
+        this.helpMessageKey = 'replies:nijika.help_message';
+
+        // Plugin registration. `blocked_channels` flows through the
+        // InteractionRouter via the `channelLoggingBlockedChannels`
+        // hook below; dispatch uses the default
+        // `createDispatchMiddleware`. Plugins resolve their
+        // dependencies through `ctx`, so the composition root does not
+        // deep-import `plugins/*/internal`.
+        this.use(AutoReplyPlugin);
+        this.use(createGuildEventsPlugin({
+            blockedChannels: this.config.blocked_channels,
+            clientId: this.clientId,
+        }));
+        this.use(createGiveawayPlugin());
+        this.use(createActivityPlugin());
+        this.use(createVoicePlugin());
+        // The earthquake webhook server + per-guild broadcast is a
+        // bot-scoped plugin; its `start` hook owns the Express route.
+        this.use(createEarthquakePlugin({ port: webhookPort }));
     }
 
-    public override interactionEventListener = async (interaction: Interaction): Promise<void> => {
-        switch (true) {
-            case interaction.isChatInputCommand() || interaction.isContextMenuCommand():
-                await executeCommand(interaction, this, this.config.blocked_channels);
-                break;
-            case interaction.isModalSubmit():
-                await executeModal(interaction, this);
-                break;
-            case interaction.isButton():
-                await executeButton(interaction, this);
-                break;
-            case interaction.isStringSelectMenu():
-                await executeSSM(interaction, this);
-                break;
-            default:
-                if (!interaction.isAutocomplete()) {
-                    await interaction.reply({ content: '目前尚不支援此類型的指令', flags: MessageFlags.Ephemeral });
-                }
-                break;
-        }
-    }
-
-    public override messageCreateListener = async (message: Message): Promise<void> => {
-        await tts_reply(message);
-        if (message.guildId)
-            await auto_reply(message, this, message.guildId);
-    }
-
-    public override messageUpdateListener = async (oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage): Promise<void> => {
-        await detectMessageUpdate(oldMessage, newMessage, this, this.config.blocked_channels);
-    }
-
-    public override messageDeleteListener = async (message: Message | PartialMessage): Promise<void> => {
-        await detectMessageDelete(message, this, this.config.blocked_channels);
+    protected override channelLoggingBlockedChannels(): readonly string[] {
+        return this.config.blocked_channels;
     }
 }

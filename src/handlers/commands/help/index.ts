@@ -1,16 +1,16 @@
-import { 
+import type {
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '@bot';
-import { Command } from '@cmd';
-import { logger } from '@utils';
+import type { BaseBot } from '@bot';
+import { Command, localizeCommandConfig } from '@cmd';
+
+import { replyForError } from '../../reply-for-error';
 
 export default class help extends Command {
     constructor() {
         super();
         this.setConfig({
             name: 'help',
-            description: '顯示指令清單與說明',
         });
     }
 
@@ -18,23 +18,26 @@ export default class help extends Command {
         await interaction.deferReply();
         try {
             if (!bot.config.commands) {
-                await interaction.editReply({ content: "沒有指令清單"});
+                await interaction.editReply({ content: bot.translator?.t('replies:help.no_commands') ?? ''});
                 return;
             }
 
             let  helpContent = '## Help Message\n';
-            helpContent += bot.help_msg;
-            helpContent += '### 目前支援的slash command：\n';
+            helpContent += bot.helpMessage;
+            helpContent += bot.translator?.t('replies:help.commands_header') ?? '';
             bot.commandHandlers.forEach((cmd) => {
                 if (cmd.config) {
-                    helpContent += `* \`/${cmd.config.name}\` : ${cmd.config.description}\n`;
+                    // Descriptions are i18n keys resolved here against
+                    // the `commands` catalog, keeping CJK literals out
+                    // of source.
+                    const localized = localizeCommandConfig(cmd.config, bot.translator);
+                    helpContent += `* \`/${localized.name}\` : ${localized.description}\n`;
                 }
             });
 
             await interaction.editReply({ content: helpContent });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得指令清單"});
+            await replyForError(interaction, bot, error, 'replies:help.failed', interaction.guild?.id);
         }
     }
 }

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits"],
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": false,
+      "groupName": "minor + patch dependencies"
+    },
+    {
+      "matchPackageNames": ["typescript", "ts-node", "vitest", "eslint"],
+      "automerge": false,
+      "groupName": "tooling — manual review"
+    },
+    {
+      "matchPackageNames": ["discord.js", "mongoose"],
+      "automerge": false,
+      "groupName": "platform deps — manual review"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security"]
+  }
+}

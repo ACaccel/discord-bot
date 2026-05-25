@@ -2,8 +2,11 @@ import { Client, GatewayIntentBits } from 'discord.js';
 import dotenv from 'dotenv';
 import { Konata } from './konata';
 import config from './config.json';
+import { loadEnv } from '@core/config';
 
 dotenv.config({ path: './src/bot/konata/.env' });
+
+const env = loadEnv();
 
 const client: Client = new Client({
     intents: [
@@ -17,9 +20,9 @@ const client: Client = new Client({
 
 const konata = new Konata(
     client,
-    process.env.TOKEN as string,
-    process.env.MONGO_URI as string,
-    process.env.CLIENT_ID as string,
+    env.TOKEN,
+    env.MONGO_URI ?? '',
+    env.CLIENT_ID,
     config,
 );
 

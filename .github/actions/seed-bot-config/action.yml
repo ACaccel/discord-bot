@@ -1,0 +1,17 @@
+name: 'Seed per-bot config.json'
+description: >-
+  Bootstrap each src/bot/<name>/config.json from its committed
+  config.example.json. The real config.json files are gitignored
+  (they hold operator secrets — guild IDs, channel IDs, admin user
+  id), so tsc cannot resolve `import config from './config.json'`
+  without a file present. The seeded values are placeholders; only
+  the JSON shape matters for type resolution.
+
+runs:
+  using: 'composite'
+  steps:
+    - run: |
+        for bot in nijika konata tomori msg-archive; do
+          cp "src/bot/${bot}/config.example.json" "src/bot/${bot}/config.json"
+        done
+      shell: bash

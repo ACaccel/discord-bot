@@ -1,0 +1,13 @@
+# gitleaks configuration: extends the default ruleset, ignoring placeholder
+# strings in example / template files. CI runs gitleaks on PR + push;
+# pre-commit hook (Phase 7) runs it locally.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Example/template files that may carry placeholder secrets"
+paths = [
+  '''.*config\.example\.json$''',
+  '''.*\.example\.env$''',
+  '''.*\.env\.example$''',
+]

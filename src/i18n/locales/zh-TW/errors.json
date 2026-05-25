@@ -1,0 +1,58 @@
+{
+  "command": {
+    "not_found": "找不到指令 /{{name}},請使用 /help 查看可用指令清單。",
+    "guild_only": "此指令只能在伺服器中使用。",
+    "guild_not_found": "找不到伺服器",
+    "guild_info_not_found": "找不到伺服器資訊",
+    "channel_not_found": "找不到頻道",
+    "channel_not_sendable": "頻道不存在或無法傳送訊息",
+    "user_not_found": "找不到使用者",
+    "bot_not_found": "找不到機器人",
+    "unsupported_interaction_type": "目前尚不支援此類型的指令",
+    "config_missing": "指令清單尚未設定,請聯絡管理員。",
+    "handler_not_initialised": "指令派發器尚未就緒,請稍後再試。"
+  },
+  "validation": {
+    "field_required": "參數「{{field}}」不可為空,請重新輸入。",
+    "field_invalid": "參數「{{field}}」格式不正確,請重新輸入。"
+  },
+  "permission": {
+    "denied": "你沒有使用此指令的權限(需要角色:{{requiredRole}})。",
+    "admin_only": "此指令僅限管理員使用。",
+    "admin_only_short": "只有管理員可以執行此指令。"
+  },
+  "ai": {
+    "not_whitelisted": "你不在白名單中,請聯絡管理員。"
+  },
+  "db": {
+    "unavailable": "資料庫暫時無法連線,本指令稍後可重試。",
+    "duplicate_key": "這筆資料已經存在,沒辦法重複新增喔,確認一下再試一次吧。",
+    "timeout": "資料庫回應有點慢,連線逾時了,稍等一下再重試看看。",
+    "network": "連不上資料庫,可能是網路出狀況,等一下再試試看吧。",
+    "validation": "資料格式不太對,沒辦法存進資料庫,檢查一下輸入內容再試一次。",
+    "connection_failed": "資料庫連線異常,請稍後再試。",
+    "operation_failed": "資料庫操作失敗,請稍後再試。",
+    "not_found": "找不到資料庫",
+    "not_configured": "請先設定資料庫",
+    "guild_disabled": "本伺服器的資料庫於啟動時連線失敗,指令暫時無法使用,請聯絡管理員。錯誤編號:{{traceId}}"
+  },
+  "llm": {
+    "rate_limited": "AI 服務 `{{provider}}` 目前忙線中(限流),請稍後再試。",
+    "invalid_api_key": "Provider `{{provider}}` 的 API 金鑰未設定或無效,請於 .env 設定後重試。",
+    "context_too_long": "對話內容超過 `{{provider}}` 模型的上下文長度限制,請縮短輸入或重新開始對話。",
+    "upstream_failure": "AI 服務 `{{provider}}` 暫時無法存取(狀態 {{status}}),請稍後再試。",
+    "timeout": "AI 服務 `{{provider}}` 回應逾時,請稍後再試。",
+    "unknown": "AI 服務發生未預期的錯誤,請稍後再試。"
+  },
+  "configuration": {
+    "missing_env": "環境變數 `{{envVar}}` 未設定,請聯絡管理員。"
+  },
+  "plugin": {
+    "lifecycle_phase_violation": "Plugin `{{plugin}}` 在階段 `{{phase}}` 呼叫了 registerInstance(`{{token}}`),只有 `init` 階段允許此操作。"
+  },
+  "bot": {
+    "login_failed": "登入 Discord 失敗({{clientId}})。",
+    "login_no_user": "登入 Discord 後未取得 user({{clientId}})。"
+  },
+  "unexpected": "指令執行時發生未預期的錯誤,管理員已收到通知(錯誤編號:{{traceId}})。"
+}

@@ -1,25 +1,24 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { requireGuildRepos } from '../../require-guild-repos';
+
+import { replyForError } from '../../reply-for-error';
 export default class add_reply extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "add_reply",
-            description: "新增自動回覆",
             options: {
                 string: [
                     {
                         name: "keyword",
-                        description: "關鍵字",
                         required: true
                     },{
                         name: "reply",
-                        description: "回覆",
                         required: true
                     }
                 ]
@@ -30,26 +29,27 @@ export default class add_reply extends Command {
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply();
         try {
-            const input = interaction.options.get("keyword")?.value;
-            const reply = interaction.options.get("reply")?.value;
-    
-            const db = bot.guildInfo[interaction.guild?.id as string].db;
-            if (!db) {
-                await interaction.editReply({ content: "找不到資料庫" });
-                return;
-            }
-            const existPair = await db.models["Reply"].find({ input, reply });
-    
-            if (existPair && existPair.length === 0) {
-                const newReply = new db.models["Reply"]({ input, reply });
-                await newReply.save();
-                await interaction.editReply({ content: `已新增 輸入：${input} 回覆：${reply}！` });
+            const input = interaction.options.get("keyword")?.value as string;
+            const reply = interaction.options.get("reply")?.value as string;
+
+            const repos = await requireGuildRepos(bot, interaction);
+            if (repos === null) return;
+            // Repo methods return Result<T, DatabaseError>. An `err` is
+            // re-thrown so the surrounding catch runs the standard log +
+            // failure-reply path.
+            const existPairResult = await repos.reply.findExactPair(input, reply);
+            if (!existPairResult.ok) throw existPairResult.error;
+            const existPair = existPairResult.value;
+
+            if (existPair.length === 0) {
+                const createResult = await repos.reply.create(input, reply);
+                if (!createResult.ok) throw createResult.error;
+                await interaction.editReply({ content: bot.translator?.t('replies:add_reply.added', { input, reply }) ?? '' });
             } else {
-                await interaction.editReply({ content: `此配對 輸入：${input} 回覆：${reply} 已經存在！` });
+                await interaction.editReply({ content: bot.translator?.t('replies:add_reply.already_exists', { input, reply }) ?? '' });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法新增訊息回覆配對" });
+            await replyForError(interaction, bot, error, 'replies:add_reply.failed', interaction.guild?.id);
         }
     }
 }

@@ -1,26 +1,23 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
 import Mee6LevelsApi from 'mee6-levels-api';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { replyForError } from '../../reply-for-error';
 export default class level_detail extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "level_detail",
-            description: "查看等級詳細資訊",
             options: {
                 number: [
                     {
                         name: "left",
-                        description: "左邊界",
                         required: true
                     },{
                         name: "right",
-                        description: "右邊界",
                         required: true
                     }
                 ]
@@ -39,26 +36,25 @@ export default class level_detail extends Command {
                 let content = "";
                 const leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
     
-                leaderboard.slice(left - 1, right).forEach((e, i) => {
+                leaderboard.slice(left - 1, right).forEach((e) => {
                     const averageXp = (e.xp.totalXp / e.messageCount).toPrecision(6);
                     content += `> **${e.rank} - ${e.username}﹝Level ${e.level}﹞**\n`;
-                    content += `**訊息總數：** ${e.messageCount} `;
-                    content += `**當前經驗值：** ${e.xp.userXp} / ${e.xp.levelXp} `;
-                    content += `**總經驗值：** ${e.xp.totalXp} `;
-                    content += `**平均經驗值：** ${averageXp} \n\n`;
+                    content += bot.translator?.t('replies:level_detail.message_count', { count: e.messageCount }) ?? '';
+                    content += bot.translator?.t('replies:level_detail.current_xp', { userXp: e.xp.userXp, levelXp: e.xp.levelXp }) ?? '';
+                    content += bot.translator?.t('replies:level_detail.total_xp', { totalXp: e.xp.totalXp }) ?? '';
+                    content += bot.translator?.t('replies:level_detail.average_xp', { averageXp }) ?? '';
                 });
     
                 if (content.length < 2000) {
                     await interaction.editReply({ content });
                 } else {
-                    await interaction.editReply({ content: "太長了...請選短一點的範圍" });
+                    await interaction.editReply({ content: bot.translator?.t('replies:level_detail.too_long') ?? '' });
                 }
             } else {
-                await interaction.editReply({ content: "太長了...請選短一點的範圍" });
+                await interaction.editReply({ content: bot.translator?.t('replies:level_detail.too_long') ?? '' });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得等級詳情" });
+            await replyForError(interaction, bot, error, 'replies:level_detail.failed', interaction.guild?.id);
         }
     }
 }

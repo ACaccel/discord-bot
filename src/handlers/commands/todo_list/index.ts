@@ -1,30 +1,29 @@
-import { 
+import type { 
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { requireGuildRepos } from '../../require-guild-repos';
+
+import { replyForError } from '../../reply-for-error';
 export default class todo_list extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "todo_list",
-            description: "待辦事項",
             options: {
                 string: [
                     {
                         name: "action",
-                        description: "新增或刪除",
                         required: true,
                         choices: [
-                            { name: "新增 (+ content: 內容)", value: "add" },
-                            { name: "刪除 (+ content: 編號)", value: "delete" },
-                            { name: "查看", value: "list" }
+                            { value: "add" },
+                            { value: "delete" },
+                            { value: "list" }
                         ]
                     },{
                         name: "content",
-                        description: "內容 (optional)",
                         required: false
                     }
                 ]
@@ -39,50 +38,56 @@ export default class todo_list extends Command {
             const content = interaction.options.get("content")?.value as string;
     
             if (!content && action !== "list") {
-                await interaction.editReply({ content: "請輸入待辦事項內容" });
+                await interaction.editReply({ content: bot.translator?.t('replies:todo_list.missing_content') ?? '' });
                 return;
             }
     
-            const db = bot.guildInfo[interaction.guild?.id as string].db;
-            if (!db) {
-                await interaction.editReply({ content: "找不到資料庫" });
-                return;
-            }
-    
-            if (action == "add") {
-                const existPair = await db.models["Todo"].find({ content });
-                if (existPair.length === 0) {
-                    const newTodo = new db.models["Todo"]({ content });
-                    await newTodo.save();
-                    await interaction.editReply({ content: `已新增待辦事項：${content}` });
+            const repos = await requireGuildRepos(bot, interaction);
+            if (repos === null) return;
+            const todos = repos.todo;
+
+            // Repo methods return Result<T, DatabaseError>. An `err`
+            // is re-thrown into the surrounding catch.
+            if (action === "add") {
+                const existPairResult = await todos.findByContent(content);
+                if (!existPairResult.ok) throw existPairResult.error;
+                if (existPairResult.value.length === 0) {
+                    const createResult = await todos.create(content);
+                    if (!createResult.ok) throw createResult.error;
+                    await interaction.editReply({ content: bot.translator?.t('replies:todo_list.added', { content }) ?? '' });
                 } else {
-                    await interaction.editReply({ content: `此待辦事項：${content} 已經存在！` });
+                    await interaction.editReply({ content: bot.translator?.t('replies:todo_list.already_exists', { content }) ?? '' });
                 }
-            } else if (action == "delete") {
+            } else if (action === "delete") {
                 // content is index
-                const todoList = await db.models["Todo"].find({});
+                const todoListResult = await todos.listAll();
+                if (!todoListResult.ok) throw todoListResult.error;
+                const todoList = todoListResult.value;
                 if (!parseInt(content)) {
-                    await interaction.editReply({ content: "請輸入數字" });
+                    await interaction.editReply({ content: bot.translator?.t('replies:todo_list.expect_number') ?? '' });
                     return;
                 }
                 if (parseInt(content) > todoList.length) {
-                    await interaction.editReply({ content: `找不到待辦事項：${content}` });
+                    await interaction.editReply({ content: bot.translator?.t('replies:todo_list.not_found', { content }) ?? '' });
                 } else {
-                    const deleted_content = todoList[parseInt(content) - 1].content;
-                    await db.models["Todo"].deleteOne({ content: deleted_content });
-                    await interaction.editReply({ content: `已刪除待辦事項：${deleted_content}` });
+                    // Index is in bounds: the `> todoList.length` guard above rejects out-of-range input.
+                    const deleted_content = todoList[parseInt(content) - 1]!.content;
+                    const deleteResult = await todos.deleteByContent(deleted_content);
+                    if (!deleteResult.ok) throw deleteResult.error;
+                    await interaction.editReply({ content: bot.translator?.t('replies:todo_list.deleted', { content: deleted_content }) ?? '' });
                 }
-            } else if (action == "list") {
-                const todoList = await db.models["Todo"].find({});
-                let content = "待辦事項：\n";
+            } else if (action === "list") {
+                const todoListResult = await todos.listAll();
+                if (!todoListResult.ok) throw todoListResult.error;
+                const todoList = todoListResult.value;
+                let content = bot.translator?.t('replies:todo_list.header') ?? '';
                 todoList.map((e, i) => {
                     content += `> ${i + 1}. ${e.content}\n`;
                 });
                 await interaction.editReply({ content });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法變更待辦事項" });
+            await replyForError(interaction, bot, error, 'replies:todo_list.failed', interaction.guild?.id);
         }
     }
 }

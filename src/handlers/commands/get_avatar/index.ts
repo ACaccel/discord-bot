@@ -1,22 +1,21 @@
-import { 
-    ChatInputCommandInteraction,
+import type { 
+    ChatInputCommandInteraction} from 'discord.js';
+import {
     EmbedBuilder,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { replyForError } from '../../reply-for-error';
 export default class get_avatar extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "get_avatar",
-            description: "取得使用者頭像",
             options: {
                 user: [
                     {
                         name: "user",
-                        description: "選擇對象",
                         required: true
                     }
                 ]
@@ -41,11 +40,10 @@ export default class get_avatar extends Command {
     
                 await interaction.editReply({ embeds: [embed] });
             } else {
-                await interaction.editReply({ content: "找不到使用者" });
+                await interaction.editReply({ content: bot.translator?.t('errors:command.user_not_found') ?? '' });
             }
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得頭像" });
+            await replyForError(interaction, bot, error, 'replies:get_avatar.failed', interaction.guild?.id);
         }
     }
 }

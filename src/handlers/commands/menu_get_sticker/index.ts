@@ -1,19 +1,21 @@
-import { 
+import type { 
     MessageContextMenuCommandInteraction,
+    ContextMenuCommandType} from 'discord.js';
+import {
     EmbedBuilder,
-    ApplicationCommandType,
-    ContextMenuCommandType,
+    ApplicationCommandType
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { logger } from '@utils';
 
+import { replyForError } from '../../reply-for-error';
 export default class menu_get_sticker extends Command {
     constructor() {
         super();
         this.setConfig({
-            name: "取得表符/貼圖連結",
-            description: "取得訊息中的表符/貼圖連結 (單一表符或貼圖)",
+            // Stable ASCII id; the user-facing Discord name is resolved
+            // from `commands:menu_get_sticker.name`.
+            name: "menu_get_sticker",
             type: ApplicationCommandType.Message as ContextMenuCommandType,
         });
     }
@@ -48,8 +50,8 @@ export default class menu_get_sticker extends Command {
 
             if (emojiMatch) {
                 const isAnimated = content.startsWith("<a:");
-                const emojiName = emojiMatch[1];
-                const emojiId = emojiMatch[2];
+                const emojiName = emojiMatch[1] as string;
+                const emojiId = emojiMatch[2] as string;
                 const emojiUrl = isAnimated 
                     ? `https://cdn.discordapp.com/emojis/${emojiId}.gif`
                     : `https://cdn.discordapp.com/emojis/${emojiId}.png`;
@@ -67,10 +69,9 @@ export default class menu_get_sticker extends Command {
             }
 
             // No stickers or emoji found
-            await interaction.editReply({ content: "此訊息沒有貼圖或單一 emoji" });
+            await interaction.editReply({ content: bot.translator?.t('replies:menu_get_sticker.not_found') ?? '' });
         } catch (error) {
-            logger.errorLogger(bot.clientId, interaction.guild?.id, error);
-            await interaction.editReply({ content: "無法取得貼圖或 emoji" });
+            await replyForError(interaction, bot, error, 'replies:menu_get_sticker.failed', interaction.guild?.id);
         }
     }
 }

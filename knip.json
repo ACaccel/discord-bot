@@ -1,0 +1,61 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/bot/nijika/index.ts",
+    "src/bot/konata/index.ts",
+    "src/bot/tomori/index.ts",
+    "src/bot/msg-archive/index.ts",
+    "src/deploy.ts",
+    "scripts/*.ts"
+  ],
+  "project": ["src/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
+  "vitest": {
+    "config": ["vitest.config.ts", "vitest.workspace.ts"],
+    "entry": ["test/**/*.test.ts", "test/**/setup.ts"]
+  },
+  "paths": {
+    "@bot": ["src/bot/index.ts"],
+    "@cmd": ["src/handlers/commands/index.ts"],
+    "@button": ["src/handlers/buttons/index.ts"],
+    "@select-menu": ["src/handlers/select-menus/index.ts"],
+    "@modal": ["src/handlers/modals/index.ts"],
+    "@reaction": ["src/handlers/reactions/index.ts"],
+    "@core/*": ["src/core/*"],
+    "@plugins": ["src/plugins/index.ts"]
+  },
+  "ignoreDependencies": ["sodium", "tsconfig-paths", "pino-pretty"],
+  "ignore": [
+    "src/persistence/index.ts",
+    "src/persistence/repositories/index.ts",
+    "src/persistence/schemas/index.ts",
+    "src/core/index.ts",
+    "src/handlers/index.ts",
+    "src/core/i18n/index.ts",
+    "src/core/config/index.ts",
+    "src/core/errors/index.ts",
+    "src/core/ioc/index.ts",
+    "src/core/plugin/index.ts",
+    "src/core/result/index.ts",
+    "src/core/time/index.ts",
+    "src/infra/llm/index.ts",
+    "src/infra/mongo/index.ts",
+    "src/plugins/index.ts",
+    "src/plugins/*/index.ts",
+    "src/handlers/*/index.ts",
+    "test/fixtures/discord/*.ts"
+  ],
+  "rules": {
+    "files": "error",
+    "dependencies": "error",
+    "devDependencies": "error",
+    "unlisted": "error",
+    "binaries": "error",
+    "duplicates": "error",
+    "exports": "warn",
+    "types": "warn",
+    "nsExports": "warn",
+    "nsTypes": "warn",
+    "enumMembers": "warn",
+    "classMembers": "warn"
+  }
+}

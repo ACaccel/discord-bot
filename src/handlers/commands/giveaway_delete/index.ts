@@ -1,21 +1,19 @@
-import {
+import type {
     ChatInputCommandInteraction,
 } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import { giveaway } from '@features';
+import * as giveaway from '../../../plugins/giveaway/internal';
 
 export default class giveaway_delete extends Command {
     constructor() {
         super();
         this.setConfig({
             name: "giveaway_delete",
-            description: "刪除抽獎",
             options: {
                 string: [
                     {
                         name: "message_id",
-                        description: "抽獎訊息ID (Bot發布的公告)",
                         required: true
                     }
                 ]
@@ -24,6 +22,6 @@ export default class giveaway_delete extends Command {
     }
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
-        await giveaway.handleGiveawayDelete(interaction, bot as BaseBot & giveaway.IGiveawayBot);
+        await giveaway.handleGiveawayDelete(interaction, bot);
     }
 }

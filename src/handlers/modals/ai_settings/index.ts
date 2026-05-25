@@ -1,9 +1,12 @@
-import { ModalSubmitInteraction, MessageFlags } from 'discord.js';
-import { BaseBot } from '@bot';
+import type { ModalSubmitInteraction} from 'discord.js';
+import { MessageFlags } from 'discord.js';
+import type { BaseBot } from '@bot';
 import { ModalHandler } from '@modal';
-import { logger } from '@utils';
-import { LLMProviderName } from '@llm_chat';
 
+import { type LLMProviderName } from '../../../infra/llm';
+import { requireGuildRepos } from '../../require-guild-repos';
+
+import { replyForError } from '../../reply-for-error';
 const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set(['xai', 'openai', 'anthropic', 'gemini']);
 
 export default class ai_settings_modal extends ModalHandler {
@@ -11,23 +14,14 @@ export default class ai_settings_modal extends ModalHandler {
         // customId format: ai_settings|<provider>
         const [modalType, providerRaw] = interaction.customId.split('|');
         if (modalType !== 'ai_settings' || !providerRaw || !VALID_PROVIDERS.has(providerRaw as LLMProviderName)) {
-            await interaction.reply({ content: 'Modal 識別錯誤，請重新執行 /ai_settings。', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('replies:ai_settings.modal_id_error') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
         const provider = providerRaw as LLMProviderName;
 
-        const guildId = interaction.guildId;
-        if (!guildId) {
-            await interaction.reply({ content: '此互動只能在伺服器中使用。', flags: MessageFlags.Ephemeral });
-            return;
-        }
-
         const userId = interaction.user.id;
-        const UserApiSetting = bot.guildInfo[guildId]?.db?.models['UserApiSetting'];
-        if (!UserApiSetting) {
-            await interaction.reply({ content: '資料庫連線異常，請稍後再試。', flags: MessageFlags.Ephemeral });
-            return;
-        }
+        const repos = await requireGuildRepos(bot, interaction);
+        if (repos === null) return;
 
         // Read fields. Select menus return readonly string[].
         const modelValues = interaction.fields.getStringSelectValues('model');
@@ -38,38 +32,38 @@ export default class ai_settings_modal extends ModalHandler {
         const model = modelValues[0];
         const webSearchValue = webSearchValues[0];
         if (!model || !webSearchValue) {
-            await interaction.reply({ content: '請選擇 Model 與 Web Search 兩個欄位。', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: bot.translator?.t('replies:ai_settings.missing_model_or_web_search') ?? '', flags: MessageFlags.Ephemeral });
             return;
         }
 
         const temperature = Number.parseFloat(tempStr);
         if (Number.isNaN(temperature) || temperature < 0 || temperature > 2) {
             await interaction.reply({
-                content: 'Temperature 必須為 0.0 – 2.0 的數字。',
+                content: bot.translator?.t('replies:ai_settings.invalid_temperature') ?? '',
                 flags: MessageFlags.Ephemeral,
             });
             return;
         }
 
         try {
-            const doc = await UserApiSetting.findOne({ userId });
-            if (!doc) {
-                await interaction.reply({ content: '你不在白名單中，請聯絡管理員。', flags: MessageFlags.Ephemeral });
+            // Repo methods return Result<T, DatabaseError>; an `err`
+            // is re-thrown into the surrounding catch.
+            const docResult = await repos.userApiSetting.findByUserId(userId);
+            if (!docResult.ok) throw docResult.error;
+            if (!docResult.value) {
+                await interaction.reply({ content: bot.translator?.t('errors:ai.not_whitelisted') ?? '', flags: MessageFlags.Ephemeral });
                 return;
             }
-            await UserApiSetting.updateOne(
-                { userId },
-                {
-                    provider,
-                    model,
-                    temperature,
-                    web_search: webSearchValue === 'on',
-                    system_prompt: systemPrompt,
-                },
-            );
+            const updateResult = await repos.userApiSetting.update(userId, {
+                provider,
+                model,
+                temperature,
+                web_search: webSearchValue === 'on',
+                system_prompt: systemPrompt,
+            });
+            if (!updateResult.ok) throw updateResult.error;
         } catch (err) {
-            logger.errorLogger(bot.clientId, guildId, err);
-            await interaction.reply({ content: '資料庫操作失敗，請稍後再試。', flags: MessageFlags.Ephemeral });
+            await replyForError(interaction, bot, err, 'replies:ai_settings.failed', interaction.guildId);
             return;
         }
 
@@ -77,18 +71,26 @@ export default class ai_settings_modal extends ModalHandler {
         // limit so the surrounding bullet lines still fit; truncate with an
         // explicit marker rather than silently dropping the tail.
         const PROMPT_DISPLAY_MAX = 1700;
+        const t = (key: string, params?: Record<string, string | number>): string =>
+            bot.translator?.t(key, params) ?? '';
         const promptDisplay = systemPrompt
             ? systemPrompt.length > PROMPT_DISPLAY_MAX
-                ? `\n\`\`\`\n${systemPrompt.slice(0, PROMPT_DISPLAY_MAX)}\n…（共 ${systemPrompt.length} 字，已截斷）\n\`\`\``
+                ? t('replies:ai_settings.modal_system_prompt_preview', {
+                    preview: systemPrompt.slice(0, PROMPT_DISPLAY_MAX),
+                    length: systemPrompt.length,
+                })
                 : `\n\`\`\`\n${systemPrompt}\n\`\`\``
-            : '（未設定）';
+            : t('replies:ai_settings.system_prompt_not_set');
+        const webSearchLabel = t(
+            webSearchValue === 'on' ? 'replies:ai_settings.toggle_on' : 'replies:ai_settings.toggle_off',
+        );
         await interaction.reply({
             content: [
-                '✅ AI 設定已更新：',
+                t('replies:ai_settings.updated_header'),
                 `• Provider: \`${provider}\``,
                 `• Model: \`${model}\``,
                 `• Temperature: \`${temperature}\``,
-                `• Web Search: ${webSearchValue === 'on' ? '開啟' : '關閉'}`,
+                t('replies:ai_settings.web_search_status', { value: webSearchLabel }),
                 `• System Prompt: ${promptDisplay}`,
             ].join('\n'),
             flags: MessageFlags.Ephemeral,
