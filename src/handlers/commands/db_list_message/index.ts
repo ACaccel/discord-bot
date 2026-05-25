@@ -43,7 +43,7 @@ export default class db_list_message extends Command {
         await interaction.editReply({ content: t('errors:command.guild_not_found') });
         return;
       }
-      const repos = bot.guildInfo[guild.id]?.repos;
+      const repos = bot.getRepos(guild.id);
       if (!repos) {
         await interaction.editReply({ content: t('errors:db.not_found') });
         return;

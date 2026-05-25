@@ -101,12 +101,12 @@ export interface Config {
 }
 
 export interface GuildInfo {
-    bot_name: string;
-    guild: Guild;
-    channels?: Record<string, Channel>;
-    roles?: Record<string, Role>;
+    readonly bot_name: string;
+    readonly guild: Guild;
+    readonly channels?: Readonly<Record<string, Channel>>;
+    readonly roles?: Readonly<Record<string, Role>>;
     /** Per-guild repository bag built from the IoC container at connect time. */
-    repos?: Repos;
+    readonly repos?: Repos;
 }
 
 interface GuildConfig {
@@ -129,7 +129,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * Composition-root IoC container. Owned by BaseBot, populated in
      * the constructor with `ConnectionManager` + `ReposFactory`. Other
      * layers must NOT import this container — handlers reach repos via
-     * `bot.guildInfo[guildId].repos`. The eslint `no-restricted-imports`
+     * `bot.getRepos(guildId)`. The eslint `no-restricted-imports`
      * rule enforces the constraint.
      */
     public readonly container: ServiceContainer;
@@ -137,7 +137,75 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     public clientId: string;
     public adminId?: string;
     public config: TConfig;
-    public guildInfo: Record<string, GuildInfo> = {};
+
+    /**
+     * Backing store for guild metadata. Private (ECMAScript hard-private)
+     * so no caller outside BaseBot can mutate it. Read access goes through
+     * {@link getGuildInfo} / {@link getAllGuildInfo} / {@link getRepos};
+     * writes go through {@link setGuildInfo} / {@link attachRepos}, both
+     * of which are private and reachable only from this class.
+     */
+    readonly #guildInfo = new Map<string, GuildInfo>();
+
+    /** Look up one guild's info. Returns undefined when unregistered. */
+    public getGuildInfo(guildId: string): Readonly<GuildInfo> | undefined {
+        return this.#guildInfo.get(guildId);
+    }
+
+    /** Readonly view over every registered guild. */
+    public getAllGuildInfo(): ReadonlyMap<string, Readonly<GuildInfo>> {
+        return this.#guildInfo;
+    }
+
+    /** Convenience accessor for the common case of just needing repos. */
+    public getRepos(guildId: string): Repos | undefined {
+        return this.#guildInfo.get(guildId)?.repos;
+    }
+
+    /**
+     * Register / replace one guild's slot. Private to BaseBot — only
+     * BaseBot itself (via `handleClientReady`) and the in-package
+     * onboarding port reach it. The port uses
+     * {@link registerGuildSlotInternal} which forwards here.
+     */
+    private setGuildInfo(guildId: string, info: GuildInfo): void {
+        this.#guildInfo.set(guildId, info);
+    }
+
+    /**
+     * Update a guild's `bot_name` after a successful `/change_avatar`
+     * flip. A narrow seam exposed so handlers do not need (and are not
+     * allowed) to reach into the underlying map. No-op when the slot
+     * has not been registered.
+     */
+    public updateBotName(guildId: string, botName: string): void {
+        const existing = this.#guildInfo.get(guildId);
+        if (existing === undefined) return;
+        this.#guildInfo.set(guildId, { ...existing, bot_name: botName });
+    }
+
+    /**
+     * Composition-root-only seam for the `BaseBotGuildOnboardingPort` to
+     * publish a freshly built `GuildInfo` slot when a guild is joined at
+     * runtime. Not part of the public BaseBot surface — handlers and
+     * plugins MUST read through {@link getGuildInfo} and never call this.
+     *
+     * @internal
+     */
+    public registerGuildSlotInternal(guildId: string, info: GuildInfo): void {
+        this.setGuildInfo(guildId, info);
+    }
+
+    /**
+     * Attach a freshly-built repos bag to an existing guild slot. Private
+     * to BaseBot. No-op when the slot has not been registered yet — the
+     * R1 design always registers the guild before connecting its DB.
+     */
+    private attachRepos(guildId: string, repos: Repos): void {
+        const existing = this.#guildInfo.get(guildId);
+        if (existing === undefined) return;
+        this.#guildInfo.set(guildId, { ...existing, repos });
+    }
 
     public commandHandlers: Map<string, Command> = new Map();
     public buttonHandlers: Map<string, ButtonHandler> = new Map();
@@ -258,13 +326,13 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         };
         this.container.registerSingleton(TOKENS.ReposFactory, () => reposFactory);
         this.container.registerSingleton(TOKENS.Clock, () => systemClock);
-        // GuildRegistry is a read-only view over `this.guildInfo` so
+        // GuildRegistry is a read-only view over `#guildInfo` so
         // plugins reach guild lookup without holding a BaseBot reference.
         const guildRegistry: GuildRegistry = {
-            getRepos: (guildId) => this.guildInfo[guildId]?.repos,
-            getChannel: (guildId, name) => this.guildInfo[guildId]?.channels?.[name],
-            getRole: (guildId, name) => this.guildInfo[guildId]?.roles?.[name],
-            listGuildIds: () => Object.keys(this.guildInfo),
+            getRepos: (guildId) => this.#guildInfo.get(guildId)?.repos,
+            getChannel: (guildId, name) => this.#guildInfo.get(guildId)?.channels?.[name],
+            getRole: (guildId, name) => this.#guildInfo.get(guildId)?.roles?.[name],
+            listGuildIds: () => Array.from(this.#guildInfo.keys()),
         };
         this.container.registerSingleton(TOKENS.GuildRegistry, () => guildRegistry);
         this.container.registerSingleton(TOKENS.DiscordClient, () => this.client);
@@ -351,7 +419,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
             host,
             router: this.interactionRouter,
             reactionPort: this.buildReactionPort(),
-            guildInfo: () => this.guildInfo,
+            guildInfo: () => this.#guildInfo,
             suppression: this.eventBridgeSuppression(),
         });
         openReadyLatch();
@@ -417,9 +485,12 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * their prior control-flow semantics.
      */
     public connectOneGuild = async (guildId: string): Promise<void> => {
-        const slot = this.guildInfo[guildId];
+        const slot = this.#guildInfo.get(guildId);
         if (slot === undefined) return;
-        await this.guildDbConnector.connectOne(guildId, slot);
+        const repos = await this.guildDbConnector.connectOne(guildId);
+        if (repos !== undefined) {
+            this.attachRepos(guildId, repos);
+        }
     };
 
     /**
@@ -427,7 +498,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      * the {@link GuildDbConnector} collaborator.
      */
     public connectGuildDB = async (): Promise<void> => {
-        await this.guildDbConnector.connectAll(this.guildInfo);
+        await this.guildDbConnector.connectAll(this.#guildInfo, (guildId, repos) =>
+            this.attachRepos(guildId, repos),
+        );
     };
 
     // ---- subclass hooks ----
@@ -563,8 +636,13 @@ export abstract class BaseBot<TConfig extends Config = Config> {
      */
     private async handleClientReady(callback?: () => Promise<void>): Promise<void> {
         try {
-            this.guildInfo = this.guildRegistrar.registerAll(this.config);
-            await this.guildDbConnector.connectAll(this.guildInfo);
+            const registered = this.guildRegistrar.registerAll(this.config);
+            for (const [guildId, info] of Object.entries(registered)) {
+                this.setGuildInfo(guildId, info);
+            }
+            await this.guildDbConnector.connectAll(this.#guildInfo, (guildId, repos) =>
+                this.attachRepos(guildId, repos),
+            );
             await registerCommands(this);
             await registerButtons(this);
             await registerSSMs(this);

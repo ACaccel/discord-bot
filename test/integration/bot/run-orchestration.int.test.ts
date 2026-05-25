@@ -138,7 +138,7 @@ describe('BaseBot.run() — contract baseline', () => {
     expect(bot.container).toBeDefined();
     expect(bot.getPluginHost()).toBeDefined();
     expect(fake.logins).toEqual(['fake-token']);
-    expect(bot.guildInfo['g-1']).toBeDefined();
+    expect(bot.getGuildInfo('g-1')).toBeDefined();
     await bot.shutdown();
   });
 

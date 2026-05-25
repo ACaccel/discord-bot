@@ -94,7 +94,7 @@ export const createChannelLoggingMiddleware = (
                     const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channelId}>`;
                     void sendChannelLog(
                         bot.logger,
-                        bot.guildInfo[interaction.guildId]?.channels?.debug,
+                        bot.getGuildInfo(interaction.guildId)?.channels?.debug,
                         undefined,
                         channel_log,
                     );

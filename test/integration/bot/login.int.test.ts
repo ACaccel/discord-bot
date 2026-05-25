@@ -85,8 +85,8 @@ describe('BaseBot.run() — R6.2 login failure', () => {
     // run() must not have reached host.startAll() / ClientReady: both
     // run after login() inside run(). We assert the public symptom —
     // `guildInfo` (populated in ClientReady) stays at the default
-    // empty record.
-    expect(bot.guildInfo).toEqual({});
+    // empty map.
+    expect(bot.getAllGuildInfo().size).toBe(0);
   });
 
   it('rejects with ConfigurationError(BOT_LOGIN_NO_USER) when client.user is missing post-login', async () => {
@@ -106,6 +106,6 @@ describe('BaseBot.run() — R6.2 login failure', () => {
       code: 'BOT_LOGIN_NO_USER',
       messageKey: 'errors:bot.login_no_user',
     });
-    expect(bot.guildInfo).toEqual({});
+    expect(bot.getAllGuildInfo().size).toBe(0);
   });
 });

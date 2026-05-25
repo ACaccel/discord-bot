@@ -6,7 +6,7 @@
  * concrete, `BaseBot`-backed implementation and lives in `src/bot/`
  * because the composition root is the only layer permitted to depend
  * on `BaseBot` internals (`connectOneGuild`, `commandHandlers`,
- * `guildInfo`).
+ * `registerGuildSlotInternal`, `getRepos`).
  *
  * Onboarding a newly joined guild is funnelled through this single
  * typed seam: `BaseBot` registers an instance under
@@ -95,7 +95,7 @@ export class BaseBotGuildOnboardingPort implements GuildOnboardingPort {
             channels: {},
             roles: {},
         };
-        this.bot.guildInfo[guild.id] = slot;
+        this.bot.registerGuildSlotInternal(guild.id, slot);
     }
 
     /**
@@ -112,7 +112,7 @@ export class BaseBotGuildOnboardingPort implements GuildOnboardingPort {
             return false;
         }
         await this.bot.connectOneGuild(guildId);
-        return this.bot.guildInfo[guildId]?.repos !== undefined;
+        return this.bot.getRepos(guildId) !== undefined;
     }
 
     /**

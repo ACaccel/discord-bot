@@ -106,7 +106,7 @@ const baseConfig = (overrides: {
   host?: PluginHost;
   router?: InteractionRouter | undefined;
   reactionPort?: ReactionHandlerPort;
-  guildInfo?: Record<string, GuildInfo>;
+  guildInfo?: ReadonlyMap<string, GuildInfo>;
   suppression?: { interaction?: boolean; reaction?: boolean; guildCreate?: boolean };
   onboardingPort?: GuildOnboardingPort;
   skipTranslator?: boolean;
@@ -128,7 +128,7 @@ const baseConfig = (overrides: {
     host: overrides.host ?? fakeHost(),
     router: overrides.router,
     reactionPort: overrides.reactionPort ?? noopReactionPort,
-    guildInfo: () => overrides.guildInfo ?? {},
+    guildInfo: () => overrides.guildInfo ?? new Map<string, GuildInfo>(),
     suppression: overrides.suppression,
   };
 };
@@ -330,23 +330,32 @@ describe('ClientEventBridge.sendRebootMessages', () => {
       },
     } as unknown as Channel;
     const unsendable = { isSendable: () => false } as unknown as Channel;
-    const guildInfo: Record<string, GuildInfo> = {
-      'g-ok': {
-        bot_name: 'Botty',
-        guild: { id: 'g-ok' } as Guild,
-        channels: { debug: sendable },
-      },
-      'g-fail': {
-        bot_name: 'Botty',
-        guild: { id: 'g-fail' } as Guild,
-        channels: { debug: failing },
-      },
-      'g-skip': {
-        bot_name: 'Botty',
-        guild: { id: 'g-skip' } as Guild,
-        channels: { debug: unsendable },
-      },
-    };
+    const guildInfo = new Map<string, GuildInfo>([
+      [
+        'g-ok',
+        {
+          bot_name: 'Botty',
+          guild: { id: 'g-ok' } as Guild,
+          channels: { debug: sendable },
+        },
+      ],
+      [
+        'g-fail',
+        {
+          bot_name: 'Botty',
+          guild: { id: 'g-fail' } as Guild,
+          channels: { debug: failing },
+        },
+      ],
+      [
+        'g-skip',
+        {
+          bot_name: 'Botty',
+          guild: { id: 'g-skip' } as Guild,
+          channels: { debug: unsendable },
+        },
+      ],
+    ]);
     const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
     bridge.attach(baseConfig({ guildInfo }));
     const translator = {

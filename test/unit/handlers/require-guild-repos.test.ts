@@ -59,7 +59,7 @@ const stubBot = (input: StubBotInput = {}): BaseBot => {
     connectionManager: {
       isDisabled: (guildId: string) => disabledMap.get(guildId),
     },
-    guildInfo: input.repos ? { 'g-1': { repos: input.repos } } : {},
+    getRepos: (guildId: string) => (guildId === 'g-1' ? input.repos : undefined),
   } as unknown as BaseBot;
 };
 
@@ -102,7 +102,7 @@ describe('requireGuildRepos (gap D5 — reads ConnectionManager.isDisabled)', ()
       logger: undefined,
       translator: echoTranslator(),
       connectionManager: undefined,
-      guildInfo: { 'g-1': { repos } },
+      getRepos: (guildId: string) => (guildId === 'g-1' ? repos : undefined),
     } as unknown as BaseBot;
     const result = await requireGuildRepos(bot, interaction);
     expect(result).toBe(repos);

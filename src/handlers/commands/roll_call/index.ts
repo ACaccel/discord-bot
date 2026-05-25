@@ -48,7 +48,7 @@ export default class roll_call extends Command {
                     return;
                 }
 
-                const repos = bot.guildInfo[guild.id]?.repos;
+                const repos = bot.getRepos(guild.id);
                 if (!repos) {
                     await interaction.reply({ content: bot.translator?.t('errors:db.not_found') ?? '', flags: MessageFlags.Ephemeral });
                     return;

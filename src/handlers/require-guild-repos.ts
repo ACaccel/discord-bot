@@ -111,7 +111,7 @@ export const requireGuildRepos = async (
         return null;
     }
 
-    const repos = bot.guildInfo[guildId]?.repos;
+    const repos = bot.getRepos(guildId);
     if (repos === undefined) {
         await replyOrEdit(
             bot,

@@ -38,7 +38,7 @@ export default class update_role extends Command {
             }
 
             const leaderboard = await Mee6LevelsApi.getLeaderboardPage(interaction.guild?.id as string);
-            const guild = bot.guildInfo[interaction.guild?.id as string]!.guild;
+            const guild = bot.getGuildInfo(interaction.guild?.id as string)!.guild;
             const channel = interaction.channel;
             if (!channel?.isSendable()) return;
             // let alive_role = guild.roles.cache.find(role => role.name === "活人");

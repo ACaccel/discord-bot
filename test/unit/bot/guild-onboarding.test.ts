@@ -37,7 +37,7 @@ const makeBot = (
 ): { bot: BaseBot; commandsSet: ReturnType<typeof vi.fn> } => {
   const commandsSet =
     overrides.commandsSet !== undefined ? vi.fn(overrides.commandsSet) : vi.fn(async () => []);
-  const guildInfo: Record<string, unknown> = {};
+  const guildInfo = new Map<string, { bot_name: string; repos?: unknown }>();
   const guild = {
     id: GUILD_ID,
     name: 'Test Guild',
@@ -49,12 +49,14 @@ const makeBot = (
     overrides.connectOneGuild ??
     (async (id: string): Promise<void> => {
       // Default: simulate a successful connect by populating `repos`.
-      (guildInfo[id] as { repos?: unknown }).repos = {};
+      const existing = guildInfo.get(id);
+      if (existing !== undefined) {
+        guildInfo.set(id, { ...existing, repos: {} });
+      }
     });
   const bot = {
     clientId: 'bot-client',
     logger: undefined,
-    guildInfo,
     commandHandlers: new Map(),
     translator: { t: (key: string) => key },
     client: {
@@ -63,6 +65,12 @@ const makeBot = (
     },
     getMongoURI: () => overrides.mongoURI ?? 'mongodb://localhost:27017',
     connectOneGuild,
+    registerGuildSlotInternal: (id: string, info: { bot_name: string }): void => {
+      guildInfo.set(id, info);
+    },
+    getGuildInfo: (id: string) => guildInfo.get(id),
+    getAllGuildInfo: () => guildInfo,
+    getRepos: (id: string) => guildInfo.get(id)?.repos,
   } as unknown as BaseBot;
   return { bot, commandsSet };
 };
@@ -79,8 +87,8 @@ describe('BaseBotGuildOnboardingPort', () => {
       databaseConnected: true,
       commandsRegistered: true,
     });
-    expect(bot.guildInfo[GUILD_ID]).toBeDefined();
-    expect(bot.guildInfo[GUILD_ID]?.bot_name).toBe('Bot');
+    expect(bot.getGuildInfo(GUILD_ID)).toBeDefined();
+    expect(bot.getGuildInfo(GUILD_ID)?.bot_name).toBe('Bot');
     expect(commandsSet).toHaveBeenCalledWith(expect.any(Array), GUILD_ID);
   });
 

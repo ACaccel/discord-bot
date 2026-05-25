@@ -15,10 +15,10 @@ import type { ActivityDeps } from './activity';
 export const buildActivityDepsFromBot = (bot: BaseBot): ActivityDeps => ({
     client: bot.client,
     registry: {
-        getRepos: (guildId) => bot.guildInfo[guildId]?.repos,
-        getChannel: (guildId, name) => bot.guildInfo[guildId]?.channels?.[name],
-        getRole: (guildId, name) => bot.guildInfo[guildId]?.roles?.[name],
-        listGuildIds: () => Object.keys(bot.guildInfo),
+        getRepos: (guildId) => bot.getRepos(guildId),
+        getChannel: (guildId, name) => bot.getGuildInfo(guildId)?.channels?.[name],
+        getRole: (guildId, name) => bot.getGuildInfo(guildId)?.roles?.[name],
+        listGuildIds: () => Array.from(bot.getAllGuildInfo().keys()),
     },
     jobMap: bot.jobs,
     logger: bot.logger ?? (undefined as unknown as Logger),

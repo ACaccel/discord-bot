@@ -26,6 +26,15 @@ import type {
 } from '../infra/mongo/connection-manager';
 
 import type { GuildInfo } from './index';
+import type { Repos } from '../persistence/repositories';
+
+/**
+ * Callback BaseBot passes into {@link GuildDbConnector.connectAll} so the
+ * connector can publish each freshly-built {@link Repos} bag back into
+ * BaseBot's private guild map. Keeps mutation private to BaseBot — the
+ * connector never holds a reference to the map itself.
+ */
+export type AttachReposFn = (guildId: string, repos: Repos) => void;
 
 export class GuildDbConnector {
     /**
@@ -46,12 +55,19 @@ export class GuildDbConnector {
     ) {}
 
     /**
-     * Fan-out connect for every guild slot in `guildInfo`. Per-slot
-     * failures are caught and logged through {@link connectOne}; a
-     * single bad guild MUST NOT abort the whole startup — the
-     * ConnectionManager's disabled-set is the durable record.
+     * Fan-out connect for every guild in `guildInfo`. Per-slot failures
+     * are caught and logged through {@link connectOne}; a single bad
+     * guild MUST NOT abort the whole startup — the ConnectionManager's
+     * disabled-set is the durable record.
+     *
+     * Mutation of the BaseBot's guild map is funnelled through the
+     * `attachRepos` callback so this connector never holds a writable
+     * reference to BaseBot's private state.
      */
-    public async connectAll(guildInfo: Record<string, GuildInfo>): Promise<void> {
+    public async connectAll(
+        guildInfo: ReadonlyMap<string, GuildInfo>,
+        attachRepos: AttachReposFn,
+    ): Promise<void> {
         logSystem(this.logger, this.clientId, ops.guildDb.poolStart());
         if (this.mongoURI === undefined || this.mongoURI.length === 0) {
             logSystem(this.logger, this.clientId, ops.guildDb.uriMissing());
@@ -62,9 +78,12 @@ export class GuildDbConnector {
         // per-guild success log line interleaves with per-guild
         // connect output, which ops grep against.
         await Promise.all(
-            Object.entries(guildInfo).map(async ([guildId, slot]) => {
+            Array.from(guildInfo.entries()).map(async ([guildId, slot]) => {
                 try {
-                    await this.connectOne(guildId, slot);
+                    const repos = await this.connectOne(guildId);
+                    if (repos !== undefined) {
+                        attachRepos(guildId, repos);
+                    }
                     logSystem(
                         this.logger,
                         this.clientId,
@@ -81,22 +100,23 @@ export class GuildDbConnector {
     }
 
     /**
-     * Connect (or reuse) ONE guild's repos bag. Mutates only
-     * `slot.repos` and only after the factory resolves successfully —
-     * a partial connect cannot leave a half-baked slot visible to
-     * handlers.
+     * Connect (or reuse) ONE guild's repos bag. Returns the freshly
+     * built {@link Repos} on success or `undefined` when the bot has no
+     * Mongo URI configured. Callers (BaseBot) decide how to publish the
+     * result; the connector itself is stateless.
      *
-     * Re-throws the normalised `Error` after logging so callers
-     * (`connectAll`'s wrapper, the `GuildOnboardingPort`) keep the
-     * prior control-flow semantics.
+     * Re-throws the normalised `Error` after logging so callers keep
+     * the prior control-flow semantics.
      */
-    public async connectOne(guildId: string, slot: GuildInfo): Promise<void> {
+    public async connectOne(guildId: string): Promise<Repos | undefined> {
+        if (this.mongoURI === undefined || this.mongoURI.length === 0) {
+            return undefined;
+        }
         const branded = asGuildId(guildId);
         try {
             const reposFactory = this.container.resolve<ReposFactory>(TOKENS.ReposFactory);
             const repos = await reposFactory(branded);
-            // Single mutation — atomic from the handlers' perspective.
-            slot.repos = repos;
+            return repos;
         } catch (err) {
             const normalised =
                 err instanceof Error

@@ -52,7 +52,7 @@ export default class change_avatar extends Command {
 
             // change nickname and avatar
             const newName = interaction.options.get("identity")?.value as string;
-            const oldName = bot.guildInfo[guild.id]?.bot_name;
+            const oldName = bot.getGuildInfo(guild.id)?.bot_name;
             const userBot = guild.members.cache.get(bot.client.user?.id as string);
             if (!userBot) {
                 await interaction.editReply({ content: bot.translator?.t('errors:command.bot_not_found') ?? ''});
@@ -68,10 +68,7 @@ export default class change_avatar extends Command {
             await userBot.setNickname(newName);
             await userBot.client.user.setAvatar(new_identity.avatar_url);
             await bot.reLogin();
-            const guildEntry = bot.guildInfo[guild.id];
-            if (guildEntry) {
-                guildEntry.bot_name = newName;
-            }
+            bot.updateBotName(guild.id, newName);
 
             // change color role
             const colorRole = userBot.roles.color;

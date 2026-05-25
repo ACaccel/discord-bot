@@ -41,17 +41,25 @@ const containerWith = (
 };
 
 describe('GuildDbConnector.connectOne', () => {
-  it('populates slot.repos on success', async () => {
+  it('returns the freshly built repos on success', async () => {
     const repos = fakeRepos();
     const factory: ReposFactory = vi.fn(async () => repos);
     const container = containerWith(factory);
     const connector = new GuildDbConnector(container, 'mongodb://x', 'bot-1', silent);
-    const slot: GuildInfo = { bot_name: '', guild: fakeGuild('g-1') };
 
-    await connector.connectOne('g-1', slot);
+    const result = await connector.connectOne('g-1');
 
-    expect(slot.repos).toBe(repos);
+    expect(result).toBe(repos);
     expect(factory).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns undefined when the bot was built without a Mongo URI', async () => {
+    const factory: ReposFactory = vi.fn(async () => fakeRepos());
+    const container = containerWith(factory);
+    const connector = new GuildDbConnector(container, undefined, 'bot-1', silent);
+
+    expect(await connector.connectOne('g-1')).toBeUndefined();
+    expect(factory).not.toHaveBeenCalled();
   });
 
   it('re-throws a normalised Error when ReposFactory throws', async () => {
@@ -72,10 +80,8 @@ describe('GuildDbConnector.connectOne', () => {
     } as unknown as ConnectionManager;
     const container = containerWith(factory, cm);
     const connector = new GuildDbConnector(container, 'mongodb://x', 'bot-1', silent);
-    const slot: GuildInfo = { bot_name: '', guild: fakeGuild('g-1') };
 
-    await expect(connector.connectOne('g-1', slot)).rejects.toThrow('mongo unreachable');
-    expect(slot.repos).toBeUndefined();
+    await expect(connector.connectOne('g-1')).rejects.toThrow('mongo unreachable');
   });
 
   it('normalises a non-Error throw into an Error before re-throwing', async () => {
@@ -85,14 +91,13 @@ describe('GuildDbConnector.connectOne', () => {
     });
     const container = containerWith(factory);
     const connector = new GuildDbConnector(container, 'mongodb://x', 'bot-1', silent);
-    const slot: GuildInfo = { bot_name: '', guild: fakeGuild('g-1') };
 
-    await expect(connector.connectOne('g-1', slot)).rejects.toBeInstanceOf(Error);
+    await expect(connector.connectOne('g-1')).rejects.toBeInstanceOf(Error);
   });
 });
 
 describe('GuildDbConnector.connectAll', () => {
-  it('continues fanning out when one slot throws', async () => {
+  it('continues fanning out when one slot throws and invokes attachRepos for successes', async () => {
     const reposA = fakeRepos();
     const reposC = fakeRepos();
     const factory: ReposFactory = vi.fn(async (guildId) => {
@@ -102,29 +107,35 @@ describe('GuildDbConnector.connectAll', () => {
     });
     const container = containerWith(factory);
     const connector = new GuildDbConnector(container, 'mongodb://x', 'bot-1', silent);
-    const guildInfo: Record<string, GuildInfo> = {
-      'g-1': { bot_name: '', guild: fakeGuild('g-1') },
-      'g-2': { bot_name: '', guild: fakeGuild('g-2') },
-      'g-3': { bot_name: '', guild: fakeGuild('g-3') },
-    };
+    const guildInfo = new Map<string, GuildInfo>([
+      ['g-1', { bot_name: '', guild: fakeGuild('g-1') }],
+      ['g-2', { bot_name: '', guild: fakeGuild('g-2') }],
+      ['g-3', { bot_name: '', guild: fakeGuild('g-3') }],
+    ]);
+    const attached = new Map<string, Repos>();
 
-    await connector.connectAll(guildInfo);
+    await connector.connectAll(guildInfo, (guildId, repos) => {
+      attached.set(guildId, repos);
+    });
 
-    expect(guildInfo['g-1']?.repos).toBe(reposA);
-    expect(guildInfo['g-2']?.repos).toBeUndefined();
-    expect(guildInfo['g-3']?.repos).toBe(reposC);
+    expect(attached.get('g-1')).toBe(reposA);
+    expect(attached.has('g-2')).toBe(false);
+    expect(attached.get('g-3')).toBe(reposC);
   });
 
   it('short-circuits when no Mongo URI was configured', async () => {
     const factory: ReposFactory = vi.fn(async () => fakeRepos());
     const container = containerWith(factory);
     const connector = new GuildDbConnector(container, undefined, 'bot-1', silent);
+    const attach = vi.fn();
 
-    await connector.connectAll({
-      'g-1': { bot_name: '', guild: fakeGuild('g-1') },
-    });
+    await connector.connectAll(
+      new Map<string, GuildInfo>([['g-1', { bot_name: '', guild: fakeGuild('g-1') }]]),
+      attach,
+    );
 
     expect(factory).not.toHaveBeenCalled();
+    expect(attach).not.toHaveBeenCalled();
   });
 });
 

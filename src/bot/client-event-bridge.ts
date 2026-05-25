@@ -73,7 +73,7 @@ interface ClientEventBridgeConfig {
     readonly router: InteractionRouter | undefined;
     readonly reactionPort: ReactionHandlerPort;
     /** Live view over the bot's `guildInfo` — read only. */
-    readonly guildInfo: () => Record<string, GuildInfo>;
+    readonly guildInfo: () => ReadonlyMap<string, GuildInfo>;
     readonly suppression?: ClientEventBridgeSuppression;
 }
 
@@ -142,9 +142,9 @@ export class ClientEventBridge {
      * — one broken debug channel must not delay `pluginHost.readyAll`.
      */
     public async sendRebootMessages(translator: Translator | undefined): Promise<void> {
-        const guildInfo = this.config?.guildInfo() ?? {};
+        const guildInfo = this.config?.guildInfo() ?? new Map<string, GuildInfo>();
         await Promise.all(
-            Object.values(guildInfo).map(async (slot) => {
+            Array.from(guildInfo.values()).map(async (slot) => {
                 try {
                     const debugChannel = slot.channels?.debug;
                     if (debugChannel === undefined || !debugChannel.isSendable()) return;
