@@ -87,15 +87,23 @@ describe('file-router stream', () => {
     expect(JSON.parse(contents[0]!)).toMatchObject({ msg: 'system line' });
   });
 
-  it('falls back to <root>/_unbound/<date>.log when bot binding is missing', async () => {
+  it('throws inside the write path when `bot` binding is missing (no _unbound fallback)', async () => {
     const now = new Date(2026, 4, 25, 13, 0, 0);
     vi.useFakeTimers();
     vi.setSystemTime(now);
 
-    await drain([JSON.stringify({ level: 30, time: now.toISOString(), msg: 'orphan' })]);
-
-    const expected = join(rootDir, '_unbound', `${dateKey(now)}.log`);
-    expect(existsSync(expected)).toBe(true);
+    // The composition root attaches `{ bot: clientId }` on the root
+    // logger, so any record reaching the file sink must carry it.
+    // Surfacing the contract violation loudly beats silently writing
+    // to a junk directory that nobody monitors.
+    const stream = createFileRouterStream({ rootDir });
+    const errored = new Promise<Error>((resolve) => {
+      stream.once('error', (err: Error) => resolve(err));
+    });
+    stream.write(`${JSON.stringify({ level: 30, time: now.toISOString(), msg: 'orphan' })}\n`);
+    const err = await errored;
+    expect(err.message).toMatch(/missing required `bot` binding/);
+    expect(existsSync(join(rootDir, '_unbound'))).toBe(false);
   });
 
   it('keeps each (bot,guild) bucket in its own file', async () => {

@@ -43,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Internal `docs/proposal.md` and `docs/tasks/` working-document
   artifacts. The gap-remediation work they tracked has shipped.
+- `_unbound/` fallback bucket from the file-router transport. The
+  composition root attaches `{ bot: clientId }` on the root logger so
+  every record carries `bot` by construction; a missing binding is now
+  a contract violation that surfaces as an error on the Writable
+  stream instead of silently landing in a junk directory.
 
 ## [1.0.0] — 2026-05-25
 
