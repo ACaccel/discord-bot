@@ -33,7 +33,7 @@ import {
   type LLMSettings,
 } from '../../infra/llm';
 import { SessionManager } from './internal';
-import { logError, type Logger } from '../../core/logger';
+import { logError, logGuildEvent, type Logger } from '../../core/logger';
 
 const PLUGIN_ID = 'llm-chat';
 const PLUGIN_VERSION = '1.0.0';
@@ -280,6 +280,7 @@ const handleNewSession = async (
     assistantMsg,
     botMsgs.map((m) => m.id),
   );
+  logMessageCreate(logger, clientId, message, 'llm-chat:new-session');
 };
 
 const handleContinueSession = async (
@@ -322,5 +323,37 @@ const handleContinueSession = async (
     userMsg,
     assistantMsg,
     botMsgs.map((m) => m.id),
+  );
+  logMessageCreate(logger, clientId, message, 'llm-chat:continue');
+};
+
+/**
+ * Audit-log a `MESSAGE_CREATE` the plugin actually acted on (new
+ * session or continuation). The `kind` field disambiguates which
+ * branch fired without forcing operators to grep both files.
+ */
+const logMessageCreate = (
+  logger: Logger | undefined,
+  clientId: string,
+  message: Message,
+  kind: string,
+): void => {
+  if (message.guild === null || message.guildId === null) return;
+  const channelName =
+    'name' in message.channel
+      ? (message.channel as { name: string | null }).name ?? '<unknown>'
+      : '<unknown>';
+  logGuildEvent(
+    logger,
+    clientId,
+    message.guildId,
+    'message_create',
+    {
+      user: message.author.username,
+      channel: channelName,
+      content: message.content,
+      kind,
+    },
+    message.guild.name,
   );
 };
