@@ -15,6 +15,10 @@
  * (Discord-channel mirror, attachment archival) live under
  * `src/infra/discord/` so `core/**` stays free of third-party SDK
  * imports per the architecture contract.
+ *
+ * History: previously named `legacy.ts` during the pino migration.
+ * Renamed because these helpers are the canonical handler-side logging
+ * entry points, not legacy code.
  */
 import type { Logger } from './logger';
 
@@ -44,24 +48,43 @@ export const logError = (
   }
 };
 
-/** Bot-scoped info-level log for operator-facing system messages. */
+/**
+ * Bot-scoped info-level log for operator-facing system messages.
+ *
+ * `msg` is passed as the pino headline argument (not in a binding
+ * object). The prior shape — `info({ msg }, 'system')` — collided with
+ * pino's `messageKey` default (`'msg'`), so the binding silently
+ * overrode the literal headline and the pretty output lost the
+ * operator-supplied text. Passing `msg` positionally avoids the
+ * collision and keeps the headline visible in both pretty and JSON
+ * sinks.
+ */
 export const logSystem = (logger: Logger | undefined, clientId: string, msg: string): void => {
-  logger?.child({ bot: clientId }).info({ msg }, 'system');
+  logger?.child({ bot: clientId }).info(msg);
 };
 
 /**
  * Audit-log-style line tagged with the guild's display name.
+ *
+ * `details` carries the event-specific structured fields (command,
+ * user, channel, oldMessage / newMessage, etc.). It is splatted onto
+ * the pino record so file consumers (`jq`, log search) can filter on
+ * the exact field; the headline is the upper-cased `eventType` so
+ * pretty consoles read like `MESSAGE_UPDATE`. Newlines inside any
+ * string field are preserved verbatim — JSON.stringify escapes them
+ * in the file sink, and pretty rendering shows them on one line per
+ * field via the multi-line formatter.
  */
 export const logGuildEvent = (
   logger: Logger | undefined,
   clientId: string,
   guildId: string,
   eventType: string,
-  msg: string,
+  details: Readonly<Record<string, unknown>>,
   guildName: string,
 ): void => {
-  const flat = msg.replaceAll('\n', '\\n');
+  const headline = eventType.toUpperCase();
   logger
     ?.child({ bot: clientId, guildId, guildName })
-    .info({ eventType: eventType.toUpperCase(), msg: flat }, 'guild event');
+    .info({ eventType: headline, ...details }, headline);
 };

@@ -10,7 +10,7 @@ The lowest layer of the architecture: pure infrastructure with no Discord, no Mo
 - `src/core/errors/` — `DomainError` tree (`ValidationError`, `NotFoundError`, `ConflictError`, `PermissionError`, `ExternalServiceError` and its `DiscordApiError` / `DatabaseError` / `LlmProviderError` subclasses, `ConfigurationError`). Each carries `code`, `messageKey`, `messageParams`, and `cause`.
 - `src/core/result/` — `Result<T, E>` with `ok` / `err` helpers; used at use-case and repository boundaries.
 - `src/core/i18n/` — `I18NextTranslator`, `loadCatalogResources`, and the `LoadCatalogOptions` contract (`localesDir` is required; the core layer never derives the content path itself).
-- `src/core/logger/` — structured logger plus PII redaction helpers.
+- `src/core/logger/` — structured logger plus PII redaction helpers. Two pino transport targets are stacked: `pino-pretty` for the dev console and a project-local `file-router-transport` that writes JSON Lines to `<rootDir>/<botId>[/<guildId>]/<localDate>.log`, rotating on the local-time day boundary. `logSystem` / `logGuildEvent` / `logError` helpers in `helpers.ts` are the canonical handler-side logging API; `logGuildEvent` takes a structured `details` object so every event-specific field stays grep- and `jq`-queryable.
 - `src/core/time/` — injectable `Clock` for deterministic time access in tests.
 - `src/core/ids.ts` — branded ID types (`GuildId`, `UserId`, etc.).
 - `src/core/guild-registry.ts` — per-guild channel / role / repo lookup interface.

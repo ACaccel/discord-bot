@@ -9,6 +9,15 @@ at the repository root.
 
 ---
 
+## Unreleased
+
+- **C1 Core Infrastructure** — documented the file-router transport and
+  the `logGuildEvent(details)` structured-details signature added in
+  the logger refactor. The `logs/` tree is now per-bot / per-guild with
+  local-time daily rotation; the helper file was renamed from
+  `legacy.ts` to `helpers.ts` to reflect that it is the canonical
+  handler-side logging API.
+
 ## v1.0.0 — Initial public release
 
 The first publicly released revision of the wiki. The eleven

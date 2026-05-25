@@ -38,9 +38,19 @@ const parseLevel = (raw: string | undefined): LogLevel => {
 export const createBootstrapLogger = (base?: Readonly<Record<string, unknown>>): Logger => {
   const level = parseLevel(process.env.LOG_LEVEL);
   const nodeEnv = process.env.NODE_ENV ?? 'development';
+  // `LOG_DIR` is the file-router root. Empty / unset disables the file
+  // sink so ephemeral containers stay write-free. The default lands
+  // logs at `<cwd>/logs/<botId>[/<guildId>]/<date>.log`. The file
+  // transport is also force-disabled under `NODE_ENV=test` so vitest
+  // suites that build a real bootstrap logger do not spawn pino worker
+  // threads that try to resolve a TypeScript transport entry point
+  // through Node's CommonJS resolver.
+  const fileRootDirRaw = process.env.LOG_DIR ?? 'logs';
+  const fileRootDir = nodeEnv === 'test' ? '' : fileRootDirRaw;
   return createLogger({
     level,
     pretty: nodeEnv !== 'production',
     ...(base !== undefined ? { base } : {}),
+    ...(fileRootDir.length > 0 ? { fileRootDir } : {}),
   });
 };

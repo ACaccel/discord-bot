@@ -60,23 +60,26 @@ describe('logSystem', () => {
     expect(() => logSystem(undefined, 'bot-1', 'hi')).not.toThrow();
   });
 
-  it('binds bot scope and writes info', () => {
+  it('binds bot scope and emits msg as the pino headline (no msg-binding collision)', () => {
     const fake = makeFake();
     logSystem(fake as unknown as Logger, 'bot-1', 'hello');
     expect(fake.child).toHaveBeenCalledWith({ bot: 'bot-1' });
-    expect(fake.info).toHaveBeenCalledWith({ msg: 'hello' }, 'system');
+    // The headline must be passed positionally — the old shape
+    // `{ msg }` collided with pino's `messageKey` default and silently
+    // dropped the headline. See helpers.ts comment.
+    expect(fake.info).toHaveBeenCalledWith('hello');
   });
 });
 
 describe('logGuildEvent', () => {
-  it('flattens newlines and binds bot/guild/name scope', () => {
+  it('binds bot/guild/name and splats structured details onto the record', () => {
     const fake = makeFake();
     logGuildEvent(
       fake as unknown as Logger,
       'bot-1',
       'g-1',
-      'role_add',
-      'line1\nline2',
+      'interaction_create',
+      { command: '/talk', user: 'DCaccel', channel: 'general' },
       'GuildName',
     );
     expect(fake.child).toHaveBeenCalledWith({
@@ -85,8 +88,55 @@ describe('logGuildEvent', () => {
       guildName: 'GuildName',
     });
     expect(fake.info).toHaveBeenCalledWith(
-      { eventType: 'ROLE_ADD', msg: 'line1\\nline2' },
-      'guild event',
+      {
+        eventType: 'INTERACTION_CREATE',
+        command: '/talk',
+        user: 'DCaccel',
+        channel: 'general',
+      },
+      'INTERACTION_CREATE',
     );
+  });
+
+  it('upper-cases the eventType in both the binding and the headline', () => {
+    const fake = makeFake();
+    logGuildEvent(
+      fake as unknown as Logger,
+      'bot-1',
+      'g-1',
+      'message_update',
+      { user: 'u', channel: 'c', oldMessage: 'a', newMessage: 'b' },
+      'GuildName',
+    );
+    const [obj, headline] = (fake.info.mock.calls[0] ?? []) as [Record<string, unknown>, string];
+    expect(obj['eventType']).toBe('MESSAGE_UPDATE');
+    expect(headline).toBe('MESSAGE_UPDATE');
+  });
+
+  it('preserves array-valued details (e.g. role mentions) verbatim', () => {
+    const fake = makeFake();
+    logGuildEvent(
+      fake as unknown as Logger,
+      'bot-1',
+      'g-1',
+      'guild_member_update',
+      { user: 'u', added: ['<@&1>'], removed: [] },
+      'GuildName',
+    );
+    expect(fake.info).toHaveBeenCalledWith(
+      {
+        eventType: 'GUILD_MEMBER_UPDATE',
+        user: 'u',
+        added: ['<@&1>'],
+        removed: [],
+      },
+      'GUILD_MEMBER_UPDATE',
+    );
+  });
+
+  it('no-ops when logger is undefined', () => {
+    expect(() =>
+      logGuildEvent(undefined, 'bot-1', 'g-1', 'x', { a: 1 }, 'GuildName'),
+    ).not.toThrow();
   });
 });

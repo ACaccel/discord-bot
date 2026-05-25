@@ -5,6 +5,44 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- File-router pino transport (`src/core/logger/file-router-transport.ts`)
+  that writes JSON Lines to `<rootDir>/<botId>[/<guildId>]/<localDate>.log`,
+  rotating on the local-time day boundary. Enabled by default via the
+  `LOG_DIR` environment variable (defaults to `logs`).
+- Structured `details` payload on `logGuildEvent` so every Discord
+  event audit line carries per-field structured data (`command`,
+  `user`, `channel`, `oldMessage`, `newMessage`, `added`, `removed`,
+  `messageId`, `emoji`, ...) for `jq` / log-search consumers instead
+  of pre-flattened strings.
+- `MESSAGE_CREATE` audit lines from `auto-reply` and `llm-chat`
+  plugins (only when the plugin actually replies), and
+  `MESSAGE_REACTION_ADD` / `MESSAGE_REACTION_REMOVE` audit lines from
+  the client-event bridge (only when a reaction handler is dispatched).
+- `GUILD_CREATE` audit line, promoted from `logSystem` to
+  `logGuildEvent` so onboarding events file under the per-guild
+  directory instead of the bot root.
+
+### Changed
+
+- `logSystem` now passes `msg` as the pino headline (positional
+  argument) rather than under a `msg` binding, fixing a
+  `messageKey` collision that silently dropped the operator-supplied
+  text in pretty output.
+- `pino-pretty` configuration: time format trimmed to seconds
+  (`SYS:HH:MM:ss`) and the always-bound `bot` / `guildId` /
+  `eventType` fields are hidden in the dev console (they remain in the
+  JSON file sink). Closes the gap that made dev terminal output
+  unreadable.
+
+### Removed
+
+- Internal `docs/proposal.md` and `docs/tasks/` working-document
+  artifacts. The gap-remediation work they tracked has shipped.
+
 ## [1.0.0] — 2026-05-25
 
 Initial public release.
