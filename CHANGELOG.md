@@ -18,11 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `user`, `channel`, `oldMessage`, `newMessage`, `added`, `removed`,
   `messageId`, `emoji`, ...) for `jq` / log-search consumers instead
   of pre-flattened strings.
-- `MESSAGE_CREATE` audit lines from `auto-reply` and `llm-chat`
-  plugins (only when the plugin actually replies). Reaction events
-  (`MESSAGE_REACTION_ADD` / `MESSAGE_REACTION_REMOVE`) are intentionally
-  NOT audit-logged — their per-guild throughput would drown every other
-  event without operator value; handlers still run as before.
 - `GUILD_CREATE` audit line, promoted from `logSystem` to
   `logGuildEvent` so onboarding events file under the per-guild
   directory instead of the bot root.
@@ -56,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every record carries `bot` by construction; a missing binding is now
   a contract violation that surfaces as an error on the Writable
   stream instead of silently landing in a junk directory.
+- `MESSAGE_CREATE` audit lines from `auto-reply` and `llm-chat`. These
+  events sit on the hot path of normal use (every plugin reply would
+  produce a log line) and operator feedback was that the volume drowned
+  every other event without adding signal. `MESSAGE_CREATE` now joins
+  reactions as an intentionally un-audited event type; the plugin reply
+  behaviour itself is unchanged.
 
 ## [1.0.0] — 2026-05-25
 

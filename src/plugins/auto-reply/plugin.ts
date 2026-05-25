@@ -18,7 +18,7 @@
  */
 import { TOKENS } from '../../core/plugin';
 import type { GuildRegistry } from '../../core/guild-registry';
-import { logGuildEvent, type Logger } from '../../core/logger';
+import type { Logger } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
 
 const PLUGIN_ID = 'auto-reply';
@@ -112,14 +112,9 @@ export const AutoReplyPlugin: Plugin = {
       if (!message.channel.isSendable()) return;
       if (message.guildId === null) return;
       const guildId = message.guildId;
-      // Track whether this plugin actually produced a reply this tick;
-      // the audit-log line below only fires on a hit so non-matching
-      // chatter does not flood the file sink. See proposal §C.
-      let acted = false;
 
       if (message.content.includes(GOODNIGHT_LINE)) {
         await message.reply(t.t('replies:auto_reply.goodnight_reply'));
-        acted = true;
       }
 
       // The remaining behaviours all skip bot authors so two bots
@@ -128,59 +123,29 @@ export const AutoReplyPlugin: Plugin = {
         const reply = await safeLookup(registry, guildId, message.content, logger, 'direct');
         if (reply !== null) {
           await message.channel.send({ content: reply });
-          acted = true;
         }
 
         if (message.author.id === FATCAT_USER_ID && Math.random() < FATCAT_PROBABILITY) {
           await message.channel.send(t.t('replies:auto_reply.fatcat_line'));
-          acted = true;
         }
         if (message.author.id === MUBAIMU_USER_ID && Math.random() < MUBAIMU_PROBABILITY) {
           await message.channel.send(t.t('replies:auto_reply.mubaimu_line'));
-          acted = true;
         }
         if (Math.random() < LUCKY_GLOBAL_PROBABILITY) {
           const lucky = await safeLookup(registry, guildId, '[*]', logger, 'lucky');
           if (lucky !== null) {
             await message.channel.send({ content: lucky });
-            acted = true;
           }
         }
 
         if (LONG_HAIR_REGEX.test(message.content)) {
           await message.channel.send(t.t('replies:auto_reply.long_hair_line'));
-          acted = true;
         }
 
         const diceResult = rollDice(message.content);
         if (diceResult !== null) {
           await message.channel.send(diceResult);
-          acted = true;
         }
-      }
-
-      if (acted && message.guild !== null) {
-        // `clientId` is sourced from the live Client rather than a
-        // factory-time config because the auto-reply plugin has no
-        // typed config. Falls back to '<unknown>' on the pre-ready
-        // window, which is impossible in production but cheap to guard.
-        const clientId = message.client.user?.id ?? '<unknown>';
-        const channelName =
-          'name' in message.channel
-            ? (message.channel as { name: string | null }).name ?? '<unknown>'
-            : '<unknown>';
-        logGuildEvent(
-          logger,
-          clientId,
-          guildId,
-          'message_create',
-          {
-            user: message.author.username,
-            channel: channelName,
-            content: message.content,
-          },
-          message.guild.name,
-        );
       }
     },
   },
