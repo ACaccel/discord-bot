@@ -29,6 +29,16 @@ import { Events } from 'discord.js';
 import type { Translator } from '../core/i18n';
 import { TOKENS, type ServiceContainer, type ServiceToken } from '../core/ioc';
 import { logError, logGuildEvent, logSystem, ops, type Logger } from '../core/logger';
+// Audit-log coverage note (proposal-derived event table):
+//   - `interaction_create` lines emit from `createChannelLoggingMiddleware`.
+//   - `message_update` / `message_delete` / `guild_member_update` /
+//     `guild_create` lines emit from `GuildEventsPlugin`.
+//   - `MESSAGE_REACTION_ADD` / `MESSAGE_REACTION_REMOVE` are
+//     intentionally NOT audit-logged here. Reaction throughput on busy
+//     guilds dwarfs every other event; an audit line per reaction would
+//     drown the file sink and the dev console without operator value.
+//     The reaction port still dispatches to handlers; we simply omit the
+//     bridge-level audit record.
 import type {
     GuildOnboardingPort,
     InteractionContext,
@@ -340,8 +350,8 @@ export class ClientEventBridge {
         const fetchedUser = user.partial ? await user.fetch() : user;
         const port = this.config?.reactionPort;
         if (port === undefined) return;
+        // Intentionally no audit log — see header comment.
         await port.handleAdded(fetchedReaction, fetchedUser);
-        this.logReaction('message_reaction_add', fetchedReaction, fetchedUser);
     }
 
     private async onReactionRemove(
@@ -353,46 +363,8 @@ export class ClientEventBridge {
         const fetchedUser = user.partial ? await user.fetch() : user;
         const port = this.config?.reactionPort;
         if (port === undefined) return;
+        // Intentionally no audit log — see header comment.
         await port.handleRemoved(fetchedReaction, fetchedUser);
-        this.logReaction('message_reaction_remove', fetchedReaction, fetchedUser);
-    }
-
-    /**
-     * Audit-log a reaction event after the reaction port has been
-     * invoked. Emitted unconditionally for any non-bot reaction that
-     * actually reached the registered handlers — the per-handler match
-     * decision lives inside each handler, so the bridge logs at the
-     * dispatch boundary. Skips silently when the guild context cannot
-     * be resolved (DM reactions, partial without guild fetch).
-     */
-    private logReaction(
-        eventType: 'message_reaction_add' | 'message_reaction_remove',
-        reaction: MessageReaction,
-        user: User,
-    ): void {
-        const guild = reaction.message.guild;
-        if (guild === null) return;
-        // `emoji.name` is the unicode glyph for native emoji and the
-        // short name for custom emoji; falls back to the id when the
-        // SDK leaves both nullable for partial reactions.
-        const emoji = reaction.emoji.name ?? reaction.emoji.id ?? '<unknown>';
-        const channelName =
-            'name' in reaction.message.channel
-                ? (reaction.message.channel as { name: string | null }).name ?? '<unknown>'
-                : '<unknown>';
-        logGuildEvent(
-            this.logger,
-            this.clientId,
-            guild.id,
-            eventType,
-            {
-                user: user.username,
-                channel: channelName,
-                messageId: reaction.message.id,
-                emoji,
-            },
-            guild.name,
-        );
     }
 
     private async onGuildCreate(guild: Guild): Promise<void> {

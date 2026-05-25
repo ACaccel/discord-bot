@@ -19,9 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `messageId`, `emoji`, ...) for `jq` / log-search consumers instead
   of pre-flattened strings.
 - `MESSAGE_CREATE` audit lines from `auto-reply` and `llm-chat`
-  plugins (only when the plugin actually replies), and
-  `MESSAGE_REACTION_ADD` / `MESSAGE_REACTION_REMOVE` audit lines from
-  the client-event bridge (only when a reaction handler is dispatched).
+  plugins (only when the plugin actually replies). Reaction events
+  (`MESSAGE_REACTION_ADD` / `MESSAGE_REACTION_REMOVE`) are intentionally
+  NOT audit-logged — their per-guild throughput would drown every other
+  event without operator value; handlers still run as before.
 - `GUILD_CREATE` audit line, promoted from `logSystem` to
   `logGuildEvent` so onboarding events file under the per-guild
   directory instead of the bot root.
