@@ -40,7 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `msg-archive` gains an optional `backup_interval_minutes` config.
 - Git Flow branching model (long-lived `main` + `dev`), documented in
   `CONTRIBUTING.md` and `CLAUDE.md`; CI and CodeQL triggers now cover
-  `dev`.
+  `dev`. Routine work is committed directly to `dev` (the local gate
+  suite is the discipline; the `dev` push CI is a post-push signal, not a
+  merge gate); PRs are reserved for `dev` → `main` releases, hotfixes,
+  and optional large / risky `feature/*` work. Only `main` enforces the
+  full required CI gate set.
 
 ### Changed
 

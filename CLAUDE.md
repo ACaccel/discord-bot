@@ -186,17 +186,17 @@ fails, root-cause it; do not bypass.
 ## Commit + PR conventions
 
 - Commits: small, focused. `<type>(<scope>): <subject>` where `<type>` is `feat`, `fix`, `refactor`, `chore`, `docs`, or `test`.
-- PRs: branch off `dev` for features (off `main` for hotfixes), run the full local gate suite, fill in the PR template, wait for CI green and reviewer approval.
+- Routine `dev` work: **commit directly to `dev`** (no per-change branch or PR) after running the full local gate suite. PRs are required only for `dev` → `main` releases and hotfixes; optional for large / risky `feature/*` work.
 
 ### Branching model (Git Flow)
 
-Two long-lived branches; everything else is short-lived and deleted after merge.
+Two long-lived branches: `main` (released) and `dev` (integration).
 
-- `main` — always equals the released / production state. Every merge into `main` is a release: tag it (`vX.Y.Z`) and cut a GitHub Release.
-- `dev` — the integration branch where features accumulate between releases.
-- `feature/*` (short-lived) — branch off `dev`, open a PR back into `dev`, delete the branch on merge.
+- `main` — always equals the released / production state. Every merge into `main` is a release: tag it (`vX.Y.Z`) and cut a GitHub Release. The **only** branch that enforces the full required CI gate set (on the `dev` → `main` release PR).
+- `dev` — the integration branch you **commit to directly**. Run the full local gate suite before pushing — that is the discipline that replaces a merge gate. A push to `dev` triggers CI as a post-push signal, not a gate; protection only blocks force-push / deletion.
+- `feature/*` (optional) — for large / risky changes or when you want a pre-merge CI gate / review, branch off `dev`, PR back into `dev`, delete on merge. Otherwise commit straight to `dev`.
 - Release — open a `dev` -> `main` PR (optionally via a `release/*` stabilisation branch that takes only bug fixes, version bumps, and changelog edits). After merging into `main`, tag + Release, then merge `main` back into `dev` to prevent drift.
 - `hotfix/*` — branch off `main` for production-urgent fixes; merge back into both `main` (tag a patch release) and `dev`.
-- Every PR — regardless of base — must pass the full required CI gate set before merge.
+- The `dev` → `main` release PR (and any optional `feature/*` PR) must pass the full required CI gate set before merge.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contributor-facing walkthrough.
