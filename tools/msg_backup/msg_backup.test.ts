@@ -20,6 +20,9 @@ import {
   type ArchivedThreadType,
   type BackfillChannelLike,
   type ChannelOutcomeLike,
+  type ThreadManagerLike,
+  activeThreadFetcher,
+  archivedThreadFetcher,
   buildAnomalies,
   buildBackfillDoc,
   enumerateChannelThreads,
@@ -593,5 +596,64 @@ describe('msg_backup / enumerateChannelThreads', () => {
         noBatch,
       ),
     ).rejects.toThrow('public boom');
+  });
+});
+
+// ---------- discord.js ThreadManager adapters ----------
+
+interface ArchivedCall {
+  readonly type: ArchivedThreadType;
+  readonly fetchAll?: boolean;
+  readonly before?: number;
+  readonly limit?: number;
+}
+
+const fakeManager = (
+  calls: ArchivedCall[],
+  active: FakeThread[] = [],
+): ThreadManagerLike<FakeThread> => ({
+  fetchActive: () => Promise.resolve({ threads: cacheLike(active) }),
+  fetchArchived: (options) => {
+    calls.push(options);
+    return Promise.resolve({ threads: cacheLike([]), hasMore: false });
+  },
+});
+
+describe('msg_backup / thread manager adapters', () => {
+  it('activeThreadFetcher reads from a single fetchActive call', async () => {
+    let activeCalls = 0;
+    const manager: ThreadManagerLike<FakeThread> = {
+      fetchActive: () => {
+        activeCalls += 1;
+        return Promise.resolve({ threads: cacheLike([t('a1'), t('a2')]) });
+      },
+      fetchArchived: () => Promise.resolve({ threads: cacheLike([]), hasMore: false }),
+    };
+    const page = await activeThreadFetcher(manager)();
+    expect([...page.threads].map((x) => x.id)).toEqual(['a1', 'a2']);
+    expect(activeCalls).toBe(1);
+  });
+
+  it('archivedThreadFetcher sets fetchAll only for the private pass', async () => {
+    const calls: ArchivedCall[] = [];
+    const fetchArchived = archivedThreadFetcher(fakeManager(calls));
+
+    await fetchArchived('public')({ before: 200, limit: 50 });
+    await fetchArchived('private')({ before: 200, limit: 50 });
+
+    // Regression: the public pass must NOT pass fetchAll; the private
+    // pass MUST, or discord.js routes to the joined-archived endpoint
+    // (snowflake cursor) and ignores the timestamp `before`, so the
+    // pagination cursor can never advance.
+    expect(calls[0]).toEqual({ type: 'public', before: 200, limit: 50 });
+    expect(calls[1]).toEqual({ type: 'private', fetchAll: true, before: 200, limit: 50 });
+  });
+
+  it('archivedThreadFetcher omits before on the first (cursorless) page', async () => {
+    const calls: ArchivedCall[] = [];
+    const fetchArchived = archivedThreadFetcher(fakeManager(calls));
+    await fetchArchived('private')({ limit: 50 });
+    expect(calls[0]).toEqual({ type: 'private', fetchAll: true, limit: 50 });
+    expect('before' in (calls[0] ?? {})).toBe(false);
   });
 });

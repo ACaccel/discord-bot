@@ -682,3 +682,57 @@ export const enumerateChannelThreads = async <T extends ThreadLike>(
     truncatedPasses,
   };
 };
+
+// ---------- discord.js ThreadManager adapters ----------
+//
+// Bridge the discord.js `ThreadManager` shape to the fetcher contracts
+// above. Kept here (pure, given the manager) so the cursor / fetchAll
+// wiring is unit-testable without a live Discord connection.
+
+/** A discord.js collection-ish page: iterate values via `.values()`. */
+export interface RawThreadCollection<T> {
+  values(): IterableIterator<T>;
+}
+
+export interface ThreadManagerLike<T> {
+  fetchActive(cache?: boolean): Promise<{ readonly threads: RawThreadCollection<T> }>;
+  fetchArchived(options: {
+    readonly type: ArchivedThreadType;
+    readonly fetchAll?: boolean;
+    readonly before?: number;
+    readonly limit?: number;
+  }): Promise<{ readonly threads: RawThreadCollection<T>; readonly hasMore: boolean }>;
+}
+
+/** Single cursorless active-thread fetch. */
+export const activeThreadFetcher =
+  <T>(manager: ThreadManagerLike<T>): ActiveThreadFetcher<T> =>
+  async () => {
+    const page = await manager.fetchActive();
+    return { threads: page.threads.values() };
+  };
+
+/**
+ * Per-visibility archived fetcher.
+ *
+ * The private pass MUST pass `fetchAll: true`. Without it discord.js
+ * routes to the joined-archived endpoint, which paginates by thread id
+ * (snowflake) and silently ignores a timestamp `before` — so the
+ * timestamp cursor never advances and the pass is stuck on page one.
+ * `fetchAll: true` routes to the MANAGE_THREADS all-private endpoint,
+ * which honours the timestamp cursor (and returns every archived
+ * private thread, not just joined ones); a missing permission surfaces
+ * as a thrown error the caller reports.
+ */
+export const archivedThreadFetcher =
+  <T>(manager: ThreadManagerLike<T>) =>
+  (type: ArchivedThreadType): ArchivedThreadFetcher<T> =>
+  async (cursor) => {
+    const page = await manager.fetchArchived({
+      type,
+      ...(type === 'private' ? { fetchAll: true } : {}),
+      ...(cursor.before !== undefined ? { before: cursor.before } : {}),
+      limit: cursor.limit,
+    });
+    return { threads: page.threads.values(), hasMore: page.hasMore };
+  };
