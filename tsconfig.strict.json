@@ -44,6 +44,6 @@
   // whole `src` tree — every layer migrated. `src/db/**` retired in
   // PR-E (audit C-2): schemas live in `src/persistence/schemas/**` and
   // the legacy shim was deleted.
-  "include": ["src/**/*", "scripts/**/*", "test/**/*"],
+  "include": ["src/**/*", "scripts/**/*", "test/**/*", "tools/**/*"],
   "exclude": ["node_modules", "dist"]
 }

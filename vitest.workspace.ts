@@ -93,4 +93,16 @@ export default defineWorkspace([
     },
     resolve: { alias: aliases },
   },
+  // `tools` project covers the unit tests that live next to the ops
+  // scripts under `tools/<name>/*.test.ts`. Aliases are mirrored so
+  // the helpers can import `@core/*` for shared error types.
+  {
+    test: {
+      name: 'tools',
+      include: ['tools/**/*.test.ts'],
+      environment: 'node',
+      env: testEnv,
+    },
+    resolve: { alias: aliases },
+  },
 ]);
