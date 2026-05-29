@@ -18,8 +18,10 @@ import {
   type AnomalyChannelStats,
   type BackfillChannelLike,
   type ChannelOutcomeLike,
+  type ThreadFetchPass,
   buildAnomalies,
   buildBackfillDoc,
+  enumerateChannelThreads,
   isTransientError,
   parseConfig,
   withRetry,
@@ -454,5 +456,53 @@ describe('msg_backup / maskMongoUri', () => {
     expect(maskMongoUri('mongodb+srv://user:hunter2@cluster.example/')).toBe(
       'mongodb+srv://user:****@cluster.example/',
     );
+  });
+});
+
+// ---------- enumerateChannelThreads ----------
+
+describe('msg_backup / enumerateChannelThreads', () => {
+  it('runs all three passes and includes archived private threads', async () => {
+    const passes: ThreadFetchPass[] = [];
+    const result = await enumerateChannelThreads<string>((pass) => {
+      passes.push(pass);
+      const byPass: Record<ThreadFetchPass, string[]> = {
+        active: ['active-1'],
+        'archived-public': ['pub-1'],
+        'archived-private': ['priv-1'],
+      };
+      return Promise.resolve(byPass[pass]);
+    });
+
+    // Regression: the archived-private pass must run, or archived private
+    // threads are silently dropped (default fetchArchived is public-only).
+    expect(passes).toEqual(['active', 'archived-public', 'archived-private']);
+    expect(result.active).toEqual(['active-1']);
+    expect(result.archived).toEqual(['pub-1', 'priv-1']);
+    expect(result.privateArchivedFailure).toBeUndefined();
+  });
+
+  it('isolates a private-pass failure while keeping active + public threads', async () => {
+    const result = await enumerateChannelThreads<string>((pass) => {
+      if (pass === 'archived-private') {
+        return Promise.reject(new Error('Missing Permissions'));
+      }
+      return Promise.resolve(pass === 'active' ? ['active-1'] : ['pub-1']);
+    });
+
+    // The private failure is surfaced (not swallowed) but does not discard
+    // the threads already collected from the other two passes.
+    expect(result.active).toEqual(['active-1']);
+    expect(result.archived).toEqual(['pub-1']);
+    expect(result.privateArchivedFailure).toBe('Missing Permissions');
+  });
+
+  it('lets an active / public pass failure propagate to the caller', async () => {
+    await expect(
+      enumerateChannelThreads<string>((pass) => {
+        if (pass === 'active') return Promise.reject(new Error('channel fetch failed'));
+        return Promise.resolve([]);
+      }),
+    ).rejects.toThrow('channel fetch failed');
   });
 });

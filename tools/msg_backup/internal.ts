@@ -504,3 +504,66 @@ export const buildAnomalies = (
   }
   return list;
 };
+
+// ---------- Thread enumeration ----------
+
+/**
+ * The three fetch passes a channel's thread enumeration must run.
+ *
+ * Discord's `ThreadManager.fetchArchived` defaults to `type: 'public'`,
+ * so a single archived fetch silently drops archived PRIVATE threads.
+ * They are a distinct pass (`type: 'private'`, gated on MANAGE_THREADS)
+ * and must be requested explicitly, or their message history is lost
+ * without any diagnostic.
+ */
+export type ThreadFetchPass = 'active' | 'archived-public' | 'archived-private';
+
+export interface ChannelThreadEnumeration<T> {
+  /** Active threads (public + private the bot can see). */
+  readonly active: readonly T[];
+  /** Archived threads, public and private passes combined. */
+  readonly archived: readonly T[];
+  /**
+   * Reason the archived-private pass failed, if it did. Fetching
+   * archived private threads needs MANAGE_THREADS; when the permission
+   * is absent the pass throws. We isolate that failure so it neither
+   * silently drops the private threads nor discards the active / public
+   * threads already collected — the caller surfaces this as a
+   * non-fatal thread-enum diagnostic.
+   */
+  readonly privateArchivedFailure?: string;
+}
+
+/**
+ * Run all three thread fetch passes for one channel via the injected
+ * `paginate` callback (the caller binds it to the real
+ * `ThreadManager.fetchActive` / `fetchArchived` with pagination and
+ * run-log wiring; tests inject a fake).
+ *
+ * The `active` and `archived-public` passes are NOT guarded here — a
+ * failure there is a genuine whole-channel enumeration failure and is
+ * left to propagate to the caller's per-channel handler. Only the
+ * `archived-private` pass is caught, so a missing-permission error on
+ * private threads degrades gracefully instead of taking the rest of
+ * the channel's threads down with it.
+ */
+export const enumerateChannelThreads = async <T>(
+  paginate: (pass: ThreadFetchPass) => Promise<readonly T[]>,
+): Promise<ChannelThreadEnumeration<T>> => {
+  const active = await paginate('active');
+  const archivedPublic = await paginate('archived-public');
+
+  let archivedPrivate: readonly T[] = [];
+  let privateArchivedFailure: string | undefined;
+  try {
+    archivedPrivate = await paginate('archived-private');
+  } catch (err: unknown) {
+    privateArchivedFailure = err instanceof Error ? err.message : String(err);
+  }
+
+  return {
+    active,
+    archived: [...archivedPublic, ...archivedPrivate],
+    ...(privateArchivedFailure !== undefined ? { privateArchivedFailure } : {}),
+  };
+};
