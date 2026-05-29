@@ -55,18 +55,24 @@ export interface LLMProvider {
   chat(messages: readonly LLMMessage[], settings: LLMSettings): Promise<LLMResult>;
 }
 
-/** Default model per provider. */
+/**
+ * Default model per provider — seeded to the cheapest currently
+ * available chat model of each provider (verified 2026-05). These are
+ * only a static seed: `DefaultModelResolver` re-resolves the cheapest
+ * still-listed model weekly so a model going legacy does not strand the
+ * default on an unavailable id.
+ */
 export const DEFAULT_MODELS: Readonly<Record<LLMProviderName, string>> = {
-  xai: 'grok-3',
-  openai: 'gpt-4o',
-  anthropic: 'claude-sonnet-4-6',
-  gemini: 'gemini-2.0-flash',
+  xai: 'grok-4-1-fast-non-reasoning',
+  openai: 'gpt-5-nano',
+  anthropic: 'claude-haiku-4-5',
+  gemini: 'gemini-2.5-flash-lite',
 };
 
 export const DEFAULT_SETTINGS: Omit<LLMSettings, 'provider' | 'model'> = {
   temperature: 1.0,
   systemPrompt: '',
-  webSearch: false,
+  webSearch: true,
 };
 
 /** Environment variable that holds each provider's API key. */

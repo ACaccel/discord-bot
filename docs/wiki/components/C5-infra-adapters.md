@@ -19,13 +19,14 @@ Isolates third-party SDKs behind typed adapters so the rest of the codebase depe
 
 `src/infra/llm/` implements the Provider Strategy:
 
-- `types.ts` — `LlmProvider` interface plus shared request/response shapes.
+- `types.ts` — `LlmProvider` interface plus shared request/response shapes. `DEFAULT_MODELS` seeds each provider's cheapest current chat model (xai `grok-4-1-fast-non-reasoning`, openai `gpt-5-nano`, anthropic `claude-haiku-4-5`, gemini `gemini-2.5-flash-lite`); `DEFAULT_SETTINGS` enables web search by default.
 - `openai-provider.ts`, `anthropic-provider.ts`, `gemini-provider.ts`, `xai-provider.ts` — concrete `LlmProvider` implementations.
 - `registry.ts` / `default-registry.ts` — provider registry assembly.
 - `llm-service.ts` — facade used by the `llm-chat` plugin.
-- `models-catalog.ts` — `ModelCatalog` (pure cache plus API-key map). Registered via `ctx.registerInstance(TOKENS.ModelCatalog, ...)` inside `LlmChatPlugin.init`; consumed by handlers through `bot.modelCatalog?.list(provider)`.
+- `models-catalog.ts` — `ModelCatalog` (pure cache plus API-key map). Registered via `ctx.registerInstance(TOKENS.ModelCatalog, ...)` inside `LlmChatPlugin.init`; consumed by handlers through `bot.modelCatalog?.list(provider)`. `list(provider)` is the synchronous cache view capped to the 25-option Discord select-menu limit (built for the 3-second window); `listLive(provider)` is the awaited authoritative fetch consumed by the default-model resolver and returns the _full_ uncapped list (the menu cap must not hide the cheapest model from price ranking), while the cache it refreshes stays capped.
+- `default-model-resolver.ts` — `DefaultModelResolver`. Holds the per-provider default chat model, seeded from `DEFAULT_MODELS` and re-derived by `refresh()` to the cheapest still-listed priced model (live list ∩ `pricing.ts`). Conservative: a failed/empty fetch or an all-unpriced list keeps the previous default. Registered via `ctx.registerInstance(TOKENS.DefaultModelResolver, ...)` in `LlmChatPlugin.init`; consumed by `ai_whitelist_add` through `bot.defaultModelResolver?.current(provider)`.
 - `error-translator.ts` — translates provider errors to `LlmProviderError`.
-- `pricing.ts` — token-cost lookup table.
+- `pricing.ts` — token-cost lookup table plus `cheapestModel(candidates)` (lowest input price, output price as tie-breaker, unpriced candidates ignored).
 
 ## Discord adapters
 

@@ -7,13 +7,12 @@
  * finally closes the log file so a partial run still leaves a usable
  * artifact.
  */
-import * as path from 'node:path';
-
 import { type Client, DiscordAPIError } from 'discord.js';
 
 import type { GuildRegistry } from '../../../core/guild-registry';
 import { logError, type Logger } from '../../../core/logger';
 import { BackupLog } from './backup-log';
+import { buildBackupLogPath } from './log-path';
 import { backupChannel, type ChannelBackupStats } from './backup-channel';
 import { collectChannels } from './collect-channels';
 
@@ -21,7 +20,6 @@ export const performBackup = async (
   guildId: string,
   registry: GuildRegistry,
   client: Client,
-  clientId: string,
   pluginLogger: Logger,
 ): Promise<void> => {
   const guild = client.guilds.cache.get(guildId);
@@ -31,17 +29,17 @@ export const performBackup = async (
   }
   const repos = registry.getRepos(guildId);
   if (repos === undefined) {
-    logError(pluginLogger, clientId, guildId, 'Repos not available for guild');
+    logError(pluginLogger, guildId, 'Repos not available for guild');
     return;
   }
 
   const debugCh = registry.getChannel(guildId, 'debug');
   if (debugCh === undefined || !debugCh.isSendable()) {
-    logError(pluginLogger, clientId, guildId, 'Debug channel not sendable');
+    logError(pluginLogger, guildId, 'Debug channel not sendable');
     return;
   }
 
-  const logPath = path.join(process.cwd(), 'logs', `msg-archive-${guildId}.log`);
+  const logPath = buildBackupLogPath(guildId, new Date());
   const log = new BackupLog(logPath);
 
   try {
@@ -57,7 +55,7 @@ export const performBackup = async (
       `[ SYSTEM ] Backup started. DB contains ${existingCount} messages.`,
     );
 
-    const { channels, liveChannelIds } = await collectChannels(guild, clientId, pluginLogger);
+    const { channels, liveChannelIds } = await collectChannels(guild, pluginLogger);
 
     log.writeln('=== MSG ARCHIVE BACKUP ===');
     log.writeln(`Guild:    ${guildId}`);
@@ -76,13 +74,19 @@ export const performBackup = async (
     const allStats: ChannelBackupStats[] = [];
     for (let i = 0; i < channels.length; i += 1) {
       const channel = channels[i]!;
-      const { added, stats } = await backupChannel(channel, repos, guildId, clientId, pluginLogger, async () => {
-        await statusMsg
-          .edit(
-            `[ SYSTEM ] Backup in progress. DB now contains (${existingCount}+${newCount}) messages.`,
-          )
-          .catch(() => undefined);
-      });
+      const { added, stats } = await backupChannel(
+        channel,
+        repos,
+        guildId,
+        pluginLogger,
+        async () => {
+          await statusMsg
+            .edit(
+              `[ SYSTEM ] Backup in progress. DB now contains (${existingCount}+${newCount}) messages.`,
+            )
+            .catch(() => undefined);
+        },
+      );
       newCount += added;
       allStats.push(stats);
 
@@ -162,7 +166,7 @@ export const performBackup = async (
           : ''),
     );
   } catch (err: unknown) {
-    logError(pluginLogger, clientId, guildId, err);
+    logError(pluginLogger, guildId, err);
     log.writeln(`FATAL ERROR: ${String(err)}`);
   } finally {
     log.close();

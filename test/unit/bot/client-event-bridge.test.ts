@@ -137,7 +137,7 @@ describe('ClientEventBridge.attach', () => {
   it('wires InteractionCreate and routes the event through the router', async () => {
     const fake = buildFakeClient();
     const dispatch = vi.fn(async () => {});
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     bridge.attach(baseConfig({ router: fakeRouter(dispatch) }));
 
     expect(fake.listeners.get(Events.InteractionCreate)?.length).toBe(1);
@@ -158,14 +158,14 @@ describe('ClientEventBridge.attach', () => {
 
   it('throws TypeError on a second attach without an intervening detach', () => {
     const fake = buildFakeClient();
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     bridge.attach(baseConfig({}));
     expect(() => bridge.attach(baseConfig({}))).toThrow(TypeError);
   });
 
   it('does not install suppressed listeners', () => {
     const fake = buildFakeClient();
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     bridge.attach(
       baseConfig({
         suppression: { interaction: true, reaction: true, guildCreate: true },
@@ -180,7 +180,7 @@ describe('ClientEventBridge.attach', () => {
 describe('ClientEventBridge.detach', () => {
   it('removes every listener installed by attach', () => {
     const fake = buildFakeClient();
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     bridge.attach(baseConfig({}));
     expect((fake.listeners.get(Events.InteractionCreate) ?? []).length).toBeGreaterThan(0);
     bridge.detach();
@@ -191,7 +191,7 @@ describe('ClientEventBridge.detach', () => {
 
   it('is safe to call without a prior attach', () => {
     const fake = buildFakeClient();
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     expect(() => bridge.detach()).not.toThrow();
   });
 });
@@ -203,7 +203,7 @@ describe('ClientEventBridge reaction routing', () => {
       handleAdded: vi.fn(async () => {}),
       handleRemoved: vi.fn(async () => {}),
     };
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     bridge.attach(baseConfig({ reactionPort }));
 
     const fullReaction = { partial: false, message: { guildId: 'g-1' } };
@@ -229,7 +229,7 @@ describe('ClientEventBridge reaction routing', () => {
       handleAdded: vi.fn(async () => {}),
       handleRemoved: vi.fn(async () => {}),
     };
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     bridge.attach(baseConfig({ reactionPort }));
 
     const reaction = { partial: false, message: { guildId: 'g-1' } };
@@ -243,7 +243,7 @@ describe('ClientEventBridge reaction routing', () => {
 describe('ClientEventBridge GuildCreate routing', () => {
   it('skips the fallback listener when a plugin already subscribes', () => {
     const fake = buildFakeClient();
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     bridge.attach(baseConfig({ host: fakeHost([Events.GuildCreate]) }));
 
     // Exactly one listener exists, and it is the dispatcher forwarder
@@ -258,7 +258,7 @@ describe('ClientEventBridge GuildCreate routing', () => {
       databaseConnected: false,
       commandsRegistered: false,
     }));
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     bridge.attach(baseConfig({ onboardingPort: { onboardGuild } }));
 
     await fake.fire(Events.GuildCreate, { id: 'g-9' } as Guild);
@@ -269,7 +269,7 @@ describe('ClientEventBridge GuildCreate routing', () => {
 describe('ClientEventBridge dispatcher forwarding', () => {
   it('installs one client.on per dispatcher-subscribed event', () => {
     const fake = buildFakeClient();
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     bridge.attach(baseConfig({ host: fakeHost([Events.MessageDelete, Events.GuildMemberUpdate]) }));
 
     expect(fake.listeners.get(Events.MessageDelete)?.length).toBe(1);
@@ -284,7 +284,7 @@ describe('ClientEventBridge interaction error path', () => {
       throw new Error('handler boom');
     });
     const replies: Array<{ content?: string }> = [];
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     bridge.attach(baseConfig({ router: fakeRouter(dispatch) }));
     // Register a translator on the container so the bridge can pick a
     // localised fallback content.
@@ -356,7 +356,7 @@ describe('ClientEventBridge.sendRebootMessages', () => {
         },
       ],
     ]);
-    const bridge = new ClientEventBridge(fake.client, 'bot-1', silent);
+    const bridge = new ClientEventBridge(fake.client, silent);
     bridge.attach(baseConfig({ guildInfo }));
     const translator = {
       t: (key: string, params?: Record<string, string>) =>

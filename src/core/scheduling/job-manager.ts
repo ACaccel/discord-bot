@@ -27,6 +27,19 @@ export class JobManager {
   }
 
   /**
+   * Schedule a recurring job from a cron expression and store it under
+   * `key`, replacing any previously stored job. Unlike {@link schedule}
+   * (a one-shot at a fixed `Date`), the returned `node-schedule` job
+   * re-fires on every cron match until cancelled — used for low-frequency
+   * maintenance loops such as the weekly default-model refresh.
+   */
+  scheduleRecurring(key: string, cron: string, callback: () => void | Promise<unknown>): Job {
+    const job = schedule.scheduleJob(cron, callback);
+    this.jobs.set(key, job);
+    return job;
+  }
+
+  /**
    * Cancel a job by its key and remove it from the map.
    *
    * @returns `true` if a job existed for `key` and was cancelled.

@@ -20,3 +20,15 @@ snippet.ts
 debug.sh
 /coverage
 
+# Internal design / proposal working documents are kept local, not
+# version-controlled (the v1.0.0 cleanup removed the tracked ones).
+docs/proposal.md
+
+# Ops tools — operator-supplied configs and per-run log output.
+# `config.json` is already matched by the global rule above; the
+# explicit entries below keep the tool-specific layout self-documenting.
+tools/msg_backup/config.json
+tools/msg_backup/logs/
+tools/msg_backup/tmp/
+tools/verify_db/config.json
+

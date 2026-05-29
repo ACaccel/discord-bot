@@ -37,7 +37,7 @@ export default class ai_settings extends Command {
     // operation-failed key.
     const docResult = await repos.userApiSetting.findByUserId(interaction.user.id);
     if (!docResult.ok) {
-      logError(bot.logger, bot.clientId, interaction.guildId, docResult.error);
+      logError(bot.logger, interaction.guildId, docResult.error);
       await interaction.reply({
         content: t('errors:db.operation_failed'),
         flags: MessageFlags.Ephemeral,

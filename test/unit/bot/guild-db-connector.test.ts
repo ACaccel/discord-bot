@@ -45,7 +45,7 @@ describe('GuildDbConnector.connectOne', () => {
     const repos = fakeRepos();
     const factory: ReposFactory = vi.fn(async () => repos);
     const container = containerWith(factory);
-    const connector = new GuildDbConnector(container, 'mongodb://x', 'bot-1', silent);
+    const connector = new GuildDbConnector(container, 'mongodb://x', silent);
 
     const result = await connector.connectOne('g-1');
 
@@ -56,7 +56,7 @@ describe('GuildDbConnector.connectOne', () => {
   it('returns undefined when the bot was built without a Mongo URI', async () => {
     const factory: ReposFactory = vi.fn(async () => fakeRepos());
     const container = containerWith(factory);
-    const connector = new GuildDbConnector(container, undefined, 'bot-1', silent);
+    const connector = new GuildDbConnector(container, undefined, silent);
 
     expect(await connector.connectOne('g-1')).toBeUndefined();
     expect(factory).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe('GuildDbConnector.connectOne', () => {
       isDisabled: () => disabled,
     } as unknown as ConnectionManager;
     const container = containerWith(factory, cm);
-    const connector = new GuildDbConnector(container, 'mongodb://x', 'bot-1', silent);
+    const connector = new GuildDbConnector(container, 'mongodb://x', silent);
 
     await expect(connector.connectOne('g-1')).rejects.toThrow('mongo unreachable');
   });
@@ -90,7 +90,7 @@ describe('GuildDbConnector.connectOne', () => {
       throw 'mongo died';
     });
     const container = containerWith(factory);
-    const connector = new GuildDbConnector(container, 'mongodb://x', 'bot-1', silent);
+    const connector = new GuildDbConnector(container, 'mongodb://x', silent);
 
     await expect(connector.connectOne('g-1')).rejects.toBeInstanceOf(Error);
   });
@@ -106,7 +106,7 @@ describe('GuildDbConnector.connectAll', () => {
       return reposC;
     });
     const container = containerWith(factory);
-    const connector = new GuildDbConnector(container, 'mongodb://x', 'bot-1', silent);
+    const connector = new GuildDbConnector(container, 'mongodb://x', silent);
     const guildInfo = new Map<string, GuildInfo>([
       ['g-1', { bot_name: '', guild: fakeGuild('g-1') }],
       ['g-2', { bot_name: '', guild: fakeGuild('g-2') }],
@@ -126,7 +126,7 @@ describe('GuildDbConnector.connectAll', () => {
   it('short-circuits when no Mongo URI was configured', async () => {
     const factory: ReposFactory = vi.fn(async () => fakeRepos());
     const container = containerWith(factory);
-    const connector = new GuildDbConnector(container, undefined, 'bot-1', silent);
+    const connector = new GuildDbConnector(container, undefined, silent);
     const attach = vi.fn();
 
     await connector.connectAll(
@@ -154,14 +154,14 @@ describe('GuildDbConnector.isDisabled', () => {
       isDisabled: vi.fn(() => expected),
     } as unknown as ConnectionManager;
     const container = containerWith(undefined, cm);
-    const connector = new GuildDbConnector(container, 'mongodb://x', 'bot-1', silent);
+    const connector = new GuildDbConnector(container, 'mongodb://x', silent);
 
     expect(connector.isDisabled('g-1')).toEqual(expected);
   });
 
   it('returns undefined when no ConnectionManager is bound', () => {
     const container = createContainer();
-    const connector = new GuildDbConnector(container, undefined, 'bot-1', silent);
+    const connector = new GuildDbConnector(container, undefined, silent);
     expect(connector.isDisabled('g-1')).toBeUndefined();
   });
 });

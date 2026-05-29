@@ -28,7 +28,17 @@ import { Events } from 'discord.js';
 
 import type { Translator } from '../core/i18n';
 import { TOKENS, type ServiceContainer, type ServiceToken } from '../core/ioc';
-import { logError, logSystem, ops, type Logger } from '../core/logger';
+import { logError, logGuildEvent, logSystem, ops, type Logger } from '../core/logger';
+// Audit-log coverage note (proposal-derived event table):
+//   - `interaction_create` lines emit from `createChannelLoggingMiddleware`.
+//   - `message_update` / `message_delete` / `guild_member_update` /
+//     `guild_create` lines emit from `GuildEventsPlugin`.
+//   - `MESSAGE_REACTION_ADD` / `MESSAGE_REACTION_REMOVE` are
+//     intentionally NOT audit-logged here. Reaction throughput on busy
+//     guilds dwarfs every other event; an audit line per reaction would
+//     drown the file sink and the dev console without operator value.
+//     The reaction port still dispatches to handlers; we simply omit the
+//     bridge-level audit record.
 import type {
     GuildOnboardingPort,
     InteractionContext,
@@ -85,14 +95,12 @@ interface Subscription {
 
 export class ClientEventBridge {
     private readonly client: Client;
-    private readonly clientId: string;
     private readonly logger: Logger;
     private config: ClientEventBridgeConfig | undefined;
     private readonly subscriptions: Subscription[] = [];
 
-    public constructor(client: Client, clientId: string, logger: Logger) {
+    public constructor(client: Client, logger: Logger) {
         this.client = client;
-        this.clientId = clientId;
         this.logger = logger;
     }
 
@@ -155,7 +163,7 @@ export class ClientEventBridge {
                     if (message.length === 0) return;
                     await debugChannel.send(message);
                 } catch (err) {
-                    logError(this.logger, this.clientId, slot.guild.id, err);
+                    logError(this.logger, slot.guild.id, err);
                 }
             }),
         );
@@ -172,7 +180,7 @@ export class ClientEventBridge {
         if (suppress.interaction !== true) {
             this.on(Events.InteractionCreate, async (interaction: Interaction) => {
                 await this.onInteraction(interaction).catch((err) => {
-                    logError(this.logger, this.clientId, interaction.guildId ?? null, err);
+                    logError(this.logger, interaction.guildId ?? null, err);
                 });
             });
         }
@@ -188,12 +196,7 @@ export class ClientEventBridge {
                 Events.MessageReactionAdd,
                 async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
                     await this.onReactionAdd(reaction, user).catch((err) => {
-                        logError(
-                            this.logger,
-                            this.clientId,
-                            reaction.message.guildId ?? null,
-                            err,
-                        );
+                        logError(this.logger, reaction.message.guildId ?? null, err);
                     });
                 },
             );
@@ -201,12 +204,7 @@ export class ClientEventBridge {
                 Events.MessageReactionRemove,
                 async (reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) => {
                     await this.onReactionRemove(reaction, user).catch((err) => {
-                        logError(
-                            this.logger,
-                            this.clientId,
-                            reaction.message.guildId ?? null,
-                            err,
-                        );
+                        logError(this.logger, reaction.message.guildId ?? null, err);
                     });
                 },
             );
@@ -222,7 +220,7 @@ export class ClientEventBridge {
         if (suppress.guildCreate !== true && !this.dispatcherSubscribesTo(Events.GuildCreate)) {
             this.on(Events.GuildCreate, async (guild: Guild) => {
                 await this.onGuildCreate(guild).catch((err) => {
-                    logError(this.logger, this.clientId, guild.id ?? null, err);
+                    logError(this.logger, guild.id ?? null, err);
                 });
             });
         }
@@ -309,7 +307,7 @@ export class ClientEventBridge {
             // A dispatch-chain throw must still produce a user-visible
             // reply. Surface the traceId so support tickets correlate
             // to the structured log line.
-            logError(this.logger, this.clientId, interaction.guildId, err);
+            logError(this.logger, interaction.guildId, err);
             if (interaction.isRepliable()) {
                 const content =
                     translator.t('errors:unexpected', { traceId }) ??
@@ -321,11 +319,7 @@ export class ClientEventBridge {
                         await interaction.reply({ content, flags: MessageFlags.Ephemeral });
                     }
                 } catch (replyErr) {
-                    logSystem(
-                        this.logger,
-                        this.clientId,
-                        ops.router.replySkipped(String(replyErr)),
-                    );
+                    logSystem(this.logger, ops.router.replySkipped(String(replyErr)));
                 }
             }
         }
@@ -340,6 +334,7 @@ export class ClientEventBridge {
         const fetchedUser = user.partial ? await user.fetch() : user;
         const port = this.config?.reactionPort;
         if (port === undefined) return;
+        // Intentionally no audit log — see header comment.
         await port.handleAdded(fetchedReaction, fetchedUser);
     }
 
@@ -352,6 +347,7 @@ export class ClientEventBridge {
         const fetchedUser = user.partial ? await user.fetch() : user;
         const port = this.config?.reactionPort;
         if (port === undefined) return;
+        // Intentionally no audit log — see header comment.
         await port.handleRemoved(fetchedReaction, fetchedUser);
     }
 
@@ -360,6 +356,21 @@ export class ClientEventBridge {
         if (container === undefined) return;
         const port = container.resolve<GuildOnboardingPort>(TOKENS.GuildOnboardingPort);
         await port.onboardGuild(guild.id);
+        // Bridge owns this fallback path only when no plugin subscribes
+        // to GuildCreate; emit the audit-log line so the file sink files
+        // it under the per-guild directory. Logged after onboarding so
+        // a failed connect surfaces as a separate `logError` upstream.
+        logGuildEvent(
+            this.logger,
+            guild.id,
+            'guild_create',
+            {
+                guildId: guild.id,
+                ownerId: guild.ownerId,
+                memberCount: guild.memberCount,
+            },
+            guild.name,
+        );
     }
 }
 

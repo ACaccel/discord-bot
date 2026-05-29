@@ -7,8 +7,8 @@ Self-contained business features. Every behavior that touches Discord users or g
 ## The eight plugins
 
 - `src/plugins/auto-reply/` — keyword-triggered replies.
-- `src/plugins/llm-chat/` — LLM chat. Registers `TOKENS.ModelCatalog` during `init` via `ctx.registerInstance(...)`.
-- `src/plugins/message-backup/` — periodic message archival; the only plugin used by the `msg-archive` worker.
+- `src/plugins/llm-chat/` — LLM chat. Registers `TOKENS.ModelCatalog` and `TOKENS.DefaultModelResolver` during `init` via `ctx.registerInstance(...)`. `onReady` kicks off an initial background `DefaultModelResolver.refresh()` and schedules a weekly refresh (Monday 04:00, cron `0 4 * * 1`) via `JobManager.scheduleRecurring`, so a model going legacy never strands the whitelist-entry default.
+- `src/plugins/message-backup/` — periodic message archival; the only plugin used by the `msg-archive` worker. The repeat cadence is configurable: `MessageBackupPluginConfig.backupIntervalMs` (optional, defaults to one hour), fed from the `msg-archive` composition root's operator-facing `backup_interval_minutes` config field.
 - `src/plugins/giveaway/` — giveaway scheduling and reaction tally. Uses `JobManager` and `parseDuration` from `@core/scheduling`.
 - `src/plugins/activity/` — activity tracking and leaderboards. Shares the same `@core/scheduling` helpers.
 - `src/plugins/guild-events/` — subscribes to `events.guildCreate`. Resolves `TOKENS.GuildOnboardingPort` and calls it to connect the new guild's DB and register its commands. Failures are logged structured, never re-thrown.

@@ -19,4 +19,28 @@ describe('createMessageBackupPlugin', () => {
     // worth pinning so future refactors don't regress it.
     expect(p).toBeDefined();
   });
+
+  it('accepts an explicit positive `backupIntervalMs`', () => {
+    const p = createMessageBackupPlugin({ backupServers: ['1'], backupIntervalMs: 5 * 60 * 1000 });
+    expect(p.id).toBe('message-backup');
+  });
+
+  it('defaults the interval when `backupIntervalMs` is omitted', () => {
+    const p = createMessageBackupPlugin({ backupServers: ['1'] });
+    expect(p).toBeDefined();
+  });
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, 2_147_483_648])(
+    'rejects a non-positive, non-finite, or over-ceiling `backupIntervalMs` (%s)',
+    (bad) => {
+      expect(() =>
+        createMessageBackupPlugin({ backupServers: ['1'], backupIntervalMs: bad }),
+      ).toThrow(TypeError);
+    },
+  );
+
+  it('accepts `backupIntervalMs` exactly at Node’s timer ceiling', () => {
+    const p = createMessageBackupPlugin({ backupServers: ['1'], backupIntervalMs: 2_147_483_647 });
+    expect(p.id).toBe('message-backup');
+  });
 });

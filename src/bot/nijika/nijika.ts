@@ -45,7 +45,6 @@ export class Nijika extends BaseBot<NijikaConfig> {
         this.use(AutoReplyPlugin);
         this.use(createGuildEventsPlugin({
             blockedChannels: this.config.blocked_channels,
-            clientId: this.clientId,
         }));
         this.use(createGiveawayPlugin());
         this.use(createActivityPlugin());

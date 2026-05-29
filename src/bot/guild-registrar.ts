@@ -63,27 +63,19 @@ export class GuildRegistrar {
      * registering.
      */
     public registerAll(config: Config): Record<string, GuildInfo> {
-        logSystem(this.logger, this.clientId, 'Registering guilds...');
+        logSystem(this.logger, 'Registering guilds...');
         const result: Record<string, GuildInfo> = {};
         let index = 0;
         for (const guild of this.client.guilds.cache.values()) {
             try {
                 result[guild.id] = this.register(guild, config);
                 index += 1;
-                logSystem(
-                    this.logger,
-                    this.clientId,
-                    `${index}. ${guild.id} - ${guild.name}`,
-                );
+                logSystem(this.logger, `${index}. ${guild.id} - ${guild.name}`);
             } catch (err) {
-                logSystem(
-                    this.logger,
-                    this.clientId,
-                    `Cannot register guild ${guild.id}: ${String(err)}`,
-                );
+                logSystem(this.logger, `Cannot register guild ${guild.id}: ${String(err)}`);
             }
         }
-        logSystem(this.logger, this.clientId, 'Successfully registered all guilds.');
+        logSystem(this.logger, 'Successfully registered all guilds.');
         return result;
     }
 

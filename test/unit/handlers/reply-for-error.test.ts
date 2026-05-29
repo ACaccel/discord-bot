@@ -33,7 +33,13 @@ const missTranslator = (): Translator =>
     tStrict: (key: string) => key,
   }) as unknown as Translator;
 
-/** A logger stub recording every `error` / `info` call on a child. */
+/**
+ * A logger stub recording every `error` / `info` call. The helpers
+ * now rely on the ambient `bot` base binding (created via
+ * `createBootstrapLogger`) rather than re-`child({ bot })`-ing on every
+ * call, so the outer logger must expose `info` directly for `logSystem`
+ * and `child(...)` for `logError`'s `guildId` scope.
+ */
 const stubLogger = () => {
   const errorCalls: unknown[] = [];
   const infoCalls: unknown[] = [];
@@ -42,7 +48,12 @@ const stubLogger = () => {
     info: (obj: unknown) => infoCalls.push(obj),
     child: () => child,
   };
-  return { logger: { child: () => child } as never, errorCalls, infoCalls };
+  const logger = {
+    error: (obj: unknown) => errorCalls.push(obj),
+    info: (obj: unknown) => infoCalls.push(obj),
+    child: () => child,
+  };
+  return { logger: logger as never, errorCalls, infoCalls };
 };
 
 /** A minimal interaction fake capturing reply / editReply payloads. */
@@ -128,7 +139,7 @@ describe('replyForError (gap D9 dual-channel boundary)', () => {
 
     await replyForError(
       interaction,
-      { logger, clientId: 'bot-1', translator: stubTranslator() },
+      { logger, translator: stubTranslator() },
       error,
       'replies:add_reply.failed',
       'g-1',
@@ -148,7 +159,7 @@ describe('replyForError (gap D9 dual-channel boundary)', () => {
 
     await replyForError(
       interaction,
-      { logger, clientId: 'bot-1', translator: stubTranslator() },
+      { logger, translator: stubTranslator() },
       raw,
       'replies:add_reply.failed',
       'g-1',
@@ -171,7 +182,7 @@ describe('replyForError (gap D9 dual-channel boundary)', () => {
 
     await replyForError(
       interaction,
-      { logger, clientId: 'bot-1', translator: stubTranslator() },
+      { logger, translator: stubTranslator() },
       new Error('boom'),
       'replies:help.failed',
     );
@@ -189,7 +200,7 @@ describe('replyForError (gap D9 dual-channel boundary)', () => {
 
     await replyForError(
       interaction,
-      { logger, clientId: 'bot-1', translator: undefined },
+      { logger, translator: undefined },
       new Error('boom'),
       'replies:help.failed',
     );
@@ -208,7 +219,7 @@ describe('replyForError (gap D9 dual-channel boundary)', () => {
     await expect(
       replyForError(
         interaction,
-        { logger, clientId: 'bot-1', translator: stubTranslator() },
+        { logger, translator: stubTranslator() },
         new Error('boom'),
         'replies:help.failed',
       ),

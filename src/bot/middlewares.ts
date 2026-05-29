@@ -100,14 +100,19 @@ export const createChannelLoggingMiddleware = (
                     );
                 }
                 if (interaction.guild) {
-                    const guild_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: ${interaction.guild?.channels.cache.get(interaction.channelId)?.name}`;
+                    const channelName =
+                        interaction.guild.channels.cache.get(interaction.channelId)?.name ??
+                        '<unknown>';
                     logGuildEvent(
                         bot.logger,
-                        bot.clientId,
                         interaction.guild.id,
                         'interaction_create',
-                        guild_log,
-                        interaction.guild?.name as string,
+                        {
+                            command: `/${interaction.commandName}`,
+                            user: interaction.user.displayName,
+                            channel: channelName,
+                        },
+                        interaction.guild.name,
                     );
                 }
             }

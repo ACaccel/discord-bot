@@ -36,6 +36,34 @@ describe('JobManager', () => {
     expect(jobs.get('giveaway:1')).toBe(job);
   });
 
+  it('schedules a recurring job from a cron expression under the key', () => {
+    const job = fakeJob();
+    scheduleJobMock.mockReturnValue(job);
+    const jobs = new Map<string, Job>();
+    const manager = new JobManager(jobs);
+    const callback = () => undefined;
+
+    const result = manager.scheduleRecurring('llm-chat:refresh', '0 4 * * 1', callback);
+
+    expect(result).toBe(job);
+    expect(scheduleJobMock).toHaveBeenCalledWith('0 4 * * 1', callback);
+    expect(jobs.get('llm-chat:refresh')).toBe(job);
+  });
+
+  it('scheduleRecurring replaces an existing job under the same key', () => {
+    const first = fakeJob();
+    const second = fakeJob();
+    const jobs = new Map<string, Job>();
+    const manager = new JobManager(jobs);
+
+    scheduleJobMock.mockReturnValueOnce(first);
+    manager.scheduleRecurring('k', '0 4 * * 1', () => undefined);
+    scheduleJobMock.mockReturnValueOnce(second);
+    manager.scheduleRecurring('k', '0 5 * * 1', () => undefined);
+
+    expect(jobs.get('k')).toBe(second);
+  });
+
   it('replaces an existing job registered under the same key', () => {
     const first = fakeJob();
     const second = fakeJob();

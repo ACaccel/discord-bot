@@ -79,7 +79,7 @@ export default class ban_user extends Command {
                         try {
                             await msg.delete();
                         } catch (err) {
-                            logError(bot.logger, bot.clientId, interaction.guild?.id, err);
+                            logError(bot.logger, interaction.guild?.id, err);
                         }
                     }
                 };

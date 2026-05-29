@@ -153,7 +153,7 @@ the `@core/plugin` barrel.
 
 Worker-style. Suppresses interaction / reaction / guildCreate
 listeners on its `BaseBot` subclass and runs the periodic
-`MessageBackupPlugin`. Log files: `logs/msg-archive-<guildId>.log`.
+`MessageBackupPlugin`. Backup transcripts: `logs/backup/msg-archive-<guildId>-<YYYY-MM-DD_HH-MM-SS>.log` (one per run; the timestamp prevents overwrites).
 
 ### `nijika`
 
@@ -186,4 +186,17 @@ fails, root-cause it; do not bypass.
 ## Commit + PR conventions
 
 - Commits: small, focused. `<type>(<scope>): <subject>` where `<type>` is `feat`, `fix`, `refactor`, `chore`, `docs`, or `test`.
-- PRs: branch off `main`, run the full local gate suite, fill in the PR template, wait for CI green and reviewer approval.
+- PRs: branch off `dev` for features (off `main` for hotfixes), run the full local gate suite, fill in the PR template, wait for CI green and reviewer approval.
+
+### Branching model (Git Flow)
+
+Two long-lived branches; everything else is short-lived and deleted after merge.
+
+- `main` — always equals the released / production state. Every merge into `main` is a release: tag it (`vX.Y.Z`) and cut a GitHub Release.
+- `dev` — the integration branch where features accumulate between releases.
+- `feature/*` (short-lived) — branch off `dev`, open a PR back into `dev`, delete the branch on merge.
+- Release — open a `dev` -> `main` PR (optionally via a `release/*` stabilisation branch that takes only bug fixes, version bumps, and changelog edits). After merging into `main`, tag + Release, then merge `main` back into `dev` to prevent drift.
+- `hotfix/*` — branch off `main` for production-urgent fixes; merge back into both `main` (tag a patch release) and `dev`.
+- Every PR — regardless of base — must pass the full required CI gate set before merge.
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contributor-facing walkthrough.

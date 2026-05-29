@@ -106,7 +106,7 @@ export const handleGiveawayCreate = async (
             }),
         });
     } catch (error) {
-        logError(bot.logger, bot.clientId, interaction.guild?.id ?? null, error);
+        logError(bot.logger, interaction.guild?.id ?? null, error);
         await interaction.editReply({ content: t('replies:giveaway.create_failed') });
     }
 };
@@ -141,7 +141,7 @@ export const handleGiveawayDelete = async (
 
         await interaction.editReply({ content: t('replies:giveaway.delete_success') });
     } catch (error) {
-        logError(bot.logger, bot.clientId, interaction.guild?.id ?? null, error);
+        logError(bot.logger, interaction.guild?.id ?? null, error);
         await interaction.editReply({ content: t('replies:giveaway.delete_failed') });
     }
 };

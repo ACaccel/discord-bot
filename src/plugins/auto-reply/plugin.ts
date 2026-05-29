@@ -119,33 +119,33 @@ export const AutoReplyPlugin: Plugin = {
 
       // The remaining behaviours all skip bot authors so two bots
       // running this plugin do not feedback-loop each other.
-      if (message.author.bot) return;
-
-      const reply = await safeLookup(registry, guildId, message.content, logger, 'direct');
-      if (reply !== null) {
-        await message.channel.send({ content: reply });
-      }
-
-      if (message.author.id === FATCAT_USER_ID && Math.random() < FATCAT_PROBABILITY) {
-        await message.channel.send(t.t('replies:auto_reply.fatcat_line'));
-      }
-      if (message.author.id === MUBAIMU_USER_ID && Math.random() < MUBAIMU_PROBABILITY) {
-        await message.channel.send(t.t('replies:auto_reply.mubaimu_line'));
-      }
-      if (Math.random() < LUCKY_GLOBAL_PROBABILITY) {
-        const lucky = await safeLookup(registry, guildId, '[*]', logger, 'lucky');
-        if (lucky !== null) {
-          await message.channel.send({ content: lucky });
+      if (!message.author.bot) {
+        const reply = await safeLookup(registry, guildId, message.content, logger, 'direct');
+        if (reply !== null) {
+          await message.channel.send({ content: reply });
         }
-      }
 
-      if (LONG_HAIR_REGEX.test(message.content)) {
-        await message.channel.send(t.t('replies:auto_reply.long_hair_line'));
-      }
+        if (message.author.id === FATCAT_USER_ID && Math.random() < FATCAT_PROBABILITY) {
+          await message.channel.send(t.t('replies:auto_reply.fatcat_line'));
+        }
+        if (message.author.id === MUBAIMU_USER_ID && Math.random() < MUBAIMU_PROBABILITY) {
+          await message.channel.send(t.t('replies:auto_reply.mubaimu_line'));
+        }
+        if (Math.random() < LUCKY_GLOBAL_PROBABILITY) {
+          const lucky = await safeLookup(registry, guildId, '[*]', logger, 'lucky');
+          if (lucky !== null) {
+            await message.channel.send({ content: lucky });
+          }
+        }
 
-      const diceResult = rollDice(message.content);
-      if (diceResult !== null) {
-        await message.channel.send(diceResult);
+        if (LONG_HAIR_REGEX.test(message.content)) {
+          await message.channel.send(t.t('replies:auto_reply.long_hair_line'));
+        }
+
+        const diceResult = rollDice(message.content);
+        if (diceResult !== null) {
+          await message.channel.send(diceResult);
+        }
       }
     },
   },

@@ -407,10 +407,35 @@ The Git history follows a `<type>(<scope>): <subject>` pattern where
 etc.). Multi-line bodies are encouraged for non-trivial changes —
 describe the _why_, not the _what_.
 
+## Branching model
+
+This repo follows **Git Flow** with two long-lived branches; everything
+else is short-lived and deleted after merge.
+
+- **`main`** — always equals the released / production state. Every merge
+  into `main` is a release: it is tagged (`vX.Y.Z`) and a GitHub Release
+  is cut from it.
+- **`dev`** — the integration branch. Day-to-day work accumulates here
+  between releases.
+- **`feature/*`** — branch off `dev`, open a PR back into `dev`, and let
+  the branch be deleted on merge.
+- **Releasing** — open a `dev` → `main` PR (optionally via a `release/*`
+  stabilisation branch that takes only bug fixes, version bumps, and
+  changelog edits). After merging into `main`, tag the release + cut the
+  GitHub Release, then merge `main` back into `dev` so the branches do
+  not drift.
+- **`hotfix/*`** — for production-urgent fixes, branch off `main`; merge
+  back into **both** `main` (tag a patch release) and `dev`.
+
+Every PR, regardless of base branch, must pass the full required CI gate
+set (see Quality gates) before it can merge.
+
 ## Submitting a PR
 
-1. Branch off `main`.
+1. Branch off `dev` (features) or `main` (hotfixes).
 2. Run the full local gate suite (see the Quality gates table).
 3. Fill in the PR template — it asks for a summary, gate evidence,
    and a rollback plan.
-4. A maintainer will review. CI must be green before merge.
+4. Target `dev` for features (`main` only for releases / hotfixes). A
+   maintainer will review. CI must be green before merge; the branch is
+   deleted on merge.

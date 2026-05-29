@@ -13,7 +13,7 @@
  * The catalog's HTTP-fetch behaviour is covered elsewhere; here we
  * only care about the DI hop because that is the surface R2 changed.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createContainer, TOKENS } from '../../../../src/core/ioc';
 import { createLogger } from '../../../../src/core/logger';
@@ -86,5 +86,34 @@ describe('ModelCatalog DI wiring (R2)', () => {
   it('leaves TOKENS.ModelCatalog unbound when LlmChatPlugin is not registered', () => {
     const container = createContainer();
     expect(container.tryResolve(TOKENS.ModelCatalog)).toBeUndefined();
+  });
+});
+
+describe('ModelCatalog.listLive (uncapped vs cached cap)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns the full live list while the cache stays capped to the menu limit', async () => {
+    // 30 distinct Gemini models — above the 25-option select-menu cap.
+    const models = Array.from({ length: 30 }, (_, i) => ({
+      name: `models/gemini-test-${String(i).padStart(2, '0')}`,
+      supportedGenerationMethods: ['generateContent'],
+    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => ({ models }) }) as unknown as Response),
+    );
+
+    const catalog = new ModelCatalog({ gemini: 'test-key' });
+
+    // listLive feeds the price-ranking resolver: it must see every model,
+    // not an alphabetical top-25 slice (the cheapest could sit past #25).
+    const live = await catalog.listLive('gemini');
+    expect(live).toHaveLength(30);
+
+    // The synchronous cache view feeds the Discord select menu and must
+    // stay within the 25-option hard limit.
+    expect(catalog.list('gemini')).toHaveLength(25);
   });
 });
