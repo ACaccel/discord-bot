@@ -51,7 +51,7 @@
     "empty": "白名單目前為空。",
     "header": "**AI 白名單({{count}} 位用戶):**",
     "already_in": "{{user}} 已在白名單中。",
-    "added": "已將 {{user}} 加入白名單(預設 provider: openai)。",
+    "added": "已將 {{user}} 加入白名單(預設 provider: {{provider}})。",
     "not_in": "{{user}} 不在白名單中。",
     "removed": "已將 {{user}} 從白名單移除。",
     "failed": "唔...白名單操作失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"

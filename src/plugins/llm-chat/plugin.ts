@@ -23,6 +23,7 @@ import type { Translator } from '../../core/i18n';
 import { TOKENS } from '../../core/plugin';
 import type { Plugin } from '../../core/plugin';
 import {
+  DefaultModelResolver,
   LLMService,
   ModelCatalog,
   createDefaultRegistry,
@@ -32,6 +33,7 @@ import {
   type LLMResult,
   type LLMSettings,
 } from '../../infra/llm';
+import { JobManager } from '../../core/scheduling';
 import { SessionManager } from './internal';
 import { logError, type Logger } from '../../core/logger';
 
@@ -40,6 +42,9 @@ const PLUGIN_VERSION = '1.0.0';
 const PREWARM_PROVIDERS: LLMProviderName[] = ['xai', 'openai', 'anthropic', 'gemini'];
 const NO_MENTIONS = { parse: [] as const };
 const MAX_DISCORD_MESSAGE_LENGTH = 2000;
+/** Job key + cron for the weekly default-model refresh (Monday 04:00). */
+const DEFAULT_MODEL_REFRESH_JOB_KEY = 'llm-chat:refresh-default-models';
+const DEFAULT_MODEL_REFRESH_CRON = '0 4 * * 1';
 
 export interface LlmChatPluginConfig {
   readonly clientId: string;
@@ -150,6 +155,10 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
   // pre-init dispatch (impossible in production — host enforces
   // ordering — but possible in tests) silently no-ops.
   let llmService: LLMService | undefined;
+  // Holds the cheapest-still-listed default model per provider. Created
+  // in `init` alongside the catalog and refreshed weekly from `onReady`
+  // so a model going legacy never strands the whitelist-entry default.
+  let defaultModelResolver: DefaultModelResolver | undefined;
 
   return {
     id: PLUGIN_ID,
@@ -174,12 +183,27 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
         gemini: env.GEMINI_API_KEY,
       });
       ctx.registerInstance(TOKENS.ModelCatalog, modelCatalog);
+      defaultModelResolver = new DefaultModelResolver(modelCatalog, ctx.logger);
+      ctx.registerInstance(TOKENS.DefaultModelResolver, defaultModelResolver);
       // Pre-warm each provider's live model catalog at boot. The call
       // returns a fallback sync while kicking off the SDK fetch, so by
       // the time `/ai_settings` is invoked the cache is usually warm.
       for (const provider of PREWARM_PROVIDERS) {
         modelCatalog.list(provider);
       }
+    },
+
+    async onReady(ctx): Promise<void> {
+      if (defaultModelResolver === undefined) return;
+      const resolver = defaultModelResolver;
+      // Initial resolve runs in the background so a slow provider does
+      // not delay readiness; the weekly cron keeps it current thereafter.
+      void resolver.refresh().catch((err: unknown) => logError(ctx.logger, null, err));
+      new JobManager(ctx.resolve(TOKENS.JobMap)).scheduleRecurring(
+        DEFAULT_MODEL_REFRESH_JOB_KEY,
+        DEFAULT_MODEL_REFRESH_CRON,
+        () => resolver.refresh().catch((err: unknown) => logError(ctx.logger, null, err)),
+      );
     },
 
     events: {

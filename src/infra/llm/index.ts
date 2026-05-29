@@ -36,5 +36,6 @@ export { GeminiProvider } from './gemini-provider';
 export { XAIProvider } from './xai-provider';
 
 export { ModelCatalog } from './models-catalog';
+export { DefaultModelResolver } from './default-model-resolver';
 export type { LlmProviderApiKeys } from './registry';
-export { calculateCost, formatUsageFooter } from './pricing';
+export { calculateCost, cheapestModel, formatUsageFooter } from './pricing';

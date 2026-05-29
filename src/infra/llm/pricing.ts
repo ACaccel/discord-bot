@@ -24,6 +24,9 @@ const MODEL_PRICING_USD_PER_M: Record<string, [number, number]> = {
   o3: [10, 40],
   'gpt-5': [1.25, 10],
   'gpt-5-mini': [0.25, 2],
+  'gpt-5-nano': [0.05, 0.4],
+  'gpt-5.4-nano': [0.2, 1.25],
+  'gpt-4.1-nano': [0.1, 0.4],
 
   // Anthropic (https://www.anthropic.com/pricing)
   'claude-opus-4-7': [15, 75],
@@ -46,6 +49,7 @@ const MODEL_PRICING_USD_PER_M: Record<string, [number, number]> = {
   // Google Gemini (https://ai.google.dev/pricing)
   'gemini-2.5-pro': [1.25, 10],
   'gemini-2.5-flash': [0.3, 2.5],
+  'gemini-2.5-flash-lite': [0.1, 0.4],
   'gemini-2.0-flash': [0.1, 0.4],
   'gemini-2.0-flash-lite': [0.075, 0.3],
   'gemini-1.5-pro': [1.25, 5],
@@ -54,7 +58,7 @@ const MODEL_PRICING_USD_PER_M: Record<string, [number, number]> = {
 
   // xAI (https://docs.x.ai/docs/models)
   'grok-4': [3, 15],
-  'grok-4.3': [3, 15],
+  'grok-4.3': [1.25, 2.5],
   'grok-4-1-fast-reasoning': [0.6, 4],
   'grok-4-1-fast-non-reasoning': [0.2, 0.5],
   'grok-3': [3, 15],
@@ -62,6 +66,33 @@ const MODEL_PRICING_USD_PER_M: Record<string, [number, number]> = {
   'grok-2-1212': [2, 10],
   'grok-2-vision-1212': [2, 10],
 };
+
+/**
+ * Pick the cheapest model among `candidates` that has a known price.
+ *
+ * Ranking is by input price first, output price as the tie-breaker.
+ * Candidates without a pricing-table entry are ignored — an unknown
+ * model cannot be compared and must never be chosen as a default.
+ * Returns `undefined` when none of the candidates are priced, letting
+ * the caller keep its existing default rather than guess.
+ */
+export function cheapestModel(candidates: readonly string[]): string | undefined {
+  let best: string | undefined;
+  let bestPrice: [number, number] | undefined;
+  for (const model of candidates) {
+    const price = MODEL_PRICING_USD_PER_M[model];
+    if (!price) continue;
+    if (
+      bestPrice === undefined ||
+      price[0] < bestPrice[0] ||
+      (price[0] === bestPrice[0] && price[1] < bestPrice[1])
+    ) {
+      best = model;
+      bestPrice = price;
+    }
+  }
+  return best;
+}
 
 /**
  * Compute USD cost for a completion. Returns null when the model is not in

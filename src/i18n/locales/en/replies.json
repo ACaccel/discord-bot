@@ -51,7 +51,7 @@
     "empty": "The whitelist is currently empty.",
     "header": "**AI whitelist ({{count}} users):**",
     "already_in": "{{user}} is already on the whitelist.",
-    "added": "Added {{user}} to the whitelist (default provider: openai).",
+    "added": "Added {{user}} to the whitelist (default provider: {{provider}}).",
     "not_in": "{{user}} is not on the whitelist.",
     "removed": "Removed {{user}} from the whitelist.",
     "failed": "Hmm... the whitelist operation failed. Give it another try later! (error code: {{traceId}})"

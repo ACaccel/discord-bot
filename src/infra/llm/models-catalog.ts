@@ -60,6 +60,33 @@ export class ModelCatalog {
     return [];
   }
 
+  /**
+   * Fetch a provider's model list **authoritatively**, awaiting the SDK
+   * call instead of returning a cached/empty snapshot. Used by
+   * {@link DefaultModelResolver}'s periodic refresh, where blocking on
+   * the live result is the whole point.
+   *
+   * Returns the *full* deduped list — deliberately NOT capped to
+   * {@link SELECT_MENU_MAX_OPTIONS}. That cap exists only to fit a
+   * Discord select menu; applying it here would let the cheapest model
+   * fall outside the alphabetical top-25 and be silently dropped before
+   * the resolver ranks by price. The cache it refreshes (consumed by the
+   * synchronous {@link list} for the menu) is still capped.
+   *
+   * Rejects when the provider has no API key or the SDK call fails — the
+   * caller decides whether to keep its existing default.
+   */
+  public async listLive(provider: LLMProviderName): Promise<string[]> {
+    const full = dedupeSort(await this.fetchModels(provider));
+    if (full.length > 0) {
+      this.cache.set(provider, {
+        list: full.slice(0, SELECT_MENU_MAX_OPTIONS),
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      });
+    }
+    return full;
+  }
+
   private scheduleBackgroundFetch(provider: LLMProviderName): void {
     if (this.inFlight.has(provider)) return;
     this.inFlight.add(provider);
@@ -145,6 +172,12 @@ async function fetchGeminiModels(apiKey: string): Promise<string[]> {
   return ids;
 }
 
+/** Dedupe + alphabetical sort, with no length cap. */
+function dedupeSort(list: string[]): string[] {
+  return Array.from(new Set(list)).sort();
+}
+
+/** Dedupe + sort, then cap to the Discord select-menu option limit. */
 function normalizeList(list: string[]): string[] {
-  return Array.from(new Set(list)).sort().slice(0, SELECT_MENU_MAX_OPTIONS);
+  return dedupeSort(list).slice(0, SELECT_MENU_MAX_OPTIONS);
 }

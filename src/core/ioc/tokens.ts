@@ -21,6 +21,7 @@ import { token, type ServiceToken } from './container';
 
 import type { ConnectionManager } from '../../infra/mongo/connection-manager';
 import type { ModelCatalog } from '../../infra/llm/models-catalog';
+import type { DefaultModelResolver } from '../../infra/llm/default-model-resolver';
 import type { VoiceController } from '../../plugins/voice/internal';
 import type { Clock } from '../time';
 import type { Env } from '../config';
@@ -94,6 +95,13 @@ export interface Tokens {
    * LlmChatPlugin.
    */
   readonly ModelCatalog: ServiceToken<ModelCatalog>;
+  /**
+   * Per-provider default-model resolver, published by LlmChatPlugin's
+   * `init` hook. Keeps the whitelist-entry default pointed at the
+   * cheapest still-listed model via a weekly refresh. Unbound for bots
+   * that do not register LlmChatPlugin.
+   */
+  readonly DefaultModelResolver: ServiceToken<DefaultModelResolver>;
 }
 
 export const TOKENS: Tokens = {
@@ -109,4 +117,5 @@ export const TOKENS: Tokens = {
   GuildOnboardingPort: token<GuildOnboardingPort>('GuildOnboardingPort'),
   VoiceController: token<VoiceController>('VoiceController'),
   ModelCatalog: token<ModelCatalog>('ModelCatalog'),
+  DefaultModelResolver: token<DefaultModelResolver>('DefaultModelResolver'),
 };
