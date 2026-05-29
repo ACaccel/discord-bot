@@ -9,9 +9,12 @@
  * Wiring:
  *   - Reads `backupServers` config — the list of guild ids the bot
  *     should back up.
- *   - Schedules itself on `onReady` (one-shot per guild then a
- *     1-hour repeat loop). `onShutdown` clears the loop so a fast
- *     restart does not double-trigger.
+ *   - Reads the optional `backupIntervalMs` config — the delay between
+ *     repeat passes. Defaults to one hour when omitted, preserving the
+ *     historical hard-coded cadence.
+ *   - Schedules itself on `onReady` (one-shot per guild then a repeat
+ *     loop on `backupIntervalMs`). `onShutdown` clears the loop so a
+ *     fast restart does not double-trigger.
  *
  * Why bot-scope rather than guild-scope: backup batches all
  * configured guilds in series to keep request-rate predictable. A
@@ -25,17 +28,39 @@ import { performBackup } from './internal';
 
 const PLUGIN_ID = 'message-backup';
 const PLUGIN_VERSION = '1.0.0';
-const BACKUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const DEFAULT_BACKUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+// Node's `setTimeout` ceiling (2^31 - 1 ms, ~24.8 days). A delay above
+// this overflows the internal 32-bit counter and is silently coerced to
+// 1ms, which would turn the repeat loop into a near-tight spin. Reject
+// such values at construction instead.
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 export interface MessageBackupPluginConfig {
   readonly backupServers: readonly string[];
+  /**
+   * Delay between repeat backup passes, in milliseconds. Omit to keep
+   * the historical one-hour cadence. The composition root converts the
+   * operator-facing `backup_interval_minutes` config field into this.
+   */
+  readonly backupIntervalMs?: number;
 }
 
 export const createMessageBackupPlugin = (
   rawConfig: MessageBackupPluginConfig,
 ): Plugin => {
-  const config: MessageBackupPluginConfig = {
+  const intervalMs = rawConfig.backupIntervalMs ?? DEFAULT_BACKUP_INTERVAL_MS;
+  // Contract guard: a non-positive or non-finite interval would turn the
+  // repeat loop into a tight spin (0ms) or never fire (NaN/Infinity); a
+  // value above Node's timer ceiling overflows to a 1ms spin (see
+  // MAX_TIMEOUT_MS).
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0 || intervalMs > MAX_TIMEOUT_MS) {
+    throw new TypeError(
+      `createMessageBackupPlugin: backupIntervalMs must be a positive finite number <= ${String(MAX_TIMEOUT_MS)}ms, got ${String(intervalMs)}`,
+    );
+  }
+  const config: Required<Pick<MessageBackupPluginConfig, 'backupServers' | 'backupIntervalMs'>> = {
     backupServers: [...rawConfig.backupServers],
+    backupIntervalMs: intervalMs,
   };
   const running = new Set<string>();
   let loopHandle: NodeJS.Timeout | undefined;
@@ -72,7 +97,7 @@ export const createMessageBackupPlugin = (
         loopHandle = setTimeout(async () => {
           await runOnce();
           scheduleNext();
-        }, BACKUP_INTERVAL_MS);
+        }, config.backupIntervalMs);
       };
       scheduleNext();
     },

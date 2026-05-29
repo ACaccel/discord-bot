@@ -7,13 +7,12 @@
  * finally closes the log file so a partial run still leaves a usable
  * artifact.
  */
-import * as path from 'node:path';
-
 import { type Client, DiscordAPIError } from 'discord.js';
 
 import type { GuildRegistry } from '../../../core/guild-registry';
 import { logError, type Logger } from '../../../core/logger';
 import { BackupLog } from './backup-log';
+import { buildBackupLogPath } from './log-path';
 import { backupChannel, type ChannelBackupStats } from './backup-channel';
 import { collectChannels } from './collect-channels';
 
@@ -40,7 +39,7 @@ export const performBackup = async (
     return;
   }
 
-  const logPath = path.join(process.cwd(), 'logs', `msg-archive-${guildId}.log`);
+  const logPath = buildBackupLogPath(guildId, new Date());
   const log = new BackupLog(logPath);
 
   try {
@@ -75,13 +74,19 @@ export const performBackup = async (
     const allStats: ChannelBackupStats[] = [];
     for (let i = 0; i < channels.length; i += 1) {
       const channel = channels[i]!;
-      const { added, stats } = await backupChannel(channel, repos, guildId, pluginLogger, async () => {
-        await statusMsg
-          .edit(
-            `[ SYSTEM ] Backup in progress. DB now contains (${existingCount}+${newCount}) messages.`,
-          )
-          .catch(() => undefined);
-      });
+      const { added, stats } = await backupChannel(
+        channel,
+        repos,
+        guildId,
+        pluginLogger,
+        async () => {
+          await statusMsg
+            .edit(
+              `[ SYSTEM ] Backup in progress. DB now contains (${existingCount}+${newCount}) messages.`,
+            )
+            .catch(() => undefined);
+        },
+      );
       newCount += added;
       allStats.push(stats);
 

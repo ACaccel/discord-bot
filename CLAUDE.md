@@ -153,7 +153,7 @@ the `@core/plugin` barrel.
 
 Worker-style. Suppresses interaction / reaction / guildCreate
 listeners on its `BaseBot` subclass and runs the periodic
-`MessageBackupPlugin`. Log files: `logs/msg-archive-<guildId>.log`.
+`MessageBackupPlugin`. Backup transcripts: `logs/backup/msg-archive-<guildId>-<YYYY-MM-DD_HH-MM-SS>.log` (one per run; the timestamp prevents overwrites).
 
 ### `nijika`
 

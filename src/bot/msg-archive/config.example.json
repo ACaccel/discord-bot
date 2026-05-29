@@ -9,5 +9,6 @@
     },
     "backup_server": [
         "YOUR_GUILD_ID"
-    ]
+    ],
+    "backup_interval_minutes": 60
 }
