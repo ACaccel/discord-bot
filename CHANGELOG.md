@@ -21,6 +21,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GUILD_CREATE` audit line, promoted from `logSystem` to
   `logGuildEvent` so onboarding events file under the per-guild
   directory instead of the bot root.
+- Standalone ops tools under `tools/`: `msg_backup` (backs up a guild's
+  message history to a single human-readable transcript) and `verify_db`
+  (scans a guild's backup database for integrity problems). Each ships
+  pure, unit-tested internals plus operator docs under
+  `docs/wiki/ops/`.
+- `tools` vitest project plus a `test:tools` script and a `test-tools`
+  CI job, so the ops-tool unit tests gate merges; the prettier glob and
+  strict-tsconfig include now cover `tools/**`.
+- `DefaultModelResolver` (`src/infra/llm/default-model-resolver.ts`):
+  keeps each provider's default chat model pointed at the cheapest model
+  still listed by the provider, published by `LlmChatPlugin.init` and
+  refreshed weekly via the new `JobManager.scheduleRecurring`, so a
+  retired model never strands a whitelist-entry default.
+- Timestamped per-run backup transcript paths
+  (`logs/backup/msg-archive-<guildId>-<YYYY-MM-DD_HH-MM-SS>.log`) so a
+  truncating reopen no longer overwrites the prior run's artifact;
+  `msg-archive` gains an optional `backup_interval_minutes` config.
+- Git Flow branching model (long-lived `main` + `dev`), documented in
+  `CONTRIBUTING.md` and `CLAUDE.md`; CI and CodeQL triggers now cover
+  `dev`.
 
 ### Changed
 

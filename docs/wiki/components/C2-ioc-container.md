@@ -18,4 +18,4 @@ This boundary is enforced by an ESLint `no-restricted-imports` rule on `src/plug
 
 ## Notes
 
-`PluginInitContext.registerInstance(token, instance)` is a thin facade over `registerSingleton(token, () => instance)`. It is the only write path a plugin has into the container, and only during the `init` lifecycle phase. Two examples of singletons published this way: `TOKENS.VoiceController` (registered by `VoicePlugin`) and `TOKENS.ModelCatalog` (registered by `LlmChatPlugin`).
+`PluginInitContext.registerInstance(token, instance)` is a thin facade over `registerSingleton(token, () => instance)`. It is the only write path a plugin has into the container, and only during the `init` lifecycle phase. Examples of singletons published this way: `TOKENS.VoiceController` (registered by `VoicePlugin`), and `TOKENS.ModelCatalog` plus `TOKENS.DefaultModelResolver` (both registered by `LlmChatPlugin`).

@@ -14,7 +14,7 @@ The lowest layer of the architecture: pure infrastructure with no Discord, no Mo
 - `src/core/time/` — injectable `Clock` for deterministic time access in tests.
 - `src/core/ids.ts` — branded ID types (`GuildId`, `UserId`, etc.).
 - `src/core/guild-registry.ts` — per-guild channel / role / repo lookup interface.
-- `src/core/scheduling/` — `JobManager` (wraps `node-schedule`) and `parseDuration`; shared by giveaway and activity plugins via `@core/scheduling`.
+- `src/core/scheduling/` — `JobManager` (wraps `node-schedule`) and `parseDuration`; shared by giveaway, activity, and llm-chat plugins via `@core/scheduling`. `schedule(key, date, cb)` registers a one-shot job; `scheduleRecurring(key, cron, cb)` registers a recurring cron job (used by llm-chat's weekly default-model refresh).
 
 ## Notes
 
