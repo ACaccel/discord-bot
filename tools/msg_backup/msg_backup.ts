@@ -32,8 +32,12 @@
  *     The pre-check / dup-detect path from the old skip-if-exists
  *     design is gone (R-23, R-25).
  *   - Channels are enumerated as `(text-like guild channels) ∪
- *     (active threads) ∪ (archived threads)`, paginated until the
- *     thread manager returns fewer than the page limit (R-08).
+ *     (active threads) ∪ (archived public threads) ∪ (archived private
+ *     threads)`, paginated until the thread manager returns fewer than
+ *     the page limit (R-08). The archived-private pass is explicit
+ *     (`fetchArchived` defaults to public-only) and gated on
+ *     MANAGE_THREADS; if it fails the channel keeps its active + public
+ *     threads and the gap is surfaced as a `thread-enum-failed`.
  *   - Transient Discord errors on `messages.fetch` retry with an
  *     exponential backoff (1s, 2s, 4s). Hard non-transient codes
  *     (50001/50013/10003/10004) bypass retries entirely and surface
@@ -87,9 +91,11 @@ import {
   type ChannelOutcomeStatus as InternalChannelOutcomeStatus,
   buildAnomalies,
   buildBackfillDoc,
+  enumerateChannelThreads,
   monthKey,
   parseConfig,
   parseLocalMidnight,
+  type ThreadFetchPass,
   type ToolConfig,
   withRetry,
 } from './internal';
@@ -409,6 +415,9 @@ const parentNameOf = (thread: AnyThreadChannel): string | undefined => {
  */
 type ThreadFetchResult = { readonly threads: Collection<string, AnyThreadChannel> };
 type ThreadFetcher = (options?: {
+  // `fetchArchived` defaults to public-only; the private pass must be
+  // requested explicitly or archived private threads are silently lost.
+  readonly type?: 'public' | 'private';
   readonly before?: Date | number | string;
   readonly limit?: number;
 }) => Promise<ThreadFetchResult>;
@@ -417,6 +426,7 @@ const paginateThreads = async (
   fetcher: ThreadFetcher,
   label: string,
   runLog: RunLogFile,
+  archivedType?: 'public' | 'private',
   pageLimit: number = THREAD_PAGE_LIMIT,
 ): Promise<readonly AnyThreadChannel[]> => {
   const out: AnyThreadChannel[] = [];
@@ -425,11 +435,11 @@ const paginateThreads = async (
   let batchIndex = 0;
   while (true) {
     batchIndex += 1;
-    const page: ThreadFetchResult = await fetcher(
-      beforeCursor !== undefined
-        ? { before: beforeCursor, limit: pageLimit }
-        : { limit: pageLimit },
-    );
+    const page: ThreadFetchResult = await fetcher({
+      ...(archivedType !== undefined ? { type: archivedType } : {}),
+      ...(beforeCursor !== undefined ? { before: beforeCursor } : {}),
+      limit: pageLimit,
+    });
     const pageSize = page.threads.size;
     appendStamped(
       runLog,
@@ -540,16 +550,35 @@ const collectChannels = async (
       typeof maybeThreaded.threads.fetchActive === 'function' &&
       typeof maybeThreaded.threads.fetchArchived === 'function'
     ) {
+      const fetchActive = maybeThreaded.threads.fetchActive.bind(maybeThreaded.threads);
+      const fetchArchived = maybeThreaded.threads.fetchArchived.bind(maybeThreaded.threads);
+      const chLabel = `#${channelName(channel as FetchableChannel)}`;
       try {
-        const activeList = await paginateThreads(
-          maybeThreaded.threads.fetchActive.bind(maybeThreaded.threads),
-          `Active threads in #${channelName(channel as FetchableChannel)}`,
-          runLog,
-        );
-        const archivedList = await paginateThreads(
-          maybeThreaded.threads.fetchArchived.bind(maybeThreaded.threads),
-          `Archived threads in #${channelName(channel as FetchableChannel)}`,
-          runLog,
+        // `fetchArchived` defaults to public-only, so the private pass is
+        // requested explicitly. `enumerateChannelThreads` isolates a
+        // private-pass failure (commonly a missing MANAGE_THREADS
+        // permission) so it neither silently drops the private threads nor
+        // discards the active / public threads already collected.
+        const enumeration = await enumerateChannelThreads<AnyThreadChannel>(
+          (pass: ThreadFetchPass): Promise<readonly AnyThreadChannel[]> => {
+            if (pass === 'active') {
+              return paginateThreads(fetchActive, `Active threads in ${chLabel}`, runLog);
+            }
+            if (pass === 'archived-public') {
+              return paginateThreads(
+                fetchArchived,
+                `Archived public threads in ${chLabel}`,
+                runLog,
+                'public',
+              );
+            }
+            return paginateThreads(
+              fetchArchived,
+              `Archived private threads in ${chLabel}`,
+              runLog,
+              'private',
+            );
+          },
         );
         const pushThread = (thread: AnyThreadChannel, bucket: DiscoveredChannelInfo[]): void => {
           if (!THREAD_CHANNEL_TYPES.has(thread.type)) return;
@@ -565,8 +594,24 @@ const collectChannels = async (
             ...(parentNameOf(thread) !== undefined ? { parentName: parentNameOf(thread) } : {}),
           });
         };
-        for (const thread of activeList) pushThread(thread, activeThreads);
-        for (const thread of archivedList) pushThread(thread, archivedThreads);
+        for (const thread of enumeration.active) pushThread(thread, activeThreads);
+        for (const thread of enumeration.archived) pushThread(thread, archivedThreads);
+        if (enumeration.privateArchivedFailure !== undefined) {
+          const name = channelName(channel as FetchableChannel);
+          threadEnumFailures.push({
+            channelId: channel.id,
+            channelName: name,
+            reason: `archived private threads: ${enumeration.privateArchivedFailure}`,
+          });
+          logger.warn(
+            { guildId, channelId: channel.id, reason: enumeration.privateArchivedFailure },
+            'msg_backup: archived private thread enumeration failed (needs MANAGE_THREADS); active + public threads kept',
+          );
+          appendStamped(
+            runLog,
+            `WARNING: archived private thread enumeration failed for ${chLabel} (${channel.id}): ${enumeration.privateArchivedFailure}`,
+          );
+        }
       } catch (err: unknown) {
         const reason = err instanceof Error ? err.message : String(err);
         const name = channelName(channel as FetchableChannel);
