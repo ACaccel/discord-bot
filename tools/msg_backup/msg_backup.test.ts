@@ -16,9 +16,10 @@ import { ConfigurationError } from '../../src/core/errors/configuration-error';
 
 import {
   type AnomalyChannelStats,
+  type ArchivedThreadFetcher,
+  type ArchivedThreadType,
   type BackfillChannelLike,
   type ChannelOutcomeLike,
-  type ThreadFetchPass,
   buildAnomalies,
   buildBackfillDoc,
   enumerateChannelThreads,
@@ -459,50 +460,138 @@ describe('msg_backup / maskMongoUri', () => {
   });
 });
 
-// ---------- enumerateChannelThreads ----------
+// ---------- thread enumeration ----------
+
+interface FakeThread {
+  readonly id: string;
+  readonly archiveTimestamp?: number | null;
+}
+const t = (id: string, archiveTimestamp?: number): FakeThread => ({
+  id,
+  ...(archiveTimestamp !== undefined ? { archiveTimestamp } : {}),
+});
+const noBatch = (): void => {};
+/** Single-page archived fetcher (`hasMore: false`). */
+const onePage =
+  (byType: { public: FakeThread[]; private: FakeThread[] }) =>
+  (type: ArchivedThreadType): ArchivedThreadFetcher<FakeThread> =>
+  () =>
+    Promise.resolve({ threads: byType[type], hasMore: false });
 
 describe('msg_backup / enumerateChannelThreads', () => {
-  it('runs all three passes and includes archived private threads', async () => {
-    const passes: ThreadFetchPass[] = [];
-    const result = await enumerateChannelThreads<string>((pass) => {
-      passes.push(pass);
-      const byPass: Record<ThreadFetchPass, string[]> = {
-        active: ['active-1'],
-        'archived-public': ['pub-1'],
-        'archived-private': ['priv-1'],
-      };
-      return Promise.resolve(byPass[pass]);
-    });
+  it('runs active + both archived passes and includes archived private threads', async () => {
+    const result = await enumerateChannelThreads<FakeThread>(
+      () => Promise.resolve({ threads: [t('active-1')] }),
+      onePage({ public: [t('pub-1', 100)], private: [t('priv-1', 50)] }),
+      noBatch,
+    );
 
     // Regression: the archived-private pass must run, or archived private
     // threads are silently dropped (default fetchArchived is public-only).
-    expect(passes).toEqual(['active', 'archived-public', 'archived-private']);
-    expect(result.active).toEqual(['active-1']);
-    expect(result.archived).toEqual(['pub-1', 'priv-1']);
+    expect(result.active.map((x) => x.id)).toEqual(['active-1']);
+    expect(result.archived.map((x) => x.id)).toEqual(['pub-1', 'priv-1']);
     expect(result.privateArchivedFailure).toBeUndefined();
+    expect(result.truncatedPasses).toEqual([]);
+  });
+
+  it('fetches active threads in a single call (no pagination cursor)', async () => {
+    let activeCalls = 0;
+    await enumerateChannelThreads<FakeThread>(
+      () => {
+        activeCalls += 1;
+        // 50 active threads (== a full archived page) must NOT trigger a
+        // second fetch; fetchActive has no cursor and returns all at once.
+        return Promise.resolve({
+          threads: Array.from({ length: 50 }, (_, i) => t(`a${String(i)}`)),
+        });
+      },
+      onePage({ public: [], private: [] }),
+      noBatch,
+    );
+    expect(activeCalls).toBe(1);
+  });
+
+  it('paginates archived threads by hasMore, advancing the archive-timestamp cursor', async () => {
+    const pubPages: { threads: FakeThread[]; hasMore: boolean }[] = [
+      { threads: [t('p1', 300), t('p2', 200)], hasMore: true },
+      { threads: [t('p3', 100)], hasMore: false },
+    ];
+    const cursors: (number | undefined)[] = [];
+    let call = 0;
+    const result = await enumerateChannelThreads<FakeThread>(
+      () => Promise.resolve({ threads: [] }),
+      (type) => (cursor) => {
+        if (type === 'private') return Promise.resolve({ threads: [], hasMore: false });
+        cursors.push(cursor.before);
+        const page = pubPages[call++];
+        if (page === undefined) throw new Error('unexpected extra archived fetch');
+        return Promise.resolve(page);
+      },
+      noBatch,
+    );
+
+    expect(result.archived.map((x) => x.id)).toEqual(['p1', 'p2', 'p3']);
+    // First call has no cursor; the second is bounded by the oldest
+    // timestamp of page one (200), not a `pageSize < limit` guess.
+    expect(cursors).toEqual([undefined, 200]);
+    expect(result.truncatedPasses).toEqual([]);
+  });
+
+  it('stops and flags truncation when hasMore stays true but the cursor cannot advance', async () => {
+    let calls = 0;
+    const result = await enumerateChannelThreads<FakeThread>(
+      () => Promise.resolve({ threads: [] }),
+      (type) => () => {
+        if (type === 'private') return Promise.resolve({ threads: [], hasMore: false });
+        calls += 1;
+        // Same already-seen thread every page, with hasMore forever true:
+        // a `pageSize < limit` loop would hang here. We must stop.
+        return Promise.resolve({ threads: [t('dup', 100)], hasMore: true });
+      },
+      noBatch,
+    );
+
+    expect(calls).toBe(2); // page 1 collects 'dup'; page 2 is all-seen -> stop
+    expect(result.archived.map((x) => x.id)).toEqual(['dup']);
+    expect(result.truncatedPasses).toEqual(['archived-public']);
   });
 
   it('isolates a private-pass failure while keeping active + public threads', async () => {
-    const result = await enumerateChannelThreads<string>((pass) => {
-      if (pass === 'archived-private') {
-        return Promise.reject(new Error('Missing Permissions'));
-      }
-      return Promise.resolve(pass === 'active' ? ['active-1'] : ['pub-1']);
-    });
+    const result = await enumerateChannelThreads<FakeThread>(
+      () => Promise.resolve({ threads: [t('active-1')] }),
+      (type) => () =>
+        type === 'private'
+          ? Promise.reject(new Error('Missing Permissions'))
+          : Promise.resolve({ threads: [t('pub-1', 100)], hasMore: false }),
+      noBatch,
+    );
 
     // The private failure is surfaced (not swallowed) but does not discard
     // the threads already collected from the other two passes.
-    expect(result.active).toEqual(['active-1']);
-    expect(result.archived).toEqual(['pub-1']);
+    expect(result.active.map((x) => x.id)).toEqual(['active-1']);
+    expect(result.archived.map((x) => x.id)).toEqual(['pub-1']);
     expect(result.privateArchivedFailure).toBe('Missing Permissions');
+    expect(result.truncatedPasses).toEqual([]);
   });
 
-  it('lets an active / public pass failure propagate to the caller', async () => {
+  it('lets an active or archived-public pass failure propagate to the caller', async () => {
     await expect(
-      enumerateChannelThreads<string>((pass) => {
-        if (pass === 'active') return Promise.reject(new Error('channel fetch failed'));
-        return Promise.resolve([]);
-      }),
-    ).rejects.toThrow('channel fetch failed');
+      enumerateChannelThreads<FakeThread>(
+        () => Promise.reject(new Error('active boom')),
+        onePage({ public: [], private: [] }),
+        noBatch,
+      ),
+    ).rejects.toThrow('active boom');
+
+    await expect(
+      enumerateChannelThreads<FakeThread>(
+        () => Promise.resolve({ threads: [] }),
+        (type) => () =>
+          type === 'public'
+            ? Promise.reject(new Error('public boom'))
+            : Promise.resolve({ threads: [], hasMore: false }),
+        noBatch,
+      ),
+    ).rejects.toThrow('public boom');
   });
 });

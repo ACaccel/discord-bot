@@ -507,16 +507,103 @@ export const buildAnomalies = (
 
 // ---------- Thread enumeration ----------
 
+/** discord.js `ThreadManager` page size cap for archived fetches. */
+export const THREAD_PAGE_LIMIT = 50;
+
+/** The archived-thread visibility passes (gated differently by Discord). */
+export type ArchivedThreadType = 'public' | 'private';
+
+/** Which archived pass, if any, stopped early on a non-advancing cursor. */
+export type ArchivedPassLabel = 'archived-public' | 'archived-private';
+
+/** Minimal thread shape needed to drive archived pagination. */
+export interface ThreadLike {
+  readonly id: string;
+  readonly archiveTimestamp?: number | null;
+  readonly createdTimestamp?: number | null;
+}
+
+/** One archived-thread page, mirroring discord.js `FetchedThreadsMore`. */
+export interface ArchivedThreadPage<T> {
+  readonly threads: Iterable<T>;
+  /** Discord's authoritative "more pages remain" flag. */
+  readonly hasMore: boolean;
+}
+
+/** Single guild-wide active-thread fetch (Discord returns all at once). */
+export type ActiveThreadFetcher<T> = () => Promise<{ readonly threads: Iterable<T> }>;
+
+/** Cursor-paginated archived-thread fetch for one visibility. */
+export type ArchivedThreadFetcher<T> = (cursor: {
+  readonly before?: number;
+  readonly limit: number;
+}) => Promise<ArchivedThreadPage<T>>;
+
+export interface ArchivedPaginationResult<T> {
+  readonly threads: readonly T[];
+  /**
+   * True when Discord reported `hasMore` but the timestamp cursor could
+   * not be advanced (the whole page was already seen, or no thread
+   * carried a usable timestamp), so pagination stopped early and the
+   * list may be incomplete. Surfaced by the caller, never dropped.
+   */
+  readonly truncated: boolean;
+}
+
 /**
- * The three fetch passes a channel's thread enumeration must run.
+ * Paginate one archived-thread visibility using Discord's `hasMore`
+ * flag as the loop signal.
  *
- * Discord's `ThreadManager.fetchArchived` defaults to `type: 'public'`,
- * so a single archived fetch silently drops archived PRIVATE threads.
- * They are a distinct pass (`type: 'private'`, gated on MANAGE_THREADS)
- * and must be requested explicitly, or their message history is lost
- * without any diagnostic.
+ * The previous `pageSize < limit` heuristic was wrong on both ends: a
+ * full page that still `hasMore` stopped early (silently missing
+ * threads), and a full final page never stopped (hanging on the
+ * redundant refetch). `hasMore` is authoritative. The cursor is the
+ * oldest thread's `archiveTimestamp`; if it cannot advance while
+ * `hasMore` is still true we stop and flag `truncated` rather than loop
+ * forever.
  */
-export type ThreadFetchPass = 'active' | 'archived-public' | 'archived-private';
+export const paginateArchivedThreads = async <T extends ThreadLike>(
+  fetchPage: ArchivedThreadFetcher<T>,
+  onBatch: (info: {
+    readonly batch: number;
+    readonly size: number;
+    readonly hasMore: boolean;
+  }) => void,
+  pageLimit: number = THREAD_PAGE_LIMIT,
+): Promise<ArchivedPaginationResult<T>> => {
+  const out: T[] = [];
+  const seen = new Set<string>();
+  let before: number | undefined;
+  let batch = 0;
+  while (true) {
+    batch += 1;
+    const page = await fetchPage(
+      before !== undefined ? { before, limit: pageLimit } : { limit: pageLimit },
+    );
+    let size = 0;
+    let newCount = 0;
+    let oldestTs: number | undefined;
+    for (const thread of page.threads) {
+      size += 1;
+      if (seen.has(thread.id)) continue;
+      seen.add(thread.id);
+      out.push(thread);
+      newCount += 1;
+      const ts = thread.archiveTimestamp ?? thread.createdTimestamp ?? undefined;
+      if (ts !== null && ts !== undefined && (oldestTs === undefined || ts < oldestTs)) {
+        oldestTs = ts;
+      }
+    }
+    onBatch({ batch, size, hasMore: page.hasMore });
+    if (!page.hasMore) return { threads: out, truncated: false };
+    if (oldestTs === undefined || newCount === 0) {
+      // Discord says more pages remain, but the cursor cannot advance.
+      // Stop to avoid an infinite loop and report the truncation.
+      return { threads: out, truncated: true };
+    }
+    before = oldestTs;
+  }
+};
 
 export interface ChannelThreadEnumeration<T> {
   /** Active threads (public + private the bot can see). */
@@ -525,45 +612,73 @@ export interface ChannelThreadEnumeration<T> {
   readonly archived: readonly T[];
   /**
    * Reason the archived-private pass failed, if it did. Fetching
-   * archived private threads needs MANAGE_THREADS; when the permission
-   * is absent the pass throws. We isolate that failure so it neither
-   * silently drops the private threads nor discards the active / public
-   * threads already collected — the caller surfaces this as a
-   * non-fatal thread-enum diagnostic.
+   * archived private threads needs MANAGE_THREADS; without it the pass
+   * throws. We isolate that failure so it neither silently drops the
+   * private threads nor discards the active / public threads already
+   * collected — the caller surfaces it as a thread-enum diagnostic.
    */
   readonly privateArchivedFailure?: string;
+  /**
+   * Archived passes whose pagination stopped early on a non-advancing
+   * cursor (see {@link ArchivedPaginationResult.truncated}). Empty in
+   * the common case; non-empty means the caller should surface a
+   * partial thread-enum diagnostic.
+   */
+  readonly truncatedPasses: readonly ArchivedPassLabel[];
 }
 
 /**
- * Run all three thread fetch passes for one channel via the injected
- * `paginate` callback (the caller binds it to the real
- * `ThreadManager.fetchActive` / `fetchArchived` with pagination and
- * run-log wiring; tests inject a fake).
+ * Enumerate a channel's threads: one active fetch plus a public and a
+ * private archived pass.
  *
- * The `active` and `archived-public` passes are NOT guarded here — a
- * failure there is a genuine whole-channel enumeration failure and is
- * left to propagate to the caller's per-channel handler. Only the
- * `archived-private` pass is caught, so a missing-permission error on
- * private threads degrades gracefully instead of taking the rest of
- * the channel's threads down with it.
+ * `fetchActive` is a single call (Discord returns every active thread at
+ * once, with no cursor); `fetchArchived(type)` yields the paginated
+ * fetcher for one visibility, driven by {@link paginateArchivedThreads}.
+ *
+ * The active and archived-public passes are NOT guarded — a failure
+ * there is a genuine whole-channel enumeration failure left to
+ * propagate to the caller. Only archived-private is caught (it needs
+ * MANAGE_THREADS); its failure is reported, not swallowed, and does not
+ * discard the active / public threads already collected.
  */
-export const enumerateChannelThreads = async <T>(
-  paginate: (pass: ThreadFetchPass) => Promise<readonly T[]>,
+export const enumerateChannelThreads = async <T extends ThreadLike>(
+  fetchActive: ActiveThreadFetcher<T>,
+  fetchArchived: (type: ArchivedThreadType) => ArchivedThreadFetcher<T>,
+  onBatch: (
+    label: ArchivedPassLabel,
+    info: { readonly batch: number; readonly size: number; readonly hasMore: boolean },
+  ) => void,
+  pageLimit: number = THREAD_PAGE_LIMIT,
 ): Promise<ChannelThreadEnumeration<T>> => {
-  const active = await paginate('active');
-  const archivedPublic = await paginate('archived-public');
+  const activePage = await fetchActive();
+  const active = [...activePage.threads];
 
-  let archivedPrivate: readonly T[] = [];
+  const publicResult = await paginateArchivedThreads(
+    fetchArchived('public'),
+    (info) => onBatch('archived-public', info),
+    pageLimit,
+  );
+
+  let privateResult: ArchivedPaginationResult<T> = { threads: [], truncated: false };
   let privateArchivedFailure: string | undefined;
   try {
-    archivedPrivate = await paginate('archived-private');
+    privateResult = await paginateArchivedThreads(
+      fetchArchived('private'),
+      (info) => onBatch('archived-private', info),
+      pageLimit,
+    );
   } catch (err: unknown) {
     privateArchivedFailure = err instanceof Error ? err.message : String(err);
   }
 
+  const truncatedPasses: ArchivedPassLabel[] = [];
+  if (publicResult.truncated) truncatedPasses.push('archived-public');
+  if (privateResult.truncated) truncatedPasses.push('archived-private');
+
   return {
     active,
-    archived: [...archivedPublic, ...archivedPrivate],
+    archived: [...publicResult.threads, ...privateResult.threads],
     ...(privateArchivedFailure !== undefined ? { privateArchivedFailure } : {}),
+    truncatedPasses,
   };
 };
