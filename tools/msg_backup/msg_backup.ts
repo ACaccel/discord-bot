@@ -94,9 +94,10 @@ import {
 import { asGuildId } from '../../src/core/ids';
 import {
   type ActiveThreadFetcher,
-  type ArchivedThreadFetcher,
-  type ArchivedThreadType,
   type ChannelOutcomeStatus as InternalChannelOutcomeStatus,
+  type ThreadManagerLike,
+  activeThreadFetcher,
+  archivedThreadFetcher,
   buildAnomalies,
   buildBackfillDoc,
   enumerateChannelThreads,
@@ -409,51 +410,17 @@ const parentNameOf = (thread: AnyThreadChannel): string | undefined => {
 };
 
 /**
- * discord.js thread manager surface we depend on. `fetchActive` is a
- * single guild-wide call (no cursor — Discord returns every active
- * thread at once); `fetchArchived` is cursor-paginated per visibility
- * and reports `hasMore`. The pure pagination / orchestration lives in
- * {@link enumerateChannelThreads} (./internal.ts); the bridges below
- * only adapt these manager methods to that contract.
+ * Narrow a channel's `threads` property to the discord.js thread
+ * manager surface the enumeration adapters need. The pure pagination /
+ * orchestration and the manager adapters (`activeThreadFetcher` /
+ * `archivedThreadFetcher`) live in ./internal.ts so the cursor /
+ * fetchAll wiring is unit-testable without a live Discord connection.
  */
-interface ThreadManagerLike {
-  readonly fetchActive: (cache?: boolean) => Promise<{
-    readonly threads: Collection<string, AnyThreadChannel>;
-  }>;
-  readonly fetchArchived: (options?: {
-    readonly type?: ArchivedThreadType;
-    readonly before?: number;
-    readonly limit?: number;
-  }) => Promise<{
-    readonly threads: Collection<string, AnyThreadChannel>;
-    readonly hasMore: boolean;
-  }>;
-}
-
-const isThreadManagerLike = (value: unknown): value is ThreadManagerLike => {
+const isThreadManagerLike = (value: unknown): value is ThreadManagerLike<AnyThreadChannel> => {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as { readonly fetchActive?: unknown; readonly fetchArchived?: unknown };
   return typeof v.fetchActive === 'function' && typeof v.fetchArchived === 'function';
 };
-
-const activeThreadFetcher =
-  (manager: ThreadManagerLike): ActiveThreadFetcher<AnyThreadChannel> =>
-  async () => {
-    const page = await manager.fetchActive();
-    return { threads: page.threads.values() };
-  };
-
-const archivedThreadFetcher =
-  (manager: ThreadManagerLike) =>
-  (type: ArchivedThreadType): ArchivedThreadFetcher<AnyThreadChannel> =>
-  async (cursor) => {
-    const page = await manager.fetchArchived({
-      type,
-      ...(cursor.before !== undefined ? { before: cursor.before } : {}),
-      limit: cursor.limit,
-    });
-    return { threads: page.threads.values(), hasMore: page.hasMore };
-  };
 
 /**
  * Wrap a promise in a hard timeout (R-07). Resolves with the original
