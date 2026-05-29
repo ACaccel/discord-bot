@@ -2,13 +2,15 @@ name: CI
 
 on:
   # PR branches are exercised by `pull_request`; the `push` trigger
-  # stays scoped to `main` so a push to a PR branch does not fire
-  # both events back-to-back (the duplicate doubled CI cost without
-  # adding any signal — the PR run already covers the same commit).
+  # stays scoped to the long-lived branches (`main`, `dev`) so a push to
+  # a feature branch does not fire both events back-to-back (the
+  # duplicate doubled CI cost without adding any signal — the PR run
+  # already covers the same commit).
   pull_request:
   push:
     branches:
       - main
+      - dev
 
 jobs:
   lint:
@@ -39,6 +41,17 @@ jobs:
       - uses: ./.github/actions/yarn-install
       - run: yarn test:unit
       - run: yarn test:i18n
+
+  test-tools:
+    # Unit tests for the standalone ops scripts under `tools/<name>/`
+    # (msg_backup / verify_db). They run the `tools` vitest project,
+    # which exercises pure internals only — no Discord/Mongo boot — so
+    # no `seed-bot-config` is needed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/yarn-install
+      - run: yarn test:tools
 
   test-coverage:
     # Plan §5.1 floors (`src/core/**` ≥ 90%, overall ≥ baseline). The
