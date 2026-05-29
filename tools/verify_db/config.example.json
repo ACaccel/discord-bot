@@ -1,0 +1,6 @@
+{
+  "mongo_uri": "mongodb://user:pass@host:port/?authSource=admin",
+  "guild_id": "<guild id>",
+  "sample_limit": 50,
+  "output_path": null
+}
