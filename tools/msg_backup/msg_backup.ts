@@ -33,11 +33,16 @@
  *     design is gone (R-23, R-25).
  *   - Channels are enumerated as `(text-like guild channels) ∪
  *     (active threads) ∪ (archived public threads) ∪ (archived private
- *     threads)`, paginated until the thread manager returns fewer than
- *     the page limit (R-08). The archived-private pass is explicit
- *     (`fetchArchived` defaults to public-only) and gated on
- *     MANAGE_THREADS; if it fails the channel keeps its active + public
- *     threads and the gap is surfaced as a `thread-enum-failed`.
+ *     threads)`. Active threads come from one cursorless guild-wide
+ *     fetch; each archived visibility is paginated by Discord's
+ *     `hasMore` flag (R-08), not a `pageSize < limit` guess that both
+ *     misses threads on a full page and loops on the final one. The
+ *     archived-private pass is explicit (`fetchArchived` defaults to
+ *     public-only) and gated on MANAGE_THREADS; if it fails the channel
+ *     keeps its active + public threads and the gap is surfaced as a
+ *     `thread-enum-failed`. A pass whose cursor cannot advance while
+ *     `hasMore` is still true stops and is likewise surfaced, never
+ *     silently truncated.
  *   - Transient Discord errors on `messages.fetch` retry with an
  *     exponential backoff (1s, 2s, 4s). Hard non-transient codes
  *     (50001/50013/10003/10004) bypass retries entirely and surface
@@ -88,6 +93,9 @@ import {
 } from '../../src/infra/mongo/connection-manager';
 import { asGuildId } from '../../src/core/ids';
 import {
+  type ActiveThreadFetcher,
+  type ArchivedThreadFetcher,
+  type ArchivedThreadType,
   type ChannelOutcomeStatus as InternalChannelOutcomeStatus,
   buildAnomalies,
   buildBackfillDoc,
@@ -95,7 +103,6 @@ import {
   monthKey,
   parseConfig,
   parseLocalMidnight,
-  type ThreadFetchPass,
   type ToolConfig,
   withRetry,
 } from './internal';
@@ -127,8 +134,6 @@ const LOG_ROOT_DIR = resolve(__dirname, 'logs');
 
 /** 60-second cap on `guild.channels.fetch()` (R-07). */
 const GUILD_CHANNELS_FETCH_TIMEOUT_MS = 60_000;
-/** Thread-manager page size — discord.js default. */
-const THREAD_PAGE_LIMIT = 50;
 
 interface ChannelStats {
   upserted: number;
@@ -404,79 +409,51 @@ const parentNameOf = (thread: AnyThreadChannel): string | undefined => {
 };
 
 /**
- * Discord's `ThreadManager.fetchActive` / `fetchArchived` return at
- * most one page (≤ 50 by default). For long-lived forum / news
- * channels the archived list almost always exceeds that — we must
- * paginate until a page returns fewer than the limit (R-08). The
- * cursor is the oldest archived thread's `archivedTimestamp` (or, for
- * active threads, `joinedTimestamp` — but active threads are usually a
- * short list so a single page is normally enough; we still loop for
- * safety).
+ * discord.js thread manager surface we depend on. `fetchActive` is a
+ * single guild-wide call (no cursor — Discord returns every active
+ * thread at once); `fetchArchived` is cursor-paginated per visibility
+ * and reports `hasMore`. The pure pagination / orchestration lives in
+ * {@link enumerateChannelThreads} (./internal.ts); the bridges below
+ * only adapt these manager methods to that contract.
  */
-type ThreadFetchResult = { readonly threads: Collection<string, AnyThreadChannel> };
-type ThreadFetcher = (options?: {
-  // `fetchArchived` defaults to public-only; the private pass must be
-  // requested explicitly or archived private threads are silently lost.
-  readonly type?: 'public' | 'private';
-  readonly before?: Date | number | string;
-  readonly limit?: number;
-}) => Promise<ThreadFetchResult>;
+interface ThreadManagerLike {
+  readonly fetchActive: (cache?: boolean) => Promise<{
+    readonly threads: Collection<string, AnyThreadChannel>;
+  }>;
+  readonly fetchArchived: (options?: {
+    readonly type?: ArchivedThreadType;
+    readonly before?: number;
+    readonly limit?: number;
+  }) => Promise<{
+    readonly threads: Collection<string, AnyThreadChannel>;
+    readonly hasMore: boolean;
+  }>;
+}
 
-const paginateThreads = async (
-  fetcher: ThreadFetcher,
-  label: string,
-  runLog: RunLogFile,
-  archivedType?: 'public' | 'private',
-  pageLimit: number = THREAD_PAGE_LIMIT,
-): Promise<readonly AnyThreadChannel[]> => {
-  const out: AnyThreadChannel[] = [];
-  const seen = new Set<string>();
-  let beforeCursor: Date | number | string | undefined;
-  let batchIndex = 0;
-  while (true) {
-    batchIndex += 1;
-    const page: ThreadFetchResult = await fetcher({
-      ...(archivedType !== undefined ? { type: archivedType } : {}),
-      ...(beforeCursor !== undefined ? { before: beforeCursor } : {}),
-      limit: pageLimit,
-    });
-    const pageSize = page.threads.size;
-    appendStamped(
-      runLog,
-      `[Channel discovery] ${label}: batch ${String(batchIndex)} (${String(pageSize)})`,
-    );
-    if (pageSize === 0) break;
-    let oldestTs: number | undefined;
-    let oldestId: string | undefined;
-    for (const thread of page.threads.values()) {
-      if (seen.has(thread.id)) continue;
-      seen.add(thread.id);
-      out.push(thread);
-      const ts = thread.archiveTimestamp ?? thread.createdTimestamp ?? undefined;
-      if (ts !== null && ts !== undefined && (oldestTs === undefined || ts < oldestTs)) {
-        oldestTs = ts;
-        oldestId = thread.id;
-      }
-    }
-    if (pageSize < pageLimit) break;
-    if (oldestTs === undefined) {
-      // No cursor we can advance on — break to avoid an infinite loop.
-      // This can only happen if the API returns a full page of threads
-      // none of which carry an `archivedTimestamp`.
-      break;
-    }
-    // Track the actual id for diagnostics; the discord.js cursor only
-    // needs the timestamp, but logging the id helps reproduce edge
-    // cases offline.
-    void oldestId;
-    beforeCursor = oldestTs;
-  }
-  appendStamped(
-    runLog,
-    `[Channel discovery] ${label}: done (${String(out.length)} total across ${String(batchIndex)} batches)`,
-  );
-  return out;
+const isThreadManagerLike = (value: unknown): value is ThreadManagerLike => {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as { readonly fetchActive?: unknown; readonly fetchArchived?: unknown };
+  return typeof v.fetchActive === 'function' && typeof v.fetchArchived === 'function';
 };
+
+const activeThreadFetcher =
+  (manager: ThreadManagerLike): ActiveThreadFetcher<AnyThreadChannel> =>
+  async () => {
+    const page = await manager.fetchActive();
+    return { threads: page.threads.values() };
+  };
+
+const archivedThreadFetcher =
+  (manager: ThreadManagerLike) =>
+  (type: ArchivedThreadType): ArchivedThreadFetcher<AnyThreadChannel> =>
+  async (cursor) => {
+    const page = await manager.fetchArchived({
+      type,
+      ...(cursor.before !== undefined ? { before: cursor.before } : {}),
+      limit: cursor.limit,
+    });
+    return { threads: page.threads.values(), hasMore: page.hasMore };
+  };
 
 /**
  * Wrap a promise in a hard timeout (R-07). Resolves with the original
@@ -539,46 +516,31 @@ const collectChannels = async (
       }
     }
 
-    const maybeThreaded = channel as {
-      readonly threads?: {
-        readonly fetchActive?: ThreadFetcher;
-        readonly fetchArchived?: ThreadFetcher;
-      };
-    };
-    if (
-      maybeThreaded.threads !== undefined &&
-      typeof maybeThreaded.threads.fetchActive === 'function' &&
-      typeof maybeThreaded.threads.fetchArchived === 'function'
-    ) {
-      const fetchActive = maybeThreaded.threads.fetchActive.bind(maybeThreaded.threads);
-      const fetchArchived = maybeThreaded.threads.fetchArchived.bind(maybeThreaded.threads);
+    const maybeThreaded = (channel as { readonly threads?: unknown }).threads;
+    if (isThreadManagerLike(maybeThreaded)) {
+      const fetchActive: ActiveThreadFetcher<AnyThreadChannel> = activeThreadFetcher(maybeThreaded);
+      const fetchArchived = archivedThreadFetcher(maybeThreaded);
       const chLabel = `#${channelName(channel as FetchableChannel)}`;
+      const onBatch = (
+        label: string,
+        info: { readonly batch: number; readonly size: number; readonly hasMore: boolean },
+      ): void => {
+        appendStamped(
+          runLog,
+          `[Channel discovery] ${label} in ${chLabel}: batch ${String(info.batch)} (${String(info.size)}, hasMore=${String(info.hasMore)})`,
+        );
+      };
       try {
         // `fetchArchived` defaults to public-only, so the private pass is
-        // requested explicitly. `enumerateChannelThreads` isolates a
+        // requested explicitly. `enumerateChannelThreads` paginates each
+        // archived visibility by Discord's `hasMore` flag and isolates a
         // private-pass failure (commonly a missing MANAGE_THREADS
         // permission) so it neither silently drops the private threads nor
         // discards the active / public threads already collected.
         const enumeration = await enumerateChannelThreads<AnyThreadChannel>(
-          (pass: ThreadFetchPass): Promise<readonly AnyThreadChannel[]> => {
-            if (pass === 'active') {
-              return paginateThreads(fetchActive, `Active threads in ${chLabel}`, runLog);
-            }
-            if (pass === 'archived-public') {
-              return paginateThreads(
-                fetchArchived,
-                `Archived public threads in ${chLabel}`,
-                runLog,
-                'public',
-              );
-            }
-            return paginateThreads(
-              fetchArchived,
-              `Archived private threads in ${chLabel}`,
-              runLog,
-              'private',
-            );
-          },
+          fetchActive,
+          fetchArchived,
+          onBatch,
         );
         const pushThread = (thread: AnyThreadChannel, bucket: DiscoveredChannelInfo[]): void => {
           if (!THREAD_CHANNEL_TYPES.has(thread.type)) return;
@@ -596,8 +558,8 @@ const collectChannels = async (
         };
         for (const thread of enumeration.active) pushThread(thread, activeThreads);
         for (const thread of enumeration.archived) pushThread(thread, archivedThreads);
+        const name = channelName(channel as FetchableChannel);
         if (enumeration.privateArchivedFailure !== undefined) {
-          const name = channelName(channel as FetchableChannel);
           threadEnumFailures.push({
             channelId: channel.id,
             channelName: name,
@@ -610,6 +572,22 @@ const collectChannels = async (
           appendStamped(
             runLog,
             `WARNING: archived private thread enumeration failed for ${chLabel} (${channel.id}): ${enumeration.privateArchivedFailure}`,
+          );
+        }
+        if (enumeration.truncatedPasses.length > 0) {
+          const passes = enumeration.truncatedPasses.join(', ');
+          threadEnumFailures.push({
+            channelId: channel.id,
+            channelName: name,
+            reason: `archived thread pagination truncated (cursor could not advance): ${passes}`,
+          });
+          logger.warn(
+            { guildId, channelId: channel.id, truncatedPasses: enumeration.truncatedPasses },
+            'msg_backup: archived thread pagination stopped early on a non-advancing cursor; list may be incomplete',
+          );
+          appendStamped(
+            runLog,
+            `WARNING: archived thread pagination truncated for ${chLabel} (${channel.id}): ${passes}`,
           );
         }
       } catch (err: unknown) {
