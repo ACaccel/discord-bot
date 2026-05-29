@@ -5,7 +5,12 @@ export {
   type CreateLoggerInput,
   type StreamEntry,
 } from './logger';
-export { createFileSink, createFileRouterStream } from './file-router-transport';
+export {
+  createFileSink,
+  createFileRouterStream,
+  createFixedPathFileSink,
+  createFixedPathFileStream,
+} from './file-router-transport';
 export {
   installProcessHandlers,
   getUnhandledRejectionCount,

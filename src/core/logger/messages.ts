@@ -31,6 +31,9 @@
  */
 
 export const ops = {
+  bot: {
+    online: (name: string): string => `ops:bot.online | ${name} is online.`,
+  },
   command: {
     registerStart: (): string => `ops:command.register_start | Registering commands...`,
     registerEmpty: (): string => `ops:command.register_empty | No commands to register.`,

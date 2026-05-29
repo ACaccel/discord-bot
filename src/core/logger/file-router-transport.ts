@@ -248,3 +248,60 @@ export const createFileSink = (options: {
   level: options.level,
   stream: createFileRouterStream({ rootDir: options.rootDir }),
 });
+
+/**
+ * Build a pino-compatible `Writable` that appends every record it
+ * receives to a single fixed file path. Unlike
+ * {@link createFileRouterStream}, no `bot` / `guildId` routing happens
+ * — every line lands in the same file. The pino multistream `level`
+ * filter is the gate that decides which records reach this sink.
+ *
+ * Designed for the ops-tool use case where the operator wants a
+ * dedicated `error.log` that they can `cat` directly without
+ * filtering a per-day routed log. Pair it with `level: 'error'` on
+ * the {@link StreamEntry} so only `error` / `fatal` records arrive.
+ *
+ * Records are written verbatim — no field stripping, no JSON
+ * re-serialisation. The router's `bot`-stripping behaviour is
+ * specific to its path-encoding contract; a flat append sink has no
+ * such contract.
+ */
+export const createFixedPathFileStream = (filePath: string): Writable => {
+  if (typeof filePath !== 'string' || filePath.length === 0) {
+    throw new Error(
+      'file-router-transport: filePath option is required and must be a non-empty string',
+    );
+  }
+  mkdirSync(dirname(filePath), { recursive: true });
+  const stream = createWriteStream(filePath, { flags: 'a', encoding: 'utf8' });
+  return new Writable({
+    decodeStrings: false,
+    write(chunk: string | Buffer, _enc, cb): void {
+      const ok = stream.write(chunk, (err) => {
+        if (err) cb(err);
+      });
+      if (ok) cb();
+    },
+    final(cb): void {
+      stream.once('close', () => {
+        cb();
+      });
+      stream.end();
+    },
+  });
+};
+
+/**
+ * Composition-root-facing factory for the fixed-path append sink.
+ * Mirrors {@link createFileSink}'s signature so a caller can stack
+ * both into one logger: one routed sink for the full log, one
+ * fixed-path sink filtered to `error` for the operator's quick-look
+ * channel.
+ */
+export const createFixedPathFileSink = (options: {
+  readonly filePath: string;
+  readonly level: StreamEntry['level'];
+}): StreamEntry => ({
+  level: options.level,
+  stream: createFixedPathFileStream(options.filePath),
+});
