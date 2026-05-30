@@ -11,6 +11,25 @@ at the repository root.
 
 ## Unreleased
 
+- **C8 Plugins / C5 Infra / C11 Bot** — new `llm-auto-reply` plugin
+  (nijika): a probability-gated `messageCreate` subscriber that, on a
+  hit, fetches the latest N messages, requires they form a burst within
+  a window, builds a transcript (bot/blank lines dropped), and posts one
+  self-hosted-LLM reply with mentions suppressed. The outbound call is a
+  new `SelfHostedLlmClient` adapter in `src/infra/llm/` (does not
+  implement `LLMProvider`; maps failures into the shared
+  `ExternalServiceError` taxonomy). Settings come from an optional,
+  fully-code-defaulted `llm_auto_reply` config block; `blocked_channels`
+  are excluded. A per-channel `cooldownSeconds` (`internal/cooldown.ts`,
+  `ReplyCooldown`) enforces a minimum gap between consecutive automatic
+  replies. A `fatcat_reply` force-trigger keyword (`internal/trigger.ts`)
+  bypasses the probability roll, the time-window burst check, and the
+  cooldown while still honouring the message-count requirement and the
+  other guards, and is stripped from the prompt transcript; every posted
+  reply records the cooldown. C8 plugin list
+  grows to nine; C5, C11 component pages and `nijika`'s
+  `config.example.json` updated.
+
 - **C11 Bot / C1 Core / C6 Handlers** — two fixes. (1) `yarn deploy`
   no longer crashes / writes logs: `createBootstrapLogger` gained a
   `fileRouter` option and `src/deploy.ts` builds a console-only logger

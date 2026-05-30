@@ -20,5 +20,14 @@
     ],
     "level_roles": {
         "level_1": "YOUR_LEVEL_1_ROLE_NAME"
+    },
+    "llm_auto_reply": {
+        "enabled": false,
+        "probability": 0.05,
+        "messageCount": 5,
+        "windowSeconds": 30,
+        "cooldownSeconds": 30,
+        "endpoint": "https://YOUR_LLM_HOST/chat",
+        "timeoutMs": 10000
     }
 }

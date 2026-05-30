@@ -7,12 +7,19 @@ import {
     createEarthquakePlugin,
     createGiveawayPlugin,
     createGuildEventsPlugin,
+    createLlmAutoReplyPlugin,
     createVoicePlugin,
 } from '@plugins';
 
 interface NijikaConfig extends Config {
     blocked_channels: string[];
     level_roles: Record<string, string>;
+    /**
+     * Raw `llm_auto_reply` block. Parsed and defaulted by the plugin
+     * (see `createLlmAutoReplyPlugin`), so it is intentionally `unknown`
+     * here and may be omitted entirely.
+     */
+    llm_auto_reply?: unknown;
 }
 
 export class Nijika extends BaseBot<NijikaConfig> {
@@ -44,6 +51,12 @@ export class Nijika extends BaseBot<NijikaConfig> {
         // deep-import `plugins/*/internal`.
         this.use(AutoReplyPlugin);
         this.use(createGuildEventsPlugin({
+            blockedChannels: this.config.blocked_channels,
+        }));
+        // Self-hosted LLM auto-reply. Settings come from the
+        // `llm_auto_reply` config block; `blocked_channels` is reused so
+        // the same channels excluded from logging are never auto-replied.
+        this.use(createLlmAutoReplyPlugin(this.config.llm_auto_reply, {
             blockedChannels: this.config.blocked_channels,
         }));
         this.use(createGiveawayPlugin());

@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Self-hosted LLM auto-reply (`nijika`): a new `llm-auto-reply` plugin
+  that, on each `messageCreate`, rolls a configurable probability and —
+  on a hit — fetches the latest N messages, requires they form a burst
+  within a time window, builds a transcript (bot/blank lines excluded),
+  sends it to a self-hosted LLM HTTP endpoint, and posts one reply with
+  mentions suppressed. Settings live in an optional `llm_auto_reply`
+  block in `config.json` (`enabled`, `probability`, `messageCount`,
+  `windowSeconds`, `cooldownSeconds`, `endpoint`, `timeoutMs`) with all
+  defaults in code (disabled by default); `nijika`'s `blocked_channels`
+  are excluded. A per-channel `cooldownSeconds` enforces a minimum gap
+  between consecutive automatic replies (`0` disables it). The
+  outbound call is a new `SelfHostedLlmClient` adapter in `src/infra/llm/`
+  that maps failures into the shared error taxonomy and stays silent on
+  failure. A message beginning with the `fatcat_reply` keyword
+  force-triggers the reply (bypassing the probability roll, the
+  time-window burst check, and the cooldown; the message-count
+  requirement and all other guards still apply), and the keyword is
+  stripped from the prompt transcript.
 - Per-bot display language: a `language` field in each personality's
   `config.json` (`"zh-TW"` | `"en"`) selects the translator's default
   locale, validated by `isLocale` and threaded into

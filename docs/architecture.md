@@ -137,6 +137,13 @@ single `LLMProvider` interface and translate their SDK errors into
 `ModelCatalog` lists supported models and is published to the
 container by `LlmChatPlugin` under `TOKENS.ModelCatalog`.
 
+`SelfHostedLlmClient` (`selfhosted-client.ts`) is a separate outbound
+adapter in the same layer for a lightweight self-hosted LLM endpoint. It
+does not implement `LLMProvider` (the endpoint's request/response shape
+and the absence of an API key / model differ), but it maps failures into
+the same `ExternalServiceError` taxonomy and returns a `Result`. Consumed
+by the `LlmAutoReplyPlugin`.
+
 ## 3. Interaction request flow
 
 ```
@@ -191,16 +198,17 @@ non-critical plugins are marked disabled and the bot keeps running.
 
 ## 5. Built-in plugins
 
-| Plugin                | Path                          | Summary                                                                      |
-| --------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| `AutoReplyPlugin`     | `src/plugins/auto-reply/`     | `messageCreate` keyword + lucky replies and a dice roller                    |
-| `GuildEventsPlugin`   | `src/plugins/guild-events/`   | guild / member lifecycle events                                              |
-| `GiveawayPlugin`      | `src/plugins/giveaway/`       | scheduled giveaways with reaction-driven winner selection                    |
-| `ActivityPlugin`      | `src/plugins/activity/`       | per-member activity tracking via message / reaction events                   |
-| `MessageBackupPlugin` | `src/plugins/message-backup/` | message create / delete / update archival (used by the `msg-archive` worker) |
-| `LlmChatPlugin`       | `src/plugins/llm-chat/`       | multi-provider LLM chat with web-search toggle and session persistence       |
-| `VoicePlugin`         | `src/plugins/voice/`          | voice channel join + recording controller                                    |
-| `EarthquakePlugin`    | `src/plugins/earthquake/`     | earthquake alert broadcast (nijika exposes the HTTP webhook)                 |
+| Plugin                | Path                          | Summary                                                                               |
+| --------------------- | ----------------------------- | ------------------------------------------------------------------------------------- |
+| `AutoReplyPlugin`     | `src/plugins/auto-reply/`     | `messageCreate` keyword + lucky replies and a dice roller                             |
+| `GuildEventsPlugin`   | `src/plugins/guild-events/`   | guild / member lifecycle events                                                       |
+| `GiveawayPlugin`      | `src/plugins/giveaway/`       | scheduled giveaways with reaction-driven winner selection                             |
+| `ActivityPlugin`      | `src/plugins/activity/`       | per-member activity tracking via message / reaction events                            |
+| `MessageBackupPlugin` | `src/plugins/message-backup/` | message create / delete / update archival (used by the `msg-archive` worker)          |
+| `LlmChatPlugin`       | `src/plugins/llm-chat/`       | multi-provider LLM chat with web-search toggle and session persistence                |
+| `VoicePlugin`         | `src/plugins/voice/`          | voice channel join + recording controller                                             |
+| `EarthquakePlugin`    | `src/plugins/earthquake/`     | earthquake alert broadcast (nijika exposes the HTTP webhook)                          |
+| `LlmAutoReplyPlugin`  | `src/plugins/llm-auto-reply/` | probability-gated, context-aware `messageCreate` reply via a self-hosted LLM (nijika) |
 
 ## 6. Personalities
 

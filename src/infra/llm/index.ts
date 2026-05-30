@@ -39,3 +39,9 @@ export { ModelCatalog } from './models-catalog';
 export { DefaultModelResolver } from './default-model-resolver';
 export type { LlmProviderApiKeys } from './registry';
 export { calculateCost, cheapestModel, formatUsageFooter } from './pricing';
+
+export {
+  SelfHostedLlmClient,
+  type SelfHostedLlmClientOptions,
+  type SelfHostedLlmError,
+} from './selfhosted-client';

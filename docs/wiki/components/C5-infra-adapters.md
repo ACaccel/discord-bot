@@ -27,6 +27,7 @@ Isolates third-party SDKs behind typed adapters so the rest of the codebase depe
 - `default-model-resolver.ts` — `DefaultModelResolver`. Holds the per-provider default chat model, seeded from `DEFAULT_MODELS` and re-derived by `refresh()` to the cheapest still-listed priced model (live list ∩ `pricing.ts`). Conservative: a failed/empty fetch or an all-unpriced list keeps the previous default. Registered via `ctx.registerInstance(TOKENS.DefaultModelResolver, ...)` in `LlmChatPlugin.init`; consumed by `ai_whitelist_add` through `bot.defaultModelResolver?.current(provider)`.
 - `error-translator.ts` — translates provider errors to `LlmProviderError`.
 - `pricing.ts` — token-cost lookup table plus `cheapestModel(candidates)` (lowest input price, output price as tie-breaker, unpriced candidates ignored).
+- `selfhosted-client.ts` — `SelfHostedLlmClient`, a standalone outbound adapter for a lightweight self-hosted LLM HTTP endpoint (consumed by the `llm-auto-reply` plugin, C8). It deliberately does **not** implement `LlmProvider`: the endpoint takes a single baked `user` message (`{ messages: [{ role, content }] }`) and returns `{ status, response }` with no API key, model, or temperature. `reply(transcript)` returns `Result<string, ExternalServiceError>` — timeout, HTTP error, malformed body, and non-`success` status are all mapped into the shared `errors:llm.*` taxonomy so callers stay silent on failure. Uses `axios` with a per-request timeout and validates the response body with zod.
 
 ## Discord adapters
 

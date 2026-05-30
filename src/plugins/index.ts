@@ -14,3 +14,4 @@ export { createMessageBackupPlugin, type MessageBackupPluginConfig } from './mes
 export { createLlmChatPlugin, type LlmChatPluginConfig } from './llm-chat';
 export { createVoicePlugin } from './voice/plugin';
 export { createEarthquakePlugin, type EarthquakePluginConfig } from './earthquake';
+export { createLlmAutoReplyPlugin, type LlmAutoReplyPluginConfig } from './llm-auto-reply';
