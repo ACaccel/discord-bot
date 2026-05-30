@@ -109,7 +109,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The default global `yarn deploy` now prunes guild-scoped command
   registrations from every guild after registering the global set, so a
   stale guild-scoped command (e.g. from a prior `--dev-guild` run) can no
-  longer override the global one in that guild. Pass
+  longer override the global one in that guild. The guild list is fetched
+  with full pagination (`fetchAllUserGuilds`), since Discord caps
+  `GET /users/@me/guilds` at 200 per page — a single request would
+  silently skip guilds beyond the first page on large bots. Pass
   `--keep-guild-commands` to skip the prune on large bots or when
   guild-scoped commands are intentional.
 

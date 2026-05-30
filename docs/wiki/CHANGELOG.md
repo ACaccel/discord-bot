@@ -30,8 +30,11 @@ at the repository root.
   of a propagation-delayed global deploy. The default global deploy also
   **prunes guild-scoped commands** (`clearAllGuildCommands`) so a stale
   guild-scoped registration cannot override the global set in a guild;
-  `--keep-guild-commands` skips the prune. C7 / C11 pages note the deploy
-  localisation path and the guild-prune step.
+  `--keep-guild-commands` skips the prune. The guild list is fetched with
+  `fetchAllUserGuilds` (`src/deploy-guilds.ts`), which paginates Discord's
+  200-per-page `after` cursor so bots in >200 guilds are fully covered
+  (a single `userGuilds` call would silently truncate). C7 / C11 pages
+  note the deploy localisation path and the guild-prune step.
 
 - **C11 Bot / C7 i18n / C6 Handlers** — three config-driven features.
   (1) A per-bot `language` field in `config.json` (`'zh-TW'` | `'en'`)

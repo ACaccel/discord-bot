@@ -43,6 +43,7 @@ import { createBootstrapLogger, loadEnv } from '@core/config';
 import { createDefaultTranslator, isLocale, type Locale, type Translator } from '@core/i18n';
 
 import { resolveLocalesDir } from './bot/locales-dir';
+import { fetchAllUserGuilds } from './deploy-guilds';
 
 // Deploy runs before the IoC container is built, so the typed `Logger`
 // bound to `TOKENS.Logger` is not available. Use the bootstrap logger
@@ -271,7 +272,10 @@ function attachRateLimitLogger(rest: REST): void {
  * rate limit — costly on bots with many hundreds of guilds.
  */
 async function clearAllGuildCommands(rest: REST, clientId: string): Promise<void> {
-    const guilds = (await rest.get(Routes.userGuilds())) as { id: string; name: string }[];
+    // Paginated: `Routes.userGuilds()` caps at 200 per page, so a single
+    // request would silently miss guilds (and leave their commands) on
+    // bots in more than 200 guilds.
+    const guilds = await fetchAllUserGuilds(rest);
 
     logger.info(
         { guildCount: guilds.length },
