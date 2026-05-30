@@ -1,4 +1,4 @@
-# Discord Bot — Repo Wiki
+# BotFleet — Repo Wiki
 
 A living component-by-component map of the codebase. Pages here
 describe **what each component does today**; for the broader

@@ -1,11 +1,11 @@
 ---
 name: project-conventions
-description: Architectural framework rules for the discord-bot project. Apply before adding, deleting, or modifying any code under src/.
+description: Architectural framework rules for the BotFleet project. Apply before adding, deleting, or modifying any code under src/.
 ---
 
 # Project Framework and Rules (project-conventions)
 
-This skill is the framework contract for the discord-bot codebase.
+This skill is the framework contract for the BotFleet codebase.
 Every piece of code produced under `src/` must comply. Read this file
 before writing; after writing, verify each item in the section 10
 self-check list.

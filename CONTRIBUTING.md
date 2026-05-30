@@ -19,8 +19,8 @@ Prerequisites:
 - `ffmpeg` on `PATH` if you plan to run the voice plugin
 
 ```bash
-git clone git@github.com:ACaccel/discord-bot.git
-cd discord-bot
+git clone git@github.com:ACaccel/BotFleet.git
+cd BotFleet
 yarn install --frozen-lockfile
 ```
 

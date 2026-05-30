@@ -1,4 +1,4 @@
-# discord-bot
+# BotFleet
 
 A multi-personality Discord bot framework built on TypeScript,
 discord.js and MongoDB, with a layered plugin architecture, bilingual
@@ -12,7 +12,7 @@ i18n, and strict type safety.
 
 ## What this is
 
-`discord-bot` hosts several independent bot personalities on a single
+`BotFleet` hosts several independent bot personalities on a single
 shared core. Each personality is a thin composition root that opts
 into the plugins it wants; the core takes care of lifecycle,
 dependency injection, per-guild MongoDB connections, internationalised
@@ -55,8 +55,8 @@ single-page overview.
 ## Quick start
 
 ```bash
-git clone https://github.com/ACaccel/discord-bot.git
-cd discord-bot
+git clone https://github.com/ACaccel/BotFleet.git
+cd BotFleet
 yarn install --frozen-lockfile
 ```
 

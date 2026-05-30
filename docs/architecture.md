@@ -1,6 +1,6 @@
 # Architecture
 
-A single-page snapshot of the discord-bot codebase: how the layers
+A single-page snapshot of the BotFleet codebase: how the layers
 fit together, what the key abstractions are, how a Discord interaction
 flows through the system, and how plugins are wired in.
 
