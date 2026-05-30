@@ -46,7 +46,6 @@ export const createEarthquakePlugin = (rawConfig: EarthquakePluginConfig): Plugi
     async start(ctx): Promise<void> {
       const client = ctx.resolve(TOKENS.DiscordClient);
       const registry = ctx.resolve(TOKENS.GuildRegistry);
-      const clientId = client.user?.id ?? 'unknown';
 
       const app: Express = express();
       app.use(express.json());
@@ -58,16 +57,16 @@ export const createEarthquakePlugin = (rawConfig: EarthquakePluginConfig): Plugi
       });
 
       router.post('/earthquake', (_req, res) => {
-        logSystem(ctx.logger, clientId, 'Earthquake alert webhook received; broadcasting.');
+        logSystem(ctx.logger, 'Earthquake alert webhook received; broadcasting.');
         // Respond 200 immediately; the per-guild broadcast runs
         // detached. `broadcastEarthquakeAlert` isolates each guild's
         // failure internally, so a single async IIFE with a defensive
         // catch is enough to keep this off the unhandledRejection path.
         void (async () => {
           try {
-            await broadcastEarthquakeAlert(client, registry, ctx.translator, ctx.logger, clientId);
+            await broadcastEarthquakeAlert(client, registry, ctx.translator, ctx.logger);
           } catch (err: unknown) {
-            logError(ctx.logger, clientId, null, err);
+            logError(ctx.logger, null, err);
           }
         })();
         res.status(200).send('OK');
@@ -77,7 +76,6 @@ export const createEarthquakePlugin = (rawConfig: EarthquakePluginConfig): Plugi
         const listening = app.listen(config.port, () => {
           logSystem(
             ctx.logger,
-            clientId,
             `earthquake webhook server is running on port ${config.port}`,
           );
           resolve();
@@ -93,8 +91,7 @@ export const createEarthquakePlugin = (rawConfig: EarthquakePluginConfig): Plugi
         server?.close(() => resolve());
       });
       server = undefined;
-      const client = ctx.resolve(TOKENS.DiscordClient);
-      logSystem(ctx.logger, client.user?.id ?? 'unknown', 'earthquake webhook server closed');
+      logSystem(ctx.logger, 'earthquake webhook server closed');
     },
   };
 };

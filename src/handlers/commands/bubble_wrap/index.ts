@@ -9,6 +9,7 @@ export default class bubble_wrap extends Command {
         super();
         this.setConfig({
             name: "bubble_wrap",
+            category: 'fun',
             options: {
                 string: [
                     {

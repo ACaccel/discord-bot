@@ -42,6 +42,7 @@ unchecked rather than deleting the line.
 - [ ] `yarn test:int`
 - [ ] `yarn test:contract`
 - [ ] `yarn test:i18n`
+- [ ] `yarn test:tools`
 - [ ] Manual smoke against a dev guild (describe what you invoked)
 
 ## Reviewer-agent results

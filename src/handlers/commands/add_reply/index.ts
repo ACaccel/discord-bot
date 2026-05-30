@@ -12,6 +12,7 @@ export default class add_reply extends Command {
         super();
         this.setConfig({
             name: "add_reply",
+            category: 'auto_reply',
             options: {
                 string: [
                     {

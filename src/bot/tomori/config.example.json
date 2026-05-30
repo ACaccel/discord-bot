@@ -1,7 +1,11 @@
 {
-    "admin": "YOUR_ADMIN_USER_ID",
+    "admin": ["YOUR_ADMIN_USER_ID"],
+    "language": "zh-TW",
     "commands": [
         "help",
         "COMMAND_NAME"
+    ],
+    "blocked_channels": [
+        "YOUR_BLOCKED_CHANNEL_ID"
     ]
 }

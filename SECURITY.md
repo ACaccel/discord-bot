@@ -1,6 +1,6 @@
 # Security Policy
 
-We take the security of `discord-bot` seriously. Thank you for taking
+We take the security of `BotFleet` seriously. Thank you for taking
 the time to disclose responsibly.
 
 ## Supported versions
@@ -17,7 +17,7 @@ Only the latest minor version is supported with security fixes.
 **Do not open a public GitHub issue for a suspected vulnerability.**
 Instead, please use the GitHub Security Advisory workflow:
 
-1. Open <https://github.com/ACaccel/discord-bot/security/advisories/new>.
+1. Open <https://github.com/ACaccel/BotFleet/security/advisories/new>.
 2. Provide:
    - A description of the vulnerability and the affected code paths.
    - The conditions required to reproduce it (configuration, Discord
@@ -29,7 +29,7 @@ Instead, please use the GitHub Security Advisory workflow:
 
 If you cannot use GitHub Security Advisories, you may instead contact
 the repository owner directly through the email listed on their GitHub
-profile. Please mark the subject line with `[discord-bot security]`.
+profile. Please mark the subject line with `[BotFleet security]`.
 
 ## Response timeline
 

@@ -15,16 +15,16 @@ import { MODAL_REGISTRY } from './registry.generated';
 export { ModalHandler };
 
 export const registerModals = async (bot: BaseBot) => {
-    logSystem(bot.logger, bot.clientId, "Registering modal handlers...");
+    logSystem(bot.logger, "Registering modal handlers...");
 
     try {
         // todo: whether to specify handlers for each bot
         // import all modal handlers
         bot.modalHandlers = createAllModalHandlers();
 
-        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.modalHandlers.size} modal handlers.`)
+        logSystem(bot.logger, `Successfully register ${bot.modalHandlers.size} modal handlers.`)
     } catch (err) {
-        logSystem(bot.logger, bot.clientId, `Failed to register modal handlers: ${err}`);
+        logSystem(bot.logger, `Failed to register modal handlers: ${err}`);
     }
 }
 

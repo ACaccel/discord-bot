@@ -10,6 +10,7 @@ export default class activity_delete extends Command {
         super();
         this.setConfig({
             name: "activity_delete",
+            category: 'server_activity',
             options: {
                 string: [
                     {

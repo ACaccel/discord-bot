@@ -16,7 +16,7 @@ If you experience or witness behaviour that violates this code of
 conduct, please report it privately to the project maintainers via the
 GitHub repository owner's contact details, or through a GitHub
 Security Advisory if the matter is sensitive
-(<https://github.com/ACaccel/discord-bot/security/advisories/new>).
+(<https://github.com/ACaccel/BotFleet/security/advisories/new>).
 
 All reports will be reviewed and handled confidentially. Maintainers
 are obligated to respect the privacy and safety of the reporter.

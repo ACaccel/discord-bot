@@ -97,11 +97,17 @@ or any `docs/` file changed), follow
 — update the affected component pages, append a CHANGELOG entry,
 refresh the Home index.
 
-## Step 8 — Commit
+## Step 8 — Commit (only when the user asks)
 
-- Produce a small, focused commit. Subject prefix follows the
-  conventional-commits style used in this repo (`feat` / `fix` /
+- **Do not commit until the user explicitly asks.** Finish the edits,
+  run the gates (Step 6), update docs (Step 7), report what changed, and
+  stop. Do not auto-commit on task completion or after fixing
+  review-gate / stop-hook findings; do not `git commit --amend` a prior
+  commit without being asked. A one-off "commit" request covers that
+  commit only.
+- When asked: produce a small, focused commit. Subject prefix follows
+  the conventional-commits style used in this repo (`feat` / `fix` /
   `refactor` / `chore` / `docs` / `test`).
 - Commit message body explains the why, not the what.
-- Include `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>`.
+- Include `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 - Do not push or open a PR unless the user explicitly asks.

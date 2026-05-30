@@ -1,6 +1,6 @@
 # Architecture
 
-A single-page snapshot of the discord-bot codebase: how the layers
+A single-page snapshot of the BotFleet codebase: how the layers
 fit together, what the key abstractions are, how a Discord interaction
 flows through the system, and how plugins are wired in.
 
@@ -49,7 +49,7 @@ Thin lifecycle owner. Subclasses (`nijika`, `konata`, `tomori`,
 configuration; `BaseBot.run()` orchestrates startup in a fixed order:
 
 1. Load env + build composition-root container.
-2. Initialise the i18n translator and load locale catalogs.
+2. Initialise the i18n translator (in the bot's configured `language`, default `zh-TW`) and load locale catalogs.
 3. Connect every configured guild's MongoDB via the shared connection manager.
 4. Resolve each guild's channels, roles, and repositories.
 5. Attach the Discord client event bridge.
@@ -99,8 +99,12 @@ interfaces; tests inject in-memory fakes.
 `src/i18n/locales/<lang>/{commands,errors,replies}.json` keyed
 `<namespace>:<feature>.<purpose>`. The `localesDir` is injected from
 the composition root so `core/i18n` has no knowledge of the content
-layer's path. CJK literals are forbidden inside `src/handlers/` and
-`src/plugins/`; a CI scanner enforces this.
+layer's path. Each personality picks its default locale through its
+`config.json` `language` field (`'zh-TW'` | `'en'`), validated by
+`isLocale` and threaded into `createDefaultTranslator({ fallbackLocale })`;
+an unsupported value falls back to `DEFAULT_LOCALE`. CJK literals are
+forbidden inside `src/handlers/` and `src/plugins/`; a CI scanner
+enforces this.
 
 ### Error taxonomy + Result ([src/core/errors/](../src/core/errors/), [src/core/result/](../src/core/result/))
 
@@ -132,6 +136,13 @@ single `LLMProvider` interface and translate their SDK errors into
 `LlmProviderError`. `LLMService` selects a provider per request;
 `ModelCatalog` lists supported models and is published to the
 container by `LlmChatPlugin` under `TOKENS.ModelCatalog`.
+
+`SelfHostedLlmClient` (`selfhosted-client.ts`) is a separate outbound
+adapter in the same layer for a lightweight self-hosted LLM endpoint. It
+does not implement `LLMProvider` (the endpoint's request/response shape
+and the absence of an API key / model differ), but it maps failures into
+the same `ExternalServiceError` taxonomy and returns a `Result`. Consumed
+by the `LlmAutoReplyPlugin`.
 
 ## 3. Interaction request flow
 
@@ -187,16 +198,17 @@ non-critical plugins are marked disabled and the bot keeps running.
 
 ## 5. Built-in plugins
 
-| Plugin                | Path                          | Summary                                                                      |
-| --------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| `AutoReplyPlugin`     | `src/plugins/auto-reply/`     | `messageCreate` keyword + lucky replies and a dice roller                    |
-| `GuildEventsPlugin`   | `src/plugins/guild-events/`   | guild / member lifecycle events                                              |
-| `GiveawayPlugin`      | `src/plugins/giveaway/`       | scheduled giveaways with reaction-driven winner selection                    |
-| `ActivityPlugin`      | `src/plugins/activity/`       | per-member activity tracking via message / reaction events                   |
-| `MessageBackupPlugin` | `src/plugins/message-backup/` | message create / delete / update archival (used by the `msg-archive` worker) |
-| `LlmChatPlugin`       | `src/plugins/llm-chat/`       | multi-provider LLM chat with web-search toggle and session persistence       |
-| `VoicePlugin`         | `src/plugins/voice/`          | voice channel join + recording controller                                    |
-| `EarthquakePlugin`    | `src/plugins/earthquake/`     | earthquake alert broadcast (nijika exposes the HTTP webhook)                 |
+| Plugin                | Path                          | Summary                                                                               |
+| --------------------- | ----------------------------- | ------------------------------------------------------------------------------------- |
+| `AutoReplyPlugin`     | `src/plugins/auto-reply/`     | `messageCreate` keyword + lucky replies and a dice roller                             |
+| `GuildEventsPlugin`   | `src/plugins/guild-events/`   | guild / member lifecycle events                                                       |
+| `GiveawayPlugin`      | `src/plugins/giveaway/`       | scheduled giveaways with reaction-driven winner selection                             |
+| `ActivityPlugin`      | `src/plugins/activity/`       | per-member activity tracking via message / reaction events                            |
+| `MessageBackupPlugin` | `src/plugins/message-backup/` | message create / delete / update archival (used by the `msg-archive` worker)          |
+| `LlmChatPlugin`       | `src/plugins/llm-chat/`       | multi-provider LLM chat with web-search toggle and session persistence                |
+| `VoicePlugin`         | `src/plugins/voice/`          | voice channel join + recording controller                                             |
+| `EarthquakePlugin`    | `src/plugins/earthquake/`     | earthquake alert broadcast (nijika exposes the HTTP webhook)                          |
+| `LlmAutoReplyPlugin`  | `src/plugins/llm-auto-reply/` | probability-gated, context-aware `messageCreate` reply via a self-hosted LLM (nijika) |
 
 ## 6. Personalities
 

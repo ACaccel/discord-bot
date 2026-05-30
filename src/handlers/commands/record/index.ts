@@ -17,6 +17,7 @@ export default class record extends Command {
         super();
         this.setConfig({
             name: "record",
+            category: 'utility',
             options: {
                 string: [
                     {

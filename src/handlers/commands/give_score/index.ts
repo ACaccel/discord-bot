@@ -9,6 +9,7 @@ export default class give_score extends Command {
         super();
         this.setConfig({
             name: "give_score",
+            category: 'fun',
         });
     }
 

@@ -24,9 +24,16 @@
  *   reads LOG_LEVEL and NODE_ENV. See `src/core/config/env.ts` header
  *   for the contract.
  */
-import pino, { type Logger as PinoLogger, type LoggerOptions } from 'pino';
+import pino, {
+  multistream,
+  type Logger as PinoLogger,
+  type LoggerOptions,
+  type StreamEntry,
+} from 'pino';
 import { buildPinoRedactPaths } from '../config/redact';
 import { scrubForLog } from './scrub-for-log';
+
+export type { StreamEntry } from 'pino';
 
 /**
  * Application-facing logger surface. A subset of pino's API — keeping
@@ -60,8 +67,18 @@ export interface CreateLoggerInput {
   readonly level: LogLevel;
   /** When true, route through pino-pretty for human-readable dev output. */
   readonly pretty: boolean;
-  /** Bound on every line (e.g. `{ env: 'production', service: 'discord-bot' }`). */
+  /** Bound on every line (e.g. `{ env: 'production', service: 'botfleet' }`). */
   readonly base?: Readonly<Record<string, unknown>>;
+  /**
+   * Additional pino multistream sinks layered on top of the (optional)
+   * pretty console. Each entry filters by `level` independently. The
+   * file-router transport lives behind {@link createFileSink} in the
+   * sibling `file-router-transport` module — wire it through this
+   * option from the composition root (`createBootstrapLogger` does this
+   * for production). Leaving this empty (the default) yields a logger
+   * with no file output, which is what unit tests want.
+   */
+  readonly extraStreams?: readonly StreamEntry[];
 }
 
 /**
@@ -79,19 +96,44 @@ export const createLogger = (input: CreateLoggerInput): Logger => {
     },
     timestamp: pino.stdTimeFunctions.isoTime,
   };
-  // pino-pretty is only loaded at runtime when `pretty: true`. The
-  // dependency is dev-only; production logs land as JSON lines.
-  if (input.pretty) {
-    options.transport = {
-      target: 'pino-pretty',
-      options: {
+  // Pretty + caller-supplied sinks (typically the file-router) are
+  // stacked through `pino.multistream` rather than `transport.targets`.
+  // Multistream keeps every sink in-process (no worker thread, no
+  // `require.resolve` of a TypeScript entry point) which is what makes
+  // the file router work cleanly under both `ts-node` and compiled JS.
+  // Each entry filters by `level` independently so the pretty console
+  // can stay at `info` while the file router captures `trace` for
+  // later forensics.
+  const streams: StreamEntry[] = [];
+  // `silent` shortcircuits every sink — pino's own `level: 'silent'`
+  // already drops the record before it reaches a stream, but we also
+  // skip stream construction so a unit test running at `silent` does
+  // not allocate a pretty stream or open a file descriptor.
+  if (input.level !== 'silent') {
+    const streamLevel = input.level;
+    if (input.pretty) {
+      // `pino-pretty` is dev-only and lazy-required so production
+      // installs that prune dev deps do not crash at logger init.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const prettyStream = (require('pino-pretty') as (opts: object) => NodeJS.WritableStream)({
         colorize: true,
-        translateTime: 'SYS:HH:MM:ss.l',
-        ignore: 'pid,hostname',
-      },
-    };
+        // `SYS:` = system localtime (no `UTC:` prefix). Seconds-only —
+        // the ms tail added too much visual noise in dev output.
+        translateTime: 'SYS:HH:MM:ss',
+        // `bot` / `guildId` / `eventType` are valuable in the JSON
+        // file sink but redundant in the pretty console: the headline
+        // already shows eventType, and a dev terminal is per-bot.
+        ignore: 'pid,hostname,bot,guildId,eventType',
+      });
+      streams.push({ level: streamLevel, stream: prettyStream });
+    }
+    if (input.extraStreams !== undefined) {
+      for (const entry of input.extraStreams) {
+        streams.push(entry);
+      }
+    }
   }
-  const root: PinoLogger = pino(options);
+  const root: PinoLogger = streams.length > 0 ? pino(options, multistream(streams)) : pino(options);
   return wrap(root);
 };
 

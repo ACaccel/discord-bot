@@ -31,11 +31,28 @@ import type { Translator } from '../../core/i18n';
  * JSON (`getCommandJsonBody`, `deploy.ts`) run the config through
  * `localizeCommandConfig` first so `description` is defined.
  */
+/**
+ * Grouping key used by `/help` to render commands under a labelled
+ * section. Stable ASCII ids (the display label is resolved from
+ * `replies:help.category.<key>`), so this stays CJK-free. A command
+ * that omits `category` falls into `'other'`.
+ */
+export type CommandCategory =
+    | 'auto_reply'
+    | 'fun'
+    | 'server_activity'
+    | 'utility'
+    | 'admin'
+    | 'ai'
+    | 'other';
+
 export interface CommandConfig {
     name: string; // command name for handler lookup and Discord registration
     /** Resolved from `commands:<name>.description`; omitted by handlers. */
     description?: string;
     type?: ContextMenuCommandType; // for context menu commands, default is Chat Input
+    /** `/help` grouping key; defaults to `'other'` when a handler omits it. */
+    category?: CommandCategory;
     options?: {
         string?: CommandOption[];
         number?: CommandOption[];

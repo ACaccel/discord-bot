@@ -43,14 +43,13 @@ export class GuildDbConnector {
      * @param mongoURI - the bot's Mongo base URI; `undefined` or empty
      *   means the bot was built without a database — `connectAll`
      *   short-circuits, mirroring the prior BaseBot behaviour.
-     * @param clientId - the bot's client snowflake; carried on every
-     *   log line so multi-bot processes stay grep-able by bot.
-     * @param logger - structured logger for ops visibility.
+     * @param logger - structured logger for ops visibility. The injected
+     *   logger already carries `{ bot: <clientId> }` in its base bindings,
+     *   so every line stays grep-able by bot without an explicit param.
      */
     public constructor(
         private readonly container: ServiceContainer,
         private readonly mongoURI: string | undefined,
-        private readonly clientId: string,
         private readonly logger: Logger,
     ) {}
 
@@ -68,9 +67,9 @@ export class GuildDbConnector {
         guildInfo: ReadonlyMap<string, GuildInfo>,
         attachRepos: AttachReposFn,
     ): Promise<void> {
-        logSystem(this.logger, this.clientId, ops.guildDb.poolStart());
+        logSystem(this.logger, ops.guildDb.poolStart());
         if (this.mongoURI === undefined || this.mongoURI.length === 0) {
-            logSystem(this.logger, this.clientId, ops.guildDb.uriMissing());
+            logSystem(this.logger, ops.guildDb.uriMissing());
             return;
         }
         // Promise.all with per-slot try/catch (rather than allSettled +
@@ -84,11 +83,7 @@ export class GuildDbConnector {
                     if (repos !== undefined) {
                         attachRepos(guildId, repos);
                     }
-                    logSystem(
-                        this.logger,
-                        this.clientId,
-                        ops.guildDb.connectSuccess(guildId, slot.guild.name),
-                    );
+                    logSystem(this.logger, ops.guildDb.connectSuccess(guildId, slot.guild.name));
                 } catch {
                     // connectOne already logged with the manager's
                     // traceId; swallow here so fan-out continues — the
@@ -126,7 +121,6 @@ export class GuildDbConnector {
             const traceId = cm?.isDisabled(branded)?.traceId ?? 'unknown';
             logSystem(
                 this.logger,
-                this.clientId,
                 ops.guildDb.connectFailed(guildId, traceId, normalised.message),
             );
             throw normalised;

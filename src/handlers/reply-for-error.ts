@@ -60,7 +60,7 @@ const generateTraceId = (): string => Math.random().toString(36).slice(2, 8).pad
 
 /** Reply or edit depending on the interaction's acknowledged state. */
 const sendUserChannel = async (
-  bot: { logger: Logger | undefined; clientId: string },
+  bot: { logger: Logger | undefined },
   interaction: HandlerInteraction,
   content: string,
 ): Promise<void> => {
@@ -73,7 +73,7 @@ const sendUserChannel = async (
     await interaction.reply({ content, flags: MessageFlags.Ephemeral });
   } catch (err) {
     if (err instanceof DiscordAPIError && EXPIRED_INTERACTION_CODES.has(Number(err.code))) {
-      logSystem(bot.logger, bot.clientId, ops.router.replySkipped(err.code));
+      logSystem(bot.logger, ops.router.replySkipped(err.code));
       return;
     }
     throw err;
@@ -122,7 +122,6 @@ export const resolveErrorReply = (
 /** Context the boundary helper needs from the `BaseBot` instance. */
 export interface ErrorReplyBot {
   readonly logger: Logger | undefined;
-  readonly clientId: string;
   readonly translator: Translator | undefined;
 }
 
@@ -131,7 +130,7 @@ export interface ErrorReplyBot {
  * user-facing reply, both stamped with the same `traceId`.
  *
  * @param interaction the interaction whose handler threw.
- * @param bot the running bot (logger / clientId / translator).
+ * @param bot the running bot (logger / translator).
  * @param error the caught value.
  * @param fallbackKey the command's `replies:<feature>.failed` key, used
  *   only when `error` is not a `DomainError`.
@@ -149,8 +148,8 @@ export const replyForError = async (
   // attached so the line correlates with the user-facing fallback
   // message; for a `DomainError` the id is unused by the user channel
   // but still recorded for completeness.
-  logError(bot.logger, bot.clientId, guildId ?? null, error);
-  logSystem(bot.logger, bot.clientId, ops.router.handlerError(traceId));
+  logError(bot.logger, guildId ?? null, error);
+  logSystem(bot.logger, ops.router.handlerError(traceId));
   // User channel.
   const content = resolveErrorReply(bot.translator, error, fallbackKey, traceId);
   await sendUserChannel(bot, interaction, content);

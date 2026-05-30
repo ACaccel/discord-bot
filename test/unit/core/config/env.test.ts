@@ -164,7 +164,7 @@ describe('loadEnv', () => {
       expect(() =>
         loadEnv({
           exitOnFailure: false,
-          envFile: '/tmp/discord-bot-no-such-file.env',
+          envFile: '/tmp/botfleet-no-such-file.env',
         }),
       ).toThrow(EnvLoadError);
       const issues = stderrCapture

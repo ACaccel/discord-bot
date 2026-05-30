@@ -5,8 +5,8 @@ import { __test as guildEventsTest } from '../../../src/plugins/guild-events/plu
 import type { GuildOnboardingPort } from '../../../src/core/plugin';
 
 describe('createGuildEventsPlugin', () => {
-  it('accepts a minimal config (clientId only) and defaults blockedChannels to []', () => {
-    const plugin = createGuildEventsPlugin({ clientId: 'bot-1' });
+  it('accepts an empty config and defaults blockedChannels to []', () => {
+    const plugin = createGuildEventsPlugin({});
     expect(plugin.id).toBe('guild-events');
     expect(plugin.scope).toBe('bot');
     expect(plugin.events?.messageUpdate).toBeTypeOf('function');
@@ -16,26 +16,20 @@ describe('createGuildEventsPlugin', () => {
   });
 
   it('accepts a blockedChannels list', () => {
-    const plugin = createGuildEventsPlugin({ clientId: 'bot-1', blockedChannels: ['1', '2'] });
+    const plugin = createGuildEventsPlugin({ blockedChannels: ['1', '2'] });
     expect(plugin.id).toBe('guild-events');
-  });
-
-  it('requires a non-empty clientId so audit logs carry bot identity', () => {
-    expect(() => createGuildEventsPlugin({})).toThrow();
-    expect(() => createGuildEventsPlugin({ clientId: '' })).toThrow();
   });
 
   it('rejects configs whose fields have the wrong shape', () => {
     expect(() =>
       createGuildEventsPlugin({
-        clientId: 'bot-1',
         blockedChannels: 'not-an-array' as unknown as string[],
       }),
     ).toThrow();
   });
 
   it('rejects unknown keys (.strict() prevents config drift)', () => {
-    expect(() => createGuildEventsPlugin({ clientId: 'bot-1', blocked: ['1'] })).toThrow();
+    expect(() => createGuildEventsPlugin({ blocked: ['1'] })).toThrow();
   });
 });
 
@@ -52,14 +46,7 @@ describe('safeSendEmbed', () => {
     // surrounding handler before its guildLogger / attachmentLogger
     // call sites run.
     await expect(
-      guildEventsTest.safeSendEmbed(
-        fakeChannel,
-        embed,
-        undefined,
-        'bot-1',
-        'guild-1',
-        'message_update',
-      ),
+      guildEventsTest.safeSendEmbed(fakeChannel, embed, undefined, 'guild-1', 'message_update'),
     ).resolves.toBeUndefined();
     expect(fakeChannel.send).toHaveBeenCalledTimes(1);
   });
@@ -69,14 +56,7 @@ describe('safeSendEmbed', () => {
       send: vi.fn(async () => undefined),
     } as unknown as TextChannel;
     const embed = new EmbedBuilder().setTitle('x');
-    await guildEventsTest.safeSendEmbed(
-      fakeChannel,
-      embed,
-      undefined,
-      'bot-1',
-      'guild-1',
-      'message_delete',
-    );
+    await guildEventsTest.safeSendEmbed(fakeChannel, embed, undefined, 'guild-1', 'message_delete');
     expect(fakeChannel.send).toHaveBeenCalledTimes(1);
   });
 });
@@ -92,7 +72,7 @@ describe('handleGuildCreate', () => {
     }));
     const port: GuildOnboardingPort = { onboardGuild };
 
-    await guildEventsTest.handleGuildCreate(port, undefined, 'bot-1', fakeGuild('g-1'));
+    await guildEventsTest.handleGuildCreate(port, undefined, fakeGuild('g-1'));
 
     expect(onboardGuild).toHaveBeenCalledTimes(1);
     expect(onboardGuild).toHaveBeenCalledWith('g-1');
@@ -108,7 +88,7 @@ describe('handleGuildCreate', () => {
     // Regression contract: onboarding is a structural side effect; a
     // failure is logged, not rethrown.
     await expect(
-      guildEventsTest.handleGuildCreate(port, undefined, 'bot-1', fakeGuild('g-2')),
+      guildEventsTest.handleGuildCreate(port, undefined, fakeGuild('g-2')),
     ).resolves.toBeUndefined();
   });
 });

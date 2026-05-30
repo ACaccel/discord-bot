@@ -19,16 +19,16 @@ export { SSMHandler };
 //==================================================//
 
 export const registerSSMs = async (bot: BaseBot) => {
-    logSystem(bot.logger, bot.clientId, "Registering string select menu handlers...");
+    logSystem(bot.logger, "Registering string select menu handlers...");
 
     try {
         // todo: whether to specify handlers for each bot
         // import all string select menu handlers
         bot.ssmHandlers = createAllSSMHandlers();
 
-        logSystem(bot.logger, bot.clientId, `Successfully register ${bot.ssmHandlers.size} string select menu handlers.`)
+        logSystem(bot.logger, `Successfully register ${bot.ssmHandlers.size} string select menu handlers.`)
     } catch (err) {
-        logSystem(bot.logger, bot.clientId, `Failed to register string select menu handlers: ${err}`);
+        logSystem(bot.logger, `Failed to register string select menu handlers: ${err}`);
     }
 }
 

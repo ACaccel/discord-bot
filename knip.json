@@ -23,7 +23,7 @@
     "@core/*": ["src/core/*"],
     "@plugins": ["src/plugins/index.ts"]
   },
-  "ignoreDependencies": ["sodium", "tsconfig-paths", "pino-pretty"],
+  "ignoreDependencies": ["sodium", "tsconfig-paths"],
   "ignore": [
     "src/persistence/index.ts",
     "src/persistence/repositories/index.ts",

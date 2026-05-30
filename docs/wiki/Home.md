@@ -1,4 +1,4 @@
-# Discord Bot — Repo Wiki
+# BotFleet — Repo Wiki
 
 A living component-by-component map of the codebase. Pages here
 describe **what each component does today**; for the broader
@@ -30,6 +30,16 @@ container.
 | C9        | Codegen & Scripts     | `scripts/`          | [components/C9-codegen-scripts.md](components/C9-codegen-scripts.md)               |
 | C10       | Quality Gates         | CI / config         | [components/C10-quality-gates.md](components/C10-quality-gates.md)                 |
 | C11       | Bot Composition Roots | `src/bot/`          | [components/C11-bot-composition-roots.md](components/C11-bot-composition-roots.md) |
+
+## Ops runbooks
+
+- [verify-db](ops/verify-db.md) —
+  read-only validity checker for a guild's `messages` collection
+  (null / empty / duplicate `messageId`, missing `channelId` /
+  `userId` / `userName`, invalid `timestamp`).
+- [msg-backup](ops/msg-backup.md) — full re-ingest of a guild's
+  message history from Discord; backfills missing `messageId`s,
+  removes leftover bot messages, repairs duplicates.
 
 ## See also
 

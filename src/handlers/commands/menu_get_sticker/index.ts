@@ -16,6 +16,7 @@ export default class menu_get_sticker extends Command {
             // Stable ASCII id; the user-facing Discord name is resolved
             // from `commands:menu_get_sticker.name`.
             name: "menu_get_sticker",
+            category: 'utility',
             type: ApplicationCommandType.Message as ContextMenuCommandType,
         });
     }

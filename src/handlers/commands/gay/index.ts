@@ -9,6 +9,7 @@ export default class gay extends Command {
     super();
     this.setConfig({
       name: 'gay',
+      category: 'fun',
       options: {
         user: [
           {

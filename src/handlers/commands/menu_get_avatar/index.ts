@@ -16,6 +16,7 @@ export default class menu_get_avatar extends Command {
             // Stable ASCII id; the user-facing Discord name is resolved
             // from `commands:menu_get_avatar.name`.
             name: "menu_get_avatar",
+            category: 'utility',
             type: ApplicationCommandType.User as ContextMenuCommandType,
         });
     }

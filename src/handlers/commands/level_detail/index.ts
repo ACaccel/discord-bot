@@ -11,6 +11,7 @@ export default class level_detail extends Command {
         super();
         this.setConfig({
             name: "level_detail",
+            category: 'utility',
             options: {
                 number: [
                     {

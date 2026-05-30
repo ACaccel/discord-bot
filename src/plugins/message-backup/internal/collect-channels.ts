@@ -28,7 +28,6 @@ const ALLOWED_CHANNEL_TYPES = new Set<ChannelType>([
 
 export const collectChannels = async (
   guild: Guild,
-  clientId: string,
   logger: Logger,
 ): Promise<{ channels: TextBasedChannel[]; liveChannelIds: Set<string> }> => {
   await guild.channels.fetch();
@@ -69,7 +68,6 @@ export const collectChannels = async (
     } catch (err) {
       logError(
         logger,
-        clientId,
         guild.id,
         `fetchActive threads failed for ${anyChannel.name ?? channel.id}: ${String(err)}`,
       );
@@ -98,7 +96,6 @@ export const collectChannels = async (
       } catch (err) {
         logError(
           logger,
-          clientId,
           guild.id,
           `fetchArchived ${type} threads failed for ${anyChannel.name ?? channel.id}: ${String(err)}`,
         );

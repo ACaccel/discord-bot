@@ -1,5 +1,5 @@
 /**
- * Manual IoC container for the discord-bot.
+ * Manual IoC container for BotFleet.
  *
  * Why hand-rolled and not Inversify / tsyringe / NestJS:
  *   - No reflect-metadata, no decorators, no class-emit gymnastics.

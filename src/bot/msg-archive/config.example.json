@@ -1,4 +1,6 @@
 {
+    "admin": ["YOUR_ADMIN_USER_ID"],
+    "language": "zh-TW",
     "guilds": {
         "YOUR_GUILD_ID": {
             "channels": {
@@ -9,5 +11,6 @@
     },
     "backup_server": [
         "YOUR_GUILD_ID"
-    ]
+    ],
+    "backup_interval_minutes": 60
 }

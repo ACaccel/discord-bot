@@ -7,7 +7,14 @@ import { createMessageBackupPlugin } from '@plugins';
 
 interface MsgArchiveConfig extends Config {
     backup_server: string[];
+    /**
+     * Minutes between repeat backup passes. Optional — omit to keep the
+     * default one-hour cadence owned by `createMessageBackupPlugin`.
+     */
+    backup_interval_minutes?: number;
 }
+
+const MINUTE_MS = 60 * 1000;
 
 /**
  * MsgArchive composition root. The periodic-backup lifecycle (channel
@@ -21,7 +28,15 @@ interface MsgArchiveConfig extends Config {
 export class MsgArchive extends BaseBot<MsgArchiveConfig> {
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: MsgArchiveConfig) {
         super(client, token, mongoURI, clientId, config);
-        this.use(createMessageBackupPlugin({ backupServers: this.config.backup_server }));
+        const intervalMinutes = this.config.backup_interval_minutes;
+        this.use(
+            createMessageBackupPlugin({
+                backupServers: this.config.backup_server,
+                ...(intervalMinutes !== undefined
+                    ? { backupIntervalMs: intervalMinutes * MINUTE_MS }
+                    : {}),
+            }),
+        );
     }
 
     protected override eventBridgeSuppression(): ClientEventBridgeSuppression {

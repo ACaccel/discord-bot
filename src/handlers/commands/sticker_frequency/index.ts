@@ -11,6 +11,7 @@ export default class sticker_frequency extends Command {
         super();
         this.setConfig({
             name: "sticker_frequency",
+            category: 'utility',
             options: {
                 string: [
                     {

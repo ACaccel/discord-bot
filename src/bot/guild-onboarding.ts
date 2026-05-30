@@ -76,11 +76,7 @@ export class BaseBotGuildOnboardingPort implements GuildOnboardingPort {
         const databaseConnected = await this.connectDatabase(guildId);
         const commandsRegistered = this.registerGuildCommands(guildId);
 
-        logSystem(
-            bot.logger,
-            bot.clientId,
-            `Bot added to guild: ${guild.name} (${guildId})`,
-        );
+        logSystem(bot.logger, `Bot added to guild: ${guild.name} (${guildId})`);
         return { guildId, databaseConnected, commandsRegistered };
     }
 
@@ -126,7 +122,6 @@ export class BaseBotGuildOnboardingPort implements GuildOnboardingPort {
         if (application === null || application === undefined) {
             logSystem(
                 bot.logger,
-                bot.clientId,
                 'Skipped guild command registration: client application is not ready.',
             );
             return false;
@@ -136,11 +131,7 @@ export class BaseBotGuildOnboardingPort implements GuildOnboardingPort {
         // not await it, but the rejection must not escape as an
         // unhandledRejection — funnel it into the structured logger.
         application.commands.set(restCommands, guildId).catch((err: unknown) => {
-            logSystem(
-                bot.logger,
-                bot.clientId,
-                ops.command.registerFailed(String(err)),
-            );
+            logSystem(bot.logger, ops.command.registerFailed(String(err)));
         });
         return true;
     }

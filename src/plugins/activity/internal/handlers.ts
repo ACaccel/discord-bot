@@ -100,7 +100,7 @@ export const handleActivityCreate = async (
             }),
         });
     } catch (error) {
-        logError(bot.logger, bot.clientId, interaction.guild?.id ?? null, error);
+        logError(bot.logger, interaction.guild?.id ?? null, error);
         await interaction.editReply({ content: t('replies:activity.create_failed') });
     }
 };
@@ -135,7 +135,7 @@ export const handleActivityDelete = async (
 
         await interaction.editReply({ content: t('replies:activity.delete_success') });
     } catch (error) {
-        logError(bot.logger, bot.clientId, interaction.guild?.id ?? null, error);
+        logError(bot.logger, interaction.guild?.id ?? null, error);
         await interaction.editReply({ content: t('replies:activity.delete_failed') });
     }
 };

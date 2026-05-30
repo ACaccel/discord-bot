@@ -1,15 +1,15 @@
 name: CodeQL
 
 # PR branches are exercised by `pull_request`; the `push` trigger
-# stays scoped to `main` (and the weekly schedule) so a push to a PR
-# branch does not fire two parallel CodeQL analyses on the same
-# commit — CodeQL TS analysis is the slowest workflow in the repo and
-# the duplicate was the dominant queue cost.
+# stays scoped to the long-lived branches (`main`, `dev`) and the weekly
+# schedule so a push to a feature branch does not fire two parallel
+# CodeQL analyses on the same commit — CodeQL TS analysis is the slowest
+# workflow in the repo and the duplicate was the dominant queue cost.
 on:
   pull_request:
-    branches: [main, 'refactor/**']
+    branches: [main, dev, 'refactor/**']
   push:
-    branches: [main]
+    branches: [main, dev]
   schedule:
     - cron: '0 6 * * 1'
 

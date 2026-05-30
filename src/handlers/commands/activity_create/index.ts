@@ -10,6 +10,7 @@ export default class activity_create extends Command {
         super();
         this.setConfig({
             name: "activity_create",
+            category: 'server_activity',
             options: {
                 string: [
                     {

@@ -19,8 +19,8 @@ Prerequisites:
 - `ffmpeg` on `PATH` if you plan to run the voice plugin
 
 ```bash
-git clone git@github.com:ACaccel/discord-bot.git
-cd discord-bot
+git clone git@github.com:ACaccel/BotFleet.git
+cd BotFleet
 yarn install --frozen-lockfile
 ```
 
@@ -38,6 +38,20 @@ earthquake webhook), and any LLM provider keys (`OPENAI_API_KEY`,
 `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`). The full
 schema lives in [`src/core/config/env.ts`](src/core/config/env.ts).
 
+Notable `config.json` fields (shape: `Config` in
+[`src/bot/index.ts`](src/bot/index.ts)):
+
+- `admin` — optional `string[]` of Discord user ids with bot-admin
+  privileges (e.g. `/ai_whitelist_*`, `/bug_report`). Snowflake ids
+  must be JSON strings, e.g. `["671160708007854120"]`.
+- `language` — optional default display locale, `"zh-TW"` (default) or
+  `"en"`. An unsupported value logs a warning and falls back to the
+  default.
+- `guilds.<id>.channels` / `roles` — both optional. Omit a map (or the
+  whole `guilds` block) to run without channel-bound side effects:
+  debug logging and the guild-event mirror simply have nothing to send
+  to. `tomori` ships with no `guilds` block for this reason.
+
 Run a personality in development:
 
 ```bash
@@ -47,10 +61,25 @@ yarn nijika          # or konata / tomori / msg-archive
 Register slash commands with Discord (run after editing commands):
 
 ```bash
-yarn deploy -t nijika                          # GLOBAL — visible in every guild after Discord propagation (~minutes, up to 1h)
+yarn deploy -t nijika                          # GLOBAL — register global set AND prune guild-scoped commands (propagation ~minutes, up to 1h)
 yarn deploy -t nijika --dev-guild <guild_id>   # guild-scoped fast iteration (instant)
-yarn deploy -t nijika --cleanup-guild-commands # one-shot: remove legacy guild-scoped registrations
+yarn deploy -t nijika --dry-run                # print resolved command name/description locally, register nothing
+yarn deploy -t nijika --keep-guild-commands    # global deploy WITHOUT pruning guild-scoped commands
+yarn deploy -t nijika --cleanup-guild-commands # only clear guild-scoped registrations
 ```
+
+The default global deploy now **prunes guild-scoped commands** from
+every guild after registering the global set, so a stale guild-scoped
+command (e.g. from a prior `--dev-guild` run) can no longer override the
+global one in that guild. This walks every guild the bot is in under the
+Discord rate limit; on bots with many hundreds of guilds, pass
+`--keep-guild-commands` to skip the prune (or run it off-peak).
+
+Command descriptions are localised to the bot's `config.language` (so
+`"language": "en"` registers English text). When debugging command
+text, `--dry-run` prints exactly what would be registered without
+touching Discord, ruling out propagation delay (global takes up to an
+hour) and guild-override effects.
 
 The default is **global** registration so a freshly-invited guild
 sees the full command set without an operator re-running deploy. Use
@@ -117,6 +146,10 @@ Discord.
        super();
        this.setConfig({
          name: 'my_command',
+         // Groups the command under a `/help` section. Pick the closest
+         // CommandCategory: auto_reply | fun | server_activity | utility |
+         // admin | ai | other. Omitting it defaults to `other`.
+         category: 'utility',
          // i18n-ignore: command-builder metadata; localised via name_localizations.
          description: '<short description>',
          options: {
@@ -407,10 +440,48 @@ The Git history follows a `<type>(<scope>): <subject>` pattern where
 etc.). Multi-line bodies are encouraged for non-trivial changes —
 describe the _why_, not the _what_.
 
+## Branching model
+
+This repo follows a **Git Flow** variant with two long-lived branches:
+`main` (released) and `dev` (integration).
+
+- **`main`** — always equals the released / production state. Every merge
+  into `main` is a release: it is tagged (`vX.Y.Z`) and a GitHub Release
+  is cut from it. `main` is the **only** branch that enforces the full
+  required CI gate set, on the `dev` → `main` release PR.
+- **`dev`** — the integration branch, and the one you **commit to
+  directly**. Routine work (features, fixes, docs) lands on `dev` without
+  a per-change branch or PR. Before pushing, run the full local gate
+  suite (see Quality gates) — that is the discipline that keeps `dev`
+  healthy. A push to `dev` still triggers CI, but as a post-push safety
+  signal, not a merge gate. `dev` branch protection only blocks
+  force-pushes and deletion.
+- **`feature/*` (optional)** — for large or risky changes, or when you
+  want a pre-merge CI gate / review, branch off `dev`, open a PR back
+  into `dev`, and delete the branch on merge. Otherwise commit straight
+  to `dev`.
+- **Releasing** — open a `dev` → `main` PR (optionally via a `release/*`
+  stabilisation branch that takes only bug fixes, version bumps, and
+  changelog edits). The full required CI gate set must be green. After
+  merging into `main`, tag the release + cut the GitHub Release, then
+  merge `main` back into `dev` so the branches do not drift.
+- **`hotfix/*`** — for production-urgent fixes, branch off `main`; merge
+  back into **both** `main` (tag a patch release) and `dev`.
+
+The `dev` → `main` release PR (and any optional `feature/*` PR) must pass
+the full required CI gate set before it can merge.
+
 ## Submitting a PR
 
-1. Branch off `main`.
+PRs are for `dev` → `main` releases, hotfixes, and optional large /
+risky `feature/*` work. **Routine `dev` work does not need a PR — commit
+it directly to `dev`** after the local gate suite passes.
+
+When you do open a PR:
+
+1. Branch off `dev` (large features) or `main` (releases / hotfixes).
 2. Run the full local gate suite (see the Quality gates table).
 3. Fill in the PR template — it asks for a summary, gate evidence,
    and a rollback plan.
-4. A maintainer will review. CI must be green before merge.
+4. A maintainer will review. CI must be green before merge; the branch
+   is deleted on merge.

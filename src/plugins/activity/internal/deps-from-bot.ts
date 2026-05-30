@@ -22,6 +22,5 @@ export const buildActivityDepsFromBot = (bot: BaseBot): ActivityDeps => ({
     },
     jobMap: bot.jobs,
     logger: bot.logger ?? (undefined as unknown as Logger),
-    clientId: bot.clientId,
     translator: bot.translator,
 });

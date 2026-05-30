@@ -14,6 +14,7 @@ export default class inspect_member_ids extends Command {
     super();
     this.setConfig({
       name: 'inspect_member_ids',
+      category: 'admin',
       options: {
         string: [{ name: 'ids', required: true }],
       },

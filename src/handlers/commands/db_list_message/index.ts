@@ -19,6 +19,7 @@ export default class db_list_message extends Command {
     super();
     this.setConfig({
       name: 'db_list_message',
+      category: 'utility',
       options: {
         channel: [{ name: 'channel', required: true }],
         string: [

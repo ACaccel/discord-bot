@@ -37,7 +37,6 @@ export const backupChannel = async (
   channel: TextBasedChannel,
   repos: Repos,
   guildId: string,
-  clientId: string,
   logger: Logger,
   onProgress: () => Promise<void>,
 ): Promise<{ added: number; stats: ChannelBackupStats }> => {
@@ -150,12 +149,7 @@ export const backupChannel = async (
     stats.endMsgContent = globalNewest?.content;
   } catch (err: unknown) {
     stats.error = String(err);
-    logError(
-      logger,
-      clientId,
-      guildId,
-      `Failed to backup channel ${ch.name ?? ch.id}: ${String(err)}`,
-    );
+    logError(logger, guildId, `Failed to backup channel ${ch.name ?? ch.id}: ${String(err)}`);
   }
   stats.durationMs = Date.now() - startTime;
   return { added: stats.newMessages, stats };

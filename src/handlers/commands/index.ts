@@ -37,7 +37,7 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
     const rest_commands: ApplicationCommandDataResolvable[] = Array.from(commandHandlers.values())
         .filter((cmd: Command) => {
             if (!cmd.config) {
-                logError(bot.logger, bot.clientId, null, ops.command.handlerMissingConfig(String(cmd)));
+                logError(bot.logger, null, ops.command.handlerMissingConfig(String(cmd)));
                 return false;
             }
             return true;
@@ -49,11 +49,11 @@ export const getCommandJsonBody = (commandHandlers: Map<string, Command>, bot: B
 }
 
 export const registerCommands = async (bot: BaseBot) => {
-    logSystem(bot.logger, bot.clientId, ops.command.registerStart());
+    logSystem(bot.logger, ops.command.registerStart());
 
     try {
         if (!bot.config.commands) {
-            logSystem(bot.logger, bot.clientId, ops.command.registerEmpty());
+            logSystem(bot.logger, ops.command.registerEmpty());
             return;
         }
 
@@ -75,9 +75,9 @@ export const registerCommands = async (bot: BaseBot) => {
             }
         });
         
-        logSystem(bot.logger, bot.clientId, ops.command.registerSuccess(bot.commandHandlers.size));
+        logSystem(bot.logger, ops.command.registerSuccess(bot.commandHandlers.size));
     } catch (err) {
-        logSystem(bot.logger, bot.clientId, ops.command.registerFailed(String(err)));
+        logSystem(bot.logger, ops.command.registerFailed(String(err)));
     }
 }
 

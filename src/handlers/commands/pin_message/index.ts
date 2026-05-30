@@ -10,6 +10,7 @@ export default class pin_message extends Command {
     super();
     this.setConfig({
       name: 'pin_message',
+      category: 'admin',
       options: {
         string: [
           {

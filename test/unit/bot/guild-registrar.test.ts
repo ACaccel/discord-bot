@@ -98,6 +98,20 @@ describe('GuildRegistrar.register', () => {
     expect(info.roles).toEqual({});
   });
 
+  it('tolerates a guild entry that omits channels and roles entirely', () => {
+    // The optional-channels contract: a `guilds.<id>` block may carry
+    // neither `channels` nor `roles`. The bot keeps every feature but has
+    // nothing to send to channel-bound side effects (debug / event mirror).
+    const guild = buildGuild({ id: 'g-1' });
+    const client = buildClient([guild]);
+    const config: Config = { guilds: { 'g-1': {} } };
+    const registrar = new GuildRegistrar(client, 'bot-1', silent);
+    expect(() => registrar.register(guild, config)).not.toThrow();
+    const info = registrar.register(guild, config);
+    expect(info.channels).toEqual({});
+    expect(info.roles).toEqual({});
+  });
+
   it('omits a role whose id is not in the guild cache', () => {
     const guild = buildGuild({ id: 'g-1' });
     const client = buildClient([guild]);

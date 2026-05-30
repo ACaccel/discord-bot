@@ -5,6 +5,9 @@
   "nijika": {
     "help_message": "### Currently supported features:\n1. auto reply: the bot replies based on message pairs in the database\n2. roll dice: example input -> `2d5`, randomly picks two numbers between 1 and 5\n"
   },
+  "tomori": {
+    "help_message": "Hi, I'm Tomori! Here are the commands you can use, grouped by purpose:"
+  },
   "konata": {
     "presence_text": "Small breasts are a status symbol, a rare commodity!"
   },
@@ -51,7 +54,7 @@
     "empty": "The whitelist is currently empty.",
     "header": "**AI whitelist ({{count}} users):**",
     "already_in": "{{user}} is already on the whitelist.",
-    "added": "Added {{user}} to the whitelist (default provider: openai).",
+    "added": "Added {{user}} to the whitelist (default provider: {{provider}}).",
     "not_in": "{{user}} is not on the whitelist.",
     "removed": "Removed {{user}} from the whitelist.",
     "failed": "Hmm... the whitelist operation failed. Give it another try later! (error code: {{traceId}})"
@@ -145,7 +148,18 @@
   "help": {
     "no_commands": "No command list available.",
     "failed": "Could not get the command list. (error code: {{traceId}})",
-    "commands_header": "### Currently supported slash commands:\n"
+    "title": "Command Help",
+    "intro_fallback": "Here are the commands you can use:",
+    "footer": "{{count}} commands · {{categories}} categories",
+    "category": {
+      "auto_reply": "💬 Auto-reply",
+      "fun": "🎮 Fun & Interaction",
+      "server_activity": "🎉 Server Activities",
+      "utility": "🔧 Tools & Queries",
+      "admin": "🛡️ Server Admin",
+      "ai": "🤖 AI Chat",
+      "other": "📦 Other"
+    }
   },
   "inspect_member_ids": {
     "no_valid_id": "No valid ID found. Please enter Discord IDs of 17-20 digits.",
@@ -304,11 +318,9 @@
   },
   "giveaway": {
     "missing_required_fields": "Please enter the duration, number of winners, and prize.",
-    "channel_not_configured": "The giveaway channel is not configured.",
     "invalid_duration": "Invalid duration.",
     "create_announce_failed": "Could not create the giveaway.",
     "create_failed": "Could not run the giveaway.",
-    "create_success": "Giveaway created! It will end at {{endTime}}.",
     "missing_message_id": "Please provide the giveaway message ID.",
     "delete_failed_with_reason": "Could not delete the giveaway: {{reason}}",
     "delete_success": "Giveaway deleted.",

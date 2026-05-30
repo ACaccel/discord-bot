@@ -5,6 +5,7 @@ import { Command } from '@cmd';
 
 import { DEFAULT_MODELS } from '../../../infra/llm';
 import { requireGuildRepos } from '../../require-guild-repos';
+import { buildWhitelistDefaults } from './build-default-settings';
 
 import { replyForError } from '../../reply-for-error';
 export default class ai_whitelist_add extends Command {
@@ -12,6 +13,7 @@ export default class ai_whitelist_add extends Command {
         super();
         this.setConfig({
             name: 'ai_whitelist_add',
+            category: 'ai',
             options: {
                 user: [
                     {
@@ -25,7 +27,7 @@ export default class ai_whitelist_add extends Command {
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        if (interaction.user.id !== bot.adminId) {
+        if (!bot.isAdmin(interaction.user.id)) {
             await interaction.editReply({ content: bot.translator?.t('errors:permission.admin_only_short') ?? '' });
             return;
         }
@@ -43,15 +45,14 @@ export default class ai_whitelist_add extends Command {
                 await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.already_in', { user: target.displayName }) ?? '' });
                 return;
             }
-            const createResult = await repos.userApiSetting.create(target.id, {
-                provider: 'openai',
-                model: DEFAULT_MODELS['openai'],
-                temperature: 1.0,
-                system_prompt: '',
-                web_search: false,
-            });
+            // Resolve the cheapest still-listed xAI model; fall back to
+            // the static seed when the resolver is unavailable (e.g. a bot
+            // without LlmChatPlugin).
+            const xaiModel = bot.defaultModelResolver?.current('xai') ?? DEFAULT_MODELS['xai'];
+            const defaults = buildWhitelistDefaults(xaiModel);
+            const createResult = await repos.userApiSetting.create(target.id, defaults);
             if (!createResult.ok) throw createResult.error;
-            await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.added', { user: target.displayName }) ?? '' });
+            await interaction.editReply({ content: bot.translator?.t('replies:ai_whitelist.added', { user: target.displayName, provider: defaults.provider }) ?? '' });
         } catch (err) {
             await replyForError(interaction, bot, err, 'replies:ai_whitelist.failed', interaction.guildId);
         }

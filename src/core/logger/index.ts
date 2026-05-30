@@ -1,4 +1,16 @@
-export { createLogger, type Logger, type LogLevel, type CreateLoggerInput } from './logger';
+export {
+  createLogger,
+  type Logger,
+  type LogLevel,
+  type CreateLoggerInput,
+  type StreamEntry,
+} from './logger';
+export {
+  createFileSink,
+  createFileRouterStream,
+  createFixedPathFileSink,
+  createFixedPathFileStream,
+} from './file-router-transport';
 export {
   installProcessHandlers,
   getUnhandledRejectionCount,
@@ -6,4 +18,4 @@ export {
   type InstallProcessHandlersInput,
 } from './process-handlers';
 export { ops } from './messages';
-export { logError, logSystem, logGuildEvent } from './legacy';
+export { logError, logSystem, logGuildEvent } from './helpers';
