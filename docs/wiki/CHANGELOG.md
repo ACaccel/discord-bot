@@ -27,8 +27,11 @@ at the repository root.
   `buildDeployTranslator`, mirroring `BaseBot.buildHost`); previously it
   always registered `zh-TW`. A new `--dry-run` flag prints the resolved
   command text without touching Discord, to verify locale output ahead
-  of a propagation-delayed global deploy. C7 / C11 pages note the deploy
-  localisation path.
+  of a propagation-delayed global deploy. The default global deploy also
+  **prunes guild-scoped commands** (`clearAllGuildCommands`) so a stale
+  guild-scoped registration cannot override the global set in a guild;
+  `--keep-guild-commands` skips the prune. C7 / C11 pages note the deploy
+  localisation path and the guild-prune step.
 
 - **C11 Bot / C7 i18n / C6 Handlers** — three config-driven features.
   (1) A per-bot `language` field in `config.json` (`'zh-TW'` | `'en'`)

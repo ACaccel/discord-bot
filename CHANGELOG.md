@@ -106,6 +106,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check. `/ai_whitelist_add` / `/ai_whitelist_remove` gate on
   `isAdmin`, and `/bug_report` DMs every configured admin (best-effort)
   rather than only the first. Snowflake ids must be JSON strings.
+- The default global `yarn deploy` now prunes guild-scoped command
+  registrations from every guild after registering the global set, so a
+  stale guild-scoped command (e.g. from a prior `--dev-guild` run) can no
+  longer override the global one in that guild. Pass
+  `--keep-guild-commands` to skip the prune on large bots or when
+  guild-scoped commands are intentional.
 
 ### Removed
 
