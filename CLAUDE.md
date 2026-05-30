@@ -186,8 +186,9 @@ fails, root-cause it; do not bypass.
 
 ## Commit + PR conventions
 
+- **Commit only when the user explicitly asks.** Do not auto-commit (or `git commit --amend`) after making changes, completing a task, or fixing review-gate / stop-hook findings — make the edits, run the gates, report, and wait for an explicit "commit" instruction. The same applies to `git push`. A one-off "commit this" authorises that commit only, not subsequent ones.
 - Commits: small, focused. `<type>(<scope>): <subject>` where `<type>` is `feat`, `fix`, `refactor`, `chore`, `docs`, or `test`.
-- Routine `dev` work: **commit directly to `dev`** (no per-change branch or PR) after running the full local gate suite. PRs are required only for `dev` → `main` releases and hotfixes; optional for large / risky `feature/*` work.
+- Routine `dev` work: **commit directly to `dev`** (no per-change branch or PR) after running the full local gate suite — once the user has asked you to commit. PRs are required only for `dev` → `main` releases and hotfixes; optional for large / risky `feature/*` work.
 
 ### Branching model (Git Flow)
 
