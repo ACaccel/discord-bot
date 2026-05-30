@@ -11,6 +11,20 @@ at the repository root.
 
 ## Unreleased
 
+- **C11 Bot / C8 Plugins** — the `tomori` personality now registers
+  `createGuildEventsPlugin(...)` (it previously only loaded auto-reply / giveaway /
+  activity / voice), so `messageUpdate` / `messageDelete` / `guildMemberUpdate` /
+  `guildCreate` are again subscribed and their `logGuildEvent` audit lines (and the
+  `event`-channel mirror, once configured) are produced. A new
+  `test/unit/bot/tomori-composition.test.ts` pins each personality's plugin set so
+  the drift cannot recur silently. The `giveaway` plugin was redesigned: it no longer
+  requires a dedicated `giveaway` channel — `/giveaway_create` publishes the
+  announcement in the channel it was invoked from and removes its own interaction
+  reply. The orphaned `replies:giveaway.channel_not_configured` and
+  `replies:giveaway.create_success` keys were dropped from both locales. The C8
+  `guild-events` description was corrected to list all four subscriptions (it
+  previously named only `guildCreate`).
+
 - **C8 Plugins / C11 Bot / C1 Core** — msg-archive backup transcripts now
   land under `logs/backup/msg-archive-<guildId>-<YYYY-MM-DD_HH-MM-SS>.log`; the
   local-time stamp (built by `buildBackupLogPath` in

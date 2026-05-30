@@ -304,11 +304,9 @@
   },
   "giveaway": {
     "missing_required_fields": "Please enter the duration, number of winners, and prize.",
-    "channel_not_configured": "The giveaway channel is not configured.",
     "invalid_duration": "Invalid duration.",
     "create_announce_failed": "Could not create the giveaway.",
     "create_failed": "Could not run the giveaway.",
-    "create_success": "Giveaway created! It will end at {{endTime}}.",
     "missing_message_id": "Please provide the giveaway message ID.",
     "delete_failed_with_reason": "Could not delete the giveaway: {{reason}}",
     "delete_success": "Giveaway deleted.",

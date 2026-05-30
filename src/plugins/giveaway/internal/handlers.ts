@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction } from 'discord.js';
+import { MessageFlags, type ChatInputCommandInteraction } from 'discord.js';
 
 import type { BaseBot } from '../../../bot';
 import { bindTranslator } from '../../../core/i18n';
@@ -17,7 +17,11 @@ export const handleGiveawayCreate = async (
     interaction: ChatInputCommandInteraction,
     bot: BaseBot,
 ): Promise<void> => {
-    await interaction.deferReply();
+    // Reply ephemerally so the acknowledgement (and any validation
+    // error) is visible only to the invoker. On the success path the
+    // deferred reply is deleted, leaving the announcement embed as the
+    // only visible output.
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const t = bindTranslator(bot.translator);
     const deps = buildGiveawayDepsFromBot(bot);
     try {
@@ -37,13 +41,10 @@ export const handleGiveawayCreate = async (
             return;
         }
 
-        const channel_id = deps.registry.getChannel(guild.id, 'giveaway')?.id;
-        if (!channel_id) {
-            await interaction.editReply({ content: t('replies:giveaway.channel_not_configured') });
-            return;
-        }
-
-        const channel = interaction.guild.channels.cache.get(channel_id);
+        // The giveaway is published directly in the channel the command
+        // was invoked from — there is no dedicated `giveaway` channel
+        // to configure.
+        const channel = interaction.channel;
         if (!channel?.isSendable()) {
             await interaction.editReply({ content: t('errors:command.channel_not_found') });
             return;
@@ -80,7 +81,10 @@ export const handleGiveawayCreate = async (
         }
 
         // `create` returns Result<GiveawayDoc, DatabaseError>. An
-        // `err` is re-thrown into the surrounding catch.
+        // `err` is re-thrown into the surrounding catch. `channel_id`
+        // records the invoking channel so the reboot path
+        // (`scheduleGiveaway`) re-resolves the same channel when it
+        // announces the result.
         const createResult = await repos.giveaway.create({
             winner_num,
             prize,
@@ -100,11 +104,9 @@ export const handleGiveawayCreate = async (
             );
         }
 
-        await interaction.editReply({
-            content: t('replies:giveaway.create_success', {
-                endTime: end_time_date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei" }),
-            }),
-        });
+        // No success reply — the announcement embed is the only
+        // intended output, so remove the ephemeral acknowledgement.
+        await interaction.deleteReply();
     } catch (error) {
         logError(bot.logger, interaction.guild?.id ?? null, error);
         await interaction.editReply({ content: t('replies:giveaway.create_failed') });

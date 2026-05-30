@@ -124,7 +124,15 @@ export const scheduleGiveaway = async (
   if (!giveawayResult.ok) throw giveawayResult.error;
   const giveaway = giveawayResult.value;
   if (!giveaway) return 'Giveaway not found';
-  const giveawayChannel = guild.channels.cache.get(giveaway.channel_id);
+  // The giveaway is announced in whatever channel `/giveaway_create`
+  // was invoked from — which may be a thread or a channel that is not
+  // in `guild.channels.cache` after a restart (threads in particular
+  // are not all delivered on GUILD_CREATE). Fall back to an API fetch
+  // so a persisted `channel_id` the cache cannot resolve does not
+  // strand the winner draw on reboot.
+  const giveawayChannel =
+    guild.channels.cache.get(giveaway.channel_id) ??
+    (await deps.client.channels.fetch(giveaway.channel_id).catch(() => null));
   if (!giveawayChannel?.isSendable()) return 'Giveaway channel not found';
 
   const message = await giveawayChannel.messages.fetch(message_id).catch(() => null);

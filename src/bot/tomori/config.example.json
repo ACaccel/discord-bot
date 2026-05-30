@@ -1,7 +1,19 @@
 {
     "admin": "YOUR_ADMIN_USER_ID",
+    "guilds": {
+        "YOUR_GUILD_ID": {
+            "channels": {
+                "event": "YOUR_EVENT_CHANNEL_ID",
+                "debug": "YOUR_DEBUG_CHANNEL_ID"
+            },
+            "roles": {}
+        }
+    },
     "commands": [
         "help",
         "COMMAND_NAME"
+    ],
+    "blocked_channels": [
+        "YOUR_BLOCKED_CHANNEL_ID"
     ]
 }

@@ -304,11 +304,9 @@
   },
   "giveaway": {
     "missing_required_fields": "請輸入持續時間、得獎人數和獎品",
-    "channel_not_configured": "抽獎頻道未設定",
     "invalid_duration": "無效的持續時間",
     "create_announce_failed": "無法建立抽獎",
     "create_failed": "無法抽獎",
-    "create_success": "抽獎已建立！將於 {{endTime}} 結束",
     "missing_message_id": "請提供抽獎訊息ID",
     "delete_failed_with_reason": "無法刪除抽獎: {{reason}}",
     "delete_success": "抽獎已刪除",
