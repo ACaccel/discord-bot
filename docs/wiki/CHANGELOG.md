@@ -22,6 +22,14 @@ at the repository root.
   and `/bug_report` DMs every configured admin. C1 / C11 component
   pages updated; all four bundled configs set `admin` to a string list.
 
+- **C11 Bot / C7 i18n** — `src/deploy.ts` now localises registered
+  command descriptions to the bot's `config.language` (via
+  `buildDeployTranslator`, mirroring `BaseBot.buildHost`); previously it
+  always registered `zh-TW`. A new `--dry-run` flag prints the resolved
+  command text without touching Discord, to verify locale output ahead
+  of a propagation-delayed global deploy. C7 / C11 pages note the deploy
+  localisation path.
+
 - **C11 Bot / C7 i18n / C6 Handlers** — three config-driven features.
   (1) A per-bot `language` field in `config.json` (`'zh-TW'` | `'en'`)
   drives the translator's default locale via `isLocale` +

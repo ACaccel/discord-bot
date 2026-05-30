@@ -63,8 +63,18 @@ Register slash commands with Discord (run after editing commands):
 ```bash
 yarn deploy -t nijika                          # GLOBAL — visible in every guild after Discord propagation (~minutes, up to 1h)
 yarn deploy -t nijika --dev-guild <guild_id>   # guild-scoped fast iteration (instant)
+yarn deploy -t nijika --dry-run                # print resolved command name/description locally, register nothing
 yarn deploy -t nijika --cleanup-guild-commands # one-shot: remove legacy guild-scoped registrations
 ```
+
+Command descriptions are localised to the bot's `config.language` (so
+`"language": "en"` registers English text). When debugging command
+text, `--dry-run` prints exactly what would be registered without
+touching Discord — use it to rule out the two operational gotchas:
+global registration can take up to an hour to propagate, and a stale
+guild-scoped command (from an earlier `--dev-guild` run) overrides the
+global one in that guild, so it keeps showing the old language until
+you re-deploy to that guild or run `--cleanup-guild-commands`.
 
 The default is **global** registration so a freshly-invited guild
 sees the full command set without an operator re-running deploy. Use

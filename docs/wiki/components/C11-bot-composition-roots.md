@@ -39,3 +39,5 @@ Each personality loads a sibling `config.json` (`import config from './config.js
 ## Deploy
 
 `src/deploy.ts` is the slash-command registration entry point. It uses the same `resolveLocalesDir()` helper as `BaseBot` to inject the locales path and emits structured pino through `createBootstrapLogger({ component: 'deploy' }, { fileRouter: false })` — console-only. As a one-shot CLI it has no `bot` binding (which the file router requires) and must not create a `logs/<botId>/` tree, so it opts out of the file sink.
+
+Command descriptions are localised to the bot's `config.language` via `buildDeployTranslator` (same `fallbackLocale` plumbing as `BaseBot.buildHost`), so a bot's registered slash-command text matches its runtime locale. The `--dry-run` flag builds and prints the resolved command name/description without registering, which isolates code behaviour from Discord's global-command propagation delay (up to ~1h) and stale guild-scoped registrations (cleared with `--cleanup-guild-commands`).

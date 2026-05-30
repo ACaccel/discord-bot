@@ -18,7 +18,14 @@
  * Usage:
  *   yarn deploy -t nijika                 # global (default)
  *   yarn deploy -t nijika --dev-guild ID  # guild-side fast iteration
+ *   yarn deploy -t nijika --dry-run       # print resolved command text, register nothing
  *   yarn deploy -t nijika --cleanup-guild-commands
+ *
+ * Command text is localised to the bot's `config.language` (see
+ * `buildDeployTranslator`). Note global registrations can take up to an
+ * hour to propagate, and any stale guild-scoped commands override the
+ * global set in that guild — use `--dev-guild` for instant iteration or
+ * `--cleanup-guild-commands` to clear leftovers.
  */
 import type { ApplicationCommandDataResolvable } from "discord.js";
 import { REST, Routes } from "discord.js";
@@ -45,6 +52,7 @@ type DeployArgs = {
     bot?: string;
     devGuild?: string;
     cleanupGuildCommands?: boolean;
+    dryRun?: boolean;
 };
 
 type BotConfig = {
@@ -62,6 +70,8 @@ function parseArgs(argv: string[]): DeployArgs {
             out.devGuild = argv[++i];
         } else if (a === "--cleanup-guild-commands") {
             out.cleanupGuildCommands = true;
+        } else if (a === "--dry-run") {
+            out.dryRun = true;
         }
     }
 
@@ -193,6 +203,28 @@ async function deployDevGuild(botName: string, guildId: string): Promise<void> {
 }
 
 /**
+ * Build the command payload and print each command's resolved name and
+ * description WITHOUT registering anything with Discord. Lets operators
+ * confirm the per-bot `language` produces the expected localised text
+ * locally, sidestepping global-command propagation delay (up to ~1h)
+ * and stale guild-scoped registrations when debugging command text.
+ */
+async function deployDryRun(botName: string): Promise<void> {
+    const { commands, language } = loadBotConfig(botName);
+    const translator = await buildDeployTranslator(language);
+    const body = buildCommandsFromConfig(commands, translator);
+
+    logger.info(
+        { bot: botName, count: body.length, language: language ?? '(default)' },
+        'Dry run — built command JSON locally; nothing registered with Discord.',
+    );
+    for (const cmd of body) {
+        const c = cmd as { name?: string; description?: string };
+        logger.info({ command: c.name, description: c.description }, 'resolved command');
+    }
+}
+
+/**
  * One-shot cleanup tool. NOT safe to invoke routinely on bots with
  * many hundreds of guilds: Discord's per-route + global rate limits
  * apply, and the discord.js REST queue handles retries but the loop
@@ -252,13 +284,16 @@ async function main() {
             'Usage:\n' +
                 '  yarn deploy -t <bot_name>                          # global (default)\n' +
                 '  yarn deploy -t <bot_name> --dev-guild <guild_id>   # guild-side fast iteration\n' +
+                '  yarn deploy -t <bot_name> --dry-run                # print resolved command text, register nothing\n' +
                 '  yarn deploy -t <bot_name> --cleanup-guild-commands # remove legacy guild-scoped commands',
         );
         process.exit(1);
     }
 
     try {
-        if (args.cleanupGuildCommands === true) {
+        if (args.dryRun === true) {
+            await deployDryRun(bot);
+        } else if (args.cleanupGuildCommands === true) {
             await cleanupGuildCommands(bot);
         } else if (args.devGuild !== undefined) {
             await deployDevGuild(bot, args.devGuild);

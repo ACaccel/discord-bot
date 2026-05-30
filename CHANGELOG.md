@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`BaseBot.buildHost`) and by `src/deploy.ts`, so registered
   slash-command descriptions match the bot's configured locale. All
   four bundled bots set `"language": "zh-TW"` explicitly.
+- `yarn deploy --dry-run`: builds the command payload and prints each
+  command's resolved name/description without registering anything with
+  Discord, so the configured-locale text can be verified locally
+  without waiting on global-command propagation.
 - Optional channel configuration: `guilds.<id>.channels` and `roles`
   are now optional in `config.json`. A bot may omit them (or the whole
   `guilds` block) and keeps every feature while silently skipping
