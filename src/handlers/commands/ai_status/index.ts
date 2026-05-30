@@ -11,6 +11,7 @@ export default class ai_status extends Command {
         super();
         this.setConfig({
             name: 'ai_status',
+            category: 'ai',
         });
     }
 

@@ -38,6 +38,20 @@ earthquake webhook), and any LLM provider keys (`OPENAI_API_KEY`,
 `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`). The full
 schema lives in [`src/core/config/env.ts`](src/core/config/env.ts).
 
+Notable `config.json` fields (shape: `Config` in
+[`src/bot/index.ts`](src/bot/index.ts)):
+
+- `admin` — optional `string[]` of Discord user ids with bot-admin
+  privileges (e.g. `/ai_whitelist_*`, `/bug_report`). Snowflake ids
+  must be JSON strings, e.g. `["671160708007854120"]`.
+- `language` — optional default display locale, `"zh-TW"` (default) or
+  `"en"`. An unsupported value logs a warning and falls back to the
+  default.
+- `guilds.<id>.channels` / `roles` — both optional. Omit a map (or the
+  whole `guilds` block) to run without channel-bound side effects:
+  debug logging and the guild-event mirror simply have nothing to send
+  to. `tomori` ships with no `guilds` block for this reason.
+
 Run a personality in development:
 
 ```bash
@@ -117,6 +131,10 @@ Discord.
        super();
        this.setConfig({
          name: 'my_command',
+         // Groups the command under a `/help` section. Pick the closest
+         // CommandCategory: auto_reply | fun | server_activity | utility |
+         // admin | ai | other. Omitting it defaults to `other`.
+         category: 'utility',
          // i18n-ignore: command-builder metadata; localised via name_localizations.
          description: '<short description>',
          options: {

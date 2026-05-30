@@ -1,16 +1,17 @@
-import type {
-    ChatInputCommandInteraction,
-} from 'discord.js';
+import type { ChatInputCommandInteraction } from 'discord.js';
 import type { BaseBot } from '@bot';
-import { Command, localizeCommandConfig } from '@cmd';
+import { Command } from '@cmd';
 
 import { replyForError } from '../../reply-for-error';
+
+import { buildHelpEmbed } from './build-help-embed';
 
 export default class help extends Command {
     constructor() {
         super();
         this.setConfig({
             name: 'help',
+            category: 'utility',
         });
     }
 
@@ -18,24 +19,20 @@ export default class help extends Command {
         await interaction.deferReply();
         try {
             if (!bot.config.commands) {
-                await interaction.editReply({ content: bot.translator?.t('replies:help.no_commands') ?? ''});
+                await interaction.editReply({
+                    content: bot.translator?.t('replies:help.no_commands') ?? '',
+                });
                 return;
             }
 
-            let  helpContent = '## Help Message\n';
-            helpContent += bot.helpMessage;
-            helpContent += bot.translator?.t('replies:help.commands_header') ?? '';
-            bot.commandHandlers.forEach((cmd) => {
-                if (cmd.config) {
-                    // Descriptions are i18n keys resolved here against
-                    // the `commands` catalog, keeping CJK literals out
-                    // of source.
-                    const localized = localizeCommandConfig(cmd.config, bot.translator);
-                    helpContent += `* \`/${localized.name}\` : ${localized.description}\n`;
-                }
+            const botUser = interaction.client.user;
+            const embed = buildHelpEmbed(bot.commandHandlers, bot.translator, {
+                botName: botUser?.username ?? '',
+                botAvatarUrl: botUser?.displayAvatarURL(),
+                intro: bot.helpMessage,
             });
 
-            await interaction.editReply({ content: helpContent });
+            await interaction.editReply({ embeds: [embed] });
         } catch (error) {
             await replyForError(interaction, bot, error, 'replies:help.failed', interaction.guild?.id);
         }

@@ -12,6 +12,7 @@ export default class get_avatar extends Command {
         super();
         this.setConfig({
             name: "get_avatar",
+            category: 'utility',
             options: {
                 user: [
                     {

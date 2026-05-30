@@ -16,6 +16,7 @@ export default class ban_user extends Command {
         super();
         this.setConfig({
             name: "ban_user",
+            category: 'admin',
             options: {
                 user: [
                     {

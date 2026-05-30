@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Per-bot display language: a `language` field in each personality's
+  `config.json` (`"zh-TW"` | `"en"`) selects the translator's default
+  locale, validated by `isLocale` and threaded into
+  `createDefaultTranslator({ fallbackLocale })`; an unsupported value
+  warns and falls back to `zh-TW`. Applied both at runtime
+  (`BaseBot.buildHost`) and by `src/deploy.ts`, so registered
+  slash-command descriptions match the bot's configured locale. All
+  four bundled bots set `"language": "zh-TW"` explicitly.
+- Optional channel configuration: `guilds.<id>.channels` and `roles`
+  are now optional in `config.json`. A bot may omit them (or the whole
+  `guilds` block) and keeps every feature while silently skipping
+  channel-bound side effects (debug logging, the guild-event mirror).
+  `tomori` runs with no `guilds` block.
+- Redesigned `/help`: a public categorized embed grouped by a new
+  `CommandConfig.category` field (rendered by the unit-tested pure
+  builder `src/handlers/commands/help/build-help-embed.ts`), with bot
+  name / avatar in the author line and command / category counts in the
+  footer. Every command handler is tagged with a category; `tomori`
+  gained a `helpMessageKey` intro.
 - File-router pino transport (`src/core/logger/file-router-transport.ts`)
   that writes JSON Lines to `<rootDir>/<botId>[/<guildId>]/<localDate>.log`,
   rotating on the local-time day boundary. Enabled by default via the
@@ -78,6 +97,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `eventType` fields are hidden in the dev console (they remain in the
   JSON file sink). Closes the gap that made dev terminal output
   unreadable.
+- Bot admins are now a list: `Config.admin` is `string[]` (was a single
+  `string`) and `BaseBot` exposes `adminIds` plus an `isAdmin(userId)`
+  check. `/ai_whitelist_add` / `/ai_whitelist_remove` gate on
+  `isAdmin`, and `/bug_report` DMs every configured admin (best-effort)
+  rather than only the first. Snowflake ids must be JSON strings.
 
 ### Removed
 
@@ -94,6 +118,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every other event without adding signal. `MESSAGE_CREATE` now joins
   reactions as an intentionally un-audited event type; the plugin reply
   behaviour itself is unchanged.
+
+### Fixed
+
+- `yarn deploy` crashed (exit 1) right after registering commands: the
+  file-router log transport rejects records without a `bot` binding,
+  which the deploy CLI's bootstrap logger lacked. Deploy now builds its
+  logger with `createBootstrapLogger(base, { fileRouter: false })` —
+  console-only — so it runs to completion and no longer creates a
+  `logs/<botId>/` directory. The new `fileRouter` option on
+  `createBootstrapLogger` (default `true`) is the opt-out.
 
 ## [1.0.0] — 2026-05-25
 

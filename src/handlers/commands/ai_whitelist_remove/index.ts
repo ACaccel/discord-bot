@@ -11,6 +11,7 @@ export default class ai_whitelist_remove extends Command {
         super();
         this.setConfig({
             name: 'ai_whitelist_remove',
+            category: 'ai',
             options: {
                 user: [
                     {
@@ -24,7 +25,7 @@ export default class ai_whitelist_remove extends Command {
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        if (interaction.user.id !== bot.adminId) {
+        if (!bot.isAdmin(interaction.user.id)) {
             await interaction.editReply({ content: bot.translator?.t('errors:permission.admin_only_short') ?? '' });
             return;
         }

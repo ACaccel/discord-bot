@@ -49,6 +49,7 @@ export default class list_guild_members extends Command {
         super();
         this.setConfig({
             name: "list_guild_members",
+            category: 'admin',
         });
     }
 

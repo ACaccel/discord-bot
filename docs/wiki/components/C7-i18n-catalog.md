@@ -26,6 +26,21 @@ Both locales must keep the same key set and the same `{{placeholder}}` set; this
 - `errors.json` — user-facing text for each `DomainError.messageKey`. Groups: `command`, `validation`, `permission`, `ai`, `db`, `llm`, `configuration`, plus a flat `unexpected` fallback.
 - `replies.json` — every other command reply. Each command feature carries an in-character `<feature>.failed` fallback that interpolates `{{traceId}}`.
 
+## Per-bot default language
+
+Each personality picks its default display locale through its `config.json` `language` field. The flow is:
+
+```
+Config.language ('zh-TW' | 'en')
+  → BaseBot.buildHost: isLocale(...) ? value : undefined  (warn + fall back on an unsupported value)
+  → createDefaultTranslator({ localesDir, fallbackLocale })
+  → I18NextTranslator.create → i18next lng / fallbackLng
+```
+
+`SUPPORTED_LOCALES` and the `isLocale` type guard (`src/core/i18n/translator.ts`) are the single source of truth for valid values; omitting `language` uses `DEFAULT_LOCALE` (`zh-TW`). Per-call overrides (`t(key, params, locale)` via `resolveLocale`) still take precedence over this bot-wide default when a call supplies one.
+
+`src/deploy.ts` applies the same `language` when it localises command descriptions for registration (`buildDeployTranslator`), so a bot's deployed slash-command text matches the locale it runs in.
+
 ## Path injection
 
 `LoadCatalogOptions.localesDir` is required. `src/core/i18n/` no longer derives the path from `__dirname`. The composition root owns the path via the helper `resolveLocalesDir()` in `src/bot/locales-dir.ts`; `BaseBot` accepts it through its constructor and `src/deploy.ts` reuses the same helper.

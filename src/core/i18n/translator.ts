@@ -20,7 +20,25 @@
  */
 export type Locale = 'zh-TW' | 'en';
 
+/**
+ * The single source of truth for every supported locale. The `Locale`
+ * union above is kept in lockstep with this tuple; {@link isLocale}
+ * validates untrusted input (e.g. a bot's `config.json` `language`
+ * field) against it. Adding a locale means extending both this tuple
+ * and the union, then dropping a parallel catalog folder.
+ */
+export const SUPPORTED_LOCALES = ['zh-TW', 'en'] as const;
+
 export const DEFAULT_LOCALE: Locale = 'zh-TW';
+
+/**
+ * Runtime type guard for {@link Locale}. Use at trust boundaries where a
+ * value arrives as an unvalidated `string | unknown` (config files,
+ * environment, request payloads) before it may be passed to the
+ * translator as a locale.
+ */
+export const isLocale = (value: unknown): value is Locale =>
+  typeof value === 'string' && (SUPPORTED_LOCALES as readonly string[]).includes(value);
 
 export type TranslationParams = Readonly<Record<string, string | number>>;
 

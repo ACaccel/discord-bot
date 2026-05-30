@@ -12,6 +12,7 @@ export default class todo_list extends Command {
         super();
         this.setConfig({
             name: "todo_list",
+            category: 'utility',
             options: {
                 string: [
                     {

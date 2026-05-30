@@ -22,6 +22,9 @@ interface TomoriConfig extends Config {
 export class Tomori extends BaseBot<TomoriConfig> {
     public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: TomoriConfig) {
         super(client, token, mongoURI, clientId, config);
+        // Intro paragraph rendered at the top of the `/help` embed; the
+        // key is resolved once the translator is loaded (see BaseBot.run).
+        this.helpMessageKey = 'replies:tomori.help_message';
         // Tomori opts into auto-reply, guild-event mirroring, giveaway,
         // activity and voice behaviour by registering the corresponding
         // plugins explicitly. Plugins resolve their dependencies through

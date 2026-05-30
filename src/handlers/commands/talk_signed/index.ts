@@ -12,6 +12,7 @@ export default class talk_signed extends Command {
         super();
         this.setConfig({
             name: "talk_signed",
+            category: 'fun',
             options: {
                 string: [
                     {

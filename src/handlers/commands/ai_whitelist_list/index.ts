@@ -11,6 +11,7 @@ export default class ai_whitelist_list extends Command {
         super();
         this.setConfig({
             name: 'ai_whitelist_list',
+            category: 'ai',
         });
     }
 

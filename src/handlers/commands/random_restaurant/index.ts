@@ -13,6 +13,7 @@ export default class random_restaurant extends Command {
         super();
         this.setConfig({
             name: "random_restaurant",
+            category: 'utility',
             options: {
                 string: [
                     {

@@ -10,6 +10,7 @@ export default class change_nickname extends Command {
         super();
         this.setConfig({
             name: "change_nickname",
+            category: 'admin',
             options: {
                 string: [
                     {

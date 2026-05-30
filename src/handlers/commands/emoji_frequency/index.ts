@@ -13,6 +13,7 @@ export default class emoji_frequency extends Command {
     super();
     this.setConfig({
       name: 'emoji_frequency',
+      category: 'utility',
       options: {
         string: [
           {

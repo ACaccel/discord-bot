@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { I18NextTranslator, MissingTranslationError } from '../../../../src/core/i18n';
+import {
+  DEFAULT_LOCALE,
+  I18NextTranslator,
+  isLocale,
+  MissingTranslationError,
+  SUPPORTED_LOCALES,
+} from '../../../../src/core/i18n';
 
 const resources = {
   'zh-TW': {
@@ -66,5 +72,33 @@ describe('I18NextTranslator', () => {
       expect(missing.en).toContain('errors:unexpected');
       expect(missing.en).not.toContain('errors:llm.rate_limited');
     });
+  });
+});
+
+describe('isLocale / SUPPORTED_LOCALES', () => {
+  it('SUPPORTED_LOCALES contains the default locale', () => {
+    expect(SUPPORTED_LOCALES).toContain(DEFAULT_LOCALE);
+  });
+
+  it('accepts every supported locale', () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      expect(isLocale(locale)).toBe(true);
+    }
+  });
+
+  it.each([
+    ['fr', 'unsupported language code'],
+    ['EN', 'wrong case'],
+    ['zh', 'partial tag'],
+    ['', 'empty string'],
+  ])('rejects %s (%s)', (value) => {
+    expect(isLocale(value)).toBe(false);
+  });
+
+  it('rejects non-string inputs', () => {
+    expect(isLocale(undefined)).toBe(false);
+    expect(isLocale(null)).toBe(false);
+    expect(isLocale(42)).toBe(false);
+    expect(isLocale({})).toBe(false);
   });
 });

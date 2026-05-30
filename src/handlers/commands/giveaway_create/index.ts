@@ -10,6 +10,7 @@ export default class giveaway_create extends Command {
         super();
         this.setConfig({
             name: "giveaway_create",
+            category: 'server_activity',
             options: {
                 string: [
                     {

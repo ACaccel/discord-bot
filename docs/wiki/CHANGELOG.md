@@ -11,6 +11,34 @@ at the repository root.
 
 ## Unreleased
 
+- **C11 Bot / C1 Core / C6 Handlers** — two fixes. (1) `yarn deploy`
+  no longer crashes / writes logs: `createBootstrapLogger` gained a
+  `fileRouter` option and `src/deploy.ts` builds a console-only logger
+  via `{ fileRouter: false }`, so the file-router `bot`-binding
+  requirement no longer applies to the one-shot CLI and no
+  `logs/<botId>/` tree is created. (2) Bot admins are now a list:
+  `Config.admin` is `string[]`, `BaseBot` exposes `adminIds` +
+  `isAdmin(userId)`, the `/ai_whitelist_*` handlers gate on `isAdmin`,
+  and `/bug_report` DMs every configured admin. C1 / C11 component
+  pages updated; all four bundled configs set `admin` to a string list.
+
+- **C11 Bot / C7 i18n / C6 Handlers** — three config-driven features.
+  (1) A per-bot `language` field in `config.json` (`'zh-TW'` | `'en'`)
+  drives the translator's default locale via `isLocale` +
+  `createDefaultTranslator({ fallbackLocale })`; `SUPPORTED_LOCALES` /
+  `isLocale` were added to `src/core/i18n/translator.ts`. (2)
+  `guilds.<id>.channels` / `roles` became optional in `Config` —
+  `GuildRegistrar` already tolerated missing maps, so omitting them
+  disables channel-bound side effects (debug log, event mirror) while
+  keeping every other feature; `tomori` ships with no `guilds` block.
+  (3) `/help` was rebuilt as a public categorized embed driven by a new
+  `CommandConfig.category` union; the pure builder lives at
+  `src/handlers/commands/help/build-help-embed.ts` (unit-tested under
+  `test/unit/handlers/help/`), all command handlers are tagged, and new
+  `replies:help.*` keys (`title`, `intro_fallback`, `footer`,
+  `category.<key>`) plus `replies:tomori.help_message` landed in both
+  locales. C6 / C7 / C11 component pages updated accordingly.
+
 - **C11 Bot / C8 Plugins** — the `tomori` personality now registers
   `createGuildEventsPlugin(...)` (it previously only loaded auto-reply / giveaway /
   activity / voice), so `messageUpdate` / `messageDelete` / `guildMemberUpdate` /

@@ -16,6 +16,7 @@ export default class ai_settings extends Command {
     super();
     this.setConfig({
       name: 'ai_settings',
+      category: 'ai',
       options: {
         string: [{ name: 'provider', required: true, choices: PROVIDER_CHOICES }],
       },

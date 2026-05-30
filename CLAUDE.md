@@ -163,11 +163,12 @@ earthquake channel (`EarthquakePlugin`).
 
 ## Architectural rules
 
-Three load-bearing rules; a CI gate or a reviewer will catch violations:
+Four load-bearing rules; a CI gate or a reviewer will catch violations:
 
 1. **No CJK literals in `src/handlers/` or `src/plugins/`.** Use translator keys; add `// i18n-ignore: <reason>` only when the literal is not user-facing.
 2. **No `process.env.X` outside `src/core/config/env.ts`.**
 3. **No new handler / plugin without a test.**
+4. **No code change without its documentation.** Any change to user-visible behaviour, a config field, a public contract, or a command must update every documentation surface it touches — the relevant `docs/wiki/components/` page, `docs/architecture.md`, `CONTRIBUTING.md`, the matching `config.example.json`, and both `CHANGELOG.md` files — in the same unit of work. A missing doc update is a defect, like a missing test. (See `contribute-change` Step 7.)
 
 ## Quality gates (non-negotiable)
 

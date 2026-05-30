@@ -72,4 +72,22 @@ describe('catalog-loader', () => {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
+
+  it('fallbackLocale selects the default locale used by t()', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'catalog-loader-'));
+    try {
+      writeLocale(tmp, 'zh-TW', { replies: { hi: '嗨' }, errors: {}, commands: {} });
+      writeLocale(tmp, 'en', { replies: { hi: 'hi' }, errors: {}, commands: {} });
+
+      // No fallbackLocale -> DEFAULT_LOCALE (zh-TW).
+      const zh = await createDefaultTranslator({ localesDir: tmp });
+      expect(zh.t('replies:hi')).toBe('嗨');
+
+      // Explicit 'en' makes English the default locale for unscoped t().
+      const en = await createDefaultTranslator({ localesDir: tmp, fallbackLocale: 'en' });
+      expect(en.t('replies:hi')).toBe('hi');
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });

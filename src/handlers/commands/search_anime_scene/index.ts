@@ -13,6 +13,7 @@ export default class search_anime_scene extends Command {
         super();
         this.setConfig({
             name: "search_anime_scene",
+            category: 'utility',
             options: {
                 attachment: [
                     {

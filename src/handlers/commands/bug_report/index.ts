@@ -12,6 +12,7 @@ export default class bug_report extends Command {
         super();
         this.setConfig({
             name: "bug_report",
+            category: 'admin',
             options: {
                 string: [
                     {
@@ -31,18 +32,26 @@ export default class bug_report extends Command {
                 return;
             }
     
-            if (!bot.adminId) {
-                throw new Error("Admin ID not found");
+            if (bot.adminIds.length === 0) {
+                throw new Error("No admin configured");
             }
-    
-            // send message to admin via dm
-            const admin = await bot.client.users.fetch(bot.adminId);
-            if (admin) {
-                await admin.send(`Bug Report from ${interaction.user.username}：${content}`);
-                await interaction.reply({ content: bot.translator?.t('replies:bug_report.reported', { content }) ?? '', flags: MessageFlags.Ephemeral });
-            } else {
-                throw new Error("Admin not found");
+
+            // DM every configured admin (best-effort); a single failed
+            // delivery must not drop the report for the others.
+            let delivered = 0;
+            for (const adminId of bot.adminIds) {
+                try {
+                    const admin = await bot.client.users.fetch(adminId);
+                    await admin.send(`Bug Report from ${interaction.user.username}：${content}`);
+                    delivered += 1;
+                } catch {
+                    // try the next admin
+                }
             }
+            if (delivered === 0) {
+                throw new Error("Failed to deliver bug report to any admin");
+            }
+            await interaction.reply({ content: bot.translator?.t('replies:bug_report.reported', { content }) ?? '', flags: MessageFlags.Ephemeral });
         } catch (error) {
             await replyForError(interaction, bot, error, 'replies:bug_report.failed', interaction.guild?.id);
         }

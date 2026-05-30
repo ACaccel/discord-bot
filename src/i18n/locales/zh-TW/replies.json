@@ -5,6 +5,9 @@
   "nijika": {
     "help_message": "### 目前支援的功能：\n1. auto reply: bot會根據資料庫的message pair回覆訊息\n2. roll dice: 輸入範例-> `2d5`, 在1~5隨機選擇兩個數字\n"
   },
+  "tomori": {
+    "help_message": "嗨,我是 Tomori!以下是你可以使用的指令,依用途分類整理:"
+  },
   "konata": {
     "presence_text": "貧乳はステータスだ、希少価値だ！"
   },
@@ -145,7 +148,18 @@
   "help": {
     "no_commands": "沒有指令清單",
     "failed": "無法取得指令清單 (錯誤代碼:{{traceId}})",
-    "commands_header": "### 目前支援的slash command:\n"
+    "title": "指令說明",
+    "intro_fallback": "以下是目前可用的指令:",
+    "footer": "共 {{count}} 個指令 · {{categories}} 個分類",
+    "category": {
+      "auto_reply": "💬 自動回覆",
+      "fun": "🎮 娛樂互動",
+      "server_activity": "🎉 伺服器活動",
+      "utility": "🔧 工具與查詢",
+      "admin": "🛡️ 伺服器管理",
+      "ai": "🤖 AI 對話",
+      "other": "📦 其他"
+    }
   },
   "inspect_member_ids": {
     "no_valid_id": "找不到有效 ID,請輸入 17~20 位數字的 Discord ID",

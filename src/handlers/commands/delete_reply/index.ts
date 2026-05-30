@@ -16,6 +16,7 @@ export default class delete_reply extends Command {
         super();
         this.setConfig({
             name: "delete_reply",
+            category: 'auto_reply',
             options: {
                 string: [
                     {

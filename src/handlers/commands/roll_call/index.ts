@@ -14,6 +14,7 @@ export default class roll_call extends Command {
         super();
         this.setConfig({
             name: "roll_call",
+            category: 'server_activity',
             options: {
                 string: [
                     {

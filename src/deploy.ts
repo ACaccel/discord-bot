@@ -28,7 +28,7 @@ import dotenv from "dotenv";
 
 import { buildCommandJsonBody, createCommand, localizeCommandConfig } from "@cmd";
 import { createBootstrapLogger, loadEnv } from '@core/config';
-import { createDefaultTranslator, type Translator } from '@core/i18n';
+import { createDefaultTranslator, isLocale, type Locale, type Translator } from '@core/i18n';
 
 import { resolveLocalesDir } from './bot/locales-dir';
 
@@ -36,8 +36,10 @@ import { resolveLocalesDir } from './bot/locales-dir';
 // bound to `TOKENS.Logger` is not available. Use the bootstrap logger
 // (the same construct `BaseBot.run()` falls back to during phase 1)
 // so the deploy CLI still emits structured pino lines instead of raw
-// `console.*` writes.
-const logger = createBootstrapLogger({ component: 'deploy' });
+// `console.*` writes. `fileRouter: false` keeps it console-only: deploy
+// is a one-shot CLI with no `bot` binding (which the file router
+// requires) and must not create a `logs/<botId>/` tree.
+const logger = createBootstrapLogger({ component: 'deploy' }, { fileRouter: false });
 
 type DeployArgs = {
     bot?: string;
@@ -47,6 +49,7 @@ type DeployArgs = {
 
 type BotConfig = {
     commands?: string[];
+    language?: string;
 };
 
 function parseArgs(argv: string[]): DeployArgs {
@@ -80,7 +83,9 @@ function resolveBotPaths(botName: string) {
     return { baseDir, configPath, envPath };
 }
 
-function loadBotConfig(botName: string): { token: string; clientId: string; commands: string[] } {
+function loadBotConfig(
+    botName: string,
+): { token: string; clientId: string; commands: string[]; language?: string } {
     const { configPath, envPath } = resolveBotPaths(botName);
 
     dotenv.config({ path: envPath });
@@ -95,7 +100,26 @@ function loadBotConfig(botName: string): { token: string; clientId: string; comm
         throw new Error(`No commands defined in ${configPath}`);
     }
 
-    return { token, clientId, commands: cfg.commands };
+    return { token, clientId, commands: cfg.commands, language: cfg.language };
+}
+
+/**
+ * Build the translator the deployed command JSON is localised against,
+ * honouring the bot's `config.language` (mirrors `BaseBot.buildHost`).
+ * An unsupported value warns and falls back to the framework default so
+ * command descriptions register in the locale the running bot will use.
+ */
+async function buildDeployTranslator(language: string | undefined): Promise<Translator> {
+    let fallbackLocale: Locale | undefined;
+    if (isLocale(language)) {
+        fallbackLocale = language;
+    } else if (language !== undefined) {
+        logger.warn(
+            { language },
+            'config.language is not a supported locale; deploying command text in the default locale.',
+        );
+    }
+    return createDefaultTranslator({ localesDir: resolveLocalesDir(), fallbackLocale });
 }
 
 function buildCommandsFromConfig(
@@ -121,9 +145,9 @@ function buildCommandsFromConfig(
 }
 
 async function deployGlobal(botName: string): Promise<void> {
-    const { token, clientId, commands } = loadBotConfig(botName);
+    const { token, clientId, commands, language } = loadBotConfig(botName);
 
-    const translator = await createDefaultTranslator({ localesDir: resolveLocalesDir() });
+    const translator = await buildDeployTranslator(language);
     const body = buildCommandsFromConfig(commands, translator);
     if (body.length === 0) {
         logger.error('No commands to deploy (after filtering).');
@@ -145,9 +169,9 @@ async function deployGlobal(botName: string): Promise<void> {
 }
 
 async function deployDevGuild(botName: string, guildId: string): Promise<void> {
-    const { token, clientId, commands } = loadBotConfig(botName);
+    const { token, clientId, commands, language } = loadBotConfig(botName);
 
-    const translator = await createDefaultTranslator({ localesDir: resolveLocalesDir() });
+    const translator = await buildDeployTranslator(language);
     const body = buildCommandsFromConfig(commands, translator);
     if (body.length === 0) {
         logger.error('No commands to deploy (after filtering).');

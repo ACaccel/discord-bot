@@ -1,14 +1,6 @@
 {
-    "admin": "YOUR_ADMIN_USER_ID",
-    "guilds": {
-        "YOUR_GUILD_ID": {
-            "channels": {
-                "event": "YOUR_EVENT_CHANNEL_ID",
-                "debug": "YOUR_DEBUG_CHANNEL_ID"
-            },
-            "roles": {}
-        }
-    },
+    "admin": ["YOUR_ADMIN_USER_ID"],
+    "language": "zh-TW",
     "commands": [
         "help",
         "COMMAND_NAME"

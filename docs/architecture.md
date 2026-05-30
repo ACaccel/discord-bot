@@ -49,7 +49,7 @@ Thin lifecycle owner. Subclasses (`nijika`, `konata`, `tomori`,
 configuration; `BaseBot.run()` orchestrates startup in a fixed order:
 
 1. Load env + build composition-root container.
-2. Initialise the i18n translator and load locale catalogs.
+2. Initialise the i18n translator (in the bot's configured `language`, default `zh-TW`) and load locale catalogs.
 3. Connect every configured guild's MongoDB via the shared connection manager.
 4. Resolve each guild's channels, roles, and repositories.
 5. Attach the Discord client event bridge.
@@ -99,8 +99,12 @@ interfaces; tests inject in-memory fakes.
 `src/i18n/locales/<lang>/{commands,errors,replies}.json` keyed
 `<namespace>:<feature>.<purpose>`. The `localesDir` is injected from
 the composition root so `core/i18n` has no knowledge of the content
-layer's path. CJK literals are forbidden inside `src/handlers/` and
-`src/plugins/`; a CI scanner enforces this.
+layer's path. Each personality picks its default locale through its
+`config.json` `language` field (`'zh-TW'` | `'en'`), validated by
+`isLocale` and threaded into `createDefaultTranslator({ fallbackLocale })`;
+an unsupported value falls back to `DEFAULT_LOCALE`. CJK literals are
+forbidden inside `src/handlers/` and `src/plugins/`; a CI scanner
+enforces this.
 
 ### Error taxonomy + Result ([src/core/errors/](../src/core/errors/), [src/core/result/](../src/core/result/))
 

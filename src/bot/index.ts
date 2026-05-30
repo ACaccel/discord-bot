@@ -38,7 +38,7 @@ import { createBootstrapLogger, loadEnv, type Env } from '../core/config';
 import { ConfigurationError } from '../core/errors';
 import type { GuildRegistry } from '../core/guild-registry';
 import type { Translator } from '../core/i18n';
-import { createDefaultTranslator } from '../core/i18n';
+import { createDefaultTranslator, isLocale } from '../core/i18n';
 import type { asGuildId } from '../core/ids';
 import { createContainer, TOKENS, type ReposFactory, type ServiceContainer } from '../core/ioc';
 import { installProcessHandlers, logError, logSystem, ops, type Logger } from '../core/logger';
@@ -77,9 +77,19 @@ const sharedConnectionManagerForUri = (uri: string): MongoConnectionManager => {
 };
 
 export interface Config {
-  admin?: string;
+  /** Discord user ids granted bot-admin privileges (e.g. `/ai_whitelist_*`). */
+  admin?: string[];
   guilds?: Record<string, GuildConfig>;
   commands?: string[];
+  /**
+   * Default display locale for this bot's user-facing text. Optional —
+   * omit to use the framework default (`zh-TW`). Supported values are
+   * the members of `SUPPORTED_LOCALES` (`'zh-TW' | 'en'`). Typed as a
+   * plain `string` because it arrives from untrusted `config.json`; it
+   * is validated with `isLocale` in `buildHost`, and an unsupported
+   * value is ignored with a warning and falls back to the default.
+   */
+  language?: string;
 }
 
 export interface GuildInfo {
@@ -92,8 +102,16 @@ export interface GuildInfo {
 }
 
 interface GuildConfig {
-  channels: Record<string, string>;
-  roles: Record<string, string>;
+  /**
+   * Symbolic channel-name -> Discord channel id. Optional: a guild that
+   * omits it (or omits the whole `guilds` block) keeps every feature but
+   * silently skips channel-bound side effects — debug logging and the
+   * guild-event mirror have nothing to send to. `GuildRegistrar` resolves
+   * a missing map to an empty record; consumers null-check downstream.
+   */
+  channels?: Record<string, string>;
+  /** Symbolic role-name -> Discord role id. Optional, same semantics as {@link channels}. */
+  roles?: Record<string, string>;
 }
 
 /**
@@ -117,7 +135,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
   public readonly container: ServiceContainer;
   public client: Client;
   public clientId: string;
-  public adminId?: string;
+  /** Discord user ids granted bot-admin privileges; resolved from `config.admin`. */
+  public adminIds: string[] = [];
   public config: TConfig;
 
   /**
@@ -286,6 +305,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     this.client = client;
     this.clientId = clientId;
     this.config = config;
+    this.adminIds = config.admin ?? [];
     // R5: composition root injects the locales path; `core/i18n`
     // no longer reverse-resolves it from `__dirname`. Subclasses
     // get the canonical monorepo layout for free via the default
@@ -560,7 +580,21 @@ export abstract class BaseBot<TConfig extends Config = Config> {
    * plugins, run host `initAll()`.
    */
   private async buildHost(rootLogger: Logger): Promise<PluginHost> {
-    const translator = await createDefaultTranslator({ localesDir: this.localesDir });
+    // Per-bot display language: drive the translator's locale from the
+    // bot's `config.json`. An unsupported value is rejected here (rather
+    // than silently producing missing-key fallbacks downstream) and the
+    // translator reverts to DEFAULT_LOCALE.
+    const configuredLocale = isLocale(this.config.language) ? this.config.language : undefined;
+    if (this.config.language !== undefined && configuredLocale === undefined) {
+      rootLogger.warn(
+        { language: this.config.language },
+        'BaseBot.buildHost: config.language is not a supported locale; falling back to DEFAULT_LOCALE.',
+      );
+    }
+    const translator = await createDefaultTranslator({
+      localesDir: this.localesDir,
+      fallbackLocale: configuredLocale,
+    });
     this.container.registerSingleton(TOKENS.Translator, () => translator);
     this.translator = translator;
     if (this.helpMessageKey !== undefined) {
@@ -690,9 +724,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
       throw error;
     }
     logSystem(this.logger, ops.bot.online(this.client.user.displayName));
-    if (this.config.admin !== undefined) {
-      this.adminId = this.config.admin;
-    }
+  }
+
+  /** True when `userId` is one of this bot's configured admins. */
+  public isAdmin(userId: string): boolean {
+    return this.adminIds.includes(userId);
   }
 
   /**

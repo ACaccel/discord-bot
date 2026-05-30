@@ -11,6 +11,7 @@ export default class weather_forecast extends Command {
         super();
         this.setConfig({
             name: "weather_forecast",
+            category: 'utility',
         });
     }
 

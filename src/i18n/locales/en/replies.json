@@ -5,6 +5,9 @@
   "nijika": {
     "help_message": "### Currently supported features:\n1. auto reply: the bot replies based on message pairs in the database\n2. roll dice: example input -> `2d5`, randomly picks two numbers between 1 and 5\n"
   },
+  "tomori": {
+    "help_message": "Hi, I'm Tomori! Here are the commands you can use, grouped by purpose:"
+  },
   "konata": {
     "presence_text": "Small breasts are a status symbol, a rare commodity!"
   },
@@ -145,7 +148,18 @@
   "help": {
     "no_commands": "No command list available.",
     "failed": "Could not get the command list. (error code: {{traceId}})",
-    "commands_header": "### Currently supported slash commands:\n"
+    "title": "Command Help",
+    "intro_fallback": "Here are the commands you can use:",
+    "footer": "{{count}} commands · {{categories}} categories",
+    "category": {
+      "auto_reply": "💬 Auto-reply",
+      "fun": "🎮 Fun & Interaction",
+      "server_activity": "🎉 Server Activities",
+      "utility": "🔧 Tools & Queries",
+      "admin": "🛡️ Server Admin",
+      "ai": "🤖 AI Chat",
+      "other": "📦 Other"
+    }
   },
   "inspect_member_ids": {
     "no_valid_id": "No valid ID found. Please enter Discord IDs of 17-20 digits.",

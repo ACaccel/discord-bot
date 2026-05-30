@@ -13,6 +13,7 @@ export default class talk extends Command {
         super();
         this.setConfig({
             name: "talk",
+            category: 'fun',
             options: {
                 channel: [
                     {

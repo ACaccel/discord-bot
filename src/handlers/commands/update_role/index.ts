@@ -18,6 +18,7 @@ export default class update_role extends Command {
         super();
         this.setConfig({
             name: "update_role",
+            category: 'admin',
         });
     }
 

@@ -4,6 +4,8 @@ export {
   type TranslationKey,
   type Translator,
   DEFAULT_LOCALE,
+  SUPPORTED_LOCALES,
+  isLocale,
   MissingTranslationError,
 } from './translator';
 export { I18NextTranslator, type CatalogResources } from './i18next-translator';
