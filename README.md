@@ -48,6 +48,7 @@ single-page overview.
 - Message backup to MongoDB.
 - Giveaways with reaction-driven winner selection.
 - Per-member activity tracking.
+- Social-media share-link previews (Twitter/X, Instagram, Threads, Facebook, Bahamut) with original-embed suppression.
 - Earthquake alert broadcast via HTTP webhook.
 - Scheduled jobs hosted by plugins.
 - Built-in `en` / `zh-TW` locales; per-guild command localisation.

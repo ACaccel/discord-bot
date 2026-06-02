@@ -86,3 +86,32 @@ export class LlmProviderError<
     super(init);
   }
 }
+
+/**
+ * Link-preview generation failed — an OpenGraph scrape (e.g. Bahamut)
+ * could not be fetched or returned an unusable payload. Surfaced only
+ * in logs: the social-link-preview plugin stays silent in the channel
+ * on failure, so the user-facing `messageKey` exists purely for catalog
+ * uniformity (`DomainError.messageKey` is required).
+ *
+ * Sub-code drives diagnostics, mirroring {@link LlmProviderError}:
+ * `TIMEOUT` / `UPSTREAM_5XX` / `RATE_LIMITED` are transient,
+ * `INVALID_RESPONSE` means the page lacked the expected OpenGraph tags,
+ * `FETCH_FAILED` / `UNKNOWN` cover transport and catch-all failures.
+ */
+export type LinkPreviewErrorCode =
+  | 'LINK_PREVIEW_FETCH_FAILED'
+  | 'LINK_PREVIEW_TIMEOUT'
+  | 'LINK_PREVIEW_UPSTREAM_5XX'
+  | 'LINK_PREVIEW_RATE_LIMITED'
+  | 'LINK_PREVIEW_INVALID_RESPONSE'
+  | 'LINK_PREVIEW_UNKNOWN';
+
+export class LinkPreviewError<
+  P extends Readonly<Record<string, string | number>> | undefined = undefined,
+> extends ExternalServiceError<LinkPreviewErrorCode, P> {
+  public override readonly kind = 'LinkPreviewError';
+  public constructor(init: DomainErrorInit<LinkPreviewErrorCode, P>) {
+    super(init);
+  }
+}

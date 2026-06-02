@@ -44,6 +44,14 @@
     "timeout": "The AI service `{{provider}}` timed out. Please try again later.",
     "unknown": "An unexpected error occurred in the AI service. Please try again later."
   },
+  "link_preview": {
+    "fetch_failed": "Could not fetch the link preview from `{{provider}}` (status {{status}}).",
+    "timeout": "The link preview from `{{provider}}` timed out (status {{status}}).",
+    "upstream_failure": "The link preview source `{{provider}}` is temporarily unavailable (status {{status}}). Please try again later.",
+    "rate_limited": "The link preview source `{{provider}}` is rate limited (status {{status}}). Please try again later.",
+    "invalid_response": "The link preview source `{{provider}}` returned an unexpected response (status {{status}}).",
+    "unknown": "An unexpected error occurred while building the link preview from `{{provider}}` (status {{status}})."
+  },
   "configuration": {
     "missing_env": "The environment variable `{{envVar}}` is not set. Please contact an administrator."
   },

@@ -313,6 +313,9 @@
   "earthquake": {
     "alert": "# <@&{{role}}> Taipei strong earthquake alert!!! (intensity 4 or above)\n> Why must there be an earthquake!?"
   },
+  "social_link_preview": {
+    "embed_footer": "Preview via {{provider}}"
+  },
   "common": {
     "empty_value": "None"
   },

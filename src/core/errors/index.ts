@@ -9,7 +9,12 @@
  */
 import type { ConfigurationError } from './configuration-error';
 import type { ConflictError } from './conflict-error';
-import type { DiscordApiError, DatabaseError, LlmProviderError } from './external-service-error';
+import type {
+  DiscordApiError,
+  DatabaseError,
+  LlmProviderError,
+  LinkPreviewError,
+} from './external-service-error';
 import type { NotFoundError } from './not-found-error';
 import type { PermissionError } from './permission-error';
 import type { ValidationError } from './validation-error';
@@ -30,6 +35,8 @@ export {
   type DatabaseErrorCode,
   LlmProviderError,
   type LlmProviderErrorCode,
+  LinkPreviewError,
+  type LinkPreviewErrorCode,
 } from './external-service-error';
 
 /**
@@ -45,4 +52,5 @@ export type AnyDomainError =
   | ConfigurationError
   | DiscordApiError
   | DatabaseError
-  | LlmProviderError;
+  | LlmProviderError
+  | LinkPreviewError;

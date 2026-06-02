@@ -1,0 +1,40 @@
+/**
+ * Instagram provider. Rewrites a post / reel / TV URL onto an embed-proxy
+ * domain (defaults `kkinstagram.com` → `uuinstagram.com`) so Discord renders
+ * a playable embed. The priority list + per-host validation mitigates
+ * Instagram's intermittent reel-video availability (bot-blocking): if the
+ * first proxy returns only an image, a later one may yield the video.
+ * Both the canonical `/reel/<id>` form and the author-prefixed
+ * `/<username>/reel/<id>` form (produced by profile / share links) are
+ * matched; bare profile URLs (`/<username>/`) are rejected — nothing to
+ * preview.
+ */
+import { createRewriteProvider } from './rewrite-provider';
+import type { OgClient } from '../og-client';
+import type { LinkPreviewProvider } from '../types';
+
+const INSTAGRAM_HOSTS: ReadonlySet<string> = new Set([
+  'instagram.com',
+  'www.instagram.com',
+  'm.instagram.com',
+]);
+
+/**
+ * `/p|reel|reels|tv/<id>`, optionally prefixed with the author handle
+ * (`/<username>/reel/<id>` — the form profile / share links use). Rejects
+ * bare profile URLs (`/<username>/`).
+ */
+const POST_PATH = /^\/(?:[A-Za-z0-9._]+\/)?(?:p|reel|reels|tv)\/[A-Za-z0-9_-]+/;
+
+export const createInstagramProvider = (opts: {
+  proxyHosts: readonly string[];
+  ogClient: OgClient;
+}): LinkPreviewProvider =>
+  createRewriteProvider({
+    name: 'instagram',
+    matches: (url) =>
+      INSTAGRAM_HOSTS.has(url.hostname.toLowerCase()) && POST_PATH.test(url.pathname),
+    proxyHosts: opts.proxyHosts,
+    ogClient: opts.ogClient,
+    toProxyUrl: (url, host) => `https://${host}${url.pathname}`,
+  });

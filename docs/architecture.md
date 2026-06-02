@@ -111,7 +111,8 @@ enforces this.
 `DomainError` is the root of a sealed taxonomy: `ValidationError`,
 `NotFoundError`, `ConflictError`, `PermissionError`,
 `ConfigurationError`, and the `ExternalServiceError` branch
-(`DiscordApiError`, `DatabaseError`, `LlmProviderError`). Every error
+(`DiscordApiError`, `DatabaseError`, `LlmProviderError`,
+`LinkPreviewError`). Every error
 carries `code`, `messageKey` (i18n), `messageParams`, and the original
 `cause`. Use cases prefer `Result<T, DomainError>`; error-translator
 modules at each infra boundary turn SDK failures into domain errors.
@@ -143,6 +144,19 @@ does not implement `LLMProvider` (the endpoint's request/response shape
 and the absence of an API key / model differ), but it maps failures into
 the same `ExternalServiceError` taxonomy and returns a `Result`. Consumed
 by the `LlmAutoReplyPlugin`.
+
+### Link-Preview Strategy ([src/infra/link-preview/](../src/infra/link-preview/))
+
+A second Provider Strategy, mirroring the LLM layer, for the
+`SocialLinkPreviewPlugin`. Each `LinkPreviewProvider` matches a URL
+(`canHandle`) and `build`s a `LinkPreviewResult` — a discriminated union
+of `rewritten-url` (an embed-proxy link Discord unfurls into a playable
+video) and `card` (neutral OpenGraph data the plugin renders into a
+static embed). The four rewrite providers (Twitter/X, Instagram, Threads,
+Facebook) are pure; `bahamut` scrapes OpenGraph via the SSRF-safe
+`OgClient` (no redirect chasing, body + timeout caps, host allow-list).
+Failures map into `LinkPreviewError`. `LinkPreviewProviderRegistry`
+matches by URL in registration order.
 
 ## 3. Interaction request flow
 
@@ -198,17 +212,18 @@ non-critical plugins are marked disabled and the bot keeps running.
 
 ## 5. Built-in plugins
 
-| Plugin                | Path                          | Summary                                                                               |
-| --------------------- | ----------------------------- | ------------------------------------------------------------------------------------- |
-| `AutoReplyPlugin`     | `src/plugins/auto-reply/`     | `messageCreate` keyword + lucky replies and a dice roller                             |
-| `GuildEventsPlugin`   | `src/plugins/guild-events/`   | guild / member lifecycle events                                                       |
-| `GiveawayPlugin`      | `src/plugins/giveaway/`       | scheduled giveaways with reaction-driven winner selection                             |
-| `ActivityPlugin`      | `src/plugins/activity/`       | per-member activity tracking via message / reaction events                            |
-| `MessageBackupPlugin` | `src/plugins/message-backup/` | message create / delete / update archival (used by the `msg-archive` worker)          |
-| `LlmChatPlugin`       | `src/plugins/llm-chat/`       | multi-provider LLM chat with web-search toggle and session persistence                |
-| `VoicePlugin`         | `src/plugins/voice/`          | voice channel join + recording controller                                             |
-| `EarthquakePlugin`    | `src/plugins/earthquake/`     | earthquake alert broadcast (nijika exposes the HTTP webhook)                          |
-| `LlmAutoReplyPlugin`  | `src/plugins/llm-auto-reply/` | probability-gated, context-aware `messageCreate` reply via a self-hosted LLM (nijika) |
+| Plugin                    | Path                               | Summary                                                                               |
+| ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------- |
+| `AutoReplyPlugin`         | `src/plugins/auto-reply/`          | `messageCreate` keyword + lucky replies and a dice roller                             |
+| `GuildEventsPlugin`       | `src/plugins/guild-events/`        | guild / member lifecycle events                                                       |
+| `GiveawayPlugin`          | `src/plugins/giveaway/`            | scheduled giveaways with reaction-driven winner selection                             |
+| `ActivityPlugin`          | `src/plugins/activity/`            | per-member activity tracking via message / reaction events                            |
+| `MessageBackupPlugin`     | `src/plugins/message-backup/`      | message create / delete / update archival (used by the `msg-archive` worker)          |
+| `LlmChatPlugin`           | `src/plugins/llm-chat/`            | multi-provider LLM chat with web-search toggle and session persistence                |
+| `VoicePlugin`             | `src/plugins/voice/`               | voice channel join + recording controller                                             |
+| `EarthquakePlugin`        | `src/plugins/earthquake/`          | earthquake alert broadcast (nijika exposes the HTTP webhook)                          |
+| `LlmAutoReplyPlugin`      | `src/plugins/llm-auto-reply/`      | probability-gated, context-aware `messageCreate` reply via a self-hosted LLM (nijika) |
+| `SocialLinkPreviewPlugin` | `src/plugins/social-link-preview/` | rewrites/embeds social-media share-link previews and suppresses the original (nijika) |
 
 ## 6. Personalities
 

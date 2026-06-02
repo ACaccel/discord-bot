@@ -38,6 +38,7 @@
     "src/core/result/index.ts",
     "src/core/time/index.ts",
     "src/infra/llm/index.ts",
+    "src/infra/link-preview/index.ts",
     "src/infra/mongo/index.ts",
     "src/plugins/index.ts",
     "src/plugins/*/index.ts",

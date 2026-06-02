@@ -44,6 +44,14 @@
     "timeout": "AI 服務 `{{provider}}` 回應逾時,請稍後再試。",
     "unknown": "AI 服務發生未預期的錯誤,請稍後再試。"
   },
+  "link_preview": {
+    "fetch_failed": "無法從 `{{provider}}` 取得連結預覽(狀態 {{status}})。",
+    "timeout": "`{{provider}}` 的連結預覽逾時(狀態 {{status}})。",
+    "upstream_failure": "連結預覽來源 `{{provider}}` 暫時無法存取(狀態 {{status}}),請稍後再試。",
+    "rate_limited": "連結預覽來源 `{{provider}}` 觸發限流(狀態 {{status}}),請稍後再試。",
+    "invalid_response": "連結預覽來源 `{{provider}}` 回傳了非預期的內容(狀態 {{status}})。",
+    "unknown": "建立 `{{provider}}` 連結預覽時發生未預期的錯誤(狀態 {{status}})。"
+  },
   "configuration": {
     "missing_env": "環境變數 `{{envVar}}` 未設定,請聯絡管理員。"
   },

@@ -4,6 +4,7 @@ import {
   ConflictError,
   DatabaseError,
   DiscordApiError,
+  LinkPreviewError,
   LlmProviderError,
   NotFoundError,
   PermissionError,
@@ -77,6 +78,14 @@ describe('DomainError subclasses', () => {
           context: { operation: 'test' },
         }),
         'LlmProviderError',
+      ],
+      [
+        new LinkPreviewError({
+          code: 'LINK_PREVIEW_FETCH_FAILED',
+          messageKey: 'errors:link_preview.fetch_failed',
+          context: { operation: 'test' },
+        }),
+        'LinkPreviewError',
       ],
     ];
     for (const [e, kind] of cases) {

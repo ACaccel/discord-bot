@@ -23,8 +23,8 @@ Both locales must keep the same key set and the same `{{placeholder}}` set; this
 ## Namespaces
 
 - `commands.json` — per-command `description`, option `options.<opt>.description`, and `choices` keyed by stable `value`. Context-menu commands additionally provide `name`.
-- `errors.json` — user-facing text for each `DomainError.messageKey`. Groups: `command`, `validation`, `permission`, `ai`, `db`, `llm`, `configuration`, plus a flat `unexpected` fallback.
-- `replies.json` — every other command reply. Each command feature carries an in-character `<feature>.failed` fallback that interpolates `{{traceId}}`.
+- `errors.json` — user-facing text for each `DomainError.messageKey`. Groups: `command`, `validation`, `permission`, `ai`, `db`, `llm`, `link_preview`, `configuration`, plus a flat `unexpected` fallback. The `link_preview` group (keyed by `LinkPreviewError` codes, all interpolating `{{provider}}` + `{{status}}`) is logged-only — the `social-link-preview` plugin stays silent in the channel on failure — but the keys exist for catalog uniformity since `messageKey` is required.
+- `replies.json` — every other command reply. Each command feature carries an in-character `<feature>.failed` fallback that interpolates `{{traceId}}`. The `social_link_preview.embed_footer` key (interpolating `{{provider}}`) labels the source on a bot-built preview card.
 
 ## Per-bot default language
 
