@@ -25,6 +25,7 @@
     "nijika": "ts-node src/bot/nijika/index.ts",
     "msg-archive": "ts-node src/bot/msg-archive/index.ts",
     "konata": "ts-node src/bot/konata/index.ts",
+    "gopher": "ts-node src/bot/gopher/index.ts",
     "typecheck": "tsc -p tsconfig.strict.json",
     "lint": "eslint src scripts test eslint.config.mjs vitest.config.ts",
     "lint:fix": "eslint src scripts test --fix",

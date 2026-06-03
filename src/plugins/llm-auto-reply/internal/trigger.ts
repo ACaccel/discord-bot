@@ -1,37 +1,31 @@
 /**
- * Force-trigger keyword handling for the LLM auto-reply plugin.
+ * Bot-mention trigger handling for the LLM auto-reply plugin.
  *
- * A message whose content begins with {@link FORCE_TRIGGER_PREFIX}
- * bypasses the random probability gate so the reply fires deterministically.
- * The downstream `messageCount` / `windowSeconds` requirements still apply
- * — a forced trigger only skips the dice roll, not the context checks.
+ * A message that @-mentions the bot fires a reply deterministically,
+ * bypassing the random probability gate (and the cooldown / in-flight /
+ * window guards) — the same role the old `fatcat_reply` keyword played, now
+ * mirroring konata's llm-chat trigger. The downstream `messageCount`
+ * requirement still applies — a mention only skips the dice roll, not the
+ * context check. The probabilistic automatic reply is unaffected.
  *
- * The keyword is a control token, not conversation, so it is stripped from
- * a message's transcript content before the prompt is built.
- *
- * ASCII keyword (no CJK), so the i18n scanner does not apply; it is kept as
- * a named constant rather than a magic string per the coding standards.
+ * The mention token is a control marker, not conversation, so it is stripped
+ * from a message's transcript content before the prompt is built.
  */
-export const FORCE_TRIGGER_PREFIX = 'fatcat_reply';
+import type { Message } from 'discord.js';
 
 /**
- * Whether `content` begins with the force-trigger keyword as a standalone
- * leading token: the keyword must be followed by whitespace or be the entire
- * message. A glued token such as `fatcat_replyfoo` is NOT a trigger, so an
- * unrelated word that merely starts with the keyword cannot force a reply.
+ * Whether `message` @-mentions the bot. Mirrors llm-chat: `ignoreRepliedUser`
+ * is set so a *reply* to one of the bot's messages (which auto-mentions it)
+ * is NOT treated as a fresh @-tag — only an explicit mention triggers.
  */
-export const startsWithForceTrigger = (content: string): boolean => {
-  if (!content.startsWith(FORCE_TRIGGER_PREFIX)) return false;
-  const next = content.charAt(FORCE_TRIGGER_PREFIX.length);
-  return next === '' || /\s/.test(next);
-};
+export const mentionsBot = (message: Message, clientId: string): boolean =>
+  message.mentions.has(clientId, { ignoreRepliedUser: true });
 
 /**
- * Remove a leading force-trigger keyword (and the whitespace after it) so the
- * control token never reaches the LLM. Content that does not start with the
- * keyword as a standalone token is returned unchanged.
+ * Remove the bot's mention token (`<@id>` / `<@!id>`) from `content` so the
+ * control marker never reaches the LLM prompt. Only the bot's own mention is
+ * stripped; mentions of other users pass through unchanged. Mirrors
+ * llm-chat's `stripMention`.
  */
-export const stripForceTrigger = (content: string): string =>
-  startsWithForceTrigger(content)
-    ? content.slice(FORCE_TRIGGER_PREFIX.length).trimStart()
-    : content;
+export const stripBotMention = (content: string, clientId: string): string =>
+  content.replace(new RegExp(`<@!?${clientId}>`, 'g'), '').trim();

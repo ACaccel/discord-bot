@@ -1,8 +1,8 @@
 /**
  * Reference-counted set of channels with a reply attempt in flight.
  *
- * A plain `Set` cannot track overlapping attempts on the same channel: a
- * force-triggered reply bypasses the in-flight check but still occupies the
+ * A plain `Set` cannot track overlapping attempts on the same channel: an
+ * @-mention reply bypasses the in-flight check but still occupies the
  * channel, so two attempts can overlap. With a Set, the first attempt's
  * cleanup would delete the single entry and clear the guard while the
  * second is still running, re-opening the race. Counting per channel keeps

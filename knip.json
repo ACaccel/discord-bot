@@ -5,6 +5,7 @@
     "src/bot/konata/index.ts",
     "src/bot/tomori/index.ts",
     "src/bot/msg-archive/index.ts",
+    "src/bot/gopher/index.ts",
     "src/deploy.ts",
     "scripts/*.ts"
   ],

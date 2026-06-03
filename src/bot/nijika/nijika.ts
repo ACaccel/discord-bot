@@ -7,7 +7,6 @@ import {
     createEarthquakePlugin,
     createGiveawayPlugin,
     createGuildEventsPlugin,
-    createLlmAutoReplyPlugin,
     createSocialLinkPreviewPlugin,
     createVoicePlugin,
 } from '@plugins';
@@ -15,12 +14,6 @@ import {
 interface NijikaConfig extends Config {
     blocked_channels: string[];
     level_roles: Record<string, string>;
-    /**
-     * Raw `llm_auto_reply` block. Parsed and defaulted by the plugin
-     * (see `createLlmAutoReplyPlugin`), so it is intentionally `unknown`
-     * here and may be omitted entirely.
-     */
-    llm_auto_reply?: unknown;
     /**
      * Raw `social_link_preview` block. Parsed and defaulted by the plugin
      * (see `createSocialLinkPreviewPlugin`), so it is intentionally
@@ -58,12 +51,6 @@ export class Nijika extends BaseBot<NijikaConfig> {
         // deep-import `plugins/*/internal`.
         this.use(AutoReplyPlugin);
         this.use(createGuildEventsPlugin({
-            blockedChannels: this.config.blocked_channels,
-        }));
-        // Self-hosted LLM auto-reply. Settings come from the
-        // `llm_auto_reply` config block; `blocked_channels` is reused so
-        // the same channels excluded from logging are never auto-replied.
-        this.use(createLlmAutoReplyPlugin(this.config.llm_auto_reply, {
             blockedChannels: this.config.blocked_channels,
         }));
         // Social-link preview: detect share links, post a richer preview,

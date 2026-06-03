@@ -470,14 +470,20 @@ export abstract class BaseBot<TConfig extends Config = Config> {
         'shutdown: client.destroy threw',
       );
     }
-    try {
-      const cm = this.container.tryResolve<ConnectionManager>(TOKENS.ConnectionManager);
-      await cm?.closeAll();
-    } catch (e: unknown) {
-      log?.warn(
-        { err: e instanceof Error ? e : new Error(String(e)) },
-        'shutdown: connection manager closeAll threw',
-      );
+    // Only a bot built with a database has a ConnectionManager to close.
+    // For a database-free bot (empty mongoURI, e.g. gopher) the registered
+    // factory throws on resolve by design, so skip it rather than logging a
+    // misleading "closeAll threw" warning on every shutdown.
+    if (this.mongoURI !== undefined && this.mongoURI.length > 0) {
+      try {
+        const cm = this.container.tryResolve<ConnectionManager>(TOKENS.ConnectionManager);
+        await cm?.closeAll();
+      } catch (e: unknown) {
+        log?.warn(
+          { err: e instanceof Error ? e : new Error(String(e)) },
+          'shutdown: connection manager closeAll threw',
+        );
+      }
     }
   };
 
@@ -559,9 +565,13 @@ export abstract class BaseBot<TConfig extends Config = Config> {
       gracefulShutdown: () => this.shutdown(),
     });
     try {
+      // An empty `mongoURI` means the bot was built without a database
+      // (e.g. gopher), matching how `GuildDbConnector` / `ConnectionManager`
+      // already treat `undefined`-or-empty. Without the length check an
+      // empty string would (wrongly) demand a valid `MONGO_URI` here.
       const env = loadEnv({
         exitOnFailure: false,
-        requireDb: this.mongoURI !== undefined,
+        requireDb: this.mongoURI !== undefined && this.mongoURI.length > 0,
       });
       this.container.registerSingleton(TOKENS.Env, () => env);
       this.env = env;

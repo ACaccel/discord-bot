@@ -1,10 +1,11 @@
 /**
  * Unit tests for the LLM auto-reply plugin:
  *   - pure helpers (`buildTranscript`, `isWithinWindow`);
+ *   - the bot-mention trigger helpers (`mentionsBot`, `stripBotMention`);
  *   - the orchestrator's fetch -> window -> transcript -> reply pipeline
  *     with an injected fake client (no network);
  *   - the plugin's guard + probability-gate ordering (the dice are rolled
- *     before any fetch).
+ *     before any fetch), and the @-mention deterministic-trigger path.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -20,11 +21,7 @@ import {
   runLlmAutoReply,
   type RunLlmAutoReplyDeps,
 } from '../../../src/plugins/llm-auto-reply/internal/orchestrator';
-import {
-  FORCE_TRIGGER_PREFIX,
-  startsWithForceTrigger,
-  stripForceTrigger,
-} from '../../../src/plugins/llm-auto-reply/internal/trigger';
+import { mentionsBot, stripBotMention } from '../../../src/plugins/llm-auto-reply/internal/trigger';
 import { ReplyCooldown } from '../../../src/plugins/llm-auto-reply/internal/cooldown';
 import { InFlightChannels } from '../../../src/plugins/llm-auto-reply/internal/in-flight';
 import {
@@ -37,6 +34,11 @@ import type { Logger } from '../../../src/core/logger';
 import type { PluginEventContext } from '../../../src/core/plugin';
 
 // --- Fakes -----------------------------------------------------------------
+
+/** The bot's client id used across the suite. */
+const BOT_ID = 'bot-1';
+/** A literal mention of the bot, as it appears in message content. */
+const botMention = `<@${BOT_ID}>`;
 
 const makeLogger = (): Logger => {
   const logger = {
@@ -90,6 +92,8 @@ const makeTriggerMessage = (
     channelId: string;
     content: string;
     createdTimestamp: number;
+    /** Whether the message @-mentions the bot (deterministic trigger). */
+    mention: boolean;
   }> = {},
 ) =>
   ({
@@ -98,6 +102,8 @@ const makeTriggerMessage = (
     guildId: overrides.guildId === undefined ? 'g-1' : overrides.guildId,
     channelId: overrides.channelId ?? 'c-1',
     createdTimestamp: overrides.createdTimestamp ?? 0,
+    // discord.js `MessageMentions#has`; the fake reports the override.
+    mentions: { has: () => overrides.mention ?? false },
     channel,
   }) as unknown as Message;
 
@@ -114,10 +120,8 @@ describe('buildTranscript', () => {
     isBot: false,
   });
 
-  it('renders one line per message in order, joined by newlines', () => {
-    expect(buildTranscript([at(1), at(2), at(3)], 'general')).toBe(
-      '[general] U1: m1\n[general] U2: m2\n[general] U3: m3',
-    );
+  it('renders one line per message in order, joined by newlines (no channel prefix)', () => {
+    expect(buildTranscript([at(1), at(2), at(3)])).toBe('U1: m1\nU2: m2\nU3: m3');
   });
 
   it('drops bot-authored and blank-content messages', () => {
@@ -127,7 +131,7 @@ describe('buildTranscript', () => {
       { displayName: 'Bob', content: '   ', createdTimestamp: 3, isBot: false },
       { displayName: 'Alice', content: ' bye ', createdTimestamp: 4, isBot: false },
     ];
-    expect(buildTranscript(messages, 'general')).toBe('[general] Alice: hi\n[general] Alice: bye');
+    expect(buildTranscript(messages)).toBe('Alice: hi\nAlice: bye');
   });
 
   it('returns an empty string when nothing human remains', () => {
@@ -135,7 +139,7 @@ describe('buildTranscript', () => {
       { displayName: 'Bot', content: 'x', createdTimestamp: 1, isBot: true },
       { displayName: 'Carl', content: '', createdTimestamp: 2, isBot: false },
     ];
-    expect(buildTranscript(messages, 'general')).toBe('');
+    expect(buildTranscript(messages)).toBe('');
   });
 });
 
@@ -154,30 +158,33 @@ describe('isWithinWindow', () => {
   });
 });
 
-describe('force-trigger keyword', () => {
-  it('detects a leading keyword only as a standalone token', () => {
-    expect(startsWithForceTrigger(`${FORCE_TRIGGER_PREFIX} hello`)).toBe(true);
-    expect(startsWithForceTrigger(`${FORCE_TRIGGER_PREFIX}\nhello`)).toBe(true);
-    expect(startsWithForceTrigger(FORCE_TRIGGER_PREFIX)).toBe(true);
-    expect(startsWithForceTrigger(`hello ${FORCE_TRIGGER_PREFIX}`)).toBe(false);
-    expect(startsWithForceTrigger('')).toBe(false);
+describe('bot-mention trigger', () => {
+  const msgWith = (has: (id: string, opts?: { ignoreRepliedUser?: boolean }) => boolean): Message =>
+    ({ mentions: { has } }) as unknown as Message;
+
+  it('detects an @-mention of the bot, ignoring replied-user mentions', () => {
+    const has = vi.fn(() => true);
+    expect(mentionsBot(msgWith(has), BOT_ID)).toBe(true);
+    expect(has).toHaveBeenCalledWith(BOT_ID, { ignoreRepliedUser: true });
   });
 
-  it('does not treat a glued token as a trigger', () => {
-    // `fatcat_replyfoo` is an unrelated word, not the control keyword.
-    expect(startsWithForceTrigger(`${FORCE_TRIGGER_PREFIX}foo bar`)).toBe(false);
-    expect(stripForceTrigger(`${FORCE_TRIGGER_PREFIX}foo bar`)).toBe(
-      `${FORCE_TRIGGER_PREFIX}foo bar`,
-    );
+  it('is false when the bot is not mentioned', () => {
+    expect(
+      mentionsBot(
+        msgWith(() => false),
+        BOT_ID,
+      ),
+    ).toBe(false);
   });
 
-  it('strips the leading keyword and following whitespace', () => {
-    expect(stripForceTrigger(`${FORCE_TRIGGER_PREFIX}   give me advice`)).toBe('give me advice');
-    expect(stripForceTrigger(FORCE_TRIGGER_PREFIX)).toBe('');
+  it('strips the bot mention (both <@id> and <@!id>) from content', () => {
+    expect(stripBotMention(`${botMention} hello`, BOT_ID)).toBe('hello');
+    expect(stripBotMention(`<@!${BOT_ID}>  hi there`, BOT_ID)).toBe('hi there');
   });
 
-  it('leaves non-matching content unchanged', () => {
-    expect(stripForceTrigger('hello world')).toBe('hello world');
+  it('leaves other-user mentions and plain content unchanged', () => {
+    expect(stripBotMention('<@other> hello', BOT_ID)).toBe('<@other> hello');
+    expect(stripBotMention('hello world', BOT_ID)).toBe('hello world');
   });
 });
 
@@ -257,6 +264,12 @@ describe('clampReply', () => {
 
 const ORCH_CONFIG = { messageCount: 5, windowSeconds: 30 } as const;
 
+/** Orchestrator deps with the injected fake client + bot id. */
+const orchDeps = (
+  reply: RunLlmAutoReplyDeps['client']['reply'],
+  logger: Logger = makeLogger(),
+): RunLlmAutoReplyDeps => ({ client: { reply }, logger, config: ORCH_CONFIG, clientId: BOT_ID });
+
 const burst = (): Message[] => [
   // newest-first, as discord.js returns; one bot line is excluded.
   makeFetchedMessage({ name: 'Bob', content: 'd', createdTimestamp: 4000 }),
@@ -270,18 +283,11 @@ describe('runLlmAutoReply', () => {
   it('builds the transcript, calls the client, and posts one reply (happy path)', async () => {
     const { channel, send } = makeChannel(burst());
     const reply = vi.fn().mockResolvedValue(ok('生成的回覆'));
-    const deps: RunLlmAutoReplyDeps = {
-      client: { reply },
-      logger: makeLogger(),
-      config: ORCH_CONFIG,
-    };
 
-    const sent = await runLlmAutoReply(deps, makeTriggerMessage(channel));
+    const sent = await runLlmAutoReply(orchDeps(reply), makeTriggerMessage(channel));
 
     expect(sent).toBe(true);
-    expect(reply).toHaveBeenCalledWith(
-      '[general] Alice: a\n[general] Bob: b\n[general] Alice: c\n[general] Bob: d',
-    );
+    expect(reply).toHaveBeenCalledWith('Alice: a\nBob: b\nAlice: c\nBob: d');
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith({ content: '生成的回覆', allowedMentions: { parse: [] } });
   });
@@ -289,10 +295,7 @@ describe('runLlmAutoReply', () => {
   it('truncates an over-long LLM reply to the Discord limit before sending', async () => {
     const { channel, send } = makeChannel(burst());
     const reply = vi.fn().mockResolvedValue(ok('y'.repeat(MAX_DISCORD_MESSAGE_LENGTH + 1000)));
-    const sent = await runLlmAutoReply(
-      { client: { reply }, logger: makeLogger(), config: ORCH_CONFIG },
-      makeTriggerMessage(channel),
-    );
+    const sent = await runLlmAutoReply(orchDeps(reply), makeTriggerMessage(channel));
 
     expect(sent).toBe(true);
     expect(send).toHaveBeenCalledTimes(1);
@@ -303,10 +306,7 @@ describe('runLlmAutoReply', () => {
   it('does not send when the LLM reply is blank', async () => {
     const { channel, send } = makeChannel(burst());
     const reply = vi.fn().mockResolvedValue(ok('   '));
-    const sent = await runLlmAutoReply(
-      { client: { reply }, logger: makeLogger(), config: ORCH_CONFIG },
-      makeTriggerMessage(channel),
-    );
+    const sent = await runLlmAutoReply(orchDeps(reply), makeTriggerMessage(channel));
 
     expect(sent).toBe(false);
     expect(send).not.toHaveBeenCalled();
@@ -315,10 +315,7 @@ describe('runLlmAutoReply', () => {
   it('does nothing when fewer than N messages were fetched', async () => {
     const { channel, send } = makeChannel(burst().slice(0, 3)); // 3 < 5
     const reply = vi.fn();
-    const sent = await runLlmAutoReply(
-      { client: { reply }, logger: makeLogger(), config: ORCH_CONFIG },
-      makeTriggerMessage(channel),
-    );
+    const sent = await runLlmAutoReply(orchDeps(reply), makeTriggerMessage(channel));
 
     expect(sent).toBe(false);
     expect(reply).not.toHaveBeenCalled();
@@ -338,10 +335,7 @@ describe('runLlmAutoReply', () => {
     };
     const reply = vi.fn();
     const logger = makeLogger();
-    const sent = await runLlmAutoReply(
-      { client: { reply }, logger, config: ORCH_CONFIG },
-      makeTriggerMessage(channel),
-    );
+    const sent = await runLlmAutoReply(orchDeps(reply, logger), makeTriggerMessage(channel));
 
     expect(sent).toBe(false);
     expect(reply).not.toHaveBeenCalled();
@@ -349,15 +343,15 @@ describe('runLlmAutoReply', () => {
     expect(logger.error as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
   });
 
-  it('does nothing when a non-forced message spans beyond the window', async () => {
+  it('does nothing when a non-mention message spans beyond the window', async () => {
     const messages = burst();
     // Push the oldest far back so the span exceeds 30s.
     messages[4] = makeFetchedMessage({ name: 'Alice', content: 'a', createdTimestamp: -60_000 });
     const { channel, send } = makeChannel(messages);
     const reply = vi.fn();
     const sent = await runLlmAutoReply(
-      { client: { reply }, logger: makeLogger(), config: ORCH_CONFIG },
-      makeTriggerMessage(channel), // content '' -> not force-triggered
+      orchDeps(reply),
+      makeTriggerMessage(channel), // mention: false -> window check applies
     );
 
     expect(sent).toBe(false);
@@ -365,15 +359,15 @@ describe('runLlmAutoReply', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it('skips the window check for a force-triggered message that spans beyond the window', async () => {
+  it('skips the window check for an @-mention message that spans beyond the window', async () => {
     const messages = burst();
     // Same out-of-window burst that blocks a normal trigger above.
     messages[4] = makeFetchedMessage({ name: 'Alice', content: 'a', createdTimestamp: -600_000 });
     const { channel, send } = makeChannel(messages);
     const reply = vi.fn().mockResolvedValue(ok('forced reply'));
     const sent = await runLlmAutoReply(
-      { client: { reply }, logger: makeLogger(), config: ORCH_CONFIG },
-      makeTriggerMessage(channel, { content: `${FORCE_TRIGGER_PREFIX} go` }),
+      orchDeps(reply),
+      makeTriggerMessage(channel, { mention: true }),
     );
 
     expect(sent).toBe(true);
@@ -387,10 +381,7 @@ describe('runLlmAutoReply', () => {
     );
     const { channel, send } = makeChannel(messages);
     const reply = vi.fn();
-    const sent = await runLlmAutoReply(
-      { client: { reply }, logger: makeLogger(), config: ORCH_CONFIG },
-      makeTriggerMessage(channel),
-    );
+    const sent = await runLlmAutoReply(orchDeps(reply), makeTriggerMessage(channel));
 
     expect(sent).toBe(false);
     expect(reply).not.toHaveBeenCalled();
@@ -409,21 +400,18 @@ describe('runLlmAutoReply', () => {
         }),
       ),
     );
-    const sent = await runLlmAutoReply(
-      { client: { reply }, logger, config: ORCH_CONFIG },
-      makeTriggerMessage(channel),
-    );
+    const sent = await runLlmAutoReply(orchDeps(reply, logger), makeTriggerMessage(channel));
 
     expect(sent).toBe(false);
     expect(send).not.toHaveBeenCalled();
     expect(logger.error as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(1);
   });
 
-  it('strips a leading force-trigger keyword from the transcript content', async () => {
+  it("strips the bot's @-mention from transcript content", async () => {
     const messages: Message[] = [
       makeFetchedMessage({
         name: 'Bob',
-        content: `${FORCE_TRIGGER_PREFIX}  give advice`,
+        content: `${botMention}  give advice`,
         createdTimestamp: 4000,
       }),
       makeFetchedMessage({ name: 'Alice', content: 'c', createdTimestamp: 3000 }),
@@ -433,15 +421,10 @@ describe('runLlmAutoReply', () => {
     ];
     const { channel, send } = makeChannel(messages);
     const reply = vi.fn().mockResolvedValue(ok('ok'));
-    const sent = await runLlmAutoReply(
-      { client: { reply }, logger: makeLogger(), config: ORCH_CONFIG },
-      makeTriggerMessage(channel),
-    );
+    const sent = await runLlmAutoReply(orchDeps(reply), makeTriggerMessage(channel));
 
     expect(sent).toBe(true);
-    expect(reply).toHaveBeenCalledWith(
-      '[general] Bob: z\n[general] Alice: a\n[general] Bob: b\n[general] Alice: c\n[general] Bob: give advice',
-    );
+    expect(reply).toHaveBeenCalledWith('Bob: z\nAlice: a\nBob: b\nAlice: c\nBob: give advice');
     expect(send).toHaveBeenCalledTimes(1);
   });
 });
@@ -461,7 +444,10 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
 
   it('rolls the probability gate before any fetch (gate fail -> no fetch)', async () => {
     const { channel, fetch } = makeChannel(burst());
-    const plugin = createLlmAutoReplyPlugin({ enabled: true }, { random: () => 0.9 });
+    const plugin = createLlmAutoReplyPlugin(
+      { enabled: true },
+      { clientId: BOT_ID, random: () => 0.9 },
+    );
     await dispatch(plugin, makeTriggerMessage(channel), makeLogger());
 
     expect(fetch).not.toHaveBeenCalled();
@@ -474,7 +460,7 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     const reply = vi.fn().mockResolvedValue(ok('x'));
     const plugin = createLlmAutoReplyPlugin(
       { enabled: true },
-      { random: () => 0, client: { reply } },
+      { clientId: BOT_ID, random: () => 0, client: { reply } },
     );
     await dispatch(plugin, makeTriggerMessage(channel), makeLogger());
 
@@ -485,7 +471,10 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
 
   it('does nothing when disabled', async () => {
     const { channel, fetch } = makeChannel(burst());
-    const plugin = createLlmAutoReplyPlugin({ enabled: false }, { random: () => 0 });
+    const plugin = createLlmAutoReplyPlugin(
+      { enabled: false },
+      { clientId: BOT_ID, random: () => 0 },
+    );
     await dispatch(plugin, makeTriggerMessage(channel), makeLogger());
 
     expect(fetch).not.toHaveBeenCalled();
@@ -496,7 +485,10 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     ['DM (no guild)', { guildId: null as string | null }],
   ])('skips %s', async (_label, overrides) => {
     const { channel, fetch } = makeChannel(burst());
-    const plugin = createLlmAutoReplyPlugin({ enabled: true }, { random: () => 0 });
+    const plugin = createLlmAutoReplyPlugin(
+      { enabled: true },
+      { clientId: BOT_ID, random: () => 0 },
+    );
     await dispatch(plugin, makeTriggerMessage(channel, overrides), makeLogger());
 
     expect(fetch).not.toHaveBeenCalled();
@@ -506,49 +498,41 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     const { channel, fetch } = makeChannel(burst());
     const plugin = createLlmAutoReplyPlugin(
       { enabled: true },
-      { random: () => 0, blockedChannels: ['c-blocked'] },
+      { clientId: BOT_ID, random: () => 0, blockedChannels: ['c-blocked'] },
     );
     await dispatch(plugin, makeTriggerMessage(channel, { channelId: 'c-blocked' }), makeLogger());
 
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('bypasses the probability gate for a force-triggered message but still honours the count gate', async () => {
-    // random() = 0.9 would normally block (>= 0.05); the keyword forces it.
+  it('bypasses the probability gate for an @-mention but still honours the count gate', async () => {
+    // random() = 0.9 would normally block (>= 0.05); the @-mention forces it.
     // fetch returns < N, so the count gate still bails before the client —
-    // proving the force-trigger skips the dice and the window, but not the
+    // proving the mention skips the dice and the window, but not the
     // message-count requirement.
     const { channel, fetch, send } = makeChannel(burst().slice(0, 2));
     const reply = vi.fn().mockResolvedValue(ok('x'));
     const plugin = createLlmAutoReplyPlugin(
       { enabled: true },
-      { random: () => 0.9, client: { reply } },
+      { clientId: BOT_ID, random: () => 0.9, client: { reply } },
     );
-    await dispatch(
-      plugin,
-      makeTriggerMessage(channel, { content: `${FORCE_TRIGGER_PREFIX} hello` }),
-      makeLogger(),
-    );
+    await dispatch(plugin, makeTriggerMessage(channel, { mention: true }), makeLogger());
 
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(reply).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
   });
 
-  it('sends one reply for a force-triggered message with a full valid burst', async () => {
-    // The marquee behaviour: keyword + enough recent context => a reply IS
+  it('sends one reply for an @-mention with a full valid burst', async () => {
+    // The marquee behaviour: @-mention + enough recent context => a reply IS
     // sent even though random() = 0.9 would have blocked the dice roll.
     const { channel, send } = makeChannel(burst()); // size === messageCount, within window
     const reply = vi.fn().mockResolvedValue(ok('forced reply'));
     const plugin = createLlmAutoReplyPlugin(
       { enabled: true },
-      { random: () => 0.9, client: { reply } },
+      { clientId: BOT_ID, random: () => 0.9, client: { reply } },
     );
-    await dispatch(
-      plugin,
-      makeTriggerMessage(channel, { content: `${FORCE_TRIGGER_PREFIX} hi` }),
-      makeLogger(),
-    );
+    await dispatch(plugin, makeTriggerMessage(channel, { mention: true }), makeLogger());
 
     expect(reply).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledTimes(1);
@@ -559,15 +543,16 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     ['disabled', { enabled: false }, {}],
     ['bot author', { enabled: true }, { authorBot: true }],
     ['blocked channel', { enabled: true }, { channelId: 'c-blocked' }],
-  ])('does not let a force-trigger override the %s guard', async (_label, rawConfig, overrides) => {
+  ])('does not let an @-mention override the %s guard', async (_label, rawConfig, overrides) => {
     const { channel, fetch } = makeChannel(burst());
     const plugin = createLlmAutoReplyPlugin(rawConfig, {
+      clientId: BOT_ID,
       random: () => 0.9,
       blockedChannels: ['c-blocked'],
     });
     await dispatch(
       plugin,
-      makeTriggerMessage(channel, { ...overrides, content: `${FORCE_TRIGGER_PREFIX} hi` }),
+      makeTriggerMessage(channel, { ...overrides, mention: true }),
       makeLogger(),
     );
 
@@ -578,7 +563,7 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     const reply = vi.fn().mockResolvedValue(ok('r'));
     const plugin = createLlmAutoReplyPlugin(
       { enabled: true, cooldownSeconds: 60 },
-      { random: () => 0, client: { reply } }, // gate always passes
+      { clientId: BOT_ID, random: () => 0, client: { reply } }, // gate always passes
     );
     // First automatic reply at t=0 sends and records the cooldown.
     const first = makeChannel(burst());
@@ -609,11 +594,11 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     expect(after.send).toHaveBeenCalledTimes(1);
   });
 
-  it('lets a force-triggered reply bypass the cooldown', async () => {
+  it('lets an @-mention reply bypass the cooldown', async () => {
     const reply = vi.fn().mockResolvedValue(ok('r'));
     const plugin = createLlmAutoReplyPlugin(
       { enabled: true, cooldownSeconds: 60 },
-      { random: () => 0, client: { reply } },
+      { clientId: BOT_ID, random: () => 0, client: { reply } },
     );
     // Automatic reply at t=0 records the cooldown.
     const first = makeChannel(burst());
@@ -624,45 +609,40 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     );
     expect(first.send).toHaveBeenCalledTimes(1);
 
-    // Forced message at t=1000 (well within the 60s cooldown) still replies.
+    // @-mention at t=1000 (well within the 60s cooldown) still replies.
     const forced = makeChannel(burst());
     await dispatch(
       plugin,
-      makeTriggerMessage(forced.channel, {
-        createdTimestamp: 1_000,
-        content: `${FORCE_TRIGGER_PREFIX} go`,
-      }),
+      makeTriggerMessage(forced.channel, { createdTimestamp: 1_000, mention: true }),
       makeLogger(),
     );
     expect(forced.send).toHaveBeenCalledTimes(1);
   });
 
-  it('records the cooldown for a force-triggered reply, blocking a later automatic reply', async () => {
+  it('records the cooldown for an @-mention reply, blocking a later automatic reply', async () => {
     const reply = vi.fn().mockResolvedValue(ok('r'));
     const plugin = createLlmAutoReplyPlugin(
       { enabled: true, cooldownSeconds: 60 },
-      { random: () => 0, client: { reply } },
+      { clientId: BOT_ID, random: () => 0, client: { reply } },
     );
     // auto@0 records, but will be long-elapsed by the final check.
     const a0 = makeChannel(burst());
     await dispatch(plugin, makeTriggerMessage(a0.channel, { createdTimestamp: 0 }), makeLogger());
     expect(a0.send).toHaveBeenCalledTimes(1);
 
-    // forced@61000: auto@0 has already elapsed; forced bypasses the check and records 61000.
+    // mention@61000: auto@0 has already elapsed; the mention bypasses the
+    // check and records 61000.
     const forced = makeChannel(burst());
     await dispatch(
       plugin,
-      makeTriggerMessage(forced.channel, {
-        createdTimestamp: 61_000,
-        content: `${FORCE_TRIGGER_PREFIX} go`,
-      }),
+      makeTriggerMessage(forced.channel, { createdTimestamp: 61_000, mention: true }),
       makeLogger(),
     );
     expect(forced.send).toHaveBeenCalledTimes(1);
 
-    // auto@90000 is blocked ONLY because the forced reply recorded at 61000
+    // auto@90000 is blocked ONLY because the @-mention reply recorded at 61000
     // (90000 - 61000 < 60000); auto@0 (90000 - 0) is long elapsed, so this
-    // would NOT block if the forced reply had not recorded.
+    // would NOT block if the mention reply had not recorded.
     const auto = makeChannel(burst());
     await dispatch(
       plugin,
@@ -677,7 +657,7 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     const reply = vi.fn().mockResolvedValue(ok('r'));
     const plugin = createLlmAutoReplyPlugin(
       { enabled: true, cooldownSeconds: 60 },
-      { random: () => 0, client: { reply } },
+      { clientId: BOT_ID, random: () => 0, client: { reply } },
     );
     // First automatic message passes the gate but the orchestrator bails at
     // the count gate (< N), so nothing is sent and the cooldown is NOT recorded.
@@ -704,7 +684,7 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     const reply = vi.fn().mockResolvedValue(ok('r'));
     const plugin = createLlmAutoReplyPlugin(
       { enabled: true, cooldownSeconds: 60 },
-      { random: () => 0, client: { reply } },
+      { clientId: BOT_ID, random: () => 0, client: { reply } },
     );
     const a = makeChannel(burst());
     const b = makeChannel(burst());
@@ -728,7 +708,7 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     expect(totalSends).toBe(1);
   });
 
-  it('keeps the in-flight guard until the last overlapping attempt finishes (forced overlap)', async () => {
+  it('keeps the in-flight guard until the last overlapping attempt finishes (mention overlap)', async () => {
     // cooldownSeconds: 0 so ONLY the in-flight guard can block the final auto.
     const resolvers: Array<(v: unknown) => void> = [];
     const reply = vi.fn().mockImplementation(
@@ -739,7 +719,7 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     );
     const plugin = createLlmAutoReplyPlugin(
       { enabled: true, cooldownSeconds: 0 },
-      { random: () => 0, client: { reply } },
+      { clientId: BOT_ID, random: () => 0, client: { reply } },
     );
     const flush = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
@@ -747,8 +727,8 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     const b = makeChannel(burst());
     const c = makeChannel(burst());
 
-    // A (automatic) and B (forced) both reach client.reply and park there, so
-    // both are in flight on the same channel at once.
+    // A (automatic) and B (@-mention) both reach client.reply and park there,
+    // so both are in flight on the same channel at once.
     const pA = dispatch(
       plugin,
       makeTriggerMessage(a.channel, { createdTimestamp: 0 }),
@@ -756,7 +736,7 @@ describe('createLlmAutoReplyPlugin messageCreate', () => {
     );
     const pB = dispatch(
       plugin,
-      makeTriggerMessage(b.channel, { createdTimestamp: 1, content: `${FORCE_TRIGGER_PREFIX} go` }),
+      makeTriggerMessage(b.channel, { createdTimestamp: 1, mention: true }),
       makeLogger(),
     );
     await flush();

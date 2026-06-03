@@ -95,19 +95,20 @@ yarn deploy
 Each personality reads its own `.env` from `src/bot/<name>/.env`. The
 authoritative schema lives in [`src/core/config/env.ts`](src/core/config/env.ts).
 
-| Key                 | Required | Notes                                                        |
-| ------------------- | -------- | ------------------------------------------------------------ |
-| `TOKEN`             | yes      | Discord bot token                                            |
-| `CLIENT_ID`         | yes      | Discord application client id                                |
-| `MONGO_URI`         | optional | Required for any personality that uses persistent state      |
-| `PORT`              | optional | HTTP port for the earthquake webhook (nijika only)           |
-| `NODE_ENV`          | optional | `development` (default), `test`, `production`                |
-| `LOG_LEVEL`         | optional | `trace`, `debug`, `info` (default), `warn`, `error`, `fatal` |
-| `OPENAI_API_KEY`    | optional | Enables OpenAI provider for the LLM chat plugin              |
-| `ANTHROPIC_API_KEY` | optional | Enables Anthropic provider                                   |
-| `GEMINI_API_KEY`    | optional | Enables Gemini provider                                      |
-| `XAI_API_KEY`       | optional | Enables xAI provider                                         |
-| `ACCUWEATHER_KEY`   | optional | Weather command                                              |
+| Key                       | Required | Notes                                                                   |
+| ------------------------- | -------- | ----------------------------------------------------------------------- |
+| `TOKEN`                   | yes      | Discord bot token                                                       |
+| `CLIENT_ID`               | yes      | Discord application client id                                           |
+| `MONGO_URI`               | optional | Required for any personality that uses persistent state                 |
+| `PORT`                    | optional | HTTP port for the earthquake webhook (nijika) / settings API (gopher)   |
+| `NODE_ENV`                | optional | `development` (default), `test`, `production`                           |
+| `LOG_LEVEL`               | optional | `trace`, `debug`, `info` (default), `warn`, `error`, `fatal`            |
+| `OPENAI_API_KEY`          | optional | Enables OpenAI provider for the LLM chat plugin                         |
+| `ANTHROPIC_API_KEY`       | optional | Enables Anthropic provider                                              |
+| `GEMINI_API_KEY`          | optional | Enables Gemini provider                                                 |
+| `XAI_API_KEY`             | optional | Enables xAI provider                                                    |
+| `ACCUWEATHER_KEY`         | optional | Weather command                                                         |
+| `GOPHER_SETTINGS_API_KEY` | optional | Bearer key for gopher's settings REST API (required when it is enabled) |
 
 Secrets must never be committed. The schema rejects obvious
 placeholders (`your_token`, `changeme`, etc.) at startup.

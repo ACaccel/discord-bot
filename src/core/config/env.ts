@@ -92,6 +92,10 @@ const envSchema = z
     GEMINI_API_KEY: llmKeySchema,
     XAI_API_KEY: llmKeySchema,
     ACCUWEATHER_KEY: z.string().min(1).optional(),
+    // Bearer key for gopher's settings REST API. Optional — only gopher
+    // sets it; the settings-api plugin refuses to start (when enabled)
+    // without it, so a secret never lives in config.json.
+    GOPHER_SETTINGS_API_KEY: z.string().min(1).optional(),
   })
   // Allow unknown env vars (Node, OS, shell tooling all add their own) but
   // only the typed keys above are returned to callers.
@@ -111,6 +115,8 @@ export type Env = Readonly<{
   XAI_API_KEY?: string;
   /** AccuWeather API key. Optional — only required for the weather_forecast slash command. */
   ACCUWEATHER_KEY?: string;
+  /** Bearer key for gopher's settings REST API. Optional — only gopher uses it. */
+  GOPHER_SETTINGS_API_KEY?: string;
 }>;
 
 /**
@@ -211,6 +217,7 @@ export const loadEnv = (options: LoadEnvOptions = {}): Env => {
     ANTHROPIC_API_KEY,
     GEMINI_API_KEY,
     XAI_API_KEY,
+    GOPHER_SETTINGS_API_KEY,
   } = parseResult.data;
   const env: Env = Object.freeze({
     TOKEN,
@@ -223,6 +230,7 @@ export const loadEnv = (options: LoadEnvOptions = {}): Env => {
     ...(ANTHROPIC_API_KEY !== undefined && { ANTHROPIC_API_KEY }),
     ...(GEMINI_API_KEY !== undefined && { GEMINI_API_KEY }),
     ...(XAI_API_KEY !== undefined && { XAI_API_KEY }),
+    ...(GOPHER_SETTINGS_API_KEY !== undefined && { GOPHER_SETTINGS_API_KEY }),
   });
 
   if (env.NODE_ENV === 'production' && env.LOG_LEVEL === 'debug') {

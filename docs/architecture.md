@@ -213,18 +213,20 @@ non-critical plugins are marked disabled and the bot keeps running.
 
 ## 5. Built-in plugins
 
-| Plugin                    | Path                               | Summary                                                                               |
-| ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------- |
-| `AutoReplyPlugin`         | `src/plugins/auto-reply/`          | `messageCreate` keyword + lucky replies and a dice roller                             |
-| `GuildEventsPlugin`       | `src/plugins/guild-events/`        | guild / member lifecycle events                                                       |
-| `GiveawayPlugin`          | `src/plugins/giveaway/`            | scheduled giveaways with reaction-driven winner selection                             |
-| `ActivityPlugin`          | `src/plugins/activity/`            | per-member activity tracking via message / reaction events                            |
-| `MessageBackupPlugin`     | `src/plugins/message-backup/`      | message create / delete / update archival (used by the `msg-archive` worker)          |
-| `LlmChatPlugin`           | `src/plugins/llm-chat/`            | multi-provider LLM chat with web-search toggle and session persistence                |
-| `VoicePlugin`             | `src/plugins/voice/`               | voice channel join + recording controller                                             |
-| `EarthquakePlugin`        | `src/plugins/earthquake/`          | earthquake alert broadcast (nijika exposes the HTTP webhook)                          |
-| `LlmAutoReplyPlugin`      | `src/plugins/llm-auto-reply/`      | probability-gated, context-aware `messageCreate` reply via a self-hosted LLM (nijika) |
-| `SocialLinkPreviewPlugin` | `src/plugins/social-link-preview/` | rewrites/embeds social-media share-link previews and suppresses the original (nijika) |
+| Plugin                    | Path                               | Summary                                                                                                      |
+| ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `AutoReplyPlugin`         | `src/plugins/auto-reply/`          | `messageCreate` keyword + lucky replies and a dice roller                                                    |
+| `GuildEventsPlugin`       | `src/plugins/guild-events/`        | guild / member lifecycle events                                                                              |
+| `GiveawayPlugin`          | `src/plugins/giveaway/`            | scheduled giveaways with reaction-driven winner selection                                                    |
+| `ActivityPlugin`          | `src/plugins/activity/`            | per-member activity tracking via message / reaction events                                                   |
+| `MessageBackupPlugin`     | `src/plugins/message-backup/`      | message create / delete / update archival (used by the `msg-archive` worker)                                 |
+| `LlmChatPlugin`           | `src/plugins/llm-chat/`            | multi-provider LLM chat with web-search toggle and session persistence                                       |
+| `VoicePlugin`             | `src/plugins/voice/`               | voice channel join + recording controller                                                                    |
+| `EarthquakePlugin`        | `src/plugins/earthquake/`          | earthquake alert broadcast (nijika exposes the HTTP webhook)                                                 |
+| `LlmAutoReplyPlugin`      | `src/plugins/llm-auto-reply/`      | probability-gated, context-aware `messageCreate` reply via a self-hosted LLM (gopher)                        |
+| `SocialLinkPreviewPlugin` | `src/plugins/social-link-preview/` | rewrites/embeds social-media share-link previews and suppresses the original (nijika)                        |
+| `SettingsApiPlugin`       | `src/plugins/settings-api/`        | owner-only, bearer-authenticated HTTP REST API to update the LLM `endpoint` at runtime + persist it (gopher) |
+| `IdentitySyncPlugin`      | `src/plugins/identity-sync/`       | daily avatar/nickname sync with a source user, or a static fallback identity (gopher)                        |
 
 ## 6. Personalities
 
@@ -239,6 +241,7 @@ is per deployment and `.gitignore`d.
 | `konata`      | Full interactive feature set                                                                                                              |
 | `tomori`      | Full interactive feature set                                                                                                              |
 | `msg-archive` | Worker-style; suppresses interaction / reaction / guildCreate listeners on its `BaseBot` subclass and runs only the `MessageBackupPlugin` |
+| `gopher`      | Database-free ("老鼠人"); self-hosted-LLM auto-reply, an owner-only settings REST API, and a daily avatar/nickname identity sync          |
 
 ## 7. Locales
 

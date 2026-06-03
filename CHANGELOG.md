@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`gopher` personality** (Discord display name "老鼠人"): a new, database-free bot that hosts the self-hosted-LLM auto-reply (ported from `nijika`) plus two gopher-only capabilities. Run with `yarn gopher`; registers only the `/help` command.
+- `settings-api` plugin (gopher): an owner-only, bearer-authenticated HTTP REST API (`GET` / `PUT {basePath}/endpoint`) to read/update the self-hosted LLM `endpoint` at runtime and persist it to `config.json`. Bound to `127.0.0.1` by default; the key is read from `GOPHER_SETTINGS_API_KEY` (never `config.json`), and an enabled API with no key refuses to start (fail-closed).
+- `identity-sync` plugin (gopher): a once-a-day check that mirrors a source user's avatar and **per-guild server nickname** (`syncWithSource`; the bot takes the source user's `GuildMember.displayName` in each guild, not their global name), guarding avatar re-uploads by the source avatar hash to respect Discord's rate limits; when sync is off it applies a static fallback identity (`fallbackNickname` + `fallbackAvatarPath`).
+- `GOPHER_SETTINGS_API_KEY` environment variable (optional; required when gopher's settings API is enabled).
+
+### Changed
+
+- The self-hosted-LLM auto-reply (`llm-auto-reply`) moved from `nijika` to the new `gopher` personality.
+- `llm-auto-reply` transcript format: dropped the `[<channelName>]` prefix — each line is now `<displayName>: <content>`, so the channel name is no longer sent to the LLM.
+- `llm-auto-reply` deterministic trigger changed from the `fatcat_reply` keyword to **@-mentioning the bot** (konata-style, `ignoreRepliedUser: true`); the bot's mention is stripped from the transcript. The probabilistic automatic reply is unchanged. The plugin now requires a `clientId` dep.
+- `SelfHostedLlmClient` endpoint now also accepts a provider function (`() => string`) resolved per request, letting a composition root swap the endpoint at runtime.
+- `BaseBot` now treats an empty `mongoURI` as "no database", so a database-free personality (gopher) boots without a `MONGO_URI` and its shutdown skips the connection-manager close.
+
+### Removed
+
+- `nijika` no longer registers `llm-auto-reply` (moved to `gopher`); its `llm_auto_reply` block was removed from `config.example.json`.
+
+### Added
+
 - Reddit link previews: a fifth rewrite provider (`src/infra/link-preview/providers/reddit.ts`) that rewrites comment permalinks (`/r/<sub>/comments/<id>`, bare `/comments/<id>`) and the mobile `/r/<sub>/s/<token>` share form — across `www`/`old`/`new`/`np`/`m`/`amp` reddit hosts — onto an embed-proxy domain so Discord unfurls a playable video. Default `redditProxyHosts` `[vxreddit.com, rxddit.com]` (vxreddit verified working; rxddit/FixReddit kept as a best-effort fallback — both are subject to Reddit's API limits). The validator's junk filter (`scoreMeta`) now also inspects `og:description` and recognises proxy-error placeholders (vxReddit's "Failed to get data from Reddit" / bare proxy-name title), so a failed Reddit probe is skipped rather than posted as a broken card.
 
 ### Fixed

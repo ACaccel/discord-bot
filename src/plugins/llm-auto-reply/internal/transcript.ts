@@ -22,17 +22,15 @@ export interface TranscriptMessage {
 /**
  * Render messages (expected oldest -> newest) into the endpoint's
  * single-string transcript. Each surviving line is
- * `[<channelName>] <displayName>: <content>`, joined with `\n`.
- * Bot-authored and blank-content messages are dropped, so the result
- * may be empty when nothing human remains.
+ * `<displayName>: <content>`, joined with `\n`. The channel name is
+ * deliberately NOT prefixed: the endpoint receives only the speaker and
+ * their words. Bot-authored and blank-content messages are dropped, so
+ * the result may be empty when nothing human remains.
  */
-export const buildTranscript = (
-  messages: readonly TranscriptMessage[],
-  channelName: string,
-): string =>
+export const buildTranscript = (messages: readonly TranscriptMessage[]): string =>
   messages
     .filter((m) => !m.isBot && m.content.trim().length > 0)
-    .map((m) => `[${channelName}] ${m.displayName}: ${m.content.trim()}`)
+    .map((m) => `${m.displayName}: ${m.content.trim()}`)
     .join('\n');
 
 /**

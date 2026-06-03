@@ -182,4 +182,32 @@ describe('BaseBot.run() — contract baseline', () => {
     await bot.run();
     await expect(bot.shutdown()).resolves.toBeUndefined();
   });
+
+  it('binds the typed Env without a MONGO_URI when constructed database-free', async () => {
+    // gopher is database-free: BaseBot must treat an empty mongoURI as
+    // "no DB" and NOT demand MONGO_URI when loading the typed Env, so
+    // TOKENS.Env still binds. (no-restricted-syntax is off in test files,
+    // so direct process.env manipulation is permitted here.)
+    const saved = {
+      TOKEN: process.env.TOKEN,
+      CLIENT_ID: process.env.CLIENT_ID,
+      MONGO_URI: process.env.MONGO_URI,
+    };
+    process.env.TOKEN = 'real-bot-token-value-xyz';
+    process.env.CLIENT_ID = '123456789012345678';
+    delete process.env.MONGO_URI;
+    try {
+      const fake = buildRunFakeClient();
+      const bot = new MinimalBot(fake.client, 'tk', '', 'bot-1', {});
+      await bot.run();
+      expect(bot.env).toBeDefined();
+      expect(bot.env?.MONGO_URI).toBeUndefined();
+      await bot.shutdown();
+    } finally {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
 });

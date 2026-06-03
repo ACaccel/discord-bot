@@ -19,3 +19,5 @@ export {
   createSocialLinkPreviewPlugin,
   type SocialLinkPreviewPluginConfig,
 } from './social-link-preview';
+export { createSettingsApiPlugin, type SettingsApiPluginConfig } from './settings-api';
+export { createIdentitySyncPlugin, type IdentitySyncPluginConfig } from './identity-sync';
