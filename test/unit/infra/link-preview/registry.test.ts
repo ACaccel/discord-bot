@@ -48,6 +48,9 @@ describe('createDefaultLinkPreviewRegistry', () => {
     expect(registry.findProvider(u('https://www.instagram.com/p/abc/'))?.name).toBe('instagram');
     expect(registry.findProvider(u('https://www.threads.net/@a/post/1'))?.name).toBe('threads');
     expect(registry.findProvider(u('https://www.facebook.com/a/posts/1'))?.name).toBe('facebook');
+    expect(registry.findProvider(u('https://www.reddit.com/r/aww/comments/abc123/'))?.name).toBe(
+      'reddit',
+    );
     expect(registry.findProvider(u('https://forum.gamer.com.tw/C.php?bsn=1'))?.name).toBe(
       'bahamut',
     );

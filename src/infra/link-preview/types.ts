@@ -50,6 +50,7 @@ export const LINK_PREVIEW_PROVIDER_NAMES = [
   'instagram',
   'threads',
   'facebook',
+  'reddit',
   'bahamut',
 ] as const;
 

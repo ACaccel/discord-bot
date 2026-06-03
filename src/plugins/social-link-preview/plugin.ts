@@ -54,6 +54,7 @@ export const createSocialLinkPreviewPlugin = (
       instagramProxyHosts: config.instagramProxyHosts,
       threadsProxyHosts: config.threadsProxyHosts,
       facebookProxyHosts: config.facebookProxyHosts,
+      redditProxyHosts: config.redditProxyHosts,
       enabledProviders: config.providers,
     });
 

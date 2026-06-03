@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Reddit link previews: a fifth rewrite provider (`src/infra/link-preview/providers/reddit.ts`) that rewrites comment permalinks (`/r/<sub>/comments/<id>`, bare `/comments/<id>`) and the mobile `/r/<sub>/s/<token>` share form — across `www`/`old`/`new`/`np`/`m`/`amp` reddit hosts — onto an embed-proxy domain so Discord unfurls a playable video. Default `redditProxyHosts` `[vxreddit.com, rxddit.com]` (vxreddit verified working; rxddit/FixReddit kept as a best-effort fallback — both are subject to Reddit's API limits). The validator's junk filter (`scoreMeta`) now also inspects `og:description` and recognises proxy-error placeholders (vxReddit's "Failed to get data from Reddit" / bare proxy-name title), so a failed Reddit probe is skipped rather than posted as a broken card.
+
 ### Fixed
 
 - Social-link-preview no longer posts a broken "Log in or sign up to view" card for a login-gated Facebook post: `scoreMeta` now rejects login-wall / not-found placeholder titles (`isJunkPreviewTitle`) so a proxy OG that carries only such a title (no media) is skipped instead of posted as a text card. (facebed already resolves Facebook `/share/<type>/<token>/` short links for accessible posts — the failure was confined to posts whose media Facebook itself gates.)

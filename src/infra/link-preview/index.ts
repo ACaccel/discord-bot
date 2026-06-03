@@ -34,4 +34,5 @@ export { createTwitterProvider } from './providers/twitter';
 export { createInstagramProvider } from './providers/instagram';
 export { createThreadsProvider } from './providers/threads';
 export { createFacebookProvider } from './providers/facebook';
+export { createRedditProvider } from './providers/reddit';
 export { createBahamutProvider } from './providers/bahamut';

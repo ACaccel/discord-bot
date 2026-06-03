@@ -12,6 +12,7 @@ import {
   createInstagramProvider,
   createThreadsProvider,
   createFacebookProvider,
+  createRedditProvider,
   invalidResponseError,
 } from '../../../../src/infra/link-preview';
 import {
@@ -158,6 +159,30 @@ describe('facebook provider canHandle', () => {
   });
 });
 
+describe('reddit provider canHandle', () => {
+  const provider = createRedditProvider({ proxyHosts: ['vxreddit.com'], ogClient: emptyClient() });
+
+  it('matches comment permalinks and share links across reddit host variants', () => {
+    expect(provider.canHandle(u('https://www.reddit.com/r/funny/comments/g0xb6c/title/'))).toBe(
+      true,
+    );
+    expect(provider.canHandle(u('https://reddit.com/r/aww/comments/abc123/'))).toBe(true);
+    expect(provider.canHandle(u('https://old.reddit.com/r/pics/comments/haucpf/slug/'))).toBe(true);
+    expect(provider.canHandle(u('https://np.reddit.com/comments/abc123'))).toBe(true); // bare /comments/
+    expect(provider.canHandle(u('https://www.reddit.com/r/videos/s/aB9xYz0Q'))).toBe(true); // share link
+  });
+
+  it('rejects bare subreddit, user, and home URLs', () => {
+    expect(provider.canHandle(u('https://www.reddit.com/r/funny/'))).toBe(false);
+    expect(provider.canHandle(u('https://www.reddit.com/user/spez/'))).toBe(false);
+    expect(provider.canHandle(u('https://www.reddit.com/'))).toBe(false);
+    // already-proxied hosts are not matched
+    expect(provider.canHandle(u('https://vxreddit.com/r/funny/comments/g0xb6c/title/'))).toBe(
+      false,
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Validation loop (the shared rewrite-provider logic, exercised via twitter)
 // ---------------------------------------------------------------------------
@@ -282,6 +307,18 @@ describe('scoreMeta login-wall / junk rejection', () => {
     expect(scoreMeta(meta({ title: 'Log in or sign up to view', images: ['logo.png'] }))).toBe(
       'none',
     );
+  });
+
+  it('rejects a vxReddit proxy-error page (title is the proxy name / description says failed)', () => {
+    expect(isJunkPreviewTitle('vxReddit')).toBe(true);
+    // vxReddit's error page: og:title="vxReddit", og:description="Failed to get data from Reddit"
+    expect(
+      scoreMeta(meta({ title: 'vxReddit', description: 'Failed to get data from Reddit' })),
+    ).toBe('none');
+    // description marker alone is enough even if the title were generic
+    expect(
+      scoreMeta(meta({ title: 'reddit', description: 'Failed to get data from Reddit' })),
+    ).toBe('none');
   });
 
   it('still scores real media / text above the junk filter', () => {

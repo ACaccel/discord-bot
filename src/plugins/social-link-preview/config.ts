@@ -67,6 +67,11 @@ const ConfigSchema = z
       .array(z.string().min(1))
       .nonempty()
       .default(['facebed.com', 'fixacebook.com']),
+    /** Embed-proxy hosts for Reddit, in priority order (vxreddit verified working; rxddit fallback). */
+    redditProxyHosts: z
+      .array(z.string().min(1))
+      .nonempty()
+      .default(['vxreddit.com', 'rxddit.com']),
   })
   .strict();
 

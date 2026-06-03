@@ -20,6 +20,7 @@ import { LinkPreviewProviderRegistry } from './registry';
 import { createBahamutProvider } from './providers/bahamut';
 import { createFacebookProvider } from './providers/facebook';
 import { createInstagramProvider } from './providers/instagram';
+import { createRedditProvider } from './providers/reddit';
 import { createThreadsProvider } from './providers/threads';
 import { createTwitterProvider } from './providers/twitter';
 import type { LinkPreviewProvider, LinkPreviewProviderName } from './types';
@@ -39,6 +40,7 @@ export const DEFAULT_PROXY_HOSTS: Readonly<
   instagram: ['kkinstagram.com', 'uuinstagram.com'],
   threads: ['viewthreads.com', 'vxthreads.net'],
   facebook: ['facebed.com', 'fixacebook.com'],
+  reddit: ['vxreddit.com', 'rxddit.com'],
 };
 
 /** Default OG-cache TTL for the shared fetcher (avoids hammering flaky proxies). */
@@ -51,6 +53,7 @@ export interface LinkPreviewRegistryDeps {
   readonly instagramProxyHosts?: readonly string[];
   readonly threadsProxyHosts?: readonly string[];
   readonly facebookProxyHosts?: readonly string[];
+  readonly redditProxyHosts?: readonly string[];
   /** When set, only these providers are registered (the kill-switch allow-list). */
   readonly enabledProviders?: readonly LinkPreviewProviderName[];
 }
@@ -74,6 +77,10 @@ export const createDefaultLinkPreviewRegistry = (
     }),
     createFacebookProvider({
       proxyHosts: deps.facebookProxyHosts ?? DEFAULT_PROXY_HOSTS.facebook,
+      ogClient,
+    }),
+    createRedditProvider({
+      proxyHosts: deps.redditProxyHosts ?? DEFAULT_PROXY_HOSTS.reddit,
       ogClient,
     }),
     createBahamutProvider(ogClient),

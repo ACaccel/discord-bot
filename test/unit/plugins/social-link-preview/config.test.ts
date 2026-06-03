@@ -22,6 +22,7 @@ describe('parseSocialLinkPreviewConfig', () => {
     expect(config.instagramProxyHosts).toEqual(DEFAULT_PROXY_HOSTS.instagram);
     expect(config.threadsProxyHosts).toEqual(DEFAULT_PROXY_HOSTS.threads);
     expect(config.facebookProxyHosts).toEqual(DEFAULT_PROXY_HOSTS.facebook);
+    expect(config.redditProxyHosts).toEqual(DEFAULT_PROXY_HOSTS.reddit);
     expect(config.providers).toBeUndefined();
   });
 

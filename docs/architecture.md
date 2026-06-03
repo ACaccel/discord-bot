@@ -152,9 +152,10 @@ A second Provider Strategy, mirroring the LLM layer, for the
 (`canHandle`) and `build`s a `LinkPreviewResult` — a discriminated union
 of `rewritten-url` (an embed-proxy link Discord unfurls into a playable
 video) and `card` (neutral OpenGraph data the plugin renders into a
-static embed). The four rewrite providers (Twitter/X, Instagram, Threads,
-Facebook) are pure; `bahamut` scrapes OpenGraph via the SSRF-safe
-`OgClient` (no redirect chasing, body + timeout caps, host allow-list).
+static embed). The five rewrite providers (Twitter/X, Instagram, Threads,
+Facebook, Reddit) are pure; `bahamut` scrapes OpenGraph via the SSRF-safe
+`OgClient` (streamed, bounded redirect-following behind a `beforeRedirect`
+SSRF guard, host allow-list).
 Failures map into `LinkPreviewError`. `LinkPreviewProviderRegistry`
 matches by URL in registration order.
 

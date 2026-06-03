@@ -38,14 +38,15 @@ import type {
 export type CandidateQuality = 'video' | 'image' | 'text' | 'none';
 
 /**
- * Placeholder titles a proxy / source serves when the post is login-gated,
- * removed, or region-blocked — NOT a real preview. Facebook's share / video
- * endpoints return an OG with only the title "Log in or sign up to view"
- * (no media) for a gated post; scoring that as a usable text card posts a
- * broken "Log in or sign up" embed. Matched case-insensitively as an
- * `og:title` substring.
+ * Placeholder text a proxy / source serves when the post is login-gated,
+ * removed, region-blocked, or the proxy failed to fetch it — NOT a real
+ * preview. Matched case-insensitively as a substring of `og:title` OR
+ * `og:description`. Facebook's gated posts return "Log in or sign up to
+ * view" (no media); vxReddit's error page returns the description "Failed
+ * to get data from Reddit". Scoring either as a usable card would post a
+ * broken embed.
  */
-const JUNK_TITLE_MARKERS: readonly string[] = [
+const JUNK_MARKERS: readonly string[] = [
   'log in or sign up',
   'log into facebook',
   'see posts, photos and more on facebook',
@@ -54,29 +55,45 @@ const JUNK_TITLE_MARKERS: readonly string[] = [
   "this content isn't available",
   'content not found',
   'page not found',
+  'failed to get data from reddit',
 ];
 
 /**
- * True when `title` is a known login-wall / not-found placeholder rather
- * than real post content. Pure + exported for unit tests.
+ * Titles that are exactly an embed-proxy's own name — the placeholder it
+ * serves as `og:title` on a fetch error (e.g. vxReddit returns
+ * `og:title="vxReddit"` when Reddit's API call fails).
  */
-export const isJunkPreviewTitle = (title: string): boolean => {
-  const normalized = title.toLowerCase();
-  return JUNK_TITLE_MARKERS.some((marker) => normalized.includes(marker));
+const JUNK_EXACT_TITLES: ReadonlySet<string> = new Set(['vxreddit', 'rxddit', 'fxreddit']);
+
+const matchesJunkMarker = (text: string): boolean => {
+  const normalized = text.toLowerCase();
+  return JUNK_MARKERS.some((marker) => normalized.includes(marker));
 };
+
+/**
+ * True when `title` is a known login-wall / not-found / proxy-error
+ * placeholder rather than real post content. Pure + exported for unit tests.
+ */
+export const isJunkPreviewTitle = (title: string): boolean =>
+  matchesJunkMarker(title) || JUNK_EXACT_TITLES.has(title.trim().toLowerCase());
+
+/** A candidate whose only "content" is a junk placeholder (title or description). */
+const isJunkPreview = (meta: OpenGraphMeta): boolean =>
+  (meta.title !== undefined && isJunkPreviewTitle(meta.title)) ||
+  (meta.description !== undefined && matchesJunkMarker(meta.description));
 
 /**
  * Rank a candidate proxy's OpenGraph: a playable video beats a static
  * image beats a text-only embed beats nothing usable. A login-wall /
- * not-found placeholder title (with no video) scores `none` so a broken
- * "Log in or sign up" card is never posted. Pure + exported so the
- * selection policy can be tested in isolation from the probe loop.
+ * not-found / proxy-error placeholder (with no video) scores `none` so a
+ * broken card is never posted. Pure + exported so the selection policy can
+ * be tested in isolation from the probe loop.
  */
 export const scoreMeta = (meta: OpenGraphMeta): CandidateQuality => {
   if (meta.video !== undefined && meta.video.length > 0) return 'video';
-  // A login-wall / not-found page carries no real content even if it serves
-  // a generic logo image, so reject it before the image / text tiers.
-  if (meta.title !== undefined && isJunkPreviewTitle(meta.title)) return 'none';
+  // A login-wall / not-found / proxy-error page carries no real content even
+  // if it serves a generic logo image, so reject it before the image/text tiers.
+  if (isJunkPreview(meta)) return 'none';
   if (meta.images.length > 0) return 'image';
   if (meta.title !== undefined && meta.title.length > 0) return 'text';
   return 'none';
