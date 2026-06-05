@@ -18,7 +18,6 @@
  * settings-api plugin's zod schema), so `setEndpoint` trusts it receives a
  * well-formed URL and focuses solely on persistence (single responsibility).
  */
-import { readFileSync } from 'node:fs';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 
 /** Shape of the `config.json` slice this store reads/writes. */
@@ -27,9 +26,14 @@ interface MutableConfigShape {
   [key: string]: unknown;
 }
 
-const readEndpoint = (raw: string): string => {
-  const parsed = JSON.parse(raw) as MutableConfigShape;
-  const endpoint = parsed.llm_auto_reply?.endpoint;
+/**
+ * Pull the configured endpoint out of an already-parsed `llm_auto_reply`
+ * block, defaulting to an empty string when absent or non-string. This store
+ * owns the `config.json` shape, so the extraction lives here; the composition
+ * root passes the block it imported at boot rather than re-reading the file.
+ */
+const extractEndpoint = (llmAutoReply: unknown): string => {
+  const endpoint = (llmAutoReply as { endpoint?: unknown } | undefined)?.endpoint;
   return typeof endpoint === 'string' ? endpoint : '';
 };
 
@@ -44,12 +48,20 @@ export class GopherSettingsStore {
   #writeChain: Promise<void> = Promise.resolve();
 
   /**
-   * @param configPath absolute path to the bot's `config.json`. Read once
-   *   synchronously at construction (boot time) to seed the live endpoint;
-   *   `config.json` is already valid JSON here because the bot imports it.
+   * @param configPath absolute path to the bot's `config.json`. Retained for
+   *   the persist path only ({@link setEndpoint}); construction performs no
+   *   filesystem I/O.
+   * @param llmAutoReply the already-imported `llm_auto_reply` block from the
+   *   bot's config, used to seed the live endpoint. The composition root has
+   *   loaded it via `import config from './config.json'`, so re-reading the
+   *   file here would be redundant and would couple construction to disk
+   *   (and break pure composition tests that never touch the real file).
    */
-  public constructor(private readonly configPath: string) {
-    this.#endpoint = readEndpoint(readFileSync(configPath, 'utf8'));
+  public constructor(
+    private readonly configPath: string,
+    llmAutoReply: unknown,
+  ) {
+    this.#endpoint = extractEndpoint(llmAutoReply);
   }
 
   /** The current self-hosted LLM endpoint. */

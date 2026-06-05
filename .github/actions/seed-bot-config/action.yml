@@ -11,7 +11,7 @@ runs:
   using: 'composite'
   steps:
     - run: |
-        for bot in nijika konata tomori msg-archive; do
+        for bot in nijika konata tomori msg-archive gopher; do
           cp "src/bot/${bot}/config.example.json" "src/bot/${bot}/config.json"
         done
       shell: bash

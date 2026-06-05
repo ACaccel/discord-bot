@@ -1,7 +1,8 @@
 /**
- * Unit tests for GopherSettingsStore: it seeds the live endpoint from disk,
- * tolerates a missing endpoint, and persists updates to config.json while
- * preserving every other key with a 2-space indent.
+ * Unit tests for GopherSettingsStore: it seeds the live endpoint from the
+ * `llm_auto_reply` block handed in at construction (no boot-time file read),
+ * tolerates a missing/malformed endpoint, and persists updates to config.json
+ * while preserving every other key with a 2-space indent.
  */
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,17 +41,23 @@ describe('GopherSettingsStore', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('reads the initial endpoint from disk', () => {
-    expect(new GopherSettingsStore(file).getEndpoint()).toBe('https://old.invalid/chat');
+  it('seeds the initial endpoint from the provided config block', () => {
+    const store = new GopherSettingsStore(file, {
+      enabled: true,
+      endpoint: 'https://old.invalid/chat',
+      probability: 0.03,
+    });
+    expect(store.getEndpoint()).toBe('https://old.invalid/chat');
   });
 
-  it('defaults to an empty endpoint when none is configured', () => {
-    writeFileSync(file, JSON.stringify({ language: 'zh-TW' }, null, 2));
-    expect(new GopherSettingsStore(file).getEndpoint()).toBe('');
+  it('defaults to an empty endpoint when the block is missing or malformed', () => {
+    expect(new GopherSettingsStore(file, undefined).getEndpoint()).toBe('');
+    expect(new GopherSettingsStore(file, {}).getEndpoint()).toBe('');
+    expect(new GopherSettingsStore(file, { endpoint: 42 }).getEndpoint()).toBe('');
   });
 
   it('updates the live endpoint and persists it, preserving other keys', async () => {
-    const store = new GopherSettingsStore(file);
+    const store = new GopherSettingsStore(file, { endpoint: 'https://old.invalid/chat' });
     await store.setEndpoint('https://new.invalid/chat');
 
     expect(store.getEndpoint()).toBe('https://new.invalid/chat');
@@ -65,7 +72,7 @@ describe('GopherSettingsStore', () => {
   });
 
   it('writes 2-space-indented JSON with a trailing newline', async () => {
-    const store = new GopherSettingsStore(file);
+    const store = new GopherSettingsStore(file, { endpoint: 'https://old.invalid/chat' });
     await store.setEndpoint('https://new.invalid/chat');
     const raw = readFileSync(file, 'utf8');
     expect(raw.endsWith('\n')).toBe(true);
@@ -73,7 +80,7 @@ describe('GopherSettingsStore', () => {
   });
 
   it('serializes concurrent writes without corrupting the file', async () => {
-    const store = new GopherSettingsStore(file);
+    const store = new GopherSettingsStore(file, { endpoint: 'https://old.invalid/chat' });
     await Promise.all([
       store.setEndpoint('https://a.invalid/chat'),
       store.setEndpoint('https://b.invalid/chat'),

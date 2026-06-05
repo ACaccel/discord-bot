@@ -58,7 +58,13 @@ export class Gopher extends BaseBot<GopherConfig> {
         this.helpMessageKey = 'replies:gopher.help_message';
 
         // Single owner of the runtime-mutable endpoint and its persistence.
-        const store = new GopherSettingsStore(path.join(__dirname, 'config.json'));
+        // Seeded from the already-imported `llm_auto_reply` block so
+        // construction stays free of filesystem I/O; the path is used only
+        // when persisting an operator's runtime update.
+        const store = new GopherSettingsStore(
+            path.join(__dirname, 'config.json'),
+            this.config.llm_auto_reply,
+        );
 
         // Ported from nijika: occasional self-hosted LLM auto-reply. The live
         // endpoint comes from the store so the settings API can swap it at
