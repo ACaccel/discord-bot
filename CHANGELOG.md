@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`social-link-preview` now previews Facebook share short links** (`https://www.facebook.com/share/r/<token>/`). The embed proxies cannot resolve Facebook's opaque share token — they return a login wall, which is correctly filtered as junk — so previously these links produced no preview at all. The Facebook provider now expands a share link to its canonical permalink (following Facebook's browser-UA redirect) before proxying it for a playable video, and falls back to a static OpenGraph card — scraped from Facebook's own crawler response — for any Facebook link no proxy can preview.
+
 ### Added
 
 - **`gopher` personality** (Discord display name "老鼠人"): a new, database-free bot that hosts the self-hosted-LLM auto-reply (ported from `nijika`) plus two gopher-only capabilities. Run with `yarn gopher`; registers only the `/help` command.

@@ -77,8 +77,13 @@ const matchesJunkMarker = (text: string): boolean => {
 export const isJunkPreviewTitle = (title: string): boolean =>
   matchesJunkMarker(title) || JUNK_EXACT_TITLES.has(title.trim().toLowerCase());
 
-/** A candidate whose only "content" is a junk placeholder (title or description). */
-const isJunkPreview = (meta: OpenGraphMeta): boolean =>
+/**
+ * A candidate whose only "content" is a junk placeholder (login-wall /
+ * not-found / proxy-error) in its title or description. Exported so a
+ * source that scrapes a page's own OpenGraph (e.g. the Facebook card
+ * fallback) can reject the same gated placeholders before posting a card.
+ */
+export const isJunkPreview = (meta: OpenGraphMeta): boolean =>
   (meta.title !== undefined && isJunkPreviewTitle(meta.title)) ||
   (meta.description !== undefined && matchesJunkMarker(meta.description));
 

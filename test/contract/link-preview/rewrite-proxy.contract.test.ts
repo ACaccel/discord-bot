@@ -9,9 +9,13 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import nock from 'nock';
 
-import { OgClient, createTwitterProvider } from '../../../src/infra/link-preview';
+import {
+  OgClient,
+  createTwitterProvider,
+  createFacebookProvider,
+} from '../../../src/infra/link-preview';
 import { isOk } from '../../../src/core/result';
-import type { LinkPreviewProvider } from '../../../src/infra/link-preview';
+import type { LinkPreviewProvider, LinkPreviewResult } from '../../../src/infra/link-preview';
 
 const HOSTS = ['fxtwitter.com', 'vxtwitter.com'];
 const PATH = '/jack/status/20';
@@ -127,5 +131,95 @@ describe('rewrite-provider proxy validation contract', () => {
       .reply(302, '', { Location: 'https://unreachable-cdn.example.com/v/20.mp4' });
     // Intentionally no interceptor for unreachable-cdn.example.com.
     expect(await build()).toBe(fxUrl);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Facebook share-link expansion + OpenGraph card fallback, at the wire
+// ---------------------------------------------------------------------------
+
+describe('facebook share-link resolution contract', () => {
+  const SHARE_PATH = '/share/r/1AcYfs5CNq/';
+  const SHARE = new URL(`https://www.facebook.com${SHARE_PATH}`);
+  const CANON_PATH = '/61585725097605/videos/866774919797953/';
+  const CANON = `https://www.facebook.com${CANON_PATH}`;
+  const PROXY_CANON = `https://facebed.com${CANON_PATH}`;
+
+  const buildFb = async (url: URL): Promise<LinkPreviewResult | null> => {
+    const provider = createFacebookProvider({
+      proxyHosts: ['facebed.com'],
+      ogClient: new OgClient(),
+    });
+    const result = await provider.build(url, { timeoutMs: 4000, budgetMs: 8000 });
+    if (!isOk(result)) throw new Error('expected ok');
+    return result.value;
+  };
+
+  beforeAll(() => {
+    if (!nock.isActive()) nock.activate();
+    nock.disableNetConnect();
+  });
+  afterEach(() => {
+    expect(nock.pendingMocks()).toEqual([]);
+    nock.cleanAll();
+  });
+  afterAll(() => {
+    nock.enableNetConnect();
+    nock.restore();
+  });
+
+  it('chases the browser-UA redirect to the canonical, then proxies it for a playable video', async () => {
+    // Facebook only redirects a share link to its canonical permalink for a
+    // NON-crawler UA; the cookieless destination page body is irrelevant.
+    nock('https://www.facebook.com', { reqheaders: { 'user-agent': /Chrome\// } })
+      .get(SHARE_PATH)
+      .reply(302, '', { Location: CANON });
+    nock('https://www.facebook.com', { reqheaders: { 'user-agent': /Chrome\// } })
+      .get(CANON_PATH)
+      .reply(200, '<html><head><title>error</title></head><body>x</body></html>');
+    // The Discord-crawler-UA proxy probe of the canonical yields og:video.
+    nock('https://facebed.com', { reqheaders: { 'user-agent': /Discordbot\/2\.0/ } })
+      .get(CANON_PATH)
+      .reply(200, ogHtml(VIDEO_HEAD));
+
+    expect(await buildFb(SHARE)).toEqual({
+      kind: 'rewritten-url',
+      url: PROXY_CANON,
+      sourceUrl: SHARE.href,
+    });
+  });
+
+  it('falls back to a Facebook OpenGraph card when resolution fails and the proxy is a login wall', async () => {
+    // No interceptor for the browser-UA resolution -> it errors (host
+    // unreachable under disableNetConnect), so the original /share/ link is
+    // probed; the proxy serves a login wall (junk), and we build a card from
+    // Facebook's own OpenGraph (served to the Discord crawler UA).
+    nock('https://facebed.com', { reqheaders: { 'user-agent': /Discordbot\/2\.0/ } })
+      .get(SHARE_PATH)
+      .reply(200, ogHtml('<meta property="og:title" content="Log in or sign up to view">'));
+    nock('https://www.facebook.com', { reqheaders: { 'user-agent': /Discordbot\/2\.0/ } })
+      .get(SHARE_PATH)
+      .reply(
+        200,
+        ogHtml(
+          [
+            '<meta property="og:title" content="Lil mouse">',
+            '<meta property="og:image" content="https://scontent.example/thumb.jpg">',
+            '<meta property="og:url" content="https://www.facebook.com/p/1/">',
+          ].join(''),
+        ),
+      );
+
+    expect(await buildFb(SHARE)).toEqual({
+      kind: 'card',
+      card: {
+        url: 'https://www.facebook.com/p/1/',
+        title: 'Lil mouse',
+        description: undefined,
+        imageUrl: 'https://scontent.example/thumb.jpg',
+        siteName: 'Facebook',
+      },
+      sourceUrl: SHARE.href,
+    });
   });
 });

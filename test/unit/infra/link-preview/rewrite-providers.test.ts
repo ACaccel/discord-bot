@@ -24,6 +24,7 @@ import type {
   LinkPreviewProvider,
   LinkPreviewBuildContext,
   LinkPreviewFailure,
+  LinkPreviewResult,
   OgClient,
   OpenGraphMeta,
 } from '../../../../src/infra/link-preview';
@@ -146,11 +147,12 @@ describe('threads provider canHandle', () => {
 describe('facebook provider canHandle', () => {
   const provider = createFacebookProvider({ proxyHosts: ['facebed.com'], ogClient: emptyClient() });
 
-  it('matches posts, videos, reels, watch, and fb.watch', () => {
+  it('matches posts, videos, reels, watch, share, and fb.watch', () => {
     expect(provider.canHandle(u('https://www.facebook.com/page/posts/123'))).toBe(true);
     expect(provider.canHandle(u('https://www.facebook.com/page/videos/123'))).toBe(true);
     expect(provider.canHandle(u('https://www.facebook.com/reel/123'))).toBe(true);
     expect(provider.canHandle(u('https://www.facebook.com/watch/?v=123'))).toBe(true);
+    expect(provider.canHandle(u('https://www.facebook.com/share/r/1AcYfs5CNq/'))).toBe(true);
     expect(provider.canHandle(u('https://fb.watch/abc123/'))).toBe(true);
   });
 
@@ -384,5 +386,131 @@ describe('rewrite URL construction', () => {
       'https://viewthreads.com/@user/post/Cabc',
       third,
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Facebook share-link resolution + OpenGraph card fallback
+// ---------------------------------------------------------------------------
+
+describe('facebook share-link resolution + card fallback', () => {
+  const share = 'https://www.facebook.com/share/r/1AcYfs5CNq/';
+  const canonical = 'https://www.facebook.com/61585725097605/videos/866774919797953/';
+  const proxyCanonical = 'https://facebed.com/61585725097605/videos/866774919797953/';
+  const proxyShare = 'https://facebed.com/share/r/1AcYfs5CNq/';
+
+  type ResolveResult = Result<string, LinkPreviewFailure>;
+
+  /** Fake OgClient exposing BOTH the resolve step and the OG fetch. */
+  const makeFbClient = (opts: {
+    resolve?: Readonly<Record<string, ResolveResult>>;
+    fetchByUrl?: Readonly<Record<string, MetaResult>>;
+  }): {
+    client: OgClient;
+    fetch: ReturnType<typeof vi.fn>;
+    resolveCanonical: ReturnType<typeof vi.fn>;
+  } => {
+    const fetch = vi.fn(
+      async (url: string): Promise<MetaResult> => opts.fetchByUrl?.[url] ?? ok(meta()),
+    );
+    const resolveCanonical = vi.fn(
+      async (url: string): Promise<ResolveResult> =>
+        opts.resolve?.[url] ?? err(invalidResponseError('facebook')),
+    );
+    return { client: { fetch, resolveCanonical } as unknown as OgClient, fetch, resolveCanonical };
+  };
+
+  const build = async (
+    provider: LinkPreviewProvider,
+    href: string,
+  ): Promise<LinkPreviewResult | null> => {
+    const result = await provider.build(u(href), { timeoutMs: 1000 });
+    if (!isOk(result)) throw new Error(`expected ok for ${href}`);
+    return result.value;
+  };
+
+  it('expands a share link to its canonical permalink, then probes the proxy for a video', async () => {
+    const { client, resolveCanonical, fetch } = makeFbClient({
+      resolve: { [share]: ok(canonical) },
+      fetchByUrl: { [proxyCanonical]: ok(meta({ video: 'v.mp4' })) },
+    });
+    const provider = createFacebookProvider({ proxyHosts: ['facebed.com'], ogClient: client });
+    expect(await build(provider, share)).toEqual({
+      kind: 'rewritten-url',
+      url: proxyCanonical,
+      sourceUrl: share, // original link is carried, not the resolved canonical
+    });
+    expect(resolveCanonical).toHaveBeenCalledWith(share, 1000);
+    expect(fetch).toHaveBeenCalledWith(proxyCanonical, 'facebook', 1000); // never the /share/ token
+  });
+
+  it('drops the share-attribution query from the resolved URL before probing', async () => {
+    const { client } = makeFbClient({
+      resolve: { [share]: ok(`${canonical}?share_url=x&rdid=y`) },
+      fetchByUrl: { [proxyCanonical]: ok(meta({ video: 'v.mp4' })) },
+    });
+    const provider = createFacebookProvider({ proxyHosts: ['facebed.com'], ogClient: client });
+    expect(await build(provider, share)).toEqual({
+      kind: 'rewritten-url',
+      url: proxyCanonical,
+      sourceUrl: share,
+    });
+  });
+
+  it('falls back to a Facebook OpenGraph card when resolution fails and the proxy is a login wall', async () => {
+    const fbImage = 'https://scontent.example/thumb.jpg';
+    const { client } = makeFbClient({
+      resolve: { [share]: err(invalidResponseError('facebook')) },
+      fetchByUrl: {
+        [proxyShare]: ok(meta({ title: 'Log in or sign up to view' })),
+        [share]: ok(
+          meta({
+            title: 'Lil mouse',
+            description: 'a clip',
+            images: [fbImage],
+            url: 'https://www.facebook.com/p/1/',
+          }),
+        ),
+      },
+    });
+    const provider = createFacebookProvider({ proxyHosts: ['facebed.com'], ogClient: client });
+    expect(await build(provider, share)).toEqual({
+      kind: 'card',
+      card: {
+        url: 'https://www.facebook.com/p/1/',
+        title: 'Lil mouse',
+        description: 'a clip',
+        imageUrl: fbImage,
+        siteName: 'Facebook',
+      },
+      sourceUrl: share,
+    });
+  });
+
+  it('returns null when the proxy cannot preview AND Facebook serves only a junk OG', async () => {
+    const { client } = makeFbClient({
+      resolve: { [share]: err(invalidResponseError('facebook')) },
+      fetchByUrl: {
+        [proxyShare]: ok(meta({ title: 'Log in or sign up to view' })),
+        [share]: ok(meta({ title: 'Log in or sign up to view' })),
+      },
+    });
+    const provider = createFacebookProvider({ proxyHosts: ['facebed.com'], ogClient: client });
+    expect(await build(provider, share)).toBeNull();
+  });
+
+  it('does not resolve non-share canonical links (probes them directly)', async () => {
+    const post = 'https://www.facebook.com/page/videos/123';
+    const proxyPost = 'https://facebed.com/page/videos/123';
+    const { client, resolveCanonical } = makeFbClient({
+      fetchByUrl: { [proxyPost]: ok(meta({ video: 'v.mp4' })) },
+    });
+    const provider = createFacebookProvider({ proxyHosts: ['facebed.com'], ogClient: client });
+    expect(await build(provider, post)).toEqual({
+      kind: 'rewritten-url',
+      url: proxyPost,
+      sourceUrl: post,
+    });
+    expect(resolveCanonical).not.toHaveBeenCalled();
   });
 });

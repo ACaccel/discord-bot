@@ -298,6 +298,50 @@ describe('OgClient.fetch', () => {
   });
 });
 
+describe('OgClient.resolveCanonical', () => {
+  const share = 'https://www.facebook.com/share/r/1AcYfs5CNq/';
+  const canonical = 'https://www.facebook.com/61585725097605/videos/866774919797953/';
+
+  it('follows redirects with a browser UA and returns the final URL (body discarded)', async () => {
+    const response = streamResponse([Buffer.from('error page')], 'text/html', canonical);
+    const get = setGet(async () => response);
+    const result = await new OgClient().resolveCanonical(share, 4000);
+
+    expect(isOk(result)).toBe(true);
+    if (isOk(result)) expect(result.value).toBe(canonical);
+    // Only the post-redirect URL matters: the destination body is never read.
+    expect(response.data.destroyed).toBe(true);
+    expect(get).toHaveBeenCalledWith(
+      share,
+      expect.objectContaining({
+        timeout: 4000,
+        maxRedirects: 3,
+        beforeRedirect: expect.any(Function),
+        responseType: 'stream',
+        // A non-crawler UA: Facebook only redirects share links to the
+        // canonical permalink for a browser-like UA (NOT the Discord crawler).
+        headers: expect.objectContaining({
+          'User-Agent': expect.stringContaining('Chrome/'),
+          Accept: 'text/html',
+        }),
+      }),
+    );
+    const ua = (get.mock.calls[0]?.[1] as { headers: Record<string, string> }).headers[
+      'User-Agent'
+    ];
+    expect(ua).not.toContain('Discordbot');
+  });
+
+  it('maps a transport error to an Err (LINK_PREVIEW_FETCH_FAILED)', async () => {
+    setGet(async () => {
+      throw Object.assign(new Error('dns'), { code: 'ENOTFOUND' });
+    });
+    const result = await new OgClient().resolveCanonical(share, 1000);
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) expect(result.error.code).toBe('LINK_PREVIEW_FETCH_FAILED');
+  });
+});
+
 describe('OgClient cache', () => {
   // A fresh single-use stream per call so a cache hit is observable as a
   // SKIPPED network call (Readable is consumed once).

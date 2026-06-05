@@ -98,6 +98,18 @@ const DEFAULT_MAX_CONTENT_LENGTH = 512 * 1024;
  * payload and guarantees we observe exactly what Discord's unfurl will fetch.
  */
 const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)';
+/**
+ * A plain desktop-browser User-Agent used only by {@link OgClient.resolveCanonical}.
+ * Facebook serves the Discord crawler UA a ready-made OpenGraph card at the
+ * share-link URL itself (HTTP 200, no redirect), so the crawler UA can never
+ * observe the canonical permalink. A non-crawler UA instead receives Facebook's
+ * 30x chain that resolves a `/share/<type>/<token>` short link to its canonical
+ * `/<page>/videos/<id>/` (or `/reel/<id>`) permalink — the only form the embed
+ * proxies can turn into a playable video. We follow that chain solely to read
+ * the final URL; the cookieless destination page itself is discarded.
+ */
+const RESOLVE_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const DEFAULT_CACHE_MAX_ENTRIES = 256;
 /**
  * Redirect hops to follow during a probe. Embed proxies commonly 301/302 to
@@ -459,6 +471,41 @@ export class OgClient {
         return ok(media);
       }
       return err(translateLinkPreviewError(provider, e));
+    }
+  }
+
+  /**
+   * Follow `url`'s redirect chain (with a plain browser UA) and return the
+   * final URL, without reading the body. Used to expand an opaque short /
+   * share link (e.g. a Facebook `/share/<type>/<token>` link) into the
+   * canonical permalink an embed proxy can actually preview.
+   *
+   * Contract mirrors {@link fetch}: the caller MUST have matched `url`
+   * against its own host allow-list first (so the initial host is never
+   * arbitrary user input), and every redirect hop is screened by the same
+   * {@link assertSafeRedirect} SSRF guard. The body stream is discarded
+   * immediately — only the post-redirect URL is of interest — so a heavy or
+   * login-gated destination page costs nothing to read.
+   */
+  public async resolveCanonical(
+    url: string,
+    timeoutMs: number,
+  ): Promise<Result<string, LinkPreviewFailure>> {
+    try {
+      const response = await axios.get<Readable>(url, {
+        responseType: 'stream',
+        timeout: timeoutMs,
+        maxRedirects: SAFE_MAX_REDIRECTS,
+        beforeRedirect: (options) => assertSafeRedirect(options),
+        // A non-crawler UA: Facebook only emits the share -> canonical redirect
+        // for a browser-like UA (the crawler UA gets a 200 OpenGraph card).
+        headers: { 'User-Agent': RESOLVE_USER_AGENT, Accept: 'text/html' },
+      });
+      discardStream(response.data);
+      return ok(readFinalUrl(response, url));
+    } catch (e: unknown) {
+      destroyResponseStream(e);
+      return err(translateLinkPreviewError('facebook', e));
     }
   }
 
