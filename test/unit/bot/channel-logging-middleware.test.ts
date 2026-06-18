@@ -32,8 +32,8 @@ vi.mock('@select-menu', () => ({
   executeSSM: async (): Promise<void> => {},
 }));
 
-// Mock the two log sinks the middleware drives; keep `parentChannelIdOf` real
-// so the parent-thread extraction is exercised, not stubbed.
+// Mock the two log sinks the middleware drives; keep `ancestorChannelIdsOf`
+// real so the parent → category ancestry walk is exercised, not stubbed.
 vi.mock('@core/logger', async (importOriginal) => ({
   ...((await importOriginal()) as Record<string, unknown>),
   logGuildEvent: vi.fn(),
@@ -92,6 +92,34 @@ describe('channel-logging middleware', () => {
 
   it('suppresses the debug feed for a channel above the channel_logging ceiling, but still writes the audit log', async () => {
     await run('private');
+    expect(sendChannelLog).not.toHaveBeenCalled();
+    expect(logGuildEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses the debug feed for a thread nested under a private category (full ancestry)', async () => {
+    const policy = createPermissionRankPolicy({ g1: { channels: { cat: 1 } } });
+    const middleware = createChannelLoggingMiddleware(fakeBot(), { policy });
+    // command in thread 'th' → channel 'ch-cat' (unlisted) → category 'cat' (rank 1);
+    // the cache resolves the intermediate channel so the walk reaches the category.
+    const ctx = {
+      interaction: {
+        isChatInputCommand: () => true,
+        isContextMenuCommand: () => false,
+        channelId: 'th',
+        guildId: 'g1',
+        channel: { parentId: 'ch-cat' },
+        commandName: 'ping',
+        user: { displayName: 'User' },
+        guild: {
+          id: 'g1',
+          name: 'Guild',
+          channels: {
+            cache: { get: (id: string) => (id === 'ch-cat' ? { parentId: 'cat' } : { name: id }) },
+          },
+        },
+      },
+    } as unknown as InteractionContext;
+    await middleware.run(ctx, async () => undefined);
     expect(sendChannelLog).not.toHaveBeenCalled();
     expect(logGuildEvent).toHaveBeenCalledTimes(1);
   });

@@ -142,11 +142,21 @@ describe('guild-events suppression by permission_rank', () => {
     displayAvatarURL: () => 'https://example.test/a.png',
   };
 
-  const message = (channelId: string, content: string, parentId: string | null = null): Message =>
+  type ChannelStub = { parentId: string | null };
+  const NO_LOOKUP = { get: (): ChannelStub | undefined => undefined };
+
+  // `lookup` resolves intermediate ancestors so the effective-rank walk can
+  // climb past the immediate parent (thread → channel → category).
+  const message = (
+    channelId: string,
+    content: string,
+    parentId: string | null = null,
+    lookup: { get: (id: string) => ChannelStub | undefined } = NO_LOOKUP,
+  ): Message =>
     ({
       content,
       author,
-      guild: { id: 'g1', name: 'Guild', channels: { cache: { get: () => undefined } } },
+      guild: { id: 'g1', name: 'Guild', channels: { cache: lookup } },
       guildId: 'g1',
       channel: { id: channelId, parentId },
       partial: false,
@@ -154,20 +164,21 @@ describe('guild-events suppression by permission_rank', () => {
     }) as unknown as Message;
 
   // `forum` is ranked so a thread under it (itself unlisted = rank 0) inherits
-  // the parent's rank and is suppressed via the effective-rank max.
-  const policy = createPermissionRankPolicy({ g1: { channels: { private: 1, forum: 1 } } });
+  // the parent's rank and is suppressed; `cat` proves the full-ancestry case.
+  const policy = createPermissionRankPolicy({ g1: { channels: { private: 1, forum: 1, cat: 1 } } });
 
   const fireUpdate = async (
     channelId: string,
     channel: TextChannel,
     parentId: string | null = null,
+    lookup?: { get: (id: string) => ChannelStub | undefined },
   ): Promise<void> => {
     const handler = createGuildEventsPlugin().events?.messageUpdate;
     if (handler === undefined) throw new Error('no messageUpdate handler');
     await handler(
       buildCtx(registryWith(channel), policy),
-      message(channelId, 'old', parentId) as Parameters<typeof handler>[1],
-      message(channelId, 'new', parentId) as Parameters<typeof handler>[2],
+      message(channelId, 'old', parentId, lookup) as Parameters<typeof handler>[1],
+      message(channelId, 'new', parentId, lookup) as Parameters<typeof handler>[2],
     );
   };
 
@@ -201,6 +212,16 @@ describe('guild-events suppression by permission_rank', () => {
   it('suppresses an edit in a thread under a ranked parent forum (effective rank via parent)', async () => {
     const channel = fakeEventChannel();
     await fireUpdate('thread', channel, 'forum'); // thread rank 0, parent forum rank 1
+    expect(channel.send).not.toHaveBeenCalled();
+    expect(logGuildEvent).not.toHaveBeenCalled();
+  });
+
+  it('suppresses an edit in a thread nested under a private category (full ancestry)', async () => {
+    const channel = fakeEventChannel();
+    // thread 'th' → channel 'ch-cat' (unlisted) → category 'cat' (rank 1); the
+    // lookup resolves the intermediate channel so the walk reaches the category.
+    const lookup = { get: (id: string) => (id === 'ch-cat' ? { parentId: 'cat' } : undefined) };
+    await fireUpdate('th', channel, 'ch-cat', lookup);
     expect(channel.send).not.toHaveBeenCalled();
     expect(logGuildEvent).not.toHaveBeenCalled();
   });

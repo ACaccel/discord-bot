@@ -26,7 +26,7 @@
 import { logError } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
 import { TOKENS } from '../../core/plugin';
-import { parentChannelIdOf } from '../../infra/discord';
+import { ancestorChannelIdsOf } from '../../infra/discord';
 import {
   createDefaultLinkPreviewRegistry,
   type LinkPreviewProviderRegistry,
@@ -80,7 +80,7 @@ export const createSocialLinkPreviewPlugin = (
               message.guildId,
               'social_preview',
               message.channelId,
-              parentChannelIdOf(message.channel),
+              ancestorChannelIdsOf(message.channel, message.guild?.channels.cache),
             )
         ) {
           return;

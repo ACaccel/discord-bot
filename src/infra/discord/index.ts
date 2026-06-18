@@ -1,3 +1,3 @@
 export { sendChannelLog } from './channel-log';
 export { archiveDeletedAttachment } from './attachment-archive';
-export { parentChannelIdOf } from './channel';
+export { parentChannelIdOf, ancestorChannelIdsOf } from './channel';

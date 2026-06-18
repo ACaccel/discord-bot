@@ -130,13 +130,17 @@ orthogonal to Discord's own permissions. Each guild's `config.json`
 carries a `permission_rank` block: channels and roles get a non-negative
 integer rank (higher = more private; a member's clearance is the max over
 their ranked roles), and each rank-gated feature has a `maxChannelRank`
-ceiling. A feature suppresses a channel when its effective rank —
-`max(channel, parent-thread)` — exceeds the ceiling; the `channelRank` /
+ceiling. A feature suppresses a channel when its effective rank — the max over
+the channel and its full ancestry (parent channel → category, so a private
+category lifts every channel and thread nested under it) — exceeds the ceiling;
+the `channelRank` /
 `userRank` / `visibilityCeiling` primitives let a visibility-gated feature —
-realized by the `/traffic` command — show channel `T` only when
-`channelRank(T) <= min(userRank, commandChannelRank)`, combined with a native
-`ViewChannel` check (the dual filter, so an unconfigured rank map still never
-leaks a Discord-private channel). The policy is a core interface built once
+realized by the `/traffic` commands — show channel `T` only when
+`channelRank(T) <= ceiling`, combined with a native `ViewChannel` check for
+the invoker (the dual filter, so an unconfigured rank map still never leaks a
+Discord-private channel). The ceiling tracks the reply audience: a public
+reply uses `visibilityCeiling = min(userRank, commandChannelRank)` (never
+above the room's own rank), a private / ephemeral reply uses `userRank` alone. The policy is a core interface built once
 from static config in the `BaseBot` constructor and registered under
 `TOKENS.PermissionRankPolicy` (same seam as `GuildOnboardingPort`):
 discord.js-free, fail-fast validated, resolved per-event by the `guild-events`

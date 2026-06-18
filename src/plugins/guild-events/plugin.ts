@@ -35,7 +35,7 @@ import type { GuildRegistry } from '../../core/guild-registry';
 import type { Plugin } from '../../core/plugin';
 import type { GuildOnboardingPort, PermissionRankPolicy } from '../../core/plugin';
 import { logError, logGuildEvent, logSystem, type Logger } from '../../core/logger';
-import { archiveDeletedAttachment, parentChannelIdOf } from '../../infra/discord';
+import { archiveDeletedAttachment, ancestorChannelIdsOf } from '../../infra/discord';
 
 const PLUGIN_ID = 'guild-events';
 const PLUGIN_VERSION = '1.0.0';
@@ -45,10 +45,7 @@ const MAX_MESSAGE_PREVIEW = 1000;
 const truncate = (text: string): string =>
   text.length > MAX_MESSAGE_PREVIEW ? `${text.slice(0, MAX_MESSAGE_PREVIEW)}...` : text;
 
-const resolveEventChannel = (
-  registry: GuildRegistry,
-  guildId: string,
-): TextChannel | undefined => {
+const resolveEventChannel = (registry: GuildRegistry, guildId: string): TextChannel | undefined => {
   const channel = registry.getChannel(guildId, EVENT_CHANNEL);
   if (channel === undefined) return undefined;
   // Use `isSendable()` — discord.js's narrowing predicate models
@@ -201,7 +198,7 @@ const handleMessageUpdate = async (
       newMessage.guildId,
       'guild_events',
       oldMessage.channel.id,
-      parentChannelIdOf(oldMessage.channel),
+      ancestorChannelIdsOf(oldMessage.channel, oldMessage.guild?.channels.cache),
     )
   ) {
     return;
@@ -262,7 +259,7 @@ const handleMessageDelete = async (
       message.guildId,
       'guild_events',
       message.channel.id,
-      parentChannelIdOf(message.channel),
+      ancestorChannelIdsOf(message.channel, message.guild?.channels.cache),
     )
   ) {
     return;

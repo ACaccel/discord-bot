@@ -19,10 +19,10 @@ import { buildTrafficMeView } from './view';
  * time-trend line chart, and a personal channel-distribution bar chart.
  *
  * `visibility` mirrors `/traffic` (default `ephemeral`). Reuses the same
- * dual visibility filter, so the breakdown only counts the invoker's
- * activity in channels the chosen audience may see — a `public` reply
- * forces the rank-0 / `@everyone` view and never leaks a restricted
- * channel the invoker happens to be active in.
+ * filter: a `public` reply is capped by both the invoker's clearance and
+ * the command channel's rank (so a shared reply never exceeds the room's
+ * level), while an `ephemeral` reply is capped by the invoker's clearance
+ * alone. It thus sets both the ceiling and whether the reply is posted.
  */
 export default class traffic_me extends Command {
   constructor() {

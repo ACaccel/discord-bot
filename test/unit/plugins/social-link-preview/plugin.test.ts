@@ -64,6 +64,9 @@ interface MsgOpts {
   readonly guildId?: string | null;
   readonly channelId?: string;
   readonly sendable?: boolean;
+  readonly parentId?: string | null;
+  /** Maps a channel id to its own parentId, so the ancestry walk can climb. */
+  readonly ancestors?: Record<string, string | null>;
 }
 
 const makeMessage = (opts: MsgOpts = {}): Message =>
@@ -72,7 +75,15 @@ const makeMessage = (opts: MsgOpts = {}): Message =>
     author: { bot: opts.bot ?? false },
     guildId: opts.guildId === undefined ? 'g1' : opts.guildId,
     channelId: opts.channelId ?? 'c1',
-    channel: { isSendable: () => opts.sendable ?? true },
+    channel: { isSendable: () => opts.sendable ?? true, parentId: opts.parentId ?? null },
+    guild: {
+      channels: {
+        cache: {
+          get: (id: string) =>
+            opts.ancestors && id in opts.ancestors ? { parentId: opts.ancestors[id] } : undefined,
+        },
+      },
+    },
   }) as unknown as Message;
 
 const fire = async (
@@ -131,6 +142,22 @@ describe('createSocialLinkPreviewPlugin guards', () => {
       g1: { channels: { 'c-secret': 1 }, features: { social_preview: { maxChannelRank: 0 } } },
     });
     await fire({ enabled: true }, makeMessage({ channelId: 'c-secret' }), { registry }, policy);
+    expect(findProvider).not.toHaveBeenCalled();
+  });
+
+  it('skips a thread nested under a private category (full ancestry)', async () => {
+    const { registry, findProvider } = makeRegistry();
+    const policy = createPermissionRankPolicy({
+      g1: { channels: { cat: 1 }, features: { social_preview: { maxChannelRank: 0 } } },
+    });
+    // thread 'th' → channel 'ch-cat' (unlisted) → category 'cat' (rank 1);
+    // the cache resolves the intermediate channel so the walk reaches the category.
+    await fire(
+      { enabled: true },
+      makeMessage({ channelId: 'th', parentId: 'ch-cat', ancestors: { 'ch-cat': 'cat' } }),
+      { registry },
+      policy,
+    );
     expect(findProvider).not.toHaveBeenCalled();
   });
 

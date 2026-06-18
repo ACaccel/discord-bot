@@ -24,7 +24,7 @@ import { executeButton } from '@button';
 import { executeModal } from '@modal';
 import { executeSSM } from '@select-menu';
 import { logGuildEvent } from '@core/logger';
-import { parentChannelIdOf, sendChannelLog } from '../infra/discord';
+import { ancestorChannelIdsOf, sendChannelLog } from '../infra/discord';
 import type {
   InteractionContext,
   InteractionMiddleware,
@@ -39,34 +39,34 @@ import { replyTranslated } from '../handlers/reply-translated';
  * user-facing reply.
  */
 export const createDispatchMiddleware = (bot: BaseBot): InteractionMiddleware => ({
-    name: 'dispatch',
-    async run(ctx: InteractionContext, next): Promise<void> {
-        const interaction = ctx.interaction;
-        if (interaction.isChatInputCommand() || interaction.isContextMenuCommand()) {
-            await executeCommand(interaction, bot);
-        } else if (interaction.isModalSubmit()) {
-            await executeModal(interaction, bot);
-        } else if (interaction.isButton()) {
-            await executeButton(interaction, bot);
-        } else if (interaction.isStringSelectMenu()) {
-            await executeSSM(interaction, bot);
-        } else if (!interaction.isAutocomplete() && interaction.isRepliable()) {
-            await interaction.reply({
-                content: bot.translator?.t('errors:command.unsupported_interaction_type') ?? '',
-                flags: MessageFlags.Ephemeral,
-            });
-        }
-        await next();
-    },
+  name: 'dispatch',
+  async run(ctx: InteractionContext, next): Promise<void> {
+    const interaction = ctx.interaction;
+    if (interaction.isChatInputCommand() || interaction.isContextMenuCommand()) {
+      await executeCommand(interaction, bot);
+    } else if (interaction.isModalSubmit()) {
+      await executeModal(interaction, bot);
+    } else if (interaction.isButton()) {
+      await executeButton(interaction, bot);
+    } else if (interaction.isStringSelectMenu()) {
+      await executeSSM(interaction, bot);
+    } else if (!interaction.isAutocomplete() && interaction.isRepliable()) {
+      await interaction.reply({
+        content: bot.translator?.t('errors:command.unsupported_interaction_type') ?? '',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+    await next();
+  },
 });
 
 export interface ChannelLoggingMiddlewareConfig {
-    /**
-     * Privacy / clearance ranking. A command whose channel (or its parent
-     * thread) is suppressed for the `channel_logging` feature stays out of
-     * the debug feed.
-     */
-    readonly policy: PermissionRankPolicy;
+  /**
+   * Privacy / clearance ranking. A command whose channel (or its parent
+   * thread) is suppressed for the `channel_logging` feature stays out of
+   * the debug feed.
+   */
+  readonly policy: PermissionRankPolicy;
 }
 
 /**
@@ -78,55 +78,54 @@ export interface ChannelLoggingMiddlewareConfig {
  * is a permanent audit trail.
  */
 export const createChannelLoggingMiddleware = (
-    bot: BaseBot,
-    config: ChannelLoggingMiddlewareConfig,
+  bot: BaseBot,
+  config: ChannelLoggingMiddlewareConfig,
 ): InteractionMiddleware => ({
-    name: 'channel-logging',
-    async run(ctx: InteractionContext, next): Promise<void> {
-        // try/finally so the durable guild audit-trail entry STILL
-        // lands even if dispatch threw. Re-throw any caught error so
-        // the outer handler still surfaces it to the user.
-        try {
-            await next();
-        } finally {
-            const interaction = ctx.interaction;
-            if (interaction.isChatInputCommand() || interaction.isContextMenuCommand()) {
-                if (interaction.guildId !== null) {
-                    const suppressed = config.policy.isSuppressed(
-                        interaction.guildId,
-                        'channel_logging',
-                        interaction.channelId,
-                        parentChannelIdOf(interaction.channel),
-                    );
-                    if (!suppressed) {
-                        const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channelId}>`;
-                        void sendChannelLog(
-                            bot.logger,
-                            bot.getGuildInfo(interaction.guildId)?.channels?.debug,
-                            undefined,
-                            channel_log,
-                        );
-                    }
-                }
-                if (interaction.guild) {
-                    const channelName =
-                        interaction.guild.channels.cache.get(interaction.channelId)?.name ??
-                        '<unknown>';
-                    logGuildEvent(
-                        bot.logger,
-                        interaction.guild.id,
-                        'interaction_create',
-                        {
-                            command: `/${interaction.commandName}`,
-                            user: interaction.user.displayName,
-                            channel: channelName,
-                        },
-                        interaction.guild.name,
-                    );
-                }
-            }
+  name: 'channel-logging',
+  async run(ctx: InteractionContext, next): Promise<void> {
+    // try/finally so the durable guild audit-trail entry STILL
+    // lands even if dispatch threw. Re-throw any caught error so
+    // the outer handler still surfaces it to the user.
+    try {
+      await next();
+    } finally {
+      const interaction = ctx.interaction;
+      if (interaction.isChatInputCommand() || interaction.isContextMenuCommand()) {
+        if (interaction.guildId !== null) {
+          const suppressed = config.policy.isSuppressed(
+            interaction.guildId,
+            'channel_logging',
+            interaction.channelId,
+            ancestorChannelIdsOf(interaction.channel, interaction.guild?.channels.cache),
+          );
+          if (!suppressed) {
+            const channel_log = `Command: /${interaction.commandName}, User: ${interaction.user.displayName}, Channel: <#${interaction.channelId}>`;
+            void sendChannelLog(
+              bot.logger,
+              bot.getGuildInfo(interaction.guildId)?.channels?.debug,
+              undefined,
+              channel_log,
+            );
+          }
         }
-    },
+        if (interaction.guild) {
+          const channelName =
+            interaction.guild.channels.cache.get(interaction.channelId)?.name ?? '<unknown>';
+          logGuildEvent(
+            bot.logger,
+            interaction.guild.id,
+            'interaction_create',
+            {
+              command: `/${interaction.commandName}`,
+              user: interaction.user.displayName,
+              channel: channelName,
+            },
+            interaction.guild.name,
+          );
+        }
+      }
+    }
+  },
 });
 
 // Re-export so consumers needing the helper to construct a fallback

@@ -1,14 +1,14 @@
 /**
- * Privacy-invariant coverage for the `/traffic` dual visibility filter.
+ * Privacy-invariant coverage for the `/traffic` visibility filter.
  *
  * Builds a REAL `PermissionRankPolicy` (the same factory consumers
  * inject) plus channel / member fixtures whose `permissionsFor` stub
  * drives the Discord-native `ViewChannel` answer. Proves the two gates
- * compose: a channel is shown only when BOTH the operator rank ceiling
- * and native ViewChannel pass, that `public` mode never leaks a
- * high-clearance invoker's private channels, that the command channel
- * caps a privileged user, and that threads inherit their parent's
- * visibility.
+ * compose and that the rank ceiling tracks the reply audience:
+ * `ephemeral` (private) caps by the invoker's clearance alone, `public`
+ * also caps by the command channel's rank, and both still require the
+ * member's native ViewChannel (so threads inherit their parent's
+ * visibility).
  */
 import { ChannelType } from 'discord.js';
 import { describe, expect, it } from 'vitest';
@@ -46,42 +46,110 @@ const channels = () => [
 const guildWith = (chs: ReturnType<typeof channels>) =>
   buildGuild({ id: GUILD, everyoneRoleId: EVERYONE, channels: chs });
 
-describe('buildAllowedChannelSet — ephemeral mode (dual filter)', () => {
-  it('includes only channels passing BOTH the rank ceiling and native ViewChannel', () => {
+describe('buildAllowedChannelSet — ephemeral (private): capped by the invoker rank only', () => {
+  it('shows everything up to the invoker rank, regardless of the command channel', () => {
     const allowed = buildAllowedChannelSet({
       guild: guildWith(channels()),
       member: staff,
       policy,
       mode: 'ephemeral',
-      commandChannelId: 'secret', // ceiling = min(userRank 2, channelRank 2) = 2
+      commandChannelId: 'pub', // a public room must NOT lower a private reply
     });
-    // pub/team0/internal/secret pass; hidden0 fails native; topsecret fails rank.
+    // ceiling = userRank 2; rank<=2 AND member-viewable: internal/secret/pub/team0.
+    // topsecret over rank; hidden0 not viewable.
     expect([...allowed].sort()).toEqual(['internal', 'pub', 'secret', 'team0']);
   });
 
-  it('caps a privileged invoker by the command-channel rank (no leak into a public room)', () => {
+  it('still excludes channels above the invoker rank', () => {
     const allowed = buildAllowedChannelSet({
       guild: guildWith(channels()),
       member: staff,
       policy,
       mode: 'ephemeral',
+      commandChannelId: 'secret',
+    });
+    expect(allowed.has('topsecret')).toBe(false); // rank 3 > userRank 2
+  });
+});
+
+describe('buildAllowedChannelSet — public: capped by BOTH the command channel and the invoker rank', () => {
+  it('lowers to the command-channel rank when it is below the invoker rank', () => {
+    const allowed = buildAllowedChannelSet({
+      guild: guildWith(channels()),
+      member: staff, // userRank 2, but the room is rank 0
+      policy,
+      mode: 'public',
       commandChannelId: 'pub', // ceiling = min(2, 0) = 0 — only rank-0 channels
     });
     expect([...allowed].sort()).toEqual(['pub', 'team0']);
   });
-});
 
-describe('buildAllowedChannelSet — public mode (public info only)', () => {
-  it('forces ceiling 0 and checks @everyone, never leaking the invoker clearance', () => {
+  it('rises to the command-channel rank, never above the invoker rank', () => {
     const allowed = buildAllowedChannelSet({
       guild: guildWith(channels()),
-      member: staff, // staff could see secret ephemerally — must NOT leak here
+      member: staff,
       policy,
       mode: 'public',
-      commandChannelId: 'secret',
+      commandChannelId: 'secret', // ceiling = min(2, 2) = 2
     });
-    // Only rank-0 channels viewable by @everyone: pub. team0 is member-only.
-    expect([...allowed]).toEqual(['pub']);
+    expect([...allowed].sort()).toEqual(['internal', 'pub', 'secret', 'team0']);
+  });
+});
+
+describe('buildAllowedChannelSet — full ancestry (category → channel → thread)', () => {
+  // A private category lifts the effective rank of a thread nested two levels
+  // under it, even though neither the thread nor its channel is itself ranked.
+  const ancestryPolicy = createPermissionRankPolicy({
+    [GUILD]: { channels: { 'cat-secret': 2 }, roles: { staff: 2 } },
+  });
+
+  const ancestryGuild = () => {
+    const category = buildTextChannel({ id: 'cat-secret', viewableByAll: true });
+    const channel = buildTextChannel({
+      id: 'ch-under-cat',
+      parentId: 'cat-secret',
+      parent: category,
+      viewableByAll: true,
+    });
+    const thread = buildTextChannel({
+      id: 'th-under-cat',
+      type: ChannelType.PublicThread,
+      parentId: 'ch-under-cat',
+      parent: channel,
+      viewableByAll: true,
+    });
+    return buildGuild({
+      id: GUILD,
+      everyoneRoleId: EVERYONE,
+      channels: [category, channel, thread],
+    });
+  };
+
+  it('lifts a nested channel and thread to the category rank', () => {
+    // Unranked invoker → ceiling 0; the thread and its channel both resolve to
+    // the category rank (2) via the ancestry walk, so both are excluded.
+    const allowed = buildAllowedChannelSet({
+      guild: ancestryGuild(),
+      member: buildGuildMember({ id: MEMBER, roleIds: [] }),
+      policy: ancestryPolicy,
+      mode: 'ephemeral',
+      commandChannelId: 'cat-secret',
+    });
+    expect(allowed.has('th-under-cat')).toBe(false);
+    expect(allowed.has('ch-under-cat')).toBe(false);
+  });
+
+  it('includes the nested thread once the invoker clears the inherited rank', () => {
+    // staff userRank 2 → ceiling 2; the thread's inherited rank 2 is within reach.
+    const allowed = buildAllowedChannelSet({
+      guild: ancestryGuild(),
+      member: staff,
+      policy: ancestryPolicy,
+      mode: 'ephemeral',
+      commandChannelId: 'cat-secret',
+    });
+    expect(allowed.has('th-under-cat')).toBe(true);
+    expect(allowed.has('ch-under-cat')).toBe(true);
   });
 });
 

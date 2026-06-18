@@ -3,7 +3,7 @@
  *
  * The policy is the single home of the privacy / clearance decision logic, so
  * it is tested exhaustively here: channel-rank resolution (unlisted = 0,
- * parent-thread max), user-rank resolution (max over roles), the per-feature
+ * full-ancestry max), user-rank resolution (max over roles), the per-feature
  * suppression ceiling (distinct defaults, config override, boundary, unbounded
  * null), the `visibilityCeiling` primitive a future `traffic_status` composes,
  * and fail-fast config validation. Consumers inject a policy built by this
@@ -23,15 +23,25 @@ describe('createPermissionRankPolicy — channelRank', () => {
     expect(policy.channelRank('other-guild', 'listed')).toBe(0);
   });
 
-  it('takes the max of the channel and its parent (effective rank is monotonic)', () => {
+  it('takes the max of the channel and its ancestors (effective rank is monotonic)', () => {
     const policy = createPermissionRankPolicy({
       [GUILD]: { channels: { child: 0, parent: 2, hot: 3 } },
     });
-    expect(policy.channelRank(GUILD, 'child', 'parent')).toBe(2); // parent dominates
-    expect(policy.channelRank(GUILD, 'hot', 'parent')).toBe(3); // own dominates
-    expect(policy.channelRank(GUILD, 'child', null)).toBe(0); // no parent
+    expect(policy.channelRank(GUILD, 'child', ['parent'])).toBe(2); // ancestor dominates
+    expect(policy.channelRank(GUILD, 'hot', ['parent'])).toBe(3); // own dominates
+    expect(policy.channelRank(GUILD, 'child', [])).toBe(0); // no ancestors
     expect(policy.channelRank(GUILD, 'child', undefined)).toBe(0);
-    expect(policy.channelRank(GUILD, 'child', 'unlisted-parent')).toBe(0); // both unlisted
+    expect(policy.channelRank(GUILD, 'child', ['unlisted'])).toBe(0); // all unlisted
+  });
+
+  it('folds the whole ancestry (thread → channel → private category)', () => {
+    // Neither the thread nor its channel is ranked, but the category id in the
+    // ancestry lifts the thread's effective rank — the 3-level case.
+    const policy = createPermissionRankPolicy({ [GUILD]: { channels: { cat: 2 } } });
+    expect(policy.channelRank(GUILD, 'thread', ['channel', 'cat'])).toBe(2);
+    // The highest ancestor wins regardless of its position in the chain.
+    const mixed = createPermissionRankPolicy({ [GUILD]: { channels: { channel: 1, cat: 3 } } });
+    expect(mixed.channelRank(GUILD, 'thread', ['channel', 'cat'])).toBe(3);
   });
 });
 
@@ -102,10 +112,12 @@ describe('createPermissionRankPolicy — isSuppressed (per-feature ceilings)', (
     expect(policy.isSuppressed(GUILD, 'guild_events', 'above')).toBe(true); // 3 > 2
   });
 
-  it('considers the parent-thread rank (a thread under a private forum is suppressed)', () => {
-    const policy = createPermissionRankPolicy({ [GUILD]: { channels: { forum: 1 } } });
-    expect(policy.isSuppressed(GUILD, 'guild_events', 'thread', 'forum')).toBe(true);
-    expect(policy.isSuppressed(GUILD, 'guild_events', 'thread', null)).toBe(false);
+  it('considers the full ancestry (a thread under a private category is suppressed)', () => {
+    // category rank 1; thread → text channel → category. Neither the thread
+    // nor the channel is ranked, but the category id in the ancestry lifts it.
+    const policy = createPermissionRankPolicy({ [GUILD]: { channels: { cat: 1 } } });
+    expect(policy.isSuppressed(GUILD, 'guild_events', 'thread', ['channel', 'cat'])).toBe(true);
+    expect(policy.isSuppressed(GUILD, 'guild_events', 'thread', [])).toBe(false);
   });
 
   it('suppresses nothing when a guild omits its permission_rank block (preserves prior behaviour)', () => {
@@ -153,6 +165,14 @@ describe('createPermissionRankPolicy — visibilityCeiling (traffic_status suppo
   it('gives an unranked user a ceiling of 0 (only rank-0 channels)', () => {
     const policy = createPermissionRankPolicy({ [GUILD]: { channels: { secret: 1 }, roles: {} } });
     expect(policy.visibilityCeiling(GUILD, [], 'anywhere')).toBe(0);
+  });
+
+  it('reflects the command channel ancestry (a command run in a thread inherits its category)', () => {
+    const policy = createPermissionRankPolicy({
+      [GUILD]: { channels: { cat: 2 }, roles: { admin: 3 } },
+    });
+    // command run in a thread whose category is rank 2 → min(userRank 3, 2) = 2.
+    expect(policy.visibilityCeiling(GUILD, ['admin'], 'thread', ['channel', 'cat'])).toBe(2);
   });
 });
 

@@ -154,16 +154,17 @@ export type PermissionRankConfig = z.input<typeof permissionRankConfigSchema>;
  */
 export interface PermissionRankPolicy {
   /**
-   * Effective privacy rank of a channel = `max(own rank, parent rank)`. An
-   * unlisted channel (or an unknown guild) is {@link RANK_ZERO}. Pass
-   * `parentChannelId` (a thread's parent) so a private forum / category raises
-   * its threads' effective rank; effective rank is monotonic — a parent can
-   * only raise it, never lower it. The policy cannot verify topology without
-   * the Discord client, so it trusts `parentChannelId` to be a genuine parent:
-   * `parentChannelIdOf` (`infra/discord`) is the single safe extraction every
-   * consumer uses to derive it.
+   * Effective privacy rank of a channel = `max(own rank, ranks of its
+   * ancestors)`. An unlisted channel (or an unknown guild) is {@link
+   * RANK_ZERO}. Pass `ancestorChannelIds` — the channel's parent chain
+   * (parent channel, then category) — so a private category / forum raises the
+   * effective rank of everything nested under it; effective rank is monotonic,
+   * an ancestor can only raise it, never lower it. The policy cannot verify
+   * topology without the Discord client, so it trusts the ids to be genuine
+   * ancestors: `ancestorChannelIdsOf` (`infra/discord`) is the single safe
+   * extraction every consumer uses to derive them.
    */
-  channelRank(guildId: string, channelId: string, parentChannelId?: string | null): Rank;
+  channelRank(guildId: string, channelId: string, ancestorChannelIds?: readonly string[]): Rank;
   /**
    * Clearance rank of a member = the max rank over their ranked roles, or
    * {@link RANK_ZERO} when none match. `roleIds` is the member's role ids
@@ -181,19 +182,20 @@ export interface PermissionRankPolicy {
     guildId: string,
     feature: RankedFeature,
     channelId: string,
-    parentChannelId?: string | null,
+    ancestorChannelIds?: readonly string[],
   ): boolean;
   /**
    * The highest channel rank a member may see from a given command channel:
-   * `min(userRank, channelRank(commandChannel))`. A visibility-gated consumer
-   * (e.g. a future `traffic_status`) shows channel `T` iff
-   * `channelRank(T) <= visibilityCeiling(...)`.
+   * `min(userRank, channelRank(commandChannel))`. The `/traffic` commands show
+   * channel `T` iff `channelRank(T) <= visibilityCeiling(...)`. Pass
+   * `commandAncestorChannelIds` so the command channel's own rank reflects its
+   * full ancestry (a command run in a thread inherits its category's rank).
    */
   visibilityCeiling(
     guildId: string,
     roleIds: Iterable<string>,
     commandChannelId: string,
-    commandParentChannelId?: string | null,
+    commandAncestorChannelIds?: readonly string[],
   ): Rank;
 }
 
@@ -215,13 +217,21 @@ class StaticPermissionRankPolicy implements PermissionRankPolicy {
     this.#byGuild = byGuild;
   }
 
-  public channelRank(guildId: string, channelId: string, parentChannelId?: string | null): Rank {
+  public channelRank(
+    guildId: string,
+    channelId: string,
+    ancestorChannelIds?: readonly string[],
+  ): Rank {
     const guild = this.#byGuild.get(guildId);
     if (guild === undefined) return RANK_ZERO;
-    const own = guild.channels.get(channelId) ?? RANK_ZERO;
-    if (parentChannelId === null || parentChannelId === undefined) return own;
-    const parent = guild.channels.get(parentChannelId) ?? RANK_ZERO;
-    return maxRank(own, parent);
+    let rank = guild.channels.get(channelId) ?? RANK_ZERO;
+    if (ancestorChannelIds !== undefined) {
+      for (const ancestorId of ancestorChannelIds) {
+        const ancestorRank = guild.channels.get(ancestorId);
+        if (ancestorRank !== undefined) rank = maxRank(rank, ancestorRank);
+      }
+    }
+    return rank;
   }
 
   public userRank(guildId: string, roleIds: Iterable<string>): Rank {
@@ -239,22 +249,22 @@ class StaticPermissionRankPolicy implements PermissionRankPolicy {
     guildId: string,
     feature: RankedFeature,
     channelId: string,
-    parentChannelId?: string | null,
+    ancestorChannelIds?: readonly string[],
   ): boolean {
     const ceiling = (this.#byGuild.get(guildId)?.ceilings ?? DEFAULT_CEILINGS)[feature];
     if (ceiling === UNBOUNDED) return false;
-    return this.channelRank(guildId, channelId, parentChannelId) > ceiling;
+    return this.channelRank(guildId, channelId, ancestorChannelIds) > ceiling;
   }
 
   public visibilityCeiling(
     guildId: string,
     roleIds: Iterable<string>,
     commandChannelId: string,
-    commandParentChannelId?: string | null,
+    commandAncestorChannelIds?: readonly string[],
   ): Rank {
     return minRank(
       this.userRank(guildId, roleIds),
-      this.channelRank(guildId, commandChannelId, commandParentChannelId),
+      this.channelRank(guildId, commandChannelId, commandAncestorChannelIds),
     );
   }
 }

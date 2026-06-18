@@ -21,9 +21,11 @@ import { buildTrafficView } from './view';
  *
  * Privacy is a dual filter (see visibility-filter): a channel's stats
  * appear only when the invoker clears both the operator rank ceiling
- * and Discord-native `ViewChannel`. `public` mode forces the public
- * (rank-0 / @everyone) view so a high-clearance invoker never leaks
- * private channels into a shared reply.
+ * and Discord-native `ViewChannel`. The ceiling tracks the reply
+ * audience — `public` is capped by both the invoker's clearance and the
+ * command channel's rank; `ephemeral` is capped by the invoker's
+ * clearance alone (only they see it). `visibility` thus sets both the
+ * ceiling and whether the reply is posted to the channel.
  */
 export default class traffic extends Command {
   constructor() {
