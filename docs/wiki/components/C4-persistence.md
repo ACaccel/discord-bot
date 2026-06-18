@@ -24,3 +24,12 @@ Every repository method returns `Result<T, DatabaseError>`:
 - Programmer errors (non-positive `limit`, malformed timestamp ranges) still throw native `TypeError` — they are bugs, not domain failures, and never enter `Result`.
 
 Callers branch on `result.ok` and surface `DatabaseError` upward via `replyForError` (handlers) or structured logs (plugins / jobs).
+
+## Indexes
+
+`message.schema.ts` declares, beyond the `messageId` unique index:
+
+- `{ timestamp: 1 }` — serves the cross-channel range query `findByTimestampRange` (the `/traffic` / `/traffic_me` aggregation hot path).
+- `{ channelId: 1, timestamp: 1 }` — serves the per-channel range query `findByChannelAndTimestampRange` (and its `timestamp` sort, so there is no blocking in-memory SORT) plus `findRecentByChannel`'s reverse sort.
+
+These predicates are plain, sargable half-open ranges (`{ timestamp: { $gte, $lt } }`). They are only index-served because stored timestamps are uniformly numeric — the queries were `$toLong`-wrapped (and therefore full collection scans) for legacy String-typed rows until the one-time [`migrate-timestamp`](../ops/migrate-timestamp.md) ops tool backfilled every timestamp to numeric. New writes are numeric (mongoose casts to the `Number` schema type), so no String rows are reintroduced.

@@ -39,6 +39,17 @@ export const messageSchema = new Schema({
   timestamp: { type: Number, required: true },
 });
 
+// Range-read indexes for the timestamp query paths (traffic stats,
+// `db_list_message`). `{ timestamp: 1 }` serves the cross-channel range
+// query; the compound `{ channelId: 1, timestamp: 1 }` serves the
+// per-channel range query plus its `timestamp` sort (and covers
+// `findRecentByChannel`'s reverse sort). These only become sargable once
+// stored timestamps are uniformly numeric — the `MessageRepo` predicates
+// were `$toLong`-wrapped for legacy String rows until the one-time
+// `tools/migrate_timestamp` backfill made every timestamp numeric.
+messageSchema.index({ timestamp: 1 });
+messageSchema.index({ channelId: 1, timestamp: 1 });
+
 export type MessageDoc = InferSchemaType<typeof messageSchema> & {
   readonly _id: Types.ObjectId;
 };

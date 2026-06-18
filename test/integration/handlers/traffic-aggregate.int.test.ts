@@ -68,4 +68,26 @@ describe('traffic aggregation (integration)', () => {
       expect(agg.activeUsers).toBe(2);
     });
   });
+
+  it('keeps half-open window semantics through the rewritten sargable predicate', async () => {
+    await withFreshConnection(async (connection) => {
+      const manager = new StaticConnectionManager(connection);
+      const guildConn = await manager.getConnection(guildId);
+      const repo = new MongoMessageRepo(guildConn);
+      const now = Date.now();
+      const window = resolveWindow('7d', now);
+
+      unwrap(
+        await repo.insertManyIgnoringDuplicates([
+          // Exactly at the inclusive lower bound — counted.
+          buildDoc({ messageId: 'start', channelId: 'pub', timestamp: window.startMs }),
+          // One ms before the window — excluded.
+          buildDoc({ messageId: 'before', channelId: 'pub', timestamp: window.startMs - 1 }),
+        ]),
+      );
+
+      const agg = await aggregateTraffic({ message: repo }, window, new Set(['pub']));
+      expect(agg.totalMessages).toBe(1);
+    });
+  });
 });

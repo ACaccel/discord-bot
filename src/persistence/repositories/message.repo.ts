@@ -212,15 +212,12 @@ export class MongoMessageRepo implements MessageRepo {
       );
     }
     try {
-      // The stored `timestamp` field is a String; the `$toLong`
-      // projection makes the comparison numeric.
+      // `timestamp` is a numeric epoch (the one-time tools/migrate_timestamp
+      // backfill removed the legacy String rows that once required a
+      // `$toLong` projection), so this plain half-open range is sargable
+      // and served by the `{ timestamp: 1 }` index instead of a collection scan.
       const docs = await this.conn.models.Message.find({
-        $expr: {
-          $and: [
-            { $gte: [{ $toLong: '$timestamp' }, startMs] },
-            { $lt: [{ $toLong: '$timestamp' }, endMs] },
-          ],
-        },
+        timestamp: { $gte: startMs, $lt: endMs },
       })
         .lean<MessageDoc[]>()
         .exec();
@@ -268,14 +265,12 @@ export class MongoMessageRepo implements MessageRepo {
       );
     }
     try {
+      // Numeric `timestamp` (see findByTimestampRange) makes this a plain
+      // half-open range; the compound `{ channelId: 1, timestamp: 1 }` index
+      // serves both the equality + range and the sort with no blocking SORT.
       const docs = await this.conn.models.Message.find({
         channelId,
-        $expr: {
-          $and: [
-            { $gte: [{ $toLong: '$timestamp' }, startMs] },
-            { $lt: [{ $toLong: '$timestamp' }, endMs] },
-          ],
-        },
+        timestamp: { $gte: startMs, $lt: endMs },
       })
         .sort({ timestamp: 1 })
         .lean<MessageDoc[]>()
