@@ -379,6 +379,52 @@
       }
     }
   },
+  "traffic": {
+    "description": "顯示伺服器訊息流量圖表與統計",
+    "options": {
+      "visibility": {
+        "description": "誰能看到回覆 (optional,預設:ephemeral)",
+        "choices": {
+          "ephemeral": "僅你自己",
+          "public": "所有人"
+        }
+      },
+      "range": {
+        "description": "回顧的時間範圍 (optional,預設:7d)",
+        "choices": {
+          "24h": "最近 24 小時",
+          "7d": "最近 7 天",
+          "30d": "最近 30 天"
+        }
+      },
+      "top_n": {
+        "description": "排行要顯示幾個頻道／用戶 (optional,1-25,預設:10)"
+      }
+    }
+  },
+  "traffic_me": {
+    "description": "顯示你自己的訊息活動統計",
+    "options": {
+      "visibility": {
+        "description": "誰能看到回覆 (optional,預設:ephemeral)",
+        "choices": {
+          "ephemeral": "僅你自己",
+          "public": "所有人"
+        }
+      },
+      "range": {
+        "description": "回顧的時間範圍 (optional,預設:7d)",
+        "choices": {
+          "24h": "最近 24 小時",
+          "7d": "最近 7 天",
+          "30d": "最近 30 天"
+        }
+      },
+      "top_n": {
+        "description": "排行要顯示幾個頻道 (optional,1-25,預設:10)"
+      }
+    }
+  },
   "update_role": {
     "description": "更新Mee6等級身分組"
   },

@@ -17,7 +17,7 @@
  * tears them down in reverse for `shutdown`. Subclasses extend by
  * registering plugins in their constructor and by overriding the small
  * set of protected hooks (`configureInteractionRouter`,
- * `channelLoggingBlockedChannels`, `eventBridgeSuppression`).
+ * `eventBridgeSuppression`).
  */
 import type { Channel, Client, Guild, Role } from 'discord.js';
 import { Events } from 'discord.js';
@@ -42,7 +42,14 @@ import { createDefaultTranslator, isLocale } from '../core/i18n';
 import type { asGuildId } from '../core/ids';
 import { createContainer, TOKENS, type ReposFactory, type ServiceContainer } from '../core/ioc';
 import { installProcessHandlers, logError, logSystem, ops, type Logger } from '../core/logger';
-import { InteractionRouter, PluginHost, type Plugin } from '../core/plugin';
+import {
+  createPermissionRankPolicy,
+  InteractionRouter,
+  PluginHost,
+  type PermissionRankConfig,
+  type PermissionRankPolicy,
+  type Plugin,
+} from '../core/plugin';
 import { systemClock, type Clock } from '../core/time';
 import { MongoConnectionManager, type ConnectionManager } from '../infra/mongo/connection-manager';
 import { buildRepos, type Repos } from '../persistence/repositories';
@@ -112,6 +119,16 @@ interface GuildConfig {
   channels?: Record<string, string>;
   /** Symbolic role-name -> Discord role id. Optional, same semantics as {@link channels}. */
   roles?: Record<string, string>;
+  /**
+   * Privacy / clearance ranks for this guild's channels and roles, plus the
+   * per-feature channel-rank ceilings. Consumed by {@link
+   * TOKENS.PermissionRankPolicy}. Distinct from {@link roles} above: that map
+   * is symbolic-name -> id for `GuildRegistry.getRole`, whereas
+   * `permission_rank.roles` is keyed by raw Discord role id (the form
+   * `member.roles.cache.keys()` yields) -> numeric rank. Optional; an omitted
+   * block ranks every channel / user 0 and suppresses nothing.
+   */
+  permission_rank?: PermissionRankConfig;
 }
 
 /**
@@ -254,6 +271,20 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     return this.container.tryResolve<DefaultModelResolver>(TOKENS.DefaultModelResolver);
   }
 
+  /**
+   * Bot-scoped {@link PermissionRankPolicy}. Built once from static
+   * config in the constructor and registered eagerly under
+   * `TOKENS.PermissionRankPolicy`; resolved here on demand. Handlers
+   * (notably `/traffic`) read the operator-defined channel / user
+   * privacy ranking through this getter rather than touching the
+   * container or `TOKENS` directly — the same boundary `getRepos`
+   * enforces for repositories. `undefined` only in the pre-`run()`
+   * window before the container is wired.
+   */
+  public get permissionRankPolicy(): PermissionRankPolicy | undefined {
+    return this.container.tryResolve<PermissionRankPolicy>(TOKENS.PermissionRankPolicy);
+  }
+
   /** Bot-scoped {@link Translator}. Undefined only in the pre-`run()` window. */
   public translator: Translator | undefined;
 
@@ -354,6 +385,17 @@ export abstract class BaseBot<TConfig extends Config = Config> {
       TOKENS.GuildOnboardingPort,
       () => new BaseBotGuildOnboardingPort(this),
     );
+    // PermissionRankPolicy is built ONCE from static config here (eagerly, not
+    // lazily) so a malformed `permission_rank` block fails fast at
+    // construction, and so event-time consumers never observe an unbuilt
+    // policy. This mirrors how the former `blocked_channels` list was captured
+    // at composition time — same lifecycle, no startup race.
+    const permissionRankByGuild: Record<string, unknown> = {};
+    for (const [guildId, guildConfig] of Object.entries(this.config.guilds ?? {})) {
+      permissionRankByGuild[guildId] = guildConfig.permission_rank;
+    }
+    const permissionRankPolicy = createPermissionRankPolicy(permissionRankByGuild);
+    this.container.registerSingleton(TOKENS.PermissionRankPolicy, () => permissionRankPolicy);
 
     // Construct collaborators with a bootstrap logger so they have a
     // structured sink before the bot-scoped Logger is wired in `run()`.
@@ -529,15 +571,6 @@ export abstract class BaseBot<TConfig extends Config = Config> {
   }
 
   /**
-   * Subclass hook returning channels (and parent thread channels)
-   * whose slash-command activity should NOT be logged to the debug
-   * channel. Default `undefined` means "log everything".
-   */
-  protected channelLoggingBlockedChannels(): readonly string[] | undefined {
-    return undefined;
-  }
-
-  /**
    * Subclass hook controlling which {@link ClientEventBridge}
    * listeners are installed. Default installs every listener. Bots
    * that opt out of an interaction class (the LLM-only `Konata`, the
@@ -618,7 +651,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     this.interactionRouter.use(createDispatchMiddleware(this));
     this.interactionRouter.use(
       createChannelLoggingMiddleware(this, {
-        blockedChannels: this.channelLoggingBlockedChannels(),
+        policy: this.container.resolve(TOKENS.PermissionRankPolicy),
       }),
     );
 

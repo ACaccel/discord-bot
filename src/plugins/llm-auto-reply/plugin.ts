@@ -38,7 +38,13 @@ export interface CreateLlmAutoReplyDeps {
    * which fires a reply deterministically (mirrors konata's llm-chat).
    */
   readonly clientId: string;
-  /** Channel ids (e.g. a bot's `blocked_channels`) that never trigger a reply. */
+  /**
+   * Channel ids that never trigger a reply. This is an intentionally
+   * list-based dep that predates the `permission_rank` model: gopher (the
+   * only consumer) passes none, so folding it into a `RankedFeature` would be
+   * speculative. Kept list-based on purpose; revisit if a gopher guild ever
+   * needs per-channel rank gating.
+   */
   readonly blockedChannels?: readonly string[];
   /** Random source in [0, 1); injectable for deterministic tests. */
   readonly random?: () => number;

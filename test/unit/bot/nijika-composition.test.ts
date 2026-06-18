@@ -59,14 +59,7 @@ const collectRegisteredPluginIds = (): string[] => {
     return this;
   });
   try {
-    new Nijika(
-      fakeClient(),
-      'token',
-      '',
-      'bot-client',
-      { commands: [], blocked_channels: [], level_roles: {} },
-      3000,
-    );
+    new Nijika(fakeClient(), 'token', '', 'bot-client', { commands: [], level_roles: {} }, 3000);
   } finally {
     useSpy.mockRestore();
   }

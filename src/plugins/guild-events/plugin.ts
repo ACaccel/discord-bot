@@ -15,14 +15,12 @@
  *     IoC container, so no plugin code reaches into `BaseBot`
  *     internals.
  *
- * Why a factory (`createGuildEventsPlugin(config)`) rather than a
- * plain `Plugin` const: the per-bot `blockedChannels` list lives in
- * the bot's `config.json` and must be captured into closures the
- * event handlers can read. The plugin's `events.messageUpdate(ctx,
- * ...)` signature does not carry the typed config (only `init` does),
- * so the cleanest production-grade option is a factory whose closures
- * encapsulate config. This keeps the plugin object pure-data
- * once produced and avoids module-scoped mutable state.
+ * Channel suppression ("only mirror rank-0 channels") is no longer baked
+ * into the plugin: the handlers resolve the {@link PermissionRankPolicy}
+ * from `ctx` at event time and ask it whether the `guild_events` feature is
+ * suppressed for the message's channel. A no-arg factory (consistent with
+ * the sibling `createGiveawayPlugin()` / `createActivityPlugin()`) keeps the
+ * returned object pure data.
  */
 import {
   EmbedBuilder,
@@ -31,46 +29,21 @@ import {
   type PartialMessage,
   type TextChannel,
 } from 'discord.js';
-import { z } from 'zod';
 
 import { TOKENS } from '../../core/plugin';
 import type { GuildRegistry } from '../../core/guild-registry';
 import type { Plugin } from '../../core/plugin';
-import type { GuildOnboardingPort } from '../../core/plugin';
+import type { GuildOnboardingPort, PermissionRankPolicy } from '../../core/plugin';
 import { logError, logGuildEvent, logSystem, type Logger } from '../../core/logger';
-import { archiveDeletedAttachment } from '../../infra/discord';
+import { archiveDeletedAttachment, parentChannelIdOf } from '../../infra/discord';
 
 const PLUGIN_ID = 'guild-events';
 const PLUGIN_VERSION = '1.0.0';
 const EVENT_CHANNEL = 'event';
 const MAX_MESSAGE_PREVIEW = 1000;
 
-const ConfigSchema = z
-  .object({
-    /**
-     * Channel ids whose `messageUpdate` / `messageDelete` events the
-     * plugin must suppress. The list also matches a message's parent
-     * channel (thread parent) so threads under a blocked forum are
-     * silenced too. Empty = mirror everything.
-     */
-    blockedChannels: z.array(z.string()).default([]),
-  })
-  .strict();
-
-export type GuildEventsConfig = z.infer<typeof ConfigSchema>;
-
 const truncate = (text: string): string =>
   text.length > MAX_MESSAGE_PREVIEW ? `${text.slice(0, MAX_MESSAGE_PREVIEW)}...` : text;
-
-const isBlocked = (
-  channelId: string,
-  parentId: string | null | undefined,
-  blocked: readonly string[],
-): boolean => {
-  if (blocked.length === 0) return false;
-  if (blocked.includes(channelId)) return true;
-  return parentId !== null && parentId !== undefined && blocked.includes(parentId);
-};
 
 const resolveEventChannel = (
   registry: GuildRegistry,
@@ -113,18 +86,9 @@ const safeSendEmbed = async (
   }
 };
 
-/**
- * Build a plugin instance with `blockedChannels` baked into closures.
- *
- * The factory validates `rawConfig` here (rather than letting the host
- * do it via `configSchema`) because the returned Plugin object has its
- * config inlined into closures — the host's register-time path never
- * needs to re-validate. Producing a `Plugin<void>` keeps the typing
- * crisp and sidesteps the `ZodObject` / `ZodType` invariance pitfall
- * that arises when a schema with `.default()` widens the input shape.
- */
-export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
-  const config = ConfigSchema.parse(rawConfig);
+/** Build the guild-events plugin. Takes no config; suppression is resolved
+ * per-event from {@link PermissionRankPolicy}. */
+export const createGuildEventsPlugin = (): Plugin => {
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
@@ -135,8 +99,8 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
       messageUpdate: async (ctx, oldMessage, newMessage) => {
         await handleMessageUpdate(
           ctx.resolve(TOKENS.GuildRegistry),
+          ctx.resolve(TOKENS.PermissionRankPolicy),
           ctx.resolve(TOKENS.Logger),
-          config.blockedChannels,
           oldMessage,
           newMessage,
         );
@@ -144,8 +108,8 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
       messageDelete: async (ctx, message) => {
         await handleMessageDelete(
           ctx.resolve(TOKENS.GuildRegistry),
+          ctx.resolve(TOKENS.PermissionRankPolicy),
           ctx.resolve(TOKENS.Logger),
-          config.blockedChannels,
           message,
         );
       },
@@ -215,23 +179,33 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
 
 const handleMessageUpdate = async (
   registry: GuildRegistry,
+  policy: PermissionRankPolicy,
   logger: Logger | undefined,
-  blockedChannels: readonly string[],
   oldMessage: Message | PartialMessage,
   newMessage: Message | PartialMessage,
 ): Promise<void> => {
-  const parentId = (oldMessage.channel as TextChannel).parentId;
-  if (isBlocked(oldMessage.channel.id, parentId, blockedChannels)) return;
-
   // Guards: skip when either content side is missing, identical, or
   // the author / guild is unresolvable. These also filter the
-  // partial-message edge that pre-cache messages emit.
+  // partial-message edge that pre-cache messages emit. The guild guard
+  // runs before the rank check so a guild id is in hand for the policy.
   if (oldMessage.content === null || oldMessage.content === undefined) return;
   if (newMessage.content === null || newMessage.content === undefined) return;
   if (oldMessage.content === newMessage.content) return;
   if (newMessage.guild === null || newMessage.guildId === null) return;
   if (newMessage.author === null || oldMessage.author === null) return;
   if (newMessage.author.bot) return;
+  // Suppress the whole mirror (embed AND audit) for channels above the
+  // guild_events rank ceiling — the feature "only records rank-0 channels".
+  if (
+    policy.isSuppressed(
+      newMessage.guildId,
+      'guild_events',
+      oldMessage.channel.id,
+      parentChannelIdOf(oldMessage.channel),
+    )
+  ) {
+    return;
+  }
   if (oldMessage.partial) await oldMessage.fetch();
   if (newMessage.partial) await newMessage.fetch();
 
@@ -274,15 +248,25 @@ const handleMessageUpdate = async (
 
 const handleMessageDelete = async (
   registry: GuildRegistry,
+  policy: PermissionRankPolicy,
   logger: Logger | undefined,
-  blockedChannels: readonly string[],
   message: Message | PartialMessage,
 ): Promise<void> => {
-  const parentId = (message.channel as TextChannel).parentId;
-  if (isBlocked(message.channel.id, parentId, blockedChannels)) return;
   if (message.guild === null || message.guildId === null) return;
   if (message.author === null) return;
   if (message.author.bot) return;
+  // Suppress the whole mirror (embed AND audit) for channels above the
+  // guild_events rank ceiling — the feature "only records rank-0 channels".
+  if (
+    policy.isSuppressed(
+      message.guildId,
+      'guild_events',
+      message.channel.id,
+      parentChannelIdOf(message.channel),
+    )
+  ) {
+    return;
+  }
   if (message.partial) await message.fetch();
 
   const eventChannel = resolveEventChannel(registry, message.guildId);

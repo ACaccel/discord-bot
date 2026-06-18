@@ -48,6 +48,14 @@ export { InteractionRouter, DoubleNextError } from './interaction-router';
 
 export type { GuildOnboardingPort, GuildOnboardingResult } from './guild-onboarding-port';
 
+export { createPermissionRankPolicy, RANKED_FEATURES } from './permission-rank-policy';
+export type {
+  PermissionRankPolicy,
+  RankedFeature,
+  Rank,
+  PermissionRankConfig,
+} from './permission-rank-policy';
+
 /*
  * R3: plugin-facing window onto the IoC layer.
  *

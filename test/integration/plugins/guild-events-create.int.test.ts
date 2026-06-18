@@ -40,7 +40,7 @@ const fakeGuild = (id: string): Guild => ({ id, name: `guild-${id}` }) as unknow
 
 describe('guild-events plugin guildCreate subscription', () => {
   it('exposes a guildCreate subscription', () => {
-    const plugin = createGuildEventsPlugin({});
+    const plugin = createGuildEventsPlugin();
     expect(plugin.events?.guildCreate).toBeTypeOf('function');
   });
 
@@ -53,7 +53,7 @@ describe('guild-events plugin guildCreate subscription', () => {
     const onboardGuild = vi.fn(async () => result);
     const port: GuildOnboardingPort = { onboardGuild };
 
-    const plugin = createGuildEventsPlugin({});
+    const plugin = createGuildEventsPlugin();
     const ctx = buildEventContext(port);
 
     await plugin.events?.guildCreate?.(ctx, fakeGuild('g-100'));
@@ -68,7 +68,7 @@ describe('guild-events plugin guildCreate subscription', () => {
     });
     const port: GuildOnboardingPort = { onboardGuild };
 
-    const plugin = createGuildEventsPlugin({});
+    const plugin = createGuildEventsPlugin();
     const ctx = buildEventContext(port);
 
     // The contract this regression test protects: a port failure is

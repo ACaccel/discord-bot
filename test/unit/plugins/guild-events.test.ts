@@ -1,35 +1,38 @@
-import { EmbedBuilder, type Guild, type TextChannel } from 'discord.js';
-import { describe, expect, it, vi } from 'vitest';
+/* eslint-disable import/first */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Mock logGuildEvent so the suppression tests can assert the audit line is ALSO
+// skipped (not just the embed); importOriginal keeps logError / logSystem real.
+vi.mock('@core/logger', async (importOriginal) => ({
+  ...((await importOriginal()) as Record<string, unknown>),
+  logGuildEvent: vi.fn(),
+}));
+
+import { EmbedBuilder, type Guild, type Message, type TextChannel } from 'discord.js';
+import { logGuildEvent } from '@core/logger';
 import { createGuildEventsPlugin } from '../../../src/plugins/guild-events';
 import { __test as guildEventsTest } from '../../../src/plugins/guild-events/plugin';
-import type { GuildOnboardingPort } from '../../../src/core/plugin';
+import {
+  createPermissionRankPolicy,
+  type GuildOnboardingPort,
+  type PermissionRankPolicy,
+  type PluginEventContext,
+} from '../../../src/core/plugin';
+import type { GuildRegistry } from '../../../src/core/guild-registry';
+import { createContainer } from '../../../src/core/ioc';
+import { TOKENS } from '../../../src/core/ioc/tokens';
+import { createLogger } from '../../../src/core/logger';
+import { systemClock } from '../../../src/core/time';
 
 describe('createGuildEventsPlugin', () => {
-  it('accepts an empty config and defaults blockedChannels to []', () => {
-    const plugin = createGuildEventsPlugin({});
+  it('declares its bot-scoped event subscriptions (no config)', () => {
+    const plugin = createGuildEventsPlugin();
     expect(plugin.id).toBe('guild-events');
     expect(plugin.scope).toBe('bot');
     expect(plugin.events?.messageUpdate).toBeTypeOf('function');
     expect(plugin.events?.messageDelete).toBeTypeOf('function');
     expect(plugin.events?.guildMemberUpdate).toBeTypeOf('function');
     expect(plugin.events?.guildCreate).toBeTypeOf('function');
-  });
-
-  it('accepts a blockedChannels list', () => {
-    const plugin = createGuildEventsPlugin({ blockedChannels: ['1', '2'] });
-    expect(plugin.id).toBe('guild-events');
-  });
-
-  it('rejects configs whose fields have the wrong shape', () => {
-    expect(() =>
-      createGuildEventsPlugin({
-        blockedChannels: 'not-an-array' as unknown as string[],
-      }),
-    ).toThrow();
-  });
-
-  it('rejects unknown keys (.strict() prevents config drift)', () => {
-    expect(() => createGuildEventsPlugin({ blocked: ['1'] })).toThrow();
   });
 });
 
@@ -90,5 +93,129 @@ describe('handleGuildCreate', () => {
     await expect(
       guildEventsTest.handleGuildCreate(port, undefined, fakeGuild('g-2')),
     ).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * Behaviour: the mirror (and its audit-log side effect) is suppressed for a
+ * channel above the `guild_events` rank ceiling. Drives the real
+ * `messageUpdate` / `messageDelete` handlers with a live IoC container holding
+ * a real (static-config) policy and a fake event channel; the channel's `send`
+ * spy is the probe — it fires only when the message is NOT suppressed.
+ */
+describe('guild-events suppression by permission_rank', () => {
+  const silent = createLogger({ level: 'silent', pretty: false });
+
+  const fakeEventChannel = (): { send: ReturnType<typeof vi.fn> } & TextChannel => {
+    const send = vi.fn(async () => undefined);
+    return { send, isSendable: () => true } as unknown as {
+      send: ReturnType<typeof vi.fn>;
+    } & TextChannel;
+  };
+
+  const registryWith = (eventChannel: TextChannel): GuildRegistry =>
+    ({
+      getRepos: () => undefined,
+      getChannel: (_guildId: string, name: string) => (name === 'event' ? eventChannel : undefined),
+      getRole: () => undefined,
+      listGuildIds: () => [],
+    }) as unknown as GuildRegistry;
+
+  const buildCtx = (registry: GuildRegistry, policy: PermissionRankPolicy): PluginEventContext => {
+    const container = createContainer();
+    container.registerSingleton(TOKENS.Logger, () => silent);
+    container.registerSingleton(TOKENS.GuildRegistry, () => registry);
+    container.registerSingleton(TOKENS.PermissionRankPolicy, () => policy);
+    return {
+      logger: silent,
+      translator: undefined,
+      clock: systemClock,
+      resolve: container.resolve.bind(container),
+    } as unknown as PluginEventContext;
+  };
+
+  const author = {
+    bot: false,
+    id: 'u1',
+    username: 'user',
+    displayName: 'User',
+    displayAvatarURL: () => 'https://example.test/a.png',
+  };
+
+  const message = (channelId: string, content: string, parentId: string | null = null): Message =>
+    ({
+      content,
+      author,
+      guild: { id: 'g1', name: 'Guild', channels: { cache: { get: () => undefined } } },
+      guildId: 'g1',
+      channel: { id: channelId, parentId },
+      partial: false,
+      attachments: { size: 0, map: () => [], forEach: () => undefined },
+    }) as unknown as Message;
+
+  // `forum` is ranked so a thread under it (itself unlisted = rank 0) inherits
+  // the parent's rank and is suppressed via the effective-rank max.
+  const policy = createPermissionRankPolicy({ g1: { channels: { private: 1, forum: 1 } } });
+
+  const fireUpdate = async (
+    channelId: string,
+    channel: TextChannel,
+    parentId: string | null = null,
+  ): Promise<void> => {
+    const handler = createGuildEventsPlugin().events?.messageUpdate;
+    if (handler === undefined) throw new Error('no messageUpdate handler');
+    await handler(
+      buildCtx(registryWith(channel), policy),
+      message(channelId, 'old', parentId) as Parameters<typeof handler>[1],
+      message(channelId, 'new', parentId) as Parameters<typeof handler>[2],
+    );
+  };
+
+  const fireDelete = async (channelId: string, channel: TextChannel): Promise<void> => {
+    const handler = createGuildEventsPlugin().events?.messageDelete;
+    if (handler === undefined) throw new Error('no messageDelete handler');
+    await handler(
+      buildCtx(registryWith(channel), policy),
+      message(channelId, 'gone') as Parameters<typeof handler>[1],
+    );
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('mirrors a message edit in a rank-0 (public) channel — embed AND audit fire', async () => {
+    const channel = fakeEventChannel();
+    await fireUpdate('public', channel);
+    expect(channel.send).toHaveBeenCalledTimes(1);
+    expect(logGuildEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses a message edit above the ceiling — neither embed NOR audit fire', async () => {
+    const channel = fakeEventChannel();
+    await fireUpdate('private', channel);
+    expect(channel.send).not.toHaveBeenCalled();
+    expect(logGuildEvent).not.toHaveBeenCalled();
+  });
+
+  it('suppresses an edit in a thread under a ranked parent forum (effective rank via parent)', async () => {
+    const channel = fakeEventChannel();
+    await fireUpdate('thread', channel, 'forum'); // thread rank 0, parent forum rank 1
+    expect(channel.send).not.toHaveBeenCalled();
+    expect(logGuildEvent).not.toHaveBeenCalled();
+  });
+
+  it('suppresses a message delete above the ceiling — neither embed NOR audit fire', async () => {
+    const channel = fakeEventChannel();
+    await fireDelete('private', channel);
+    expect(channel.send).not.toHaveBeenCalled();
+    expect(logGuildEvent).not.toHaveBeenCalled();
+  });
+
+  it('mirrors a message delete in a rank-0 channel — embed AND audit fire', async () => {
+    const channel = fakeEventChannel();
+    await fireDelete('public', channel);
+    expect(channel.send).toHaveBeenCalledTimes(1);
+    expect(logGuildEvent).toHaveBeenCalledTimes(1);
   });
 });

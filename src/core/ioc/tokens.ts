@@ -30,6 +30,7 @@ import type { Translator } from '../i18n';
 import type { Logger } from '../logger';
 import type { Repos } from '../../persistence/repositories';
 import type { GuildOnboardingPort } from '../plugin/guild-onboarding-port';
+import type { PermissionRankPolicy } from '../plugin/permission-rank-policy';
 
 /** Per-guild single-repository factory shape. */
 export type RepoFactory<R> = (guildId: GuildId) => Promise<R>;
@@ -82,6 +83,15 @@ export interface Tokens {
    */
   readonly GuildOnboardingPort: ServiceToken<GuildOnboardingPort>;
   /**
+   * Operator-defined privacy / clearance ranking for channels and users
+   * (`permission_rank` in `config.json`). Resolved by the guild-events /
+   * social-link-preview plugins and the channel-logging middleware to decide
+   * which channels each feature acts on. Built once from static config in the
+   * `BaseBot` constructor; a bot that omits `permission_rank` gets an
+   * all-rank-0 policy that suppresses nothing.
+   */
+  readonly PermissionRankPolicy: ServiceToken<PermissionRankPolicy>;
+  /**
    * Voice controller, published by VoicePlugin's `init` hook via
    * {@link PluginInitContext.registerInstance}. Resolved by BaseBot's
    * `voice` getter and any handler that needs to drive recording.
@@ -115,6 +125,7 @@ export const TOKENS: Tokens = {
   Env: token<Env>('Env'),
   JobMap: token<Map<string, Job>>('JobMap'),
   GuildOnboardingPort: token<GuildOnboardingPort>('GuildOnboardingPort'),
+  PermissionRankPolicy: token<PermissionRankPolicy>('PermissionRankPolicy'),
   VoiceController: token<VoiceController>('VoiceController'),
   ModelCatalog: token<ModelCatalog>('ModelCatalog'),
   DefaultModelResolver: token<DefaultModelResolver>('DefaultModelResolver'),

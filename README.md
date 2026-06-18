@@ -122,9 +122,11 @@ top-level keys are:
 
 - `guilds` — every guild the bot serves; each entry maps named
   `channels` and `roles` (e.g. `"debug"`, `"admin"`) to real Discord
-  IDs so handlers can look them up by name.
+  IDs so handlers can look them up by name, and may carry a
+  `permission_rank` block (channel / user privacy ranks plus per-feature
+  channel-rank ceilings — see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 - `commands` — the slash commands this personality should register.
-- Personality-specific extras (e.g. `blocked_channels`, `level_roles`).
+- Personality-specific extras (e.g. `level_roles`).
 
 ## Adding a command, button, modal, or plugin
 

@@ -1,11 +1,25 @@
 {
     "admin": ["YOUR_ADMIN_USER_ID"],
     "language": "zh-TW",
+    "guilds": {
+        "YOUR_GUILD_ID": {
+            "channels": {
+                "debug": "YOUR_DEBUG_CHANNEL_ID",
+                "event": "YOUR_EVENT_CHANNEL_ID"
+            },
+            "permission_rank": {
+                "channels": {
+                    "YOUR_PRIVATE_CHANNEL_ID": 1
+                },
+                "features": {
+                    "guild_events": { "maxChannelRank": 0 },
+                    "channel_logging": { "maxChannelRank": 0 }
+                }
+            }
+        }
+    },
     "commands": [
         "help",
         "COMMAND_NAME"
-    ],
-    "blocked_channels": [
-        "YOUR_BLOCKED_CHANNEL_ID"
     ]
 }

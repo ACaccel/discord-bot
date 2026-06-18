@@ -13,6 +13,8 @@ interface BuildGuildInput {
   readonly channels?: readonly { id: string; name?: string; type?: number }[];
   /** Pre-populated member cache. Tests pass members built by `buildGuildMember`. */
   readonly members?: readonly { id: string; displayName?: string }[];
+  /** Id of the synthetic `@everyone` role exposed at `roles.everyone`. */
+  readonly everyoneRoleId?: string;
 }
 
 export const buildGuild = (input: BuildGuildInput = {}): Guild => {
@@ -24,10 +26,12 @@ export const buildGuild = (input: BuildGuildInput = {}): Guild => {
   for (const m of input.members ?? []) {
     memberCache.set(m.id, m);
   }
+  const everyoneId = input.everyoneRoleId ?? 'everyone';
   return {
     id: input.id ?? 'g-1',
     name: input.name ?? 'TestGuild',
     channels: { cache: channelCache },
     members: { cache: memberCache },
+    roles: { everyone: { id: everyoneId } },
   } as unknown as Guild;
 };

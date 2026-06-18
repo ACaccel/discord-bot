@@ -13,9 +13,11 @@
  *
  * Factory pattern (mirrors `createLlmAutoReplyPlugin`): per-bot settings
  * are parsed once and the provider registry is captured in the closure,
- * so the returned object is pure data. `deps` exposes the host's
- * `blockedChannels` list (so blocked channels never trigger) and an
- * injectable `registry` seam for deterministic tests.
+ * so the returned object is pure data. Channel suppression is resolved
+ * per-event from the {@link PermissionRankPolicy} (the `social_preview`
+ * feature; its default ceiling is unbounded, so previews fire everywhere
+ * unless an operator sets a finite ceiling). `deps` exposes an injectable
+ * `registry` seam for deterministic tests.
  *
  * Not critical: a preview failure must never abort the bot, and the
  * event handler swallows every error so a bad link cannot break the
@@ -23,6 +25,8 @@
  */
 import { logError } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
+import { TOKENS } from '../../core/plugin';
+import { parentChannelIdOf } from '../../infra/discord';
 import {
   createDefaultLinkPreviewRegistry,
   type LinkPreviewProviderRegistry,
@@ -35,8 +39,6 @@ const PLUGIN_VERSION = '1.0.0';
 
 /** Optional collaborators wired by the composition root / tests. */
 export interface CreateSocialLinkPreviewDeps {
-  /** Channel ids (e.g. nijika's `blocked_channels`) that never trigger a preview. */
-  readonly blockedChannels?: readonly string[];
   /** Provider registry; injectable so tests can supply fakes without the network. */
   readonly registry?: LinkPreviewProviderRegistry;
 }
@@ -46,7 +48,6 @@ export const createSocialLinkPreviewPlugin = (
   deps: CreateSocialLinkPreviewDeps = {},
 ): Plugin => {
   const config = parseSocialLinkPreviewConfig(rawConfig);
-  const blockedChannels = new Set(deps.blockedChannels ?? []);
   const registry =
     deps.registry ??
     createDefaultLinkPreviewRegistry({
@@ -69,7 +70,21 @@ export const createSocialLinkPreviewPlugin = (
         if (!config.enabled) return;
         if (message.author.bot) return; // self-loop + bot-feedback guard
         if (message.guildId === null) return; // guild-only
-        if (blockedChannels.has(message.channelId)) return;
+        // Channels above the social_preview rank ceiling are suppressed.
+        // Default ceiling is unbounded, so this is a no-op unless an operator
+        // sets a finite `social_preview.maxChannelRank`.
+        if (
+          ctx
+            .resolve(TOKENS.PermissionRankPolicy)
+            .isSuppressed(
+              message.guildId,
+              'social_preview',
+              message.channelId,
+              parentChannelIdOf(message.channel),
+            )
+        ) {
+          return;
+        }
         if (!message.channel.isSendable()) return;
 
         try {

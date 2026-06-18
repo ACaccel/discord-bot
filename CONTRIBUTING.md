@@ -298,7 +298,7 @@ listeners, etc.
 
    const ConfigSchema = z
      .object({
-       blockedChannels: z.array(z.string()).default([]),
+       cooldownSeconds: z.number().int().min(0).default(0),
      })
      .strict();
 
@@ -310,7 +310,6 @@ listeners, etc.
     */
    export const createXxxPlugin = (rawConfig: unknown): Plugin => {
      const config: XxxConfig = ConfigSchema.parse(rawConfig);
-     const isBlocked = (channelId: string): boolean => config.blockedChannels.includes(channelId);
 
      return {
        id: PLUGIN_ID,
@@ -321,14 +320,21 @@ listeners, etc.
        events: {
          messageCreate: async (ctx, message): Promise<void> => {
            if (message.guildId === null) return;
-           if (isBlocked(message.channelId)) return;
+           // Per-channel suppression is centralised in PermissionRankPolicy —
+           // do NOT reintroduce a per-plugin `blockedChannels` list. Add a key
+           // to `RankedFeature` in `core/plugin/permission-rank-policy.ts`,
+           // then gate on it here:
+           const policy = ctx.resolve(TOKENS.PermissionRankPolicy);
+           if (policy.isSuppressed(message.guildId, 'guild_events', message.channelId)) return;
 
-           const registry = ctx.resolve(TOKENS.GuildRegistry);
            ctx.logger.debug(
-             { guildId: message.guildId, channelId: message.channelId },
+             {
+               guildId: message.guildId,
+               channelId: message.channelId,
+               cooldownSeconds: config.cooldownSeconds,
+             },
              'xxx: handling message',
            );
-           void registry;
          },
        },
      };
@@ -364,7 +370,7 @@ listeners, etc.
    export class Nijika extends BaseBot<NijikaConfig> {
      public constructor(/* … */) {
        super(/* … */);
-       this.use(createXxxPlugin({ blockedChannels: [] }));
+       this.use(createXxxPlugin({ cooldownSeconds: 0 }));
      }
    }
    ```

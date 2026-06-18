@@ -5,7 +5,7 @@ fit together, what the key abstractions are, how a Discord interaction
 flows through the system, and how plugins are wired in.
 
 For day-to-day contribution recipes (adding a command, adding a plugin,
-running the quality gates) see [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+running the quality gates) see `[CONTRIBUTING.md](../CONTRIBUTING.md)`.
 
 ---
 
@@ -58,9 +58,9 @@ configuration; `BaseBot.run()` orchestrates startup in a fixed order:
 
 Three single-purpose collaborators back the orchestrator:
 
-- **`GuildRegistrar`** ([src/bot/guild-registrar.ts](../src/bot/guild-registrar.ts)) — pure assembly of per-guild `GuildInfo` (channels, roles) from Discord cache + bot config. Best-effort; never throws.
-- **`ClientEventBridge`** ([src/bot/client-event-bridge.ts](../src/bot/client-event-bridge.ts)) — adapter from `client.on(...)` raw events to the `InteractionRouter`, the plugin `EventDispatcher`, the reaction port, and the `GuildCreate` fallback. Owns a single attach/detach cycle.
-- **`GuildDbConnector`** ([src/bot/guild-db-connector.ts](../src/bot/guild-db-connector.ts)) — per-guild Mongo lifecycle. Drives the `ReposFactory` and normalises failure into `ConnectionManager`'s disabled-set so other guilds keep running.
+- `**GuildRegistrar**` ([src/bot/guild-registrar.ts](../src/bot/guild-registrar.ts)) — pure assembly of per-guild `GuildInfo` (channels, roles) from Discord cache + bot config. Best-effort; never throws.
+- `**ClientEventBridge**` ([src/bot/client-event-bridge.ts](../src/bot/client-event-bridge.ts)) — adapter from `client.on(...)` raw events to the `InteractionRouter`, the plugin `EventDispatcher`, the reaction port, and the `GuildCreate` fallback. Owns a single attach/detach cycle.
+- `**GuildDbConnector**` ([src/bot/guild-db-connector.ts](../src/bot/guild-db-connector.ts)) — per-guild Mongo lifecycle. Drives the `ReposFactory` and normalises failure into `ConnectionManager`'s disabled-set so other guilds keep running.
 
 ### Plugin contract ([src/core/plugin/](../src/core/plugin/))
 
@@ -122,6 +122,28 @@ modules at each infra boundary turn SDK failures into domain errors.
 `GuildId`, `ChannelId`, `UserId`, `RoleId`, `MessageId` are branded
 strings so a `ChannelId` cannot be passed where a `GuildId` is
 expected.
+
+### `PermissionRankPolicy` ([src/core/plugin/permission-rank-policy.ts](../src/core/plugin/permission-rank-policy.ts))
+
+Operator-defined privacy / clearance ranking for channels and users —
+orthogonal to Discord's own permissions. Each guild's `config.json`
+carries a `permission_rank` block: channels and roles get a non-negative
+integer rank (higher = more private; a member's clearance is the max over
+their ranked roles), and each rank-gated feature has a `maxChannelRank`
+ceiling. A feature suppresses a channel when its effective rank —
+`max(channel, parent-thread)` — exceeds the ceiling; the `channelRank` /
+`userRank` / `visibilityCeiling` primitives let a visibility-gated feature —
+realized by the `/traffic` command — show channel `T` only when
+`channelRank(T) <= min(userRank, commandChannelRank)`, combined with a native
+`ViewChannel` check (the dual filter, so an unconfigured rank map still never
+leaks a Discord-private channel). The policy is a core interface built once
+from static config in the `BaseBot` constructor and registered under
+`TOKENS.PermissionRankPolicy` (same seam as `GuildOnboardingPort`):
+discord.js-free, fail-fast validated, resolved per-event by the `guild-events`
+/ `social-link-preview` plugins and the channel-logging middleware, and
+per-invocation by the `/traffic` handler through the `bot.permissionRankPolicy`
+accessor. It replaced the bot-wide `blocked_channels` list (suppression is now
+per-guild).
 
 ### `MongoConnectionManager` ([src/infra/mongo/connection-manager.ts](../src/infra/mongo/connection-manager.ts))
 
@@ -196,15 +218,15 @@ generated registry disagree.
 Plugins are processed in topological order over their declared
 dependency graph:
 
-1. **`init`** — runs before Discord login. The only phase where a
+1. `**init**` — runs before Discord login. The only phase where a
    plugin may publish a singleton via
    `ctx.registerInstance(token, instance)`. Reads config and bootstraps
    collaborators.
-2. **`start`** — runs after `init` but before `ClientReady`. Attaches
+2. `**start**` — runs after `init` but before `ClientReady`. Attaches
    subscriptions, registers low-frequency listeners, schedules jobs.
-3. **`onReady`** — runs once after `ClientReady`. Used for boot
+3. `**onReady**` — runs once after `ClientReady`. Used for boot
    messages, startup checks.
-4. **`onShutdown`** — runs in **reverse** topological order during
+4. `**onShutdown**` — runs in **reverse** topological order during
    graceful shutdown (`SIGINT` / `SIGTERM`). Failures are logged but
    never fatal.
 

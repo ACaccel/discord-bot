@@ -1,15 +1,26 @@
 /**
- * Unit tests for {@link createSocialLinkPreviewPlugin}: plugin shape and
- * the cheap-guard ordering (enabled / bot author / DM / blocked channel /
- * non-sendable). The injected registry's `findProvider` is the probe: it
- * is reached only when every guard passes.
+ * Unit tests for {@link createSocialLinkPreviewPlugin}: plugin shape and the
+ * cheap-guard ordering (enabled / bot author / DM / rank-suppressed channel /
+ * non-sendable). The injected registry's `findProvider` is the probe: it is
+ * reached only when every guard passes.
+ *
+ * Channel suppression now comes from a real {@link PermissionRankPolicy}
+ * (built by the production factory from static config) resolved off the event
+ * context, not a `blockedChannels` list. The `social_preview` default ceiling
+ * is unbounded, so a channel previews unless an operator sets a finite ceiling.
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { Message } from 'discord.js';
 
 import { createSocialLinkPreviewPlugin } from '../../../../src/plugins/social-link-preview';
 import type { LinkPreviewProviderRegistry } from '../../../../src/infra/link-preview';
-import type { PluginEventContext } from '../../../../src/core/plugin';
+import {
+  createPermissionRankPolicy,
+  type PermissionRankPolicy,
+  type PluginEventContext,
+} from '../../../../src/core/plugin';
+import { createContainer } from '../../../../src/core/ioc';
+import { TOKENS } from '../../../../src/core/ioc/tokens';
 import type { Logger } from '../../../../src/core/logger';
 import type { Translator } from '../../../../src/core/i18n';
 
@@ -26,11 +37,18 @@ const makeLogger = (): Logger => {
   return logger as unknown as Logger;
 };
 
-const ctx = (): PluginEventContext =>
-  ({
+/** An empty policy: `social_preview` ceiling defaults to unbounded, so nothing is suppressed. */
+const emptyPolicy = createPermissionRankPolicy({});
+
+const ctx = (policy: PermissionRankPolicy): PluginEventContext => {
+  const container = createContainer();
+  container.registerSingleton(TOKENS.PermissionRankPolicy, () => policy);
+  return {
     logger: makeLogger(),
     translator: { t: vi.fn((k: string) => k) } as unknown as Translator,
-  }) as unknown as PluginEventContext;
+    resolve: container.resolve.bind(container),
+  } as unknown as PluginEventContext;
+};
 
 const makeRegistry = (): {
   registry: LinkPreviewProviderRegistry;
@@ -61,13 +79,14 @@ const fire = async (
   rawConfig: unknown,
   message: Message,
   deps: Parameters<typeof createSocialLinkPreviewPlugin>[1],
+  policy: PermissionRankPolicy = emptyPolicy,
 ): Promise<void> => {
   const plugin = createSocialLinkPreviewPlugin(rawConfig, deps);
   const handler = plugin.events?.messageCreate;
   if (handler === undefined) throw new Error('no messageCreate handler');
   // The discord.js event arg is OmitPartialGroupDMChannel<Message>; our fake
   // is structurally a Message, so narrow it to the handler's exact param type.
-  await handler(ctx(), message as Parameters<typeof handler>[1]);
+  await handler(ctx(policy), message as Parameters<typeof handler>[1]);
 };
 
 describe('createSocialLinkPreviewPlugin shape', () => {
@@ -106,13 +125,23 @@ describe('createSocialLinkPreviewPlugin guards', () => {
     expect(findProvider).not.toHaveBeenCalled();
   });
 
-  it('skips blocked channels', async () => {
+  it('skips a channel above a configured social_preview ceiling', async () => {
     const { registry, findProvider } = makeRegistry();
-    await fire({ enabled: true }, makeMessage({ channelId: 'c-blocked' }), {
-      registry,
-      blockedChannels: ['c-blocked'],
+    const policy = createPermissionRankPolicy({
+      g1: { channels: { 'c-secret': 1 }, features: { social_preview: { maxChannelRank: 0 } } },
     });
+    await fire({ enabled: true }, makeMessage({ channelId: 'c-secret' }), { registry }, policy);
     expect(findProvider).not.toHaveBeenCalled();
+  });
+
+  it('previews a ranked channel under the DEFAULT (unbounded) ceiling — the intentional change from blocked_channels', async () => {
+    const { registry, findProvider } = makeRegistry();
+    // A channel that would have been in nijika's old `blocked_channels` (rank
+    // 1 here) now receives a preview, because social_preview defaults to no
+    // ceiling. Suppressing it again requires an explicit finite ceiling.
+    const policy = createPermissionRankPolicy({ g1: { channels: { 'c-secret': 1 } } });
+    await fire({ enabled: true }, makeMessage({ channelId: 'c-secret' }), { registry }, policy);
+    expect(findProvider).toHaveBeenCalledTimes(1);
   });
 
   it('skips non-sendable channels', async () => {
