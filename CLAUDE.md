@@ -172,30 +172,42 @@ Four load-bearing rules; a CI gate or a reviewer will catch violations:
 
 ## Quality gates (non-negotiable)
 
+This set mirrors the GitHub CI jobs (`.github/workflows/ci.yml`) and is a
+**hard commit gate: every check must pass locally before you commit** — never
+commit on a red or unrun gate.
+
 ```bash
 yarn typecheck
+yarn typecheck:emit   # declaration build (CI: typecheck:emit)
 yarn lint
-yarn test
 yarn format:check
 yarn handlers:gen:check
+yarn test             # all vitest projects: unit / integration / contract / i18n / tools
+yarn test:coverage    # coverage thresholds
 yarn knip
+yarn security         # audit-ci (HIGH+ advisories)
 ```
 
-No `--no-verify`, no skipped tests, no loosened assertions. If a gate
-fails, root-cause it; do not bypass.
+Two CI checks cannot run locally — **`gitleaks`** (secret scan) and **CodeQL** —
+and run only on GitHub. A `dev` commit triggers the full CI on push, so after
+committing you MUST confirm that CI run is green (`gh run list --branch dev`)
+and fix any red immediately — CI is a gate, not a passive signal.
+
+No `--no-verify`, no skipped tests, no loosened assertions. If a gate fails,
+root-cause it; do not bypass.
 
 ## Commit + PR conventions
 
-- **Commit only when the user explicitly asks.** Do not auto-commit (or `git commit --amend`) after making changes, completing a task, or fixing review-gate / stop-hook findings — make the edits, run the gates, report, and wait for an explicit "commit" instruction. The same applies to `git push`. A one-off "commit this" authorises that commit only, not subsequent ones.
+- **Commit only when the user explicitly asks — then commit AND push together.** Do not auto-commit (or `git commit --amend`) after making changes, completing a task, or fixing review-gate / stop-hook findings — make the edits, run the gates, report, and wait for an explicit "commit" instruction. When the user does ask you to commit, push the commit to `dev` in the same step — `git push` no longer needs its own authorisation, it is part of the commit action. A one-off "commit this" authorises that commit and its push only, not subsequent ones.
 - Commits: small, focused. `<type>(<scope>): <subject>` where `<type>` is `feat`, `fix`, `refactor`, `chore`, `docs`, or `test`.
-- Routine `dev` work: **commit directly to `dev`** (no per-change branch or PR) after running the full local gate suite — once the user has asked you to commit. PRs are required only for `dev` → `main` releases and hotfixes; optional for large / risky `feature/*` work.
+- Routine `dev` work: **commit directly to `dev` and push** (no per-change branch or PR) — once the user has asked you to commit — but only after the full quality-gate suite (above) passes locally. The push triggers CI; confirm that run is green (`gh run list --branch dev`) and fix any red immediately. PRs are required only for `dev` → `main` releases and hotfixes; optional for large / risky `feature/*` work.
 
 ### Branching model (Git Flow)
 
 Two long-lived branches: `main` (released) and `dev` (integration).
 
 - `main` — always equals the released / production state. Every merge into `main` is a release: tag it (`vX.Y.Z`) and cut a GitHub Release. The **only** branch that enforces the full required CI gate set (on the `dev` → `main` release PR).
-- `dev` — the integration branch you **commit to directly**. Run the full local gate suite before pushing — that is the discipline that replaces a merge gate. A push to `dev` triggers CI as a post-push signal, not a gate; protection only blocks force-push / deletion.
+- `dev` — the integration branch you **commit to directly**. The full quality-gate suite (see "Quality gates") must pass locally before every commit. A `dev` commit triggers CI on push; that CI run is a **required gate** — it must be green, and a red CI is fixed immediately (never left as a passive signal). Branch protection only blocks force-push / deletion.
 - `feature/*` (optional) — for large / risky changes or when you want a pre-merge CI gate / review, branch off `dev`, PR back into `dev`, delete on merge. Otherwise commit straight to `dev`.
 - Release — open a `dev` -> `main` PR (optionally via a `release/*` stabilisation branch that takes only bug fixes, version bumps, and changelog edits). After merging into `main`, tag + Release, then merge `main` back into `dev` to prevent drift.
 - `hotfix/*` — branch off `main` for production-urgent fixes; merge back into both `main` (tag a patch release) and `dev`.
