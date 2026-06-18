@@ -40,6 +40,10 @@ container.
 - [msg-backup](ops/msg-backup.md) — full re-ingest of a guild's
   message history from Discord; backfills missing `messageId`s,
   removes leftover bot messages, repairs duplicates.
+- [migrate-timestamp](ops/migrate-timestamp.md) — audits, converts
+  (String → numeric), and indexes the `messages.timestamp` field so the
+  range queries can drop `$toLong` and become index-served; mandatory
+  fail-fast backup before any conversion.
 
 ## See also
 

@@ -31,4 +31,6 @@ tools/msg_backup/config.json
 tools/msg_backup/logs/
 tools/msg_backup/tmp/
 tools/verify_db/config.json
+tools/migrate_timestamp/config.json
+tools/migrate_timestamp/backups/
 
