@@ -18,6 +18,7 @@
 import { OgClient } from './og-client';
 import { LinkPreviewProviderRegistry } from './registry';
 import { createBahamutProvider } from './providers/bahamut';
+import { createBilibiliProvider } from './providers/bilibili';
 import { createFacebookProvider } from './providers/facebook';
 import { createInstagramProvider } from './providers/instagram';
 import { createRedditProvider } from './providers/reddit';
@@ -41,6 +42,7 @@ export const DEFAULT_PROXY_HOSTS: Readonly<
   threads: ['viewthreads.com', 'vxthreads.net'],
   facebook: ['facebed.com', 'fixacebook.com'],
   reddit: ['vxreddit.com', 'rxddit.com'],
+  bilibili: ['vxbilibili.com', 'bilibiliez.com'],
 };
 
 /** Default OG-cache TTL for the shared fetcher (avoids hammering flaky proxies). */
@@ -54,6 +56,7 @@ export interface LinkPreviewRegistryDeps {
   readonly threadsProxyHosts?: readonly string[];
   readonly facebookProxyHosts?: readonly string[];
   readonly redditProxyHosts?: readonly string[];
+  readonly bilibiliProxyHosts?: readonly string[];
   /** When set, only these providers are registered (the kill-switch allow-list). */
   readonly enabledProviders?: readonly LinkPreviewProviderName[];
 }
@@ -84,6 +87,10 @@ export const createDefaultLinkPreviewRegistry = (
       ogClient,
     }),
     createBahamutProvider(ogClient),
+    createBilibiliProvider({
+      proxyHosts: deps.bilibiliProxyHosts ?? DEFAULT_PROXY_HOSTS.bilibili,
+      ogClient,
+    }),
   ];
   const allow = deps.enabledProviders;
   const providers = allow === undefined ? all : all.filter((p) => allow.includes(p.name));

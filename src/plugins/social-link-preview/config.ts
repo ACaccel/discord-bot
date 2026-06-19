@@ -72,6 +72,11 @@ const ConfigSchema = z
       .array(z.string().min(1))
       .nonempty()
       .default(['vxreddit.com', 'rxddit.com']),
+    /** Embed-proxy hosts for Bilibili, in priority order (BiliFix vxbilibili; BilibiliEZ fallback). */
+    bilibiliProxyHosts: z
+      .array(z.string().min(1))
+      .nonempty()
+      .default(['vxbilibili.com', 'bilibiliez.com']),
   })
   .strict();
 

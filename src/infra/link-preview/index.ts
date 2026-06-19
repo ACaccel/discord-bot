@@ -36,3 +36,4 @@ export { createThreadsProvider } from './providers/threads';
 export { createFacebookProvider } from './providers/facebook';
 export { createRedditProvider } from './providers/reddit';
 export { createBahamutProvider } from './providers/bahamut';
+export { createBilibiliProvider } from './providers/bilibili';

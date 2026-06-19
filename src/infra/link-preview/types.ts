@@ -52,6 +52,7 @@ export const LINK_PREVIEW_PROVIDER_NAMES = [
   'facebook',
   'reddit',
   'bahamut',
+  'bilibili',
 ] as const;
 
 export type LinkPreviewProviderName = (typeof LINK_PREVIEW_PROVIDER_NAMES)[number];

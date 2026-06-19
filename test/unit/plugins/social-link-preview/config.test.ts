@@ -23,6 +23,7 @@ describe('parseSocialLinkPreviewConfig', () => {
     expect(config.threadsProxyHosts).toEqual(DEFAULT_PROXY_HOSTS.threads);
     expect(config.facebookProxyHosts).toEqual(DEFAULT_PROXY_HOSTS.facebook);
     expect(config.redditProxyHosts).toEqual(DEFAULT_PROXY_HOSTS.reddit);
+    expect(config.bilibiliProxyHosts).toEqual(DEFAULT_PROXY_HOSTS.bilibili);
     expect(config.providers).toBeUndefined();
   });
 

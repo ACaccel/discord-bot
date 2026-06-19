@@ -34,7 +34,7 @@
     "social_link_preview": {
         "enabled": false,
         "originalMessageStrategy": "suppress",
-        "providers": ["twitter", "instagram", "threads", "facebook", "reddit", "bahamut"],
+        "providers": ["twitter", "instagram", "threads", "facebook", "reddit", "bahamut", "bilibili"],
         "timeoutMs": 4000,
         "validationBudgetMs": 8000,
         "maxUrlsPerMessage": 1,
@@ -42,6 +42,7 @@
         "instagramProxyHosts": ["kkinstagram.com", "uuinstagram.com"],
         "threadsProxyHosts": ["viewthreads.com", "vxthreads.net"],
         "facebookProxyHosts": ["facebed.com", "fixacebook.com"],
-        "redditProxyHosts": ["vxreddit.com", "rxddit.com"]
+        "redditProxyHosts": ["vxreddit.com", "rxddit.com"],
+        "bilibiliProxyHosts": ["vxbilibili.com", "bilibiliez.com"]
     }
 }

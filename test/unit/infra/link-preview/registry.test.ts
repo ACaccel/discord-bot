@@ -54,6 +54,9 @@ describe('createDefaultLinkPreviewRegistry', () => {
     expect(registry.findProvider(u('https://forum.gamer.com.tw/C.php?bsn=1'))?.name).toBe(
       'bahamut',
     );
+    expect(registry.findProvider(u('https://www.bilibili.com/video/BV1xx411c7mD'))?.name).toBe(
+      'bilibili',
+    );
   });
 
   it('honours the enabledProviders allow-list', () => {

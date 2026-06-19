@@ -100,6 +100,25 @@ describe('parseOpenGraph', () => {
     expect(meta.title).toBe('Reversed');
   });
 
+  it('parses unquoted attribute values and a missing space before the next attribute (vxbilibili)', () => {
+    // vxbilibili emits unquoted OpenGraph attributes (an og:image URL keeps
+    // its `:` and `/`) and sometimes omits the space between a quoted content
+    // value and the following unquoted `property=` — a quoted-only matcher
+    // skipped every such tag, so the preview yielded nothing.
+    const meta = parseOpenGraph(
+      html(
+        [
+          '<meta content=http://i0.hdslb.com/bfs/archive/abc.jpg property=og:image>',
+          '<meta content="https://media.vxbilibili.com/video/BV1/1?_=x"property=og:video>',
+          '<meta content=PlainTitle property=og:title>',
+        ].join(''),
+      ),
+    );
+    expect(meta.video).toBe('https://media.vxbilibili.com/video/BV1/1?_=x');
+    expect(meta.images).toEqual(['http://i0.hdslb.com/bfs/archive/abc.jpg']);
+    expect(meta.title).toBe('PlainTitle');
+  });
+
   it('falls back to twitter:* when og:* is absent', () => {
     const meta = parseOpenGraph(
       html(

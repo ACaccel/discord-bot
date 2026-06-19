@@ -362,12 +362,19 @@ const decodeEntities = (value: string): string =>
 
 const META_TAG_RE = /<meta\b[^>]*>/gi;
 
-/** Extract an attribute value (double- or single-quoted) from a tag string. */
+/**
+ * Extract an attribute value (double-quoted, single-quoted, or unquoted)
+ * from a tag string. Some embed proxies emit unquoted OpenGraph attributes
+ * (e.g. vxbilibili: `property=og:video`, `content=http://host/img.jpg`); a
+ * quoted-only matcher would skip the tag entirely and lose its preview. An
+ * unquoted value runs to the next whitespace or `>` (so it keeps a URL's
+ * `:` / `/`), matching how a lenient HTML parser reads the attribute.
+ */
 const attr = (tag: string, name: string): string | undefined => {
-  const re = new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)')`, 'i');
+  const re = new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i');
   const m = re.exec(tag);
   if (m === null) return undefined;
-  return decodeEntities(m[2] ?? m[3] ?? '');
+  return decodeEntities(m[2] ?? m[3] ?? m[4] ?? '');
 };
 
 /**
