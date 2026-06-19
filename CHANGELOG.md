@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Link-preview provider Strategy layer (`src/infra/link-preview/`) mirroring the LLM layer: a `LinkPreviewProvider` interface, an ordered URL-matching registry, four validating URL-rewrite providers, an OpenGraph provider, and an SSRF-safe `OgClient` (bounded redirect-following with a per-hop SSRF guard, streamed head-only reads, timeout caps, host allow-list).
 - `LinkPreviewError` (an `ExternalServiceError` subclass) plus the `errors:link_preview.*` bilingual catalog group.
 
+### Documentation
+
+- Aligned the project documentation to the global engineering standard: added [docs/STATUS.md](docs/STATUS.md) (the authoritative current-state handoff) and a [docs/history/](docs/history/README.md) decision log (entries `0000`–`0004`, with an index), folded a "Design trade-offs" section into [docs/architecture.md](docs/architecture.md), and extended `CLAUDE.md` with a tech-stack/version block, a command cheat sheet, and key-document pointers.
+- Captured the `permission_rank` design rationale — previously only in the local-only `docs/proposal.md` working document (gitignored since `1.0.0`, never under version control) — in the tracked decision log at [docs/history/0001](docs/history/0001-permission-rank-privacy-model.md), so the reasoning and rejected options now live in the repo.
+
 ## [1.0.0] — 2026-05-31
 
 Initial public release.

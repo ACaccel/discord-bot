@@ -9,6 +9,44 @@ in strict mode.
 For the architecture overview see [`docs/architecture.md`](docs/architecture.md).
 For the contributor workflow see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+## Tech stack and versions
+
+- Runtime: Node.js `>=22.13.0` (`.nvmrc`: `22.13.0`) · Yarn 1 (classic)
+- Language: TypeScript `^5.6` (strict; `tsconfig.strict.json`)
+- Discord: discord.js `^14.21` (+ `@discordjs/voice` `^0.17`)
+- Persistence: Mongoose `^8.22` / MongoDB
+- Validation: zod `^3.23` · i18n: i18next `^23.15` · Logging: pino `^10` ·
+  HTTP: express `^4.21` · Charts: `canvas` `^3`
+- LLM SDKs: `@anthropic-ai/sdk` `^0.94`, `openai` `^6`,
+  `@google/generative-ai` `^0.24` (xAI via the OpenAI-compatible client)
+- Test: vitest `^3.2` · Lint: eslint `^9` + typescript-eslint `^8` ·
+  Format: prettier `^3`
+
+## Command cheat sheet
+
+```
+Install:    yarn install            (reproducible: yarn install-lock)
+Dev:        yarn tomori | yarn nijika | yarn konata | yarn gopher | yarn msg-archive
+            (register slash commands: yarn deploy)
+Test:       yarn test               (subsets: test:unit | test:int | test:contract | test:i18n | test:tools)
+Lint:       yarn lint               (format check: yarn format:check)
+Type-check: yarn typecheck          (tsc -p tsconfig.strict.json)
+Build:      yarn typecheck:emit     (declaration build; runtime is ts-node, no bundling step)
+```
+
+The full commit-gate set (run every check before committing) is in
+[Quality gates (non-negotiable)](#quality-gates-non-negotiable) below.
+
+## Key documents
+
+- [`docs/STATUS.md`](docs/STATUS.md) — authoritative current-state handoff
+  (start here)
+- [`docs/architecture.md`](docs/architecture.md) — single-page architecture
+  overview
+- [`docs/history/`](docs/history/README.md) — decision history (one file per
+  decision; `README.md` index)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution recipes and quality gates
+
 ## Directory layout
 
 ```

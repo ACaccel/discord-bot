@@ -8,8 +8,8 @@ and for the contributor workflow see [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 ## Project overview
 
 A TypeScript + discord.js + MongoDB multi-personality Discord bot
-codebase. A single shared core hosts four built-in personalities —
-`nijika`, `konata`, `tomori`, `msg-archive`. The architecture is
+codebase. A single shared core hosts five built-in personalities —
+`nijika`, `konata`, `tomori`, `msg-archive`, `gopher`. The architecture is
 layered (`bot → handlers / plugins → persistence / infra → core`)
 with the dependency direction enforced by ESLint. Plugins extend the
 bot through a topologically-ordered lifecycle and a typed IoC
@@ -47,6 +47,8 @@ container.
 
 ## See also
 
+- [Project status](../STATUS.md) — authoritative current-state handoff
 - [Architecture overview](../architecture.md)
+- [Decision history](../history/README.md)
 - [Contributing guide](../../CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)

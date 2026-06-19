@@ -279,3 +279,32 @@ split into three namespaces:
 - `replies.json` — user-facing prose (help text, confirmations).
 
 A CI parity check ensures the two locales stay key-aligned.
+
+## 8. Design trade-offs
+
+Cross-cutting pattern choices; the full reasoning, including the rejected
+options, lives in [`docs/history/`](history/README.md).
+
+- **Manual typed IoC, no `reflect-metadata` / DI framework** — a ~280-line
+  `ServiceContainer` keeps the wiring explicit and the container's write face
+  inside the composition root.
+- **Repository pattern + in-memory fakes** over raw Mongoose — handlers and
+  plugins depend on `<X>Repo` interfaces, so tests inject fakes without a
+  database.
+- **Provider Strategy mirrored for LLM and Link-Preview** — both external
+  surfaces share the same "interface + ordered registry + per-provider SDK
+  error translation" shape (`src/infra/llm/`, `src/infra/link-preview/`).
+- **`PermissionRankPolicy` as a static, discord.js-free core service** built
+  once in the `BaseBot` constructor, chosen over binding rank into
+  `GuildRegistry` to avoid event-before-registration races
+  (→ [0001](history/0001-permission-rank-privacy-model.md)).
+- **Full-ancestry effective rank**, folded monotonically over channel → parent
+  → category so a private category gates everything beneath it and degrades
+  fail-safe when an ancestor is uncached
+  (→ [0002](history/0002-channel-aware-full-ancestry-rank.md)).
+- **Index-served numeric timestamps** over a computed `$toLong` predicate, after
+  a one-time `migrate_timestamp` backfill
+  (→ [0003](history/0003-migrate-timestamp-numeric-migration.md),
+  [0004](history/0004-index-served-timestamp-range-reads.md)).
+- **Fail-fast zod configuration** validated at startup; a malformed
+  `permission_rank` block aborts the boot per-guild rather than fail-open.
