@@ -1,7 +1,16 @@
-import { MessageFlags, type ChatInputCommandInteraction } from 'discord.js';
+import {
+    ActionRowBuilder,
+    MessageFlags,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
+    type ChatInputCommandInteraction,
+    type ModalSubmitInteraction,
+    type StringSelectMenuInteraction,
+} from 'discord.js';
 
 import type { BaseBot } from '../../../bot';
 import { bindTranslator } from '../../../core/i18n';
+import type { BoundTranslate } from '../../../core/i18n';
 import { logError } from '../../../core/logger';
 import { JobManager, parseDuration } from '@core/scheduling';
 import {
@@ -11,10 +20,21 @@ import {
     giveawayJobKey,
     scheduleGiveaway,
 } from './giveaway';
+import type { GiveawayDoc } from '../../../persistence/schemas/giveaway.schema';
 import { buildGiveawayDepsFromBot } from './deps-from-bot';
 
+// Discord allows at most 25 options per string-select and 5 selects per
+// message, so the delete prompt pages giveaways across multiple selects
+// instead of silently dropping any past the first 25.
+const MAX_OPTIONS_PER_SELECT = 25;
+// Discord caps a select-option label at 100 chars; keep the prize short
+// enough that the formatted "<prize> — ends at <time>" label still fits.
+const MAX_PRIZE_LABEL_LENGTH = 50;
+const TAIPEI_LOCALE = 'zh-TW';
+const TAIPEI_TIME_ZONE = 'Asia/Taipei';
+
 export const handleGiveawayCreate = async (
-    interaction: ChatInputCommandInteraction,
+    interaction: ModalSubmitInteraction,
     bot: BaseBot,
 ): Promise<void> => {
     // Reply ephemerally so the acknowledgement (and any validation
@@ -25,13 +45,23 @@ export const handleGiveawayCreate = async (
     const t = bindTranslator(bot.translator);
     const deps = buildGiveawayDepsFromBot(bot);
     try {
-        const duration = interaction.options.get("duration")?.value as string | null;
-        const winner_num = interaction.options.get("winner_num")?.value as number | null;
-        const prize = interaction.options.get("prize")?.value as string | null;
-        const description = interaction.options.get("description")?.value as string | null;
+        // Modal fields are always strings; trim and validate here since
+        // the modal has no numeric input type.
+        const duration = interaction.fields.getTextInputValue('duration').trim();
+        const winnerRaw = interaction.fields.getTextInputValue('winner_num').trim();
+        const prize = interaction.fields.getTextInputValue('prize').trim();
+        const description = interaction.fields.getTextInputValue('description').trim();
 
-        if (!duration || !winner_num || !prize) {
+        if (!duration || !winnerRaw || !prize) {
             await interaction.editReply({ content: t('replies:giveaway.missing_required_fields') });
+            return;
+        }
+
+        // `Number(...)` (not parseInt) so trailing junk like "3abc" is
+        // rejected rather than silently coerced to 3.
+        const winner_num = Number(winnerRaw);
+        if (!Number.isInteger(winner_num) || winner_num <= 0) {
+            await interaction.editReply({ content: t('replies:giveaway.invalid_winner_num') });
             return;
         }
 
@@ -113,15 +143,91 @@ export const handleGiveawayCreate = async (
     }
 };
 
-export const handleGiveawayDelete = async (
+/**
+ * Build the paged string-select rows offering each active giveaway as
+ * a delete target. Each row carries a distinct `customId` page suffix
+ * because Discord requires unique component ids within a message; the
+ * select handler only reads the selected value (the message id).
+ */
+const buildGiveawayDeleteRows = (
+    giveaways: readonly GiveawayDoc[],
+    t: BoundTranslate,
+): ActionRowBuilder<StringSelectMenuBuilder>[] => {
+    const rows: ActionRowBuilder<StringSelectMenuBuilder>[] = [];
+    for (let i = 0; i < giveaways.length; i += MAX_OPTIONS_PER_SELECT) {
+        const page = i / MAX_OPTIONS_PER_SELECT;
+        const select = new StringSelectMenuBuilder()
+            .setCustomId(`giveaway_delete|${page}`)
+            .setPlaceholder(t('replies:giveaway.delete_select_placeholder'))
+            .addOptions(
+                giveaways.slice(i, i + MAX_OPTIONS_PER_SELECT).map((g) => {
+                    const prize =
+                        g.prize.length > MAX_PRIZE_LABEL_LENGTH
+                            ? `${g.prize.slice(0, MAX_PRIZE_LABEL_LENGTH)}…`
+                            : g.prize;
+                    const endTime = new Date(g.end_time).toLocaleString(TAIPEI_LOCALE, {
+                        timeZone: TAIPEI_TIME_ZONE,
+                    });
+                    return new StringSelectMenuOptionBuilder()
+                        .setLabel(t('replies:giveaway.delete_option_label', { prize, endTime }).slice(0, 100))
+                        .setValue(g.message_id);
+                }),
+            );
+        rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select));
+    }
+    return rows;
+};
+
+export const handleGiveawayDeletePrompt = async (
     interaction: ChatInputCommandInteraction,
     bot: BaseBot,
 ): Promise<void> => {
-    await interaction.deferReply();
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const t = bindTranslator(bot.translator);
     const deps = buildGiveawayDepsFromBot(bot);
     try {
-        const message_id = interaction.options.get("message_id")?.value as string | null;
+        const guild = interaction.guild;
+        if (!guild) {
+            await interaction.editReply({ content: t('errors:command.guild_not_found') });
+            return;
+        }
+
+        const repos = deps.registry.getRepos(guild.id);
+        if (!repos) {
+            await interaction.editReply({ content: t('errors:db.not_found') });
+            return;
+        }
+
+        // listAll returns Result<T, DatabaseError>. An `err` is
+        // re-thrown into the surrounding catch.
+        const listResult = await repos.giveaway.listAll();
+        if (!listResult.ok) throw listResult.error;
+        const giveaways = listResult.value;
+
+        if (giveaways.length === 0) {
+            await interaction.editReply({ content: t('replies:giveaway.no_active_giveaways') });
+            return;
+        }
+
+        await interaction.editReply({
+            content: t('replies:giveaway.delete_select_placeholder'),
+            components: buildGiveawayDeleteRows(giveaways, t),
+        });
+    } catch (error) {
+        logError(bot.logger, interaction.guild?.id ?? null, error);
+        await interaction.editReply({ content: t('replies:giveaway.delete_failed') });
+    }
+};
+
+export const handleGiveawayDeleteSelection = async (
+    interaction: StringSelectMenuInteraction,
+    bot: BaseBot,
+): Promise<void> => {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const t = bindTranslator(bot.translator);
+    const deps = buildGiveawayDepsFromBot(bot);
+    try {
+        const message_id = interaction.values[0];
         if (!message_id) {
             await interaction.editReply({ content: t('replies:giveaway.missing_message_id') });
             return;
@@ -134,7 +240,7 @@ export const handleGiveawayDelete = async (
         }
 
         const result = await deleteGiveaway(deps, guild.id, message_id);
-        if (typeof result === 'string' && result !== null) {
+        if (typeof result === 'string') {
             await interaction.editReply({
                 content: t('replies:giveaway.delete_failed_with_reason', { reason: result }),
             });

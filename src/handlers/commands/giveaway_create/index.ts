@@ -3,7 +3,8 @@ import type {
 } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
-import * as giveaway from '../../../plugins/giveaway/internal';
+
+import { buildGiveawayModal } from './build-giveaway-modal';
 
 export default class giveaway_create extends Command {
     constructor() {
@@ -11,30 +12,13 @@ export default class giveaway_create extends Command {
         this.setConfig({
             name: "giveaway_create",
             category: 'server_activity',
-            options: {
-                string: [
-                    {
-                        name: "duration",
-                        required: true
-                    },{
-                        name: "prize",
-                        required: true
-                    },{
-                        name: "description",
-                        required: false
-                    }
-                ],
-                number: [
-                    {
-                        name: "winner_num",
-                        required: true
-                    }
-                ]
-            }
         });
     }
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
-        await giveaway.handleGiveawayCreate(interaction, bot);
+        // The giveaway parameters are collected through a modal rather
+        // than slash-command options; the submitted modal is handled by
+        // the `giveaway_create` modal handler.
+        await interaction.showModal(buildGiveawayModal(bot.translator));
     }
 }

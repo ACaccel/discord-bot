@@ -11,18 +11,13 @@ export default class giveaway_delete extends Command {
         this.setConfig({
             name: "giveaway_delete",
             category: 'server_activity',
-            options: {
-                string: [
-                    {
-                        name: "message_id",
-                        required: true
-                    }
-                ]
-            }       
         });
     }
 
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
-        await giveaway.handleGiveawayDelete(interaction, bot);
+        // Instead of asking for a message id, present the guild's active
+        // giveaways as a select menu; the `giveaway_delete` select
+        // handler performs the deletion on selection.
+        await giveaway.handleGiveawayDeletePrompt(interaction, bot);
     }
 }

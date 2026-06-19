@@ -176,29 +176,10 @@
     }
   },
   "giveaway_create": {
-    "description": "建立抽獎",
-    "options": {
-      "duration": {
-        "description": "抽獎時限 (1s, 1m, 1h, 1d, 1w)"
-      },
-      "prize": {
-        "description": "獎品"
-      },
-      "description": {
-        "description": "抽獎描述 (optional)"
-      },
-      "winner_num": {
-        "description": "中獎人數"
-      }
-    }
+    "description": "建立抽獎"
   },
   "giveaway_delete": {
-    "description": "刪除抽獎",
-    "options": {
-      "message_id": {
-        "description": "抽獎訊息ID (Bot發布的公告)"
-      }
-    }
+    "description": "刪除抽獎"
   },
   "give_score": {
     "description": "給分"

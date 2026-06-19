@@ -176,29 +176,10 @@
     }
   },
   "giveaway_create": {
-    "description": "Create a giveaway",
-    "options": {
-      "duration": {
-        "description": "Giveaway duration (1s, 1m, 1h, 1d, 1w)"
-      },
-      "prize": {
-        "description": "Prize"
-      },
-      "description": {
-        "description": "Giveaway description (optional)"
-      },
-      "winner_num": {
-        "description": "Number of winners"
-      }
-    }
+    "description": "Create a giveaway"
   },
   "giveaway_delete": {
-    "description": "Delete a giveaway",
-    "options": {
-      "message_id": {
-        "description": "Giveaway message ID (the announcement posted by the bot)"
-      }
-    }
+    "description": "Delete a giveaway"
   },
   "give_score": {
     "description": "Give a score"

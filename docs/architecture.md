@@ -257,7 +257,7 @@ non-critical plugins are marked disabled and the bot keeps running.
 | ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `AutoReplyPlugin`         | `src/plugins/auto-reply/`          | `messageCreate` keyword + lucky replies and a dice roller                                                    |
 | `GuildEventsPlugin`       | `src/plugins/guild-events/`        | guild / member lifecycle events                                                                              |
-| `GiveawayPlugin`          | `src/plugins/giveaway/`            | scheduled giveaways with reaction-driven winner selection                                                    |
+| `GiveawayPlugin`          | `src/plugins/giveaway/`            | scheduled giveaways (modal-driven create, select-menu delete) with reaction-driven winner selection          |
 | `TempRolePlugin`          | `src/plugins/temp-role/`           | temporary, permission-less self-claim notification roles with a hard 30-day expiry (nijika)                  |
 | `ActivityPlugin`          | `src/plugins/activity/`            | per-member activity tracking via message / reaction events                                                   |
 | `MessageBackupPlugin`     | `src/plugins/message-backup/`      | message create / delete / update archival (used by the `msg-archive` worker)                                 |
