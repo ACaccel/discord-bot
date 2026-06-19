@@ -44,6 +44,15 @@ const aliases = {
   handlers: path.resolve(__dirname, 'src/handlers/index'),
 };
 
+/**
+ * Per-test timeout ceiling. The 5s default is marginal for the heavy
+ * unit tests that run ESLint (`plugin-ioc-import-rule`) or the handler
+ * codegen (`gen-registry`) inline; under vite 7's cold transform they
+ * cross 5s in the full parallel suite (they pass in ~2s in isolation).
+ * 20s gives headroom without masking a real hang.
+ */
+const TEST_TIMEOUT_MS = 20000;
+
 export default defineWorkspace([
   {
     test: {
@@ -51,6 +60,7 @@ export default defineWorkspace([
       include: ['test/unit/**/*.test.ts'],
       environment: 'node',
       env: testEnv,
+      testTimeout: TEST_TIMEOUT_MS,
     },
     resolve: { alias: aliases },
   },
@@ -60,6 +70,7 @@ export default defineWorkspace([
       include: ['test/integration/**/*.test.ts'],
       environment: 'node',
       env: testEnv,
+      testTimeout: TEST_TIMEOUT_MS,
       globalSetup: ['./test/integration/setup.ts'],
       // The integration project shares one mongodb-memory-server
       // (started by globalSetup). Parallel test files race on the
@@ -81,6 +92,7 @@ export default defineWorkspace([
       include: ['test/contract/**/*.test.ts'],
       environment: 'node',
       env: testEnv,
+      testTimeout: TEST_TIMEOUT_MS,
     },
     resolve: { alias: aliases },
   },
@@ -90,6 +102,7 @@ export default defineWorkspace([
       include: ['test/i18n/**/*.test.ts'],
       environment: 'node',
       env: testEnv,
+      testTimeout: TEST_TIMEOUT_MS,
     },
     resolve: { alias: aliases },
   },
@@ -102,6 +115,7 @@ export default defineWorkspace([
       include: ['tools/**/*.test.ts'],
       environment: 'node',
       env: testEnv,
+      testTimeout: TEST_TIMEOUT_MS,
     },
     resolve: { alias: aliases },
   },

@@ -60,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Aligned the project documentation to the global engineering standard: added [docs/STATUS.md](docs/STATUS.md) (the authoritative current-state handoff) and a [docs/history/](docs/history/README.md) decision log (entries `0000`–`0004`, with an index), folded a "Design trade-offs" section into [docs/architecture.md](docs/architecture.md), and extended `CLAUDE.md` with a tech-stack/version block, a command cheat sheet, and key-document pointers.
 - Captured the `permission_rank` design rationale — previously only in the local-only `docs/proposal.md` working document (gitignored since `1.0.0`, never under version control) — in the tracked decision log at [docs/history/0001](docs/history/0001-permission-rank-privacy-model.md), so the reasoning and rejected options now live in the repo.
 
+### Security
+
+- Upgraded `vitest` 2 → 3 (3.2.6) — which pulls `vite` 7.x — to clear a critical Vitest advisory (GHSA-5xrq-8626-4rwp) and a high Vite advisory (GHSA-fx2h-pf6j-xcff), and pinned `ws` `>=8.21.0` (GHSA-96hv-2xvq-fx4p) and `form-data` `>=4.0.6` (GHSA-hmw2-7cc7-3qxx) via `resolutions`. All four were HIGH/CRITICAL `yarn audit` advisories in the test toolchain. The Vitest workspace gained a 20s per-test `testTimeout`, since the heavy ESLint-rule and handler-codegen unit tests cross the 5s default under vite 7's cold transform in the full parallel suite.
+
 ## [1.0.0] — 2026-05-31
 
 Initial public release.
