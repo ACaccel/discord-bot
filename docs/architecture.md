@@ -189,7 +189,11 @@ A second Provider Strategy, mirroring the LLM layer, for the
 of `rewritten-url` (an embed-proxy link Discord unfurls into a playable
 video) and `card` (neutral OpenGraph data the plugin renders into a
 static embed). The six rewrite providers (Twitter/X, Instagram, Threads,
-Facebook, Reddit, Bilibili) are pure; `bahamut` scrapes OpenGraph via the SSRF-safe
+Facebook, Reddit, Bilibili) are mostly pure host-swaps, but Facebook and
+Bilibili are composed providers that first expand an opaque short link
+(`facebook.com/share/<token>` / `fb.watch`, `b23.tv`) to its canonical
+permalink via `OgClient.resolveCanonical` before probing the proxies;
+`bahamut` scrapes OpenGraph via the SSRF-safe
 `OgClient` (streamed, bounded redirect-following behind a `beforeRedirect`
 SSRF guard, host allow-list).
 Failures map into `LinkPreviewError`. `LinkPreviewProviderRegistry`

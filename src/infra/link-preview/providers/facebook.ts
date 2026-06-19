@@ -81,7 +81,7 @@ const resolveShareLink = async (
   ctx: LinkPreviewBuildContext,
   ogClient: OgClient,
 ): Promise<URL | undefined> => {
-  const resolved = await ogClient.resolveCanonical(url.href, ctx.timeoutMs);
+  const resolved = await ogClient.resolveCanonical(url.href, ctx.timeoutMs, PROVIDER_NAME);
   if (!resolved.ok) {
     ctx.logger?.debug(
       { provider: PROVIDER_NAME, code: resolved.error.code },

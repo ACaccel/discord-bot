@@ -13,7 +13,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Message } from 'discord.js';
 
 import { createSocialLinkPreviewPlugin } from '../../../../src/plugins/social-link-preview';
-import type { LinkPreviewProviderRegistry } from '../../../../src/infra/link-preview';
+import {
+  createDefaultLinkPreviewRegistry,
+  type LinkPreviewProviderRegistry,
+} from '../../../../src/infra/link-preview';
 import {
   createPermissionRankPolicy,
   type PermissionRankPolicy,
@@ -23,6 +26,20 @@ import { createContainer } from '../../../../src/core/ioc';
 import { TOKENS } from '../../../../src/core/ioc/tokens';
 import type { Logger } from '../../../../src/core/logger';
 import type { Translator } from '../../../../src/core/i18n';
+import type * as LinkPreviewModule from '../../../../src/infra/link-preview';
+
+// Spy on the registry factory (wrapping the real impl, so behavior is
+// unchanged) to assert the plugin forwards every configured proxy-host list.
+// `vi.mock` is hoisted above the imports, so the spy is in place before the
+// plugin captures the factory. Other tests inject their own `deps.registry`,
+// so the factory is never called for them and the spy stays inert.
+vi.mock('../../../../src/infra/link-preview', async (importOriginal) => {
+  const actual = await importOriginal<typeof LinkPreviewModule>();
+  return {
+    ...actual,
+    createDefaultLinkPreviewRegistry: vi.fn(actual.createDefaultLinkPreviewRegistry),
+  };
+});
 
 const makeLogger = (): Logger => {
   const logger = {
@@ -108,6 +125,22 @@ describe('createSocialLinkPreviewPlugin shape', () => {
     expect(plugin.scope).toBe('bot');
     expect(plugin.critical === true).toBe(false);
     expect(plugin.events?.messageCreate).toBeTypeOf('function');
+  });
+
+  it('forwards every configured proxy-host list (incl. bilibili) to the registry factory', () => {
+    const spy = vi.mocked(createDefaultLinkPreviewRegistry);
+    spy.mockClear();
+    createSocialLinkPreviewPlugin({
+      enabled: true,
+      twitterProxyHosts: ['custom-tw.example'],
+      bilibiliProxyHosts: ['custom-bili.example'],
+    });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        twitterProxyHosts: ['custom-tw.example'],
+        bilibiliProxyHosts: ['custom-bili.example'],
+      }),
+    );
   });
 });
 

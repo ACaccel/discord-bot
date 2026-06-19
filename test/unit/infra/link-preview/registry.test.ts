@@ -57,6 +57,7 @@ describe('createDefaultLinkPreviewRegistry', () => {
     expect(registry.findProvider(u('https://www.bilibili.com/video/BV1xx411c7mD'))?.name).toBe(
       'bilibili',
     );
+    expect(registry.findProvider(u('https://b23.tv/mHCI3y3'))?.name).toBe('bilibili');
   });
 
   it('honours the enabledProviders allow-list', () => {

@@ -440,7 +440,7 @@ describe('facebook share-link resolution + card fallback', () => {
       url: proxyCanonical,
       sourceUrl: share, // original link is carried, not the resolved canonical
     });
-    expect(resolveCanonical).toHaveBeenCalledWith(share, 1000);
+    expect(resolveCanonical).toHaveBeenCalledWith(share, 1000, 'facebook');
     expect(fetch).toHaveBeenCalledWith(proxyCanonical, 'facebook', 1000); // never the /share/ token
   });
 

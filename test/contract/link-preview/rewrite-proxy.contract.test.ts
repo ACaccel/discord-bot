@@ -13,6 +13,7 @@ import {
   OgClient,
   createTwitterProvider,
   createFacebookProvider,
+  createBilibiliProvider,
 } from '../../../src/infra/link-preview';
 import { isOk } from '../../../src/core/result';
 import type { LinkPreviewProvider, LinkPreviewResult } from '../../../src/infra/link-preview';
@@ -221,5 +222,74 @@ describe('facebook share-link resolution contract', () => {
       },
       sourceUrl: SHARE.href,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bilibili b23.tv short-link resolution, at the wire
+// ---------------------------------------------------------------------------
+
+describe('bilibili b23.tv resolution contract', () => {
+  const B23_PATH = '/mHCI3y3';
+  const B23 = new URL(`https://b23.tv${B23_PATH}`);
+  const VIDEO_PATH = '/video/BV1xx411c7mD';
+  const CANON = `https://www.bilibili.com${VIDEO_PATH}`;
+  const PROXY = `https://vxbilibili.com${VIDEO_PATH}`;
+
+  const buildB23 = async (url: URL): Promise<LinkPreviewResult | null> => {
+    const provider = createBilibiliProvider({
+      proxyHosts: ['vxbilibili.com'],
+      ogClient: new OgClient(),
+    });
+    const result = await provider.build(url, { timeoutMs: 4000, budgetMs: 8000 });
+    if (!isOk(result)) throw new Error('expected ok');
+    return result.value;
+  };
+
+  beforeAll(() => {
+    if (!nock.isActive()) nock.activate();
+    nock.disableNetConnect();
+  });
+  afterEach(() => {
+    expect(nock.pendingMocks()).toEqual([]);
+    nock.cleanAll();
+  });
+  afterAll(() => {
+    nock.enableNetConnect();
+    nock.restore();
+  });
+
+  it('chases the browser-UA redirect to the canonical video, then proxies it for a playable video', async () => {
+    // b23.tv 302s a browser-like UA to the canonical /video/<BV> URL; the
+    // cookieless destination page body is read only to be discarded.
+    nock('https://b23.tv', { reqheaders: { 'user-agent': /Chrome\// } })
+      .get(B23_PATH)
+      .reply(302, '', { Location: CANON });
+    nock('https://www.bilibili.com', { reqheaders: { 'user-agent': /Chrome\// } })
+      .get(VIDEO_PATH)
+      .reply(200, '<html><head><title>x</title></head><body>x</body></html>');
+    // The Discord-crawler-UA proxy probe of the canonical yields og:video.
+    nock('https://vxbilibili.com', { reqheaders: { 'user-agent': /Discordbot\/2\.0/ } })
+      .get(VIDEO_PATH)
+      .reply(200, ogHtml(VIDEO_HEAD));
+
+    expect(await buildB23(B23)).toEqual({
+      kind: 'rewritten-url',
+      url: PROXY,
+      sourceUrl: B23.href, // original short link carried, not the canonical
+    });
+  });
+
+  it('posts nothing when the b23.tv link resolves to a non-video page (no proxy probe)', async () => {
+    // Resolves to a live page (not `/video/<BV|av>`), so the video predicate
+    // rejects it and no proxy host is probed — only the resolution hops run.
+    nock('https://b23.tv', { reqheaders: { 'user-agent': /Chrome\// } })
+      .get(B23_PATH)
+      .reply(302, '', { Location: 'https://live.bilibili.com/123' });
+    nock('https://live.bilibili.com', { reqheaders: { 'user-agent': /Chrome\// } })
+      .get('/123')
+      .reply(200, '<html><head><title>live</title></head><body>x</body></html>');
+
+    expect(await buildB23(B23)).toBeNull();
   });
 });

@@ -106,7 +106,9 @@ const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://di
  * 30x chain that resolves a `/share/<type>/<token>` short link to its canonical
  * `/<page>/videos/<id>/` (or `/reel/<id>`) permalink — the only form the embed
  * proxies can turn into a playable video. We follow that chain solely to read
- * the final URL; the cookieless destination page itself is discarded.
+ * the final URL; the cookieless destination page itself is discarded. The
+ * Bilibili provider reuses the same chase to expand a `b23.tv` short link to
+ * its canonical `bilibili.com/video/<BV|av>` URL.
  */
 const RESOLVE_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -484,8 +486,9 @@ export class OgClient {
   /**
    * Follow `url`'s redirect chain (with a plain browser UA) and return the
    * final URL, without reading the body. Used to expand an opaque short /
-   * share link (e.g. a Facebook `/share/<type>/<token>` link) into the
-   * canonical permalink an embed proxy can actually preview.
+   * share link into the canonical permalink an embed proxy can actually
+   * preview — by the Facebook provider for a `/share/<type>/<token>` link and
+   * by the Bilibili provider for a `b23.tv` short link.
    *
    * Contract mirrors {@link fetch}: the caller MUST have matched `url`
    * against its own host allow-list first (so the initial host is never
@@ -493,10 +496,14 @@ export class OgClient {
    * {@link assertSafeRedirect} SSRF guard. The body stream is discarded
    * immediately — only the post-redirect URL is of interest — so a heavy or
    * login-gated destination page costs nothing to read.
+   *
+   * @param provider Source name used to tag any error on the Err rail
+   *   (defaults to `'facebook'`, the original caller).
    */
   public async resolveCanonical(
     url: string,
     timeoutMs: number,
+    provider: string = 'facebook',
   ): Promise<Result<string, LinkPreviewFailure>> {
     try {
       const response = await axios.get<Readable>(url, {
@@ -504,15 +511,15 @@ export class OgClient {
         timeout: timeoutMs,
         maxRedirects: SAFE_MAX_REDIRECTS,
         beforeRedirect: (options) => assertSafeRedirect(options),
-        // A non-crawler UA: Facebook only emits the share -> canonical redirect
-        // for a browser-like UA (the crawler UA gets a 200 OpenGraph card).
+        // A non-crawler UA: the source only emits the short -> canonical
+        // redirect for a browser-like UA (the crawler UA gets a 200 page).
         headers: { 'User-Agent': RESOLVE_USER_AGENT, Accept: 'text/html' },
       });
       discardStream(response.data);
       return ok(readFinalUrl(response, url));
     } catch (e: unknown) {
       destroyResponseStream(e);
-      return err(translateLinkPreviewError('facebook', e));
+      return err(translateLinkPreviewError(provider, e));
     }
   }
 
