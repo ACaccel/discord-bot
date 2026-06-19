@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`/temp_role` — temporary self-claim notification roles.** A new slash command (open to every member) creates a permission-less, mentionable role used only for `@mention` notifications and posts a claim message with a toggle button — reusing the existing `toggle_role` button so any member can self-claim / release it. The role auto-deletes after a selectable lifetime with a hard 30-day cap (default 30 days), at which point the claim message is marked expired and the database row is removed; pending expiries survive restarts via a giveaway-style `onReady` reboot sweep. Creation is rejected when the guild is at Discord's 250-role ceiling. Shipped as the general-purpose `temp-role` plugin (`src/plugins/temp-role/`) plus a new `TempRole` schema and repository, and loaded by the `nijika` personality (enable it by adding `temp_role` to that bot's `config.json` `commands` list). As part of this work, the shared `toggle_role` button's replies are now localised (`zh-TW` / `en`) instead of hardcoded English.
+
 ### Fixed
 
 - **A transient network blip no longer crashes the whole bot.** A momentary outbound-socket reset (`ECONNRESET` / "socket hang up", e.g. a discord.js gateway connection dropped by the network) used to surface as an unhandled client `error` event, which Node rethrows as an `uncaughtException` — tripping the process-level graceful-shutdown path and stopping the bot until a manual restart. Two defences now absorb it: the Discord client gains non-fatal `error` / `shardError` / `shardDisconnect` listeners (installed once for the client's full lifecycle, so the gateway error is logged while discord.js reconnects on its own), and the `uncaughtException` safety net classifies a narrow whitelist of transient network errors (via `isTransientNetworkError`) and logs + tolerates them instead of shutting down — genuine defects still crash loudly. A `getTransientNetworkErrorCount()` counter is exposed for /health.

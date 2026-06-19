@@ -9,6 +9,7 @@ import { fetchSchema, type FetchDoc } from './fetch.schema';
 import { giveawaySchema, type GiveawayDoc } from './giveaway.schema';
 import { messageSchema, type MessageDoc } from './message.schema';
 import { replySchema, type ReplyDoc } from './reply.schema';
+import { tempRoleSchema, type TempRoleDoc } from './temp-role.schema';
 import { todoSchema, type TodoDoc } from './todo.schema';
 import { userApiSettingSchema, type UserApiSettingDoc } from './user-api-setting.schema';
 
@@ -17,6 +18,7 @@ export { fetchSchema, type FetchDoc } from './fetch.schema';
 export { giveawaySchema, type GiveawayDoc } from './giveaway.schema';
 export { messageSchema, type MessageDoc } from './message.schema';
 export { replySchema, type ReplyDoc } from './reply.schema';
+export { tempRoleSchema, type TempRoleDoc } from './temp-role.schema';
 export { todoSchema, type TodoDoc } from './todo.schema';
 export { userApiSettingSchema, type UserApiSettingDoc } from './user-api-setting.schema';
 
@@ -27,6 +29,7 @@ export const SCHEMAS = {
   Todo: todoSchema,
   Giveaway: giveawaySchema,
   Activity: activitySchema,
+  TempRole: tempRoleSchema,
   UserApiSetting: userApiSettingSchema,
 } as const;
 
@@ -43,5 +46,6 @@ export interface DocByName {
   Todo: TodoDoc;
   Giveaway: GiveawayDoc;
   Activity: ActivityDoc;
+  TempRole: TempRoleDoc;
   UserApiSetting: UserApiSettingDoc;
 }

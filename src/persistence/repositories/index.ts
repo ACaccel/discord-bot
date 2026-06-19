@@ -15,6 +15,7 @@ import { MongoFetchRepo, type FetchRepo } from './fetch.repo';
 import { MongoGiveawayRepo, type GiveawayRepo } from './giveaway.repo';
 import { MongoMessageRepo, type MessageRepo } from './message.repo';
 import { MongoReplyRepo, type ReplyRepo } from './reply.repo';
+import { MongoTempRoleRepo, type TempRoleRepo } from './temp-role.repo';
 import { MongoTodoRepo, type TodoRepo } from './todo.repo';
 import { MongoUserApiSettingRepo, type UserApiSettingRepo } from './user-api-setting.repo';
 
@@ -23,6 +24,7 @@ export { MongoFetchRepo, type FetchRepo } from './fetch.repo';
 export { MongoGiveawayRepo, type GiveawayRepo, type GiveawayInput } from './giveaway.repo';
 export { MongoMessageRepo, type MessageRepo, type InsertResult } from './message.repo';
 export { MongoReplyRepo, type ReplyRepo } from './reply.repo';
+export { MongoTempRoleRepo, type TempRoleRepo, type TempRoleInput } from './temp-role.repo';
 export { MongoTodoRepo, type TodoRepo } from './todo.repo';
 export {
   MongoUserApiSettingRepo,
@@ -42,6 +44,7 @@ export interface Repos {
   readonly giveaway: GiveawayRepo;
   readonly message: MessageRepo;
   readonly reply: ReplyRepo;
+  readonly tempRole: TempRoleRepo;
   readonly todo: TodoRepo;
   readonly userApiSetting: UserApiSettingRepo;
 }
@@ -58,6 +61,7 @@ export const buildRepos = (conn: GuildConnection): Repos => ({
   giveaway: new MongoGiveawayRepo(conn),
   message: new MongoMessageRepo(conn),
   reply: new MongoReplyRepo(conn),
+  tempRole: new MongoTempRoleRepo(conn),
   todo: new MongoTodoRepo(conn),
   userApiSetting: new MongoUserApiSettingRepo(conn),
 });

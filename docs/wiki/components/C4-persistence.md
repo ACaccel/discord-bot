@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Wraps MongoDB access behind the Repository pattern. Seven repositories — `activity`, `fetch`, `giveaway`, `message`, `reply`, `todo`, `user-api-setting` — each expose an interface plus a `MongoXRepo` implementation. Consumers depend on the interface; tests inject in-memory fakes.
+Wraps MongoDB access behind the Repository pattern. Eight repositories — `activity`, `fetch`, `giveaway`, `message`, `reply`, `temp-role`, `todo`, `user-api-setting` — each expose an interface plus a `MongoXRepo` implementation. Consumers depend on the interface; tests inject in-memory fakes.
 
 `user-api-setting.schema.ts` schema-level defaults are an xAI-first safety net (provider `xai`, web search on); the authoritative whitelist-entry defaults are written by the `ai_whitelist_add` handler (`buildWhitelistDefaults`), which resolves the live cheapest xAI model. Persistence may not import the infra `DEFAULT_MODELS` constant (layering), so the schema's seed model id is a static literal kept fresh at runtime by `DefaultModelResolver`.
 

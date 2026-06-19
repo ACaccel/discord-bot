@@ -74,6 +74,7 @@ describe('Nijika composition', () => {
         'guild-events',
         'social-link-preview',
         'giveaway',
+        'temp-role',
         'activity',
         'voice',
         'earthquake',

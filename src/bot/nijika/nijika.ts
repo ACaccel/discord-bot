@@ -8,6 +8,7 @@ import {
     createGiveawayPlugin,
     createGuildEventsPlugin,
     createSocialLinkPreviewPlugin,
+    createTempRolePlugin,
     createVoicePlugin,
 } from '@plugins';
 
@@ -55,6 +56,9 @@ export class Nijika extends BaseBot<NijikaConfig> {
         this.use(createSocialLinkPreviewPlugin(this.config.social_link_preview));
         this.use(createGiveawayPlugin());
         this.use(createActivityPlugin());
+        // Temporary, permission-less notification roles with a self-claim
+        // button and a hard 30-day expiry (see `createTempRolePlugin`).
+        this.use(createTempRolePlugin());
         this.use(createVoicePlugin());
         // The earthquake webhook server + per-guild broadcast is a
         // bot-scoped plugin; its `start` hook owns the Express route.

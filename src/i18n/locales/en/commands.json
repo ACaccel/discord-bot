@@ -363,6 +363,17 @@
       }
     }
   },
+  "temp_role": {
+    "description": "Create a temporary notification role that anyone can claim; it is deleted automatically when it expires",
+    "options": {
+      "name": {
+        "description": "Role name"
+      },
+      "days": {
+        "description": "Lifetime in days (1-30, default 30)"
+      }
+    }
+  },
   "todo_list": {
     "description": "To-do list",
     "options": {

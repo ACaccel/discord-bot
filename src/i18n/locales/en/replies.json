@@ -420,5 +420,20 @@
     "result_with_participants": "📢 **Activity ended!** 📢\n\n**Activity: {{title}}**\n\n✅ **Participants:**\n{{participants}}\n\n{{count}} people joined the activity!",
     "result_no_participants": "📢 **Activity ended!** 📢\n\n**Activity: {{title}}**\n\n😢 **No one joined the activity**",
     "failed": "Hmm... the activity operation failed. Give it another try later! (error code: {{traceId}})"
+  },
+  "temp_role": {
+    "created": "🔔 Temporary notification role {{role}} created! It will be deleted automatically at {{expiry}}. Use the button below to claim or remove the role.",
+    "button_label": "Claim / remove role",
+    "expired": "⌛ The temporary notification role \"{{role}}\" has expired and was deleted.",
+    "at_role_limit": "This server has reached its role limit ({{max}}); a new temporary role cannot be created.",
+    "invalid_duration": "The lifetime must be an integer between 1 and {{max}} days.",
+    "missing_name": "Please provide a role name.",
+    "announce_failed": "Could not post the claim message in this channel; the temporary role was not created.",
+    "failed": "Could not create the temporary role (error code: {{traceId}})"
+  },
+  "toggle_role": {
+    "role_not_found": "Role not found; it may have been deleted.",
+    "added": "Added the role {{role}} to you.",
+    "removed": "Removed the role {{role}} from you."
   }
 }

@@ -120,6 +120,7 @@ const buildModels = (connection: Connection): Models => ({
   Todo: connection.model<DocByName['Todo']>('Todo', SCHEMAS.Todo),
   Giveaway: connection.model<DocByName['Giveaway']>('Giveaway', SCHEMAS.Giveaway),
   Activity: connection.model<DocByName['Activity']>('Activity', SCHEMAS.Activity),
+  TempRole: connection.model<DocByName['TempRole']>('TempRole', SCHEMAS.TempRole),
   UserApiSetting: connection.model<DocByName['UserApiSetting']>(
     'UserApiSetting',
     SCHEMAS.UserApiSetting,

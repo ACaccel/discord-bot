@@ -19,3 +19,4 @@ Conventions:
 | 0003 | `migrate_timestamp` numeric-timestamp migration   | accepted | —                  |
 | 0004 | Index-served `Message.timestamp` range reads      | accepted | —                  |
 | 0005 | Tolerate transient network resets, not crash      | accepted | —                  |
+| 0006 | Open, self-claim temporary roles with hard expiry | accepted | —                  |

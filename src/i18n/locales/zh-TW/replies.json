@@ -420,5 +420,20 @@
     "result_with_participants": "📢 **活動結束!** 📢\n\n**活動: {{title}}**\n\n✅ **參與者:**\n{{participants}}\n\n共 {{count}} 人參與活動！",
     "result_no_participants": "📢 **活動結束!** 📢\n\n**活動: {{title}}**\n\n😢 **沒有人參加活動**",
     "failed": "唔...活動操作失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
+  },
+  "temp_role": {
+    "created": "🔔 暫時通知身份組 {{role}} 已建立!將於 {{expiry}} 自動刪除。點下方按鈕領取或取消身份組。",
+    "button_label": "領取 / 取消身份組",
+    "expired": "⌛ 暫時通知身份組「{{role}}」已到期並被刪除。",
+    "at_role_limit": "本伺服器的身份組數量已達上限 ({{max}}),無法建立新的暫時身份組。",
+    "invalid_duration": "存活天數必須是 1 到 {{max}} 之間的整數。",
+    "missing_name": "請提供身份組名稱。",
+    "announce_failed": "無法在此頻道發送領取訊息,暫時身份組未建立。",
+    "failed": "無法建立暫時身份組 (錯誤代碼:{{traceId}})"
+  },
+  "toggle_role": {
+    "role_not_found": "找不到該身份組,可能已被刪除。",
+    "added": "已為你加上身份組 {{role}}。",
+    "removed": "已為你移除身份組 {{role}}。"
   }
 }

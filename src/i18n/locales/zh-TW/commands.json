@@ -363,6 +363,17 @@
       }
     }
   },
+  "temp_role": {
+    "description": "建立一個暫時性的通知身份組,任何人都能領取,到期後自動刪除",
+    "options": {
+      "name": {
+        "description": "身份組名稱"
+      },
+      "days": {
+        "description": "存活天數 (1-30,預設 30)"
+      }
+    }
+  },
   "todo_list": {
     "description": "待辦事項",
     "options": {

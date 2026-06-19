@@ -41,12 +41,13 @@ import { default as Handler_33 } from './search_anime_scene';
 import { default as Handler_34 } from './sticker_frequency';
 import { default as Handler_35 } from './talk';
 import { default as Handler_36 } from './talk_signed';
-import { default as Handler_37 } from './todo_list';
-import { default as Handler_38 } from './traffic';
-import { default as Handler_39 } from './traffic_me';
-import { default as Handler_40 } from './traffic_user';
-import { default as Handler_41 } from './update_role';
-import { default as Handler_42 } from './weather_forecast';
+import { default as Handler_37 } from './temp_role';
+import { default as Handler_38 } from './todo_list';
+import { default as Handler_39 } from './traffic';
+import { default as Handler_40 } from './traffic_me';
+import { default as Handler_41 } from './traffic_user';
+import { default as Handler_42 } from './update_role';
+import { default as Handler_43 } from './weather_forecast';
 export const COMMAND_REGISTRY = {
   activity_create: Handler_0,
   activity_delete: Handler_1,
@@ -85,10 +86,11 @@ export const COMMAND_REGISTRY = {
   sticker_frequency: Handler_34,
   talk: Handler_35,
   talk_signed: Handler_36,
-  todo_list: Handler_37,
-  traffic: Handler_38,
-  traffic_me: Handler_39,
-  traffic_user: Handler_40,
-  update_role: Handler_41,
-  weather_forecast: Handler_42,
+  temp_role: Handler_37,
+  todo_list: Handler_38,
+  traffic: Handler_39,
+  traffic_me: Handler_40,
+  traffic_user: Handler_41,
+  update_role: Handler_42,
+  weather_forecast: Handler_43,
 } as const satisfies Readonly<Record<string, new () => Command>>;
