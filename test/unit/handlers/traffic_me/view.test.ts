@@ -1,16 +1,18 @@
 /**
- * Unit coverage for `/traffic_me` view assembly: two embeds + two chart
- * files, attachment wiring, channel-name resolution / ordering, and the
- * overview field values (share %, totals). Echo translator pins keys.
+ * Unit coverage for the shared per-user traffic view assembly
+ * (`/traffic_me`, `/traffic_user`): two embeds + two chart files,
+ * attachment wiring, channel-name resolution / ordering, the overview
+ * field values (share %, totals), and `keyPrefix` namespace routing.
+ * Echo translator pins keys.
  */
 import { describe, expect, it } from 'vitest';
 
-import type { UserTrafficAggregate } from '../../../../src/handlers/commands/traffic_me/aggregation-user';
-import {
-  buildTrafficMeView,
-  resolveTopChannels,
-} from '../../../../src/handlers/commands/traffic_me/view';
+import type { UserTrafficAggregate } from '../../../../src/handlers/commands/traffic-shared/aggregation-user';
 import type { TFn } from '../../../../src/handlers/commands/traffic-shared/types';
+import {
+  buildUserTrafficView,
+  resolveTopChannels,
+} from '../../../../src/handlers/commands/traffic-shared/user-view';
 import { buildTextChannel } from '../../../fixtures/discord/channel-builder';
 import { buildGuild } from '../../../fixtures/discord/guild-builder';
 
@@ -42,23 +44,27 @@ describe('resolveTopChannels', () => {
   });
 });
 
-describe('buildTrafficMeView', () => {
+describe('buildUserTrafficView', () => {
   it('produces two embeds + two chart files wired in order', () => {
-    const view = buildTrafficMeView(agg, 5, '7d', 'TestUser', guild, echo);
+    const view = buildUserTrafficView(agg, 5, '7d', 'TestUser', guild, echo, 'traffic_me');
     expect(view.embeds).toHaveLength(2);
-    expect(view.files.map((f) => f.name)).toEqual([
-      'traffic-me-time.png',
-      'traffic-me-channels.png',
-    ]);
-    expect(view.embeds[0]?.data.image?.url).toBe('attachment://traffic-me-time.png');
-    expect(view.embeds[1]?.data.image?.url).toBe('attachment://traffic-me-channels.png');
+    expect(view.files.map((f) => f.name)).toEqual(['traffic-time.png', 'traffic-channels.png']);
+    expect(view.embeds[0]?.data.image?.url).toBe('attachment://traffic-time.png');
+    expect(view.embeds[1]?.data.image?.url).toBe('attachment://traffic-channels.png');
   });
 
   it('shows the share of visible traffic in the overview fields', () => {
-    const view = buildTrafficMeView(agg, 5, '7d', 'TestUser', guild, echo);
+    const view = buildUserTrafficView(agg, 5, '7d', 'TestUser', guild, echo, 'traffic_me');
     const fields = view.embeds[0]?.data.fields ?? [];
     const values = fields.map((f) => f.value);
     expect(values).toContain('10'); // total
     expect(values).toContain('20.0%'); // 10 / 50
+  });
+
+  it('routes labels to the keyPrefix namespace', () => {
+    const me = buildUserTrafficView(agg, 5, '7d', 'TestUser', guild, echo, 'traffic_me');
+    const user = buildUserTrafficView(agg, 5, '7d', 'TestUser', guild, echo, 'traffic_user');
+    expect(me.embeds[0]?.data.title).toBe('replies:traffic_me.title');
+    expect(user.embeds[0]?.data.title).toBe('replies:traffic_user.title');
   });
 });

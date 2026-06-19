@@ -1,13 +1,15 @@
 /**
- * Unit coverage for `/traffic_me`'s per-user aggregation. Confirms the
- * focus user's own counts (per-channel / busiest) exclude disallowed
- * channels and other users, while the guild total / active-user count /
- * rank are derived from every visible author.
+ * Unit coverage for the shared per-user aggregation (`/traffic_me`,
+ * `/traffic_user`). Confirms the focus user's own counts (per-channel /
+ * busiest) exclude disallowed channels and other users, while the guild
+ * total / active-user count / rank are derived from every visible author.
+ * The `allowed` set is the invoker's visible channels, so the same logic
+ * powers `/traffic_user` (focus = target, allowed = invoker's view).
  */
 import { describe, expect, it } from 'vitest';
 
 import { ok } from '../../../../src/core/result';
-import { aggregateUserTraffic } from '../../../../src/handlers/commands/traffic_me/aggregation-user';
+import { aggregateUserTraffic } from '../../../../src/handlers/commands/traffic-shared/aggregation-user';
 import { resolveWindow } from '../../../../src/handlers/commands/traffic-shared/window';
 import type { Repos } from '../../../../src/persistence/repositories';
 import type { MessageDoc } from '../../../../src/persistence/schemas/message.schema';

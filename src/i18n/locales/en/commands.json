@@ -425,6 +425,32 @@
       }
     }
   },
+  "traffic_user": {
+    "description": "Show a specified user's message-activity stats",
+    "options": {
+      "user": {
+        "description": "User to look up"
+      },
+      "visibility": {
+        "description": "Who can see the reply (optional, default: ephemeral)",
+        "choices": {
+          "ephemeral": "Only you",
+          "public": "Everyone"
+        }
+      },
+      "range": {
+        "description": "Look-back window (optional, default: 7d)",
+        "choices": {
+          "24h": "Last 24 hours",
+          "7d": "Last 7 days",
+          "30d": "Last 30 days"
+        }
+      },
+      "top_n": {
+        "description": "How many top channels to rank (optional, 1-25, default: 10)"
+      }
+    }
+  },
   "update_role": {
     "description": "Update Mee6 level roles"
   },

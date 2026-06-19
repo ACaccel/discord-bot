@@ -44,8 +44,9 @@ import { default as Handler_36 } from './talk_signed';
 import { default as Handler_37 } from './todo_list';
 import { default as Handler_38 } from './traffic';
 import { default as Handler_39 } from './traffic_me';
-import { default as Handler_40 } from './update_role';
-import { default as Handler_41 } from './weather_forecast';
+import { default as Handler_40 } from './traffic_user';
+import { default as Handler_41 } from './update_role';
+import { default as Handler_42 } from './weather_forecast';
 export const COMMAND_REGISTRY = {
   activity_create: Handler_0,
   activity_delete: Handler_1,
@@ -87,6 +88,7 @@ export const COMMAND_REGISTRY = {
   todo_list: Handler_37,
   traffic: Handler_38,
   traffic_me: Handler_39,
-  update_role: Handler_40,
-  weather_forecast: Handler_41,
+  traffic_user: Handler_40,
+  update_role: Handler_41,
+  weather_forecast: Handler_42,
 } as const satisfies Readonly<Record<string, new () => Command>>;

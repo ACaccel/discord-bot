@@ -338,6 +338,23 @@
     "rank_value": "第 {{rank}} 名 / 共 {{total}} 人",
     "rank_none": "無"
   },
+  "traffic_user": {
+    "failed": "無法產生流量報告 (錯誤代碼:{{traceId}})",
+    "no_data": "找不到該用戶在所選時間範圍內的訊息活動",
+    "title": "{{user}} 的活動 - {{range}}",
+    "channels_title": "{{user}} 最常發言的頻道",
+    "chart_time_title": "{{user}} 的訊息時間趨勢",
+    "field_total": "總訊息數",
+    "field_daily_average": "日均訊息數",
+    "field_share": "佔可見流量比例",
+    "field_busiest": "最忙碌時段",
+    "field_rank": "名次",
+    "field_active_channels": "活躍頻道數",
+    "busiest_none": "無",
+    "busiest_value": "{{label}} ({{count}})",
+    "rank_value": "第 {{rank}} 名 / 共 {{total}} 人",
+    "rank_none": "無"
+  },
   "update_role": {
     "no_config": "設定檔中未找到等級身分組配置",
     "done": "更新完成",

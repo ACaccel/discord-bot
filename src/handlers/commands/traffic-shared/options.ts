@@ -1,15 +1,19 @@
 /**
- * Parse and clamp `/traffic_me` options. `visibility` mirrors `/traffic`:
- * `ephemeral` (default) replies privately; `public` posts the stats to
- * the channel and — through the shared visibility filter — counts only
- * public-channel activity, so a public reply never reveals that the
- * invoker is active in restricted channels.
+ * Parse and clamp the shared `visibility` / `range` / `top_n` options for
+ * the per-user traffic commands (`/traffic_me`, `/traffic_user`).
+ * `visibility` mirrors `/traffic`: `ephemeral` (default) replies privately;
+ * `public` posts the stats to the channel and — through the shared
+ * visibility filter — counts only public-channel activity, so a public
+ * reply never reveals that the invoker is active in restricted channels.
+ *
+ * A command-specific option (e.g. `/traffic_user`'s required `user`) is
+ * read in the handler, not here, so this stays focused on the common trio.
  */
 import type { ChatInputCommandInteraction } from 'discord.js';
 
-import type { TrafficRange, Visibility } from '../traffic-shared/types';
+import type { TrafficRange, Visibility } from './types';
 
-export interface TrafficMeOptions {
+export interface TrafficStatsOptions {
   readonly visibility: Visibility;
   readonly range: TrafficRange;
   readonly topN: number;
@@ -29,9 +33,9 @@ const clampTopN = (value: number): number => {
   return Math.min(MAX_TOP_N, Math.max(MIN_TOP_N, Math.floor(value)));
 };
 
-export const readTrafficMeOptions = (
+export const readTrafficStatsOptions = (
   interaction: Pick<ChatInputCommandInteraction, 'options'>,
-): TrafficMeOptions => {
+): TrafficStatsOptions => {
   const rawVisibility = interaction.options.get('visibility')?.value;
   const rawRange = interaction.options.get('range')?.value;
   const rawTopN = interaction.options.get('top_n')?.value;

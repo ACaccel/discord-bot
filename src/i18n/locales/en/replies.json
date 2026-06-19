@@ -338,6 +338,23 @@
     "rank_value": "#{{rank}} of {{total}}",
     "rank_none": "N/A"
   },
+  "traffic_user": {
+    "failed": "Could not build the traffic report. (error code: {{traceId}})",
+    "no_data": "No message activity found for that user in the selected window.",
+    "title": "{{user}}'s activity - {{range}}",
+    "channels_title": "{{user}}'s top channels",
+    "chart_time_title": "{{user}}'s messages over time",
+    "field_total": "Total messages",
+    "field_daily_average": "Daily average",
+    "field_share": "Share of traffic",
+    "field_busiest": "Busiest period",
+    "field_rank": "Rank",
+    "field_active_channels": "Channels active in",
+    "busiest_none": "N/A",
+    "busiest_value": "{{label}} ({{count}})",
+    "rank_value": "#{{rank}} of {{total}}",
+    "rank_none": "N/A"
+  },
   "update_role": {
     "no_config": "No level role configuration found in the config file.",
     "done": "Update complete.",

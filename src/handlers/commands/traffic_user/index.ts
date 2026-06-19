@@ -12,24 +12,29 @@ import { buildAllowedChannelSet } from '../traffic-shared/visibility-filter';
 import { resolveWindow } from '../traffic-shared/window';
 
 /**
- * `/traffic_me` — the invoker's personal message-activity stats over a
- * time window: an overview (total, daily average, share of visible
- * traffic, busiest period, rank among active users), a personal
- * time-trend line chart, and a personal channel-distribution bar chart.
+ * `/traffic_user` — a specified target user's message-activity stats over
+ * a time window: an overview (total, daily average, share of visible
+ * traffic, busiest period, rank among active users), a time-trend line
+ * chart, and a channel-distribution bar chart.
  *
- * `visibility` mirrors `/traffic` (default `ephemeral`). Reuses the same
- * filter: a `public` reply is capped by both the invoker's clearance and
- * the command channel's rank (so a shared reply never exceeds the room's
- * level), while an `ephemeral` reply is capped by the invoker's clearance
- * alone. It thus sets both the ceiling and whether the reply is posted.
+ * Privacy is gated by the INVOKER, never the target. The visible-channel
+ * set is built from the invoker's clearance (`permission_rank`) plus their
+ * native `ViewChannel` permission, and the target's activity is counted
+ * only within it; the target's own clearance is irrelevant. A target with
+ * no visible activity — including one not in the guild — yields the same
+ * neutral no-data reply, so the command never reveals a restricted channel
+ * or whether a user is a member. `visibility` mirrors `/traffic_me`
+ * (default `ephemeral`): a `public` reply is additionally capped by the
+ * command channel's rank.
  */
-export default class traffic_me extends Command {
+export default class traffic_user extends Command {
   constructor() {
     super();
     this.setConfig({
-      name: 'traffic_me',
+      name: 'traffic_user',
       category: 'server_activity',
       options: {
+        user: [{ name: 'user', required: true }],
         string: [
           {
             name: 'visibility',
@@ -70,6 +75,8 @@ export default class traffic_me extends Command {
         return;
       }
 
+      // Filter subject: the INVOKER. Their clearance + native ViewChannel
+      // decide which channels are visible — never the target's.
       const member = await guild.members.fetch(interaction.user.id);
       const allowed = buildAllowedChannelSet({
         guild,
@@ -79,10 +86,16 @@ export default class traffic_me extends Command {
         commandChannelId: interaction.channelId,
       });
 
+      // Aggregation subject: the TARGET, counted only within `allowed`.
+      const target = interaction.options.getUser('user', true);
+      const targetMember = interaction.options.getMember('user');
+      const targetDisplayName =
+        targetMember && 'displayName' in targetMember ? targetMember.displayName : target.username;
+
       const window = resolveWindow(options.range, Date.now());
-      const aggregate = await aggregateUserTraffic(repos, window, allowed, interaction.user.id);
+      const aggregate = await aggregateUserTraffic(repos, window, allowed, target.id);
       if (aggregate.userTotal === 0) {
-        await interaction.editReply({ content: t('replies:traffic_me.no_data') });
+        await interaction.editReply({ content: t('replies:traffic_user.no_data') });
         return;
       }
 
@@ -90,10 +103,10 @@ export default class traffic_me extends Command {
         aggregate,
         options.topN,
         options.range,
-        member.displayName,
+        targetDisplayName,
         guild,
         t,
-        'traffic_me',
+        'traffic_user',
       );
       await interaction.editReply({ embeds: view.embeds, files: view.files });
     } catch (error) {
@@ -101,7 +114,7 @@ export default class traffic_me extends Command {
         interaction,
         bot,
         error,
-        'replies:traffic_me.failed',
+        'replies:traffic_user.failed',
         interaction.guild?.id,
       );
     }

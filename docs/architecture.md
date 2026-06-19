@@ -145,8 +145,8 @@ from static config in the `BaseBot` constructor and registered under
 `TOKENS.PermissionRankPolicy` (same seam as `GuildOnboardingPort`):
 discord.js-free, fail-fast validated, resolved per-event by the `guild-events`
 / `social-link-preview` plugins and the channel-logging middleware, and
-per-invocation by the `/traffic` handler through the `bot.permissionRankPolicy`
-accessor. It replaced the bot-wide `blocked_channels` list (suppression is now
+per-invocation by the `/traffic` / `/traffic_me` / `/traffic_user` handlers
+through the `bot.permissionRankPolicy` accessor. It replaced the bot-wide `blocked_channels` list (suppression is now
 per-guild).
 
 ### `MongoConnectionManager` ([src/infra/mongo/connection-manager.ts](../src/infra/mongo/connection-manager.ts))

@@ -1,16 +1,18 @@
 /**
- * Chunked, privacy-filtered aggregation focused on ONE user for
- * `/traffic_me`. Within the invoker's visible channels it accumulates
- * the focus user's per-channel / per-time-bucket counts, plus a global
- * per-user tally so the user's share of visible traffic and their rank
- * among active users can be derived. Day-sized chunks bound heap use
- * (mirrors `/traffic`'s aggregation).
+ * Chunked, privacy-filtered aggregation focused on ONE user, shared by
+ * `/traffic_me` (focus = the invoker) and `/traffic_user` (focus = a
+ * specified target). Within the invoker's visible channels (`allowed`,
+ * built from the invoker's clearance — never the focus user's) it
+ * accumulates the focus user's per-channel / per-time-bucket counts, plus
+ * a global per-user tally so the user's share of visible traffic and
+ * their rank among active users can be derived. Day-sized chunks bound
+ * heap use (mirrors `/traffic`'s aggregation).
  */
 import type { MessageDoc } from '../../../persistence/schemas/message.schema';
 import type { Repos } from '../../../persistence/repositories';
 
-import type { BucketCount, BucketGranularity, TimeWindow } from '../traffic-shared/types';
-import { DAY_MS } from '../traffic-shared/window';
+import type { BucketCount, BucketGranularity, TimeWindow } from './types';
+import { DAY_MS } from './window';
 
 export interface UserTrafficAggregate {
   readonly userTotal: number;
