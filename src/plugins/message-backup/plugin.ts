@@ -85,6 +85,11 @@ export const createMessageBackupPlugin = (
           running.add(guildId);
           try {
             await performBackup(guildId, registry, client, ctx.logger);
+          } catch (err: unknown) {
+            // Isolate a per-guild failure: one guild's error must not
+            // abort the remaining guilds in this pass, nor reject the
+            // scheduling loop above.
+            logError(ctx.logger, guildId, err);
           } finally {
             running.delete(guildId);
           }
@@ -94,9 +99,20 @@ export const createMessageBackupPlugin = (
       await runOnce();
       const scheduleNext = (): void => {
         if (stopped) return;
-        loopHandle = setTimeout(async () => {
-          await runOnce();
-          scheduleNext();
+        loopHandle = setTimeout(() => {
+          // Run the pass in a self-contained async IIFE: a throw must be
+          // caught here and the loop always rescheduled in `finally`.
+          // Without this, a rejected pass would die as an
+          // unhandledRejection and silently kill the repeat loop.
+          void (async (): Promise<void> => {
+            try {
+              await runOnce();
+            } catch (err: unknown) {
+              logError(ctx.logger, null, err);
+            } finally {
+              scheduleNext();
+            }
+          })();
         }, config.backupIntervalMs);
       };
       scheduleNext();

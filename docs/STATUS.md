@@ -32,6 +32,12 @@ routing, and a CJK-literal scanner enforced in strict mode. See
   owner-only settings REST API, and a daily identity sync.
 - `social-link-preview` plugin (nijika): Twitter/X, Instagram, Threads,
   Facebook, Reddit, and Bahamut providers.
+- Transient-network resilience
+  (→ [0005](history/0005-transient-network-resilience.md)): the Discord client
+  gains non-fatal `error` / `shardError` / `shardDisconnect` listeners and the
+  `uncaughtException` net tolerates a whitelisted transient blip
+  (`isTransientNetworkError`) instead of shutting the bot down; `message-backup`'s
+  repeat loop is failure-isolated.
 
 ### In progress
 
@@ -94,3 +100,4 @@ Mirror of [`docs/history/README.md`](history/README.md):
 | 0002 | Channel-aware visibility and full-ancestry rank   | accepted |
 | 0003 | `migrate_timestamp` numeric-timestamp migration   | accepted |
 | 0004 | Index-served `Message.timestamp` range reads      | accepted |
+| 0005 | Tolerate transient network resets, not crash      | accepted |

@@ -62,6 +62,11 @@ Three single-purpose collaborators back the orchestrator:
 - `**ClientEventBridge**` ([src/bot/client-event-bridge.ts](../src/bot/client-event-bridge.ts)) — adapter from `client.on(...)` raw events to the `InteractionRouter`, the plugin `EventDispatcher`, the reaction port, and the `GuildCreate` fallback. Owns a single attach/detach cycle.
 - `**GuildDbConnector**` ([src/bot/guild-db-connector.ts](../src/bot/guild-db-connector.ts)) — per-guild Mongo lifecycle. Drives the `ReposFactory` and normalises failure into `ConnectionManager`'s disabled-set so other guilds keep running.
 
+Two process-level safety nets are installed in step 1 (before login), so they span the client's whole lifecycle and are owned by `BaseBot` rather than the late-attaching `ClientEventBridge`:
+
+- `installProcessHandlers` ([src/core/logger/process-handlers.ts](../src/core/logger/process-handlers.ts)) — `uncaughtException` triggers best-effort graceful shutdown, **except** a transient network blip (`ECONNRESET` / "socket hang up", classified by [`isTransientNetworkError`](../src/core/errors/transient-network-error.ts)), which is logged and tolerated so a momentary outbound-socket reset cannot kill the process; `unhandledRejection` is logged and counted, never fatal.
+- `installClientSafetyListeners` ([src/bot/client-safety-listeners.ts](../src/bot/client-safety-listeners.ts)) — attaches non-fatal `error` / `shardError` / `shardDisconnect` listeners to the Discord client. Without an `error` listener Node rethrows an emitted client error as an `uncaughtException`; this keeps a gateway socket reset observable while discord.js reconnects on its own.
+
 ### Plugin contract ([src/core/plugin/](../src/core/plugin/))
 
 A `Plugin<Config>` declares:
@@ -116,6 +121,11 @@ enforces this.
 carries `code`, `messageKey` (i18n), `messageParams`, and the original
 `cause`. Use cases prefer `Result<T, DomainError>`; error-translator
 modules at each infra boundary turn SDK failures into domain errors.
+Alongside the taxonomy, [`isTransientNetworkError`](../src/core/errors/transient-network-error.ts)
+classifies a raw, unwrapped `Error` as a transient connectivity blip
+(a narrow whitelist of socket error codes plus Node's "socket hang up"
+message) — used by the process-level safety net to tolerate a momentary
+network reset instead of crashing.
 
 ### Branded IDs ([src/core/ids.ts](../src/core/ids.ts))
 

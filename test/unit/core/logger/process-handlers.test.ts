@@ -1,16 +1,18 @@
 /**
  * Process-handler installer tests.
  *
- * We only verify the install-once contract and the side-effects on the
- * exposed counter — actually invoking `uncaughtException` would call
- * `process.exit(1)`, which would terminate the test runner. The
- * counter increment for `unhandledRejection` can be exercised because
- * the handler does not exit.
+ * We verify the install-once contract and the counter side-effects.
+ * Emitting a *fatal* `uncaughtException` would call `process.exit(1)`
+ * and kill the test runner, so that path is left to the classifier's
+ * own unit tests. The two paths that do NOT exit — `unhandledRejection`
+ * and a *transient-network* `uncaughtException` — are exercised directly
+ * because the handler returns without shutting down.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   __resetProcessHandlersForTests,
   createLogger,
+  getTransientNetworkErrorCount,
   getUnhandledRejectionCount,
   installProcessHandlers,
 } from '../../../../src/core/logger';
@@ -48,5 +50,25 @@ describe('installProcessHandlers', () => {
     // Allow microtasks to flush.
     await new Promise<void>((r) => setImmediate(r));
     expect(getUnhandledRejectionCount()).toBe(before + 1);
+  });
+
+  it('downgrades a transient-network uncaughtException: counts it, never shuts down', async () => {
+    const logger = createLogger({ level: 'silent', pretty: false });
+    let shutdownCalls = 0;
+    const before = getTransientNetworkErrorCount();
+    installProcessHandlers({
+      logger,
+      gracefulShutdown: async () => {
+        shutdownCalls += 1;
+      },
+    });
+    // The exact crash signature: ECONNRESET / "socket hang up". The
+    // handler returns before arming the shutdown timer, so emitting it
+    // here is safe — the runner is not torn down.
+    const err = Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
+    process.emit('uncaughtException', err);
+    await new Promise<void>((r) => setImmediate(r));
+    expect(getTransientNetworkErrorCount()).toBe(before + 1);
+    expect(shutdownCalls).toBe(0);
   });
 });

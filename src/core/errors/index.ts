@@ -20,6 +20,7 @@ import type { PermissionError } from './permission-error';
 import type { ValidationError } from './validation-error';
 
 export type { ErrorContext } from './error-context';
+export { isTransientNetworkError } from './transient-network-error';
 export { DomainError, type DomainErrorInit } from './domain-error';
 export { ValidationError, type ValidationErrorCode } from './validation-error';
 export { NotFoundError, type NotFoundErrorCode } from './not-found-error';

@@ -62,6 +62,7 @@ import {
   type ClientEventBridgeSuppression,
   type ReactionHandlerPort,
 } from './client-event-bridge';
+import { installClientSafetyListeners } from './client-safety-listeners';
 import { GuildDbConnector } from './guild-db-connector';
 import { BaseBotGuildOnboardingPort } from './guild-onboarding';
 import { GuildRegistrar } from './guild-registrar';
@@ -597,6 +598,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
       logger: rootLogger,
       gracefulShutdown: () => this.shutdown(),
     });
+    // Connection-layer safety net: keep a transient gateway socket reset
+    // (ECONNRESET / "socket hang up") from escaping as an uncaughtException
+    // that would crash the whole process. Installed here so it spans the
+    // client's full lifecycle, including login (see client-safety-listeners).
+    installClientSafetyListeners({ client: this.client, logger: rootLogger });
     try {
       // An empty `mongoURI` means the bot was built without a database
       // (e.g. gopher), matching how `GuildDbConnector` / `ConnectionManager`

@@ -18,3 +18,4 @@ Conventions:
 | 0002 | Channel-aware visibility and full-ancestry rank   | accepted | —                  |
 | 0003 | `migrate_timestamp` numeric-timestamp migration   | accepted | —                  |
 | 0004 | Index-served `Message.timestamp` range reads      | accepted | —                  |
+| 0005 | Tolerate transient network resets, not crash      | accepted | —                  |

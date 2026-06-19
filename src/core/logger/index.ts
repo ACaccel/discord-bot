@@ -14,6 +14,7 @@ export {
 export {
   installProcessHandlers,
   getUnhandledRejectionCount,
+  getTransientNetworkErrorCount,
   __resetProcessHandlersForTests,
   type InstallProcessHandlersInput,
 } from './process-handlers';
