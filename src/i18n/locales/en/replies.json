@@ -287,16 +287,6 @@
     "tag_warning": "{{displayName}} ({{username}}), you naughty one — I caught you tagging everyone.",
     "failed": "Hmm... the message couldn't be sent. Give it another try later! (error code: {{traceId}})"
   },
-  "todo_list": {
-    "missing_content": "Please enter the to-do item content.",
-    "expect_number": "Please enter a number.",
-    "failed": "Could not change the to-do item. (error code: {{traceId}})",
-    "added": "Added to-do item: {{content}}",
-    "already_exists": "This to-do item: {{content}} already exists!",
-    "not_found": "To-do item not found: {{content}}",
-    "deleted": "Deleted to-do item: {{content}}",
-    "header": "To-do list:\n"
-  },
   "traffic": {
     "failed": "Could not build the traffic report. (error code: {{traceId}})",
     "no_data": "No message traffic found for the selected window.",

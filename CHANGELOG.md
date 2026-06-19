@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **`/todo_list` permanently removed.** The to-do list command (add / delete / list, on the `nijika` personality) has been retired. Its command handler, the `TodoRepo` / `MongoTodoRepo` repository, the `todoSchema` / `Todo` model registration, the `commands:todo_list.*` / `replies:todo_list.*` catalog keys (both locales), and the integration test are all gone. **Operator action required:** the feature stored its items in a `todos` collection inside each guild's own database, which is _not_ deleted automatically — run the new `tools/drop_todo_collection` ops tool (dry-run by default) to drop it per guild, and re-run `yarn deploy -t nijika` so Discord drops the `/todo_list` command (it has already been removed from that bot's `config.json` `commands` list). Decision `0007`.
+
 ### Added
 
 - **`/temp_role` — temporary self-claim notification roles.** A new slash command (open to every member) creates a permission-less, mentionable role used only for `@mention` notifications and posts a claim message with a toggle button — reusing the existing `toggle_role` button so any member can self-claim / release it. The role auto-deletes after a selectable lifetime with a hard 30-day cap (default 30 days), at which point the claim message is marked expired and the database row is removed; pending expiries survive restarts via a giveaway-style `onReady` reboot sweep. Creation is rejected when the guild is at Discord's 250-role ceiling. Shipped as the general-purpose `temp-role` plugin (`src/plugins/temp-role/`) plus a new `TempRole` schema and repository, and loaded by the `nijika` personality (enable it by adding `temp_role` to that bot's `config.json` `commands` list). As part of this work, the shared `toggle_role` button's replies are now localised (`zh-TW` / `en`) instead of hardcoded English.

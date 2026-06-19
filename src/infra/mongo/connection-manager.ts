@@ -117,7 +117,6 @@ const buildModels = (connection: Connection): Models => ({
   Fetch: connection.model<DocByName['Fetch']>('Fetch', SCHEMAS.Fetch),
   Message: connection.model<DocByName['Message']>('Message', SCHEMAS.Message),
   Reply: connection.model<DocByName['Reply']>('Reply', SCHEMAS.Reply),
-  Todo: connection.model<DocByName['Todo']>('Todo', SCHEMAS.Todo),
   Giveaway: connection.model<DocByName['Giveaway']>('Giveaway', SCHEMAS.Giveaway),
   Activity: connection.model<DocByName['Activity']>('Activity', SCHEMAS.Activity),
   TempRole: connection.model<DocByName['TempRole']>('TempRole', SCHEMAS.TempRole),

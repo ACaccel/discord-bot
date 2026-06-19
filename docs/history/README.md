@@ -20,3 +20,4 @@ Conventions:
 | 0004 | Index-served `Message.timestamp` range reads      | accepted | —                  |
 | 0005 | Tolerate transient network resets, not crash      | accepted | —                  |
 | 0006 | Open, self-claim temporary roles with hard expiry | accepted | —                  |
+| 0007 | Permanently remove the `todo_list` feature        | accepted | —                  |

@@ -355,22 +355,6 @@
       }
     }
   },
-  "todo_list": {
-    "description": "To-do list",
-    "options": {
-      "action": {
-        "description": "Add or delete",
-        "choices": {
-          "add": "Add (+ content: text)",
-          "delete": "Delete (+ content: id)",
-          "list": "List"
-        }
-      },
-      "content": {
-        "description": "Content (optional)"
-      }
-    }
-  },
   "traffic": {
     "description": "Show guild message-traffic charts and statistics",
     "options": {

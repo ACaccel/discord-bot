@@ -355,22 +355,6 @@
       }
     }
   },
-  "todo_list": {
-    "description": "待辦事項",
-    "options": {
-      "action": {
-        "description": "新增或刪除",
-        "choices": {
-          "add": "新增 (+ content: 內容)",
-          "delete": "刪除 (+ content: 編號)",
-          "list": "查看"
-        }
-      },
-      "content": {
-        "description": "內容 (optional)"
-      }
-    }
-  },
   "traffic": {
     "description": "顯示伺服器訊息流量圖表與統計",
     "options": {

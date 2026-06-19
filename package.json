@@ -49,6 +49,8 @@
     "msg_backup:test": "vitest run --project tools tools/msg_backup",
     "verify_db": "ts-node tools/verify_db/verify_db.ts",
     "verify_db:test": "vitest run --project tools tools/verify_db",
+    "drop_todo_collection": "ts-node tools/drop_todo_collection/drop_todo_collection.ts",
+    "drop_todo_collection:test": "vitest run --project tools tools/drop_todo_collection",
     "migrate_timestamp": "ts-node tools/migrate_timestamp/migrate_timestamp.ts",
     "migrate_timestamp:test": "vitest run --project tools tools/migrate_timestamp"
   },
