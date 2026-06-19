@@ -245,13 +245,16 @@
   "roll_call": {
     "missing_target": "請提供被點名者 (users) 或活動ID (activity_id)",
     "no_participants": "該活動目前沒有參與者",
-    "format_error": "格式錯誤!regex: match(/^<@\\d+>(\\s*<@\\d+>)*$/)",
+    "format_error": "格式錯誤!請用 @ 提及使用者或身份組 (例如 @user1 @role1)",
     "no_valid_id": "請至少提供一個有效的使用者ID",
     "sent": "點名已發送!",
     "failed": "無法進行點名 (錯誤代碼:{{traceId}})",
     "activity_not_found": "找不到活動ID為 {{id}} 的活動",
     "activity_already_consumed": "活動 {{id}} 已經被另一次點名指令消化過了。",
     "user_not_found": "找不到ID為 {{id}} 的使用者, 請確認ID是否正確",
+    "role_no_members": "身份組 <@&{{id}}> 沒有可點名的成員 (機器人不算喔)。",
+    "everyone_not_allowed": "初華大人不准點 @everyone 啦!請改點特定的人或身份組。",
+    "too_many_targets": "點名人數太多啦!最多只能點 {{max}} 人,但這次有 {{count}} 人,請減少身份組或人數~",
     "announcement_header": "初華大人的點名簿:<@{{userId}}> 發起了點名!\n",
     "activity_id_line": "(活動ID: {{id}})\n",
     "trigger_prefix": "初華大人的點名簿"

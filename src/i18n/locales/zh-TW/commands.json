@@ -289,7 +289,7 @@
     "description": "點名",
     "options": {
       "users": {
-        "description": "被點名者 (ex: @user1 @user2...)"
+        "description": "被點名者或身份組 (ex: @user1 @role1 @user2...)"
       },
       "activity_id": {
         "description": "活動ID (用於連動活動參與者點名)"

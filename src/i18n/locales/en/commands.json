@@ -289,7 +289,7 @@
     "description": "Roll call",
     "options": {
       "users": {
-        "description": "Users to call (ex: @user1 @user2...)"
+        "description": "Users or roles to call (ex: @user1 @role1 @user2...)"
       },
       "activity_id": {
         "description": "Activity ID (used to roll-call activity participants)"

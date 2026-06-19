@@ -245,13 +245,16 @@
   "roll_call": {
     "missing_target": "Please provide the users to call (users) or an activity ID (activity_id).",
     "no_participants": "That activity currently has no participants.",
-    "format_error": "Format error! regex: match(/^<@\\d+>(\\s*<@\\d+>)*$/)",
+    "format_error": "Format error! Mention users or roles with @ (e.g. @user1 @role1).",
     "no_valid_id": "Please provide at least one valid user ID.",
     "sent": "Roll call sent!",
     "failed": "Could not run the roll call. (error code: {{traceId}})",
     "activity_not_found": "No activity found with ID {{id}}.",
     "activity_already_consumed": "Activity {{id}} has already been consumed by another roll-call command.",
     "user_not_found": "No user found with ID {{id}}. Please verify the ID is correct.",
+    "role_no_members": "Role <@&{{id}}> has no callable members (bots don't count).",
+    "everyone_not_allowed": "Lady Sakiko won't let you roll-call @everyone! Pick specific members or roles instead.",
+    "too_many_targets": "Too many people for one roll call! The limit is {{max}}, but this call has {{count}}. Trim some roles or users.",
     "announcement_header": "Lady Sakiko's roll-call list: <@{{userId}}> has started a roll call!\n",
     "activity_id_line": "(Activity ID: {{id}})\n",
     "trigger_prefix": "Lady Sakiko's roll-call list"
