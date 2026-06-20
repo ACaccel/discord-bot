@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **`/pin_message` permanently removed.** The deprecated thread-pin command (pin / unpin a message in your own public thread by link) has been retired — Discord now provides a native thread-pin permission, so the command duplicated a built-in capability. Its command handler and the `commands:pin_message.*` / `replies:pin_message.*` catalog keys (both locales) are gone and the command registry was regenerated (43 → 42 commands). **Operator action required:** removing the code does not unpublish the command — remove `"pin_message"` from the `commands` list of any bot `config.json` that still carries it and re-run `yarn deploy -t <bot>` so Discord drops it. Decision `0008`.
 - **`/todo_list` permanently removed.** The to-do list command (add / delete / list, on the `nijika` personality) has been retired. Its command handler, the `TodoRepo` / `MongoTodoRepo` repository, the `todoSchema` / `Todo` model registration, the `commands:todo_list.*` / `replies:todo_list.*` catalog keys (both locales), and the integration test are all gone. **Operator action required:** the feature stored its items in a `todos` collection inside each guild's own database, which is _not_ deleted automatically — run the new `tools/drop_todo_collection` ops tool (dry-run by default) to drop it per guild, and re-run `yarn deploy -t nijika` so Discord drops the `/todo_list` command (it has already been removed from that bot's `config.json` `commands` list). Decision `0007`.
 
 ### Added

@@ -39,15 +39,6 @@
     "is_not_gay": "{{name}} is not gay",
     "failed": "Hmm... the verdict failed this time. Give it another try later! (error code: {{traceId}})"
   },
-  "pin_message": {
-    "not_in_thread": "This command can only be used in a thread.",
-    "not_thread_owner": "You are not the thread owner.",
-    "unpinned": "Message unpinned.",
-    "pinned": "Message pinned.",
-    "invalid_action": "Invalid action.",
-    "operation_failed": "Could not pin the message.",
-    "failed": "Hmm... the pin operation failed. Give it another try later! (error code: {{traceId}})"
-  },
   "add_reply": {
     "added": "Added input: {{input}} reply: {{reply}}!",
     "already_exists": "The pair input: {{input}} reply: {{reply}} already exists!",

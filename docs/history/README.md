@@ -21,3 +21,4 @@ Conventions:
 | 0005 | Tolerate transient network resets, not crash      | accepted | —                  |
 | 0006 | Open, self-claim temporary roles with hard expiry | accepted | —                  |
 | 0007 | Permanently remove the `todo_list` feature        | accepted | —                  |
+| 0008 | Permanently remove the `pin_message` command      | accepted | —                  |

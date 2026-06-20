@@ -223,21 +223,6 @@
   "menu_get_sticker": {
     "name": "取得表符/貼圖連結"
   },
-  "pin_message": {
-    "description": "釘選訊息",
-    "options": {
-      "action": {
-        "description": "釘選或取消釘選",
-        "choices": {
-          "pin": "釘選",
-          "unpin": "取消釘選"
-        }
-      },
-      "message_link": {
-        "description": "要釘選的訊息連結"
-      }
-    }
-  },
   "random_restaurant": {
     "description": "隨機餐廳抽取器 (台北/部分新北地區)",
     "options": {

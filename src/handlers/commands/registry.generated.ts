@@ -32,21 +32,20 @@ import { default as Handler_24 } from './list_guild_members';
 import { default as Handler_25 } from './list_reply';
 import { default as Handler_26 } from './menu_get_avatar';
 import { default as Handler_27 } from './menu_get_sticker';
-import { default as Handler_28 } from './pin_message';
-import { default as Handler_29 } from './random_restaurant';
-import { default as Handler_30 } from './record';
-import { default as Handler_31 } from './role_message';
-import { default as Handler_32 } from './roll_call';
-import { default as Handler_33 } from './search_anime_scene';
-import { default as Handler_34 } from './sticker_frequency';
-import { default as Handler_35 } from './talk';
-import { default as Handler_36 } from './talk_signed';
-import { default as Handler_37 } from './temp_role';
-import { default as Handler_38 } from './traffic';
-import { default as Handler_39 } from './traffic_me';
-import { default as Handler_40 } from './traffic_user';
-import { default as Handler_41 } from './update_role';
-import { default as Handler_42 } from './weather_forecast';
+import { default as Handler_28 } from './random_restaurant';
+import { default as Handler_29 } from './record';
+import { default as Handler_30 } from './role_message';
+import { default as Handler_31 } from './roll_call';
+import { default as Handler_32 } from './search_anime_scene';
+import { default as Handler_33 } from './sticker_frequency';
+import { default as Handler_34 } from './talk';
+import { default as Handler_35 } from './talk_signed';
+import { default as Handler_36 } from './temp_role';
+import { default as Handler_37 } from './traffic';
+import { default as Handler_38 } from './traffic_me';
+import { default as Handler_39 } from './traffic_user';
+import { default as Handler_40 } from './update_role';
+import { default as Handler_41 } from './weather_forecast';
 export const COMMAND_REGISTRY = {
   activity_create: Handler_0,
   activity_delete: Handler_1,
@@ -76,19 +75,18 @@ export const COMMAND_REGISTRY = {
   list_reply: Handler_25,
   menu_get_avatar: Handler_26,
   menu_get_sticker: Handler_27,
-  pin_message: Handler_28,
-  random_restaurant: Handler_29,
-  record: Handler_30,
-  role_message: Handler_31,
-  roll_call: Handler_32,
-  search_anime_scene: Handler_33,
-  sticker_frequency: Handler_34,
-  talk: Handler_35,
-  talk_signed: Handler_36,
-  temp_role: Handler_37,
-  traffic: Handler_38,
-  traffic_me: Handler_39,
-  traffic_user: Handler_40,
-  update_role: Handler_41,
-  weather_forecast: Handler_42,
+  random_restaurant: Handler_28,
+  record: Handler_29,
+  role_message: Handler_30,
+  roll_call: Handler_31,
+  search_anime_scene: Handler_32,
+  sticker_frequency: Handler_33,
+  talk: Handler_34,
+  talk_signed: Handler_35,
+  temp_role: Handler_36,
+  traffic: Handler_37,
+  traffic_me: Handler_38,
+  traffic_user: Handler_39,
+  update_role: Handler_40,
+  weather_forecast: Handler_41,
 } as const satisfies Readonly<Record<string, new () => Command>>;

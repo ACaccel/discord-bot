@@ -223,21 +223,6 @@
   "menu_get_sticker": {
     "name": "Get emoji/sticker URL"
   },
-  "pin_message": {
-    "description": "Pin a message",
-    "options": {
-      "action": {
-        "description": "Pin or unpin",
-        "choices": {
-          "pin": "Pin",
-          "unpin": "Unpin"
-        }
-      },
-      "message_link": {
-        "description": "Link to the message to pin"
-      }
-    }
-  },
   "random_restaurant": {
     "description": "Random restaurant picker (Taipei / parts of New Taipei)",
     "options": {

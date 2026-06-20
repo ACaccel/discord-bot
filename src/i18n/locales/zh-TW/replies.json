@@ -39,15 +39,6 @@
     "is_not_gay": "{{name}} 不是 gay",
     "failed": "唔...這次判定失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
   },
-  "pin_message": {
-    "not_in_thread": "這個指令只能在討論串使用喔",
-    "not_thread_owner": "你不是串主喔",
-    "unpinned": "已取消釘選訊息",
-    "pinned": "已釘選訊息",
-    "invalid_action": "無效的指令",
-    "operation_failed": "無法釘選訊息",
-    "failed": "唔...釘選操作失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
-  },
   "add_reply": {
     "added": "已新增 輸入:{{input}} 回覆:{{reply}}!",
     "already_exists": "此配對 輸入:{{input}} 回覆:{{reply}} 已經存在!",
