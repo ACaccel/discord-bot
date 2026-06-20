@@ -33,17 +33,23 @@ container.
 
 ## Ops runbooks
 
-- [verify-db](ops/verify-db.md) —
+The DB-maintenance runbooks below all run through the unified
+`yarn db <subcommand>` CLI (`tools/db/`, one `config.json`); `msg-backup`
+remains its own tool.
+
+- [verify-db](ops/verify-db.md) (`yarn db verify`) —
   read-only validity checker for a guild's `messages` collection
   (null / empty / duplicate `messageId`, missing `channelId` /
   `userId` / `userName`, invalid `timestamp`).
+- [migrate-timestamp](ops/migrate-timestamp.md) (`yarn db migrate-timestamp`)
+  — audits, converts (String → numeric), and indexes the
+  `messages.timestamp` field so the range queries can drop `$toLong` and
+  become index-served; mandatory fail-fast backup before any conversion.
+- [drop-todo](ops/drop-todo.md) (`yarn db drop-todo`) — drops the retired
+  `todo_list` feature's `todos` collection per guild; dry-run by default.
 - [msg-backup](ops/msg-backup.md) — full re-ingest of a guild's
   message history from Discord; backfills missing `messageId`s,
   removes leftover bot messages, repairs duplicates.
-- [migrate-timestamp](ops/migrate-timestamp.md) — audits, converts
-  (String → numeric), and indexes the `messages.timestamp` field so the
-  range queries can drop `$toLong` and become index-served; mandatory
-  fail-fast backup before any conversion.
 
 ## See also
 

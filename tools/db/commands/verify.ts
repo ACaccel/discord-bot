@@ -1,19 +1,11 @@
 /**
- * Ops tool — verify the structural validity of a guild's `messages`
+ * `db verify` — read-only structural validation of a guild's `messages`
  * collection.
  *
- * Read-only by design. Runs a fixed battery of checks against the
- * collection and produces a JSON report. Replaces the older single-
- * purpose `inspect-null-message-ids.ts`; "messageId is null" is now
- * one of the eight checks below rather than the whole tool.
- *
- * Configuration
- * -------------
- * All inputs come from `tools/verify_db/config.json` (gitignored —
- * never commit operator credentials). No CLI args. The config schema
- * is documented in the sibling `config.example.json` and validated
- * at startup by `internal.parseConfig`; missing or malformed fields
- * fail-fast with a structured `ConfigurationError`.
+ * Runs a fixed battery of checks and produces a JSON report. Single-guild
+ * by contract: the shared `guilds` block must hold exactly one id, else
+ * the command fails with a `ConfigurationError` rather than silently
+ * verifying only the first guild.
  *
  * Checks
  * ------
@@ -26,31 +18,22 @@
  *   - `timestamp-invalid`      `timestamp` non-numeric or <= 0
  *   - `total-count`            informational; never a violation
  *
- * Output
- * ------
- * JSON report to stdout (or `output_path` if set), plus a final
- * `PASS` / `FAIL` line. Exit code is 0 when every check has zero
- * violations, 1 otherwise. The duplicate check additionally emits the
- * offending `messageId` values and their counts under
- * `duplicateGroups`.
- *
- * Authentication
- * --------------
- * `internal.buildGuildUri` defaults `authSource=admin` when the
- * operator-supplied `mongo_uri` omits it — matching the bot's
- * `buildGuildMongoUri`.
+ * Exit code is 0 when every check has zero violations, 1 otherwise.
  */
-import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import type { Connection } from 'mongoose';
+import { z } from 'zod';
 
-import mongoose, { type Connection } from 'mongoose';
-
-import { createBootstrapLogger } from '../../src/core/config';
-
-import { buildGuildUri, createProgressWriter, parseConfig } from './internal';
+import { ConfigurationError } from '../../../src/core/errors/configuration-error';
+import { defineCommand, type DbCommandResult } from '../framework/command';
+import { createProgressWriter } from '../framework/progress';
 
 const CONTENT_PREVIEW_LENGTH = 50;
-const CONFIG_PATH = resolve(__dirname, 'config.json');
+
+export const verifyOptionsSchema = z.object({
+  sample_limit: z.number().int().min(0).default(50),
+});
+
+type VerifyOptions = z.infer<typeof verifyOptionsSchema>;
 
 interface SampleDoc {
   readonly _id: string;
@@ -81,7 +64,7 @@ interface CheckTotalResult {
 
 type CheckResult = CheckSampleResult | CheckDuplicateResult | CheckTotalResult;
 
-interface Report {
+interface VerifyReport {
   readonly guildId: string;
   readonly totalCount: number;
   readonly checks: readonly CheckResult[];
@@ -109,10 +92,10 @@ interface FilterCheck {
 
 /**
  * Each filter-based check shares the same shape: count + sample. The
- * `violationField` names the field whose value the sample echoes back
- * so the operator can spot the actual offending value.
+ * `violationField` names the field whose value the sample echoes back so
+ * the operator can spot the actual offending value.
  */
-const FILTER_CHECKS: readonly FilterCheck[] = [
+export const FILTER_CHECKS: readonly FilterCheck[] = [
   { name: 'messageId-null', violationField: 'messageId', filter: { messageId: null } },
   { name: 'messageId-empty-string', violationField: 'messageId', filter: { messageId: '' } },
   {
@@ -178,11 +161,8 @@ const runDuplicateCheck = async (
   //
   // Single pass: fetch ALL dup groups sorted by count desc, then derive
   // violationCount (sum of excess docs per group) and the top-N sample
-  // in JS. Previously this ran two server-side aggregations; the second
-  // pass for the total was redundant since the first already had the
-  // data once `$limit` is removed. Halves cluster load on large
-  // collections at the cost of holding all dup groups in process memory
-  // (each group is `{_id: string, count: number}` — negligible).
+  // in JS. Holding all dup groups in process memory is negligible (each
+  // group is `{_id: string, count: number}`).
   type DupGroup = { readonly _id: string; readonly count: number };
   const allGroups = (await collection
     .aggregate([
@@ -202,9 +182,9 @@ const runDuplicateCheck = async (
 };
 
 /**
- * In-place progress reporter — writes to stderr so the stdout JSON
- * report stays uncluttered. The TTY-aware writer factory lives in
- * `internal.ts`; this module just binds it to `process.stderr`.
+ * In-place progress reporter — writes to stderr so the stdout JSON report
+ * stays uncluttered. TTY detection is read once at module load, matching
+ * the standalone tool's behaviour.
  */
 const writeProgress = createProgressWriter(
   {
@@ -219,16 +199,16 @@ const runAllChecks = async (
   connection: Connection,
   guildId: string,
   sampleLimit: number,
-): Promise<Report> => {
+): Promise<VerifyReport> => {
   const db = connection.db;
   if (db === undefined) {
     throw new Error(`mongoose connection has no resolved db handle for guild ${guildId}`);
   }
   const collection = db.collection('messages');
 
-  // Build the ordered list of checks (filter checks interleaved with
-  // the duplicate aggregation at its canonical slot) so progress
-  // numbering matches output ordering. `+ 1` for total-count tail.
+  // Build the ordered list of checks (filter checks interleaved with the
+  // duplicate aggregation at its canonical slot) so progress numbering
+  // matches output ordering. `+ 1` for the total-count tail.
   type Step =
     | { readonly kind: 'filter'; readonly check: FilterCheck }
     | { readonly kind: 'duplicate' }
@@ -281,50 +261,39 @@ const runAllChecks = async (
   return { guildId, totalCount, checks };
 };
 
-const main = async (): Promise<void> => {
-  // Force-disable the file-router sink for this ops invocation —
-  // a one-shot read-only verifier must not pollute `logs/<bot>/...`
-  // with synthetic, bot-less records. `createBootstrapLogger` honours
-  // `LOG_DIR=''` as the explicit toggle that skips the file sink.
-  process.env['LOG_DIR'] = '';
-  const logger = createBootstrapLogger({ component: 'verify_db' });
+export const verifyCommand = defineCommand<VerifyOptions>({
+  name: 'verify',
+  description: "Read-only structural validation of a guild's messages collection.",
+  optionsSchema: verifyOptionsSchema,
+  run: async ({ shared, options, logger, withGuildConnection }): Promise<DbCommandResult> => {
+    const [guildId, ...rest] = shared.guilds;
+    if (guildId === undefined || rest.length > 0) {
+      throw new ConfigurationError({
+        code: 'INVALID_CONFIG_JSON',
+        messageKey: 'errors:config.invalid',
+        context: {
+          operation: 'db.verify',
+          input: {
+            field: 'guilds',
+            reason: 'verify operates on exactly one guild; provide a single-element guilds array',
+          },
+        },
+      });
+    }
 
-  const config = parseConfig(CONFIG_PATH);
-  const guildUri = buildGuildUri(config.mongoUri, config.guildId);
+    logger.info({ guildId, sampleLimit: options.sample_limit }, 'db verify: connecting');
+    const report = await withGuildConnection(guildId, (connection) =>
+      runAllChecks(connection, guildId, options.sample_limit),
+    );
 
-  logger.info(
-    { guildId: config.guildId, sampleLimit: config.sampleLimit },
-    'verify_db: connecting',
-  );
-
-  const connection = await mongoose.createConnection(guildUri).asPromise();
-  let report: Report;
-  try {
-    report = await runAllChecks(connection, config.guildId, config.sampleLimit);
-  } finally {
-    await connection.close();
-  }
-
-  const serialised = `${JSON.stringify(report, null, 2)}\n`;
-  if (config.outputPath !== null) {
-    writeFileSync(config.outputPath, serialised, 'utf8');
-    logger.info({ outputPath: config.outputPath }, 'verify_db: results written');
-  } else {
-    process.stdout.write(serialised);
-  }
-
-  const totalViolations = report.checks.reduce((acc, c) => acc + c.violationCount, 0);
-  if (totalViolations === 0) {
-    process.stdout.write('PASS\n');
-    process.exitCode = 0;
-  } else {
-    process.stdout.write(`FAIL (${String(totalViolations)} violations across all checks)\n`);
-    process.exitCode = 1;
-  }
-};
-
-main().catch((err: unknown) => {
-  const message = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`[verify_db] FAIL: ${message}\n`);
-  process.exit(1);
+    const totalViolations = report.checks.reduce((acc, c) => acc + c.violationCount, 0);
+    return {
+      report,
+      summaryLine:
+        totalViolations === 0
+          ? 'PASS'
+          : `FAIL (${String(totalViolations)} violations across all checks)`,
+      exitCode: totalViolations === 0 ? 0 : 1,
+    };
+  },
 });

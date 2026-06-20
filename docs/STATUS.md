@@ -38,6 +38,11 @@ routing, and a CJK-literal scanner enforced in strict mode. See
   `uncaughtException` net tolerates a whitelisted transient blip
   (`isTransientNetworkError`) instead of shutting the bot down; `message-backup`'s
   repeat loop is failure-isolated.
+- Unified `db` ops CLI (`tools/db/`, `yarn db <subcommand>`): consolidates the
+  former `verify_db` / `migrate_timestamp` / `drop_todo_collection` tools behind
+  one extensible Strategy + registry, one shared connection/config/logging layer,
+  and a single `config.json` (shared block + per-operation `operations` map). The
+  standalone `yarn <tool>` scripts and their directories were removed (breaking).
 
 ### In progress
 

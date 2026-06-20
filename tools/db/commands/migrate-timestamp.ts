@@ -1,60 +1,135 @@
 /**
- * Ops tool — migrate the `Message.timestamp` field to a uniform numeric
- * type across every guild database, so the `MessageRepo` range queries
- * can drop `$toLong` and become index-served.
+ * `db migrate-timestamp` — migrate the `Message.timestamp` field to a
+ * uniform numeric type across every guild database, so the `MessageRepo`
+ * range queries can drop the non-sargable `$toLong` predicate and become
+ * index-served.
  *
- * Three modes (selected via `config.json` `mode`):
+ * Three modes (selected via the `operations.migrate-timestamp.mode`
+ * config field):
  *   - `audit`   read-only. Per guild, count String-typed / numeric-string
  *               / non-numeric-string / null-or-missing timestamps and
  *               print a fleet recommendation. ALWAYS exits 0.
  *   - `convert` write. For each guild with convertible rows: take a
- *               mandatory in-database snapshot (fail-fast — no backup,
- *               no convert), run the String → numeric `updateMany`, then
+ *               mandatory in-database snapshot (fail-fast — no backup, no
+ *               convert), run the String → numeric `updateMany`, then
  *               re-verify the convertible count is 0. `dry_run: true`
- *               counts + samples without writing. Exits 1 if any guild
- *               is left non-clean or fails.
+ *               counts + samples without writing. Exits 1 if any guild is
+ *               left non-clean or fails.
  *   - `index`   write. Build `{ timestamp: 1 }` and
  *               `{ channelId: 1, timestamp: 1 }` per guild (idempotent).
  *
- * Per-guild `try/catch` isolation: one guild's failure never aborts the
- * rest of the fleet; re-runs are idempotent. See the sibling README for
- * the full runbook (audit → convert → verify → index → deploy) and the
- * hard gate: the numeric-timestamp repo predicate must not ship until
- * every guild reports zero String-typed timestamps.
- *
- * Configuration comes from `tools/migrate_timestamp/config.json`
- * (gitignored — never commit operator credentials), validated at startup
- * by `internal.parseConfig`. Output is a JSON report to stdout (or
- * `output_path`) plus a final PASS/FAIL/RECOMMENDATION line.
+ * Per-guild failure isolation (via `runPerGuild`): one guild's failure
+ * never aborts the rest of the fleet; re-runs are idempotent. See the
+ * unified README for the full runbook and the hard gate: the
+ * numeric-timestamp repo predicate must not ship until every guild
+ * reports zero String-typed timestamps.
  */
-import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import type { Connection } from 'mongoose';
+import { z } from 'zod';
 
-import mongoose, { type Connection } from 'mongoose';
+import { defineCommand, type DbCommandResult } from '../framework/command';
+import { runPerGuild, type GuildOutcome } from '../framework/guild-runner';
 
-import { createBootstrapLogger } from '../../src/core/config';
-import { buildGuildMongoUri } from '../../src/infra/mongo/connection-manager';
-
-import {
-  backupCollectionName,
-  buildConvertFilter,
-  buildConvertPipeline,
-  buildIndexSpecs,
-  NON_NUMERIC_STRING_FILTER,
-  NULL_OR_MISSING_FILTER,
-  NUMERIC_STRING_FILTER,
-  parseConfig,
-  STRING_TYPED_FILTER,
-  type MigrateConfig,
-} from './internal';
-
-const CONFIG_PATH = resolve(__dirname, 'config.json');
 const MESSAGES_COLLECTION = 'messages';
 
 // Derive the resolved db handle from mongoose's own `Connection` type so the
 // tool does not take a direct dependency on the `mongodb` driver package (it
-// is only a transitive dependency of mongoose, as in the sibling ops tools).
+// is only a transitive dependency of mongoose).
 type GuildDb = NonNullable<Connection['db']>;
+
+/** The three phases of the migration, selected per run via config. */
+export type MigrateMode = 'audit' | 'convert' | 'index';
+
+export const MIGRATE_MODES: readonly MigrateMode[] = ['audit', 'convert', 'index'];
+
+export const migrateTimestampOptionsSchema = z.object({
+  mode: z.enum(['audit', 'convert', 'index']),
+  dry_run: z.boolean().default(false),
+  sample_limit: z.number().int().min(0).default(20),
+});
+
+type MigrateOptions = z.infer<typeof migrateTimestampOptionsSchema>;
+
+// ---------- Query / pipeline builders ----------
+
+/**
+ * The audit buckets. `string-typed` is the migration's scope; a row is
+ * convertible only when it is also `numeric-string`. `non-numeric-string`
+ * are garbage rows routed to manual triage (never auto-converted). The
+ * regex is anchored digits-only so an empty or sign-prefixed string is
+ * treated as garbage, not a timestamp.
+ */
+export const STRING_TYPED_FILTER: Readonly<Record<string, unknown>> = {
+  timestamp: { $type: 'string' },
+};
+
+/** Convertible legacy rows: String-typed AND all-digit. */
+export const NUMERIC_STRING_FILTER: Readonly<Record<string, unknown>> = {
+  timestamp: { $type: 'string', $regex: /^[0-9]+$/ },
+};
+
+/** Garbage rows: String-typed but not all-digit. Manual triage only. */
+export const NON_NUMERIC_STRING_FILTER: Readonly<Record<string, unknown>> = {
+  timestamp: { $type: 'string', $not: /^[0-9]+$/ },
+};
+
+/** Informational: `{ timestamp: null }` also matches a missing field. */
+export const NULL_OR_MISSING_FILTER: Readonly<Record<string, unknown>> = {
+  timestamp: null,
+};
+
+/** The match filter for the conversion `updateMany` — convertible rows only. */
+export const buildConvertFilter = (): Record<string, unknown> => ({
+  timestamp: { $type: 'string', $regex: /^[0-9]+$/ },
+});
+
+/**
+ * The aggregation-pipeline update body. The pipeline form is required to
+ * reference the field's own value. `$convert` with `onError: '$timestamp'`
+ * leaves a value unchanged if it cannot be coerced (e.g. an int64
+ * overflow) rather than aborting the whole batch — such a row stays
+ * String and is caught by the post-conversion verify count.
+ */
+export const buildConvertPipeline = (): Record<string, unknown>[] => [
+  {
+    $set: {
+      timestamp: {
+        $convert: { input: '$timestamp', to: 'long', onError: '$timestamp' },
+      },
+    },
+  },
+];
+
+/**
+ * Per-guild in-database snapshot name for the mandatory pre-conversion
+ * backup. Encodes a sortable UTC timestamp so repeated runs never
+ * overwrite an earlier snapshot. Colons/dots are replaced so the name is
+ * a valid MongoDB collection identifier.
+ */
+export const backupCollectionName = (nowMs: number): string => {
+  const stamp = new Date(nowMs).toISOString().replace(/[:.]/g, '-');
+  return `messages_backup_pre_ts_${stamp}`;
+};
+
+export interface IndexSpec {
+  readonly name: string;
+  readonly spec: Readonly<Record<string, 1>>;
+}
+
+/**
+ * Indexes the timestamp migration adds. `{ timestamp: 1 }` serves the
+ * cross-channel range query (`findByTimestampRange`); the compound
+ * `{ channelId: 1, timestamp: 1 }` serves the per-channel range query and
+ * its sort (`findByChannelAndTimestampRange`, `findRecentByChannel`).
+ * Names are pinned so they match the mongoose-built indexes from the
+ * schema declarations and `createIndex` stays a no-op on re-run.
+ */
+export const buildIndexSpecs = (): readonly IndexSpec[] => [
+  { name: 'timestamp_1', spec: { timestamp: 1 } },
+  { name: 'channelId_1_timestamp_1', spec: { channelId: 1, timestamp: 1 } },
+];
+
+// ---------- Per-guild mode handlers ----------
 
 interface AuditGuildResult {
   readonly mode: 'audit';
@@ -89,13 +164,6 @@ interface IndexGuildResult {
 
 type GuildResult = AuditGuildResult | ConvertGuildResult | IndexGuildResult;
 
-interface GuildOutcome {
-  readonly guildId: string;
-  readonly ok: boolean;
-  readonly result: GuildResult | null;
-  readonly error: string | null;
-}
-
 /** Narrow `connection.db` to a resolved handle or fail loudly. */
 const dbOf = (connection: Connection, guildId: string): GuildDb => {
   const db = connection.db;
@@ -129,7 +197,7 @@ const sampleConvertibleIds = async (db: GuildDb, limit: number): Promise<string[
 
 const convertGuild = async (
   db: GuildDb,
-  config: MigrateConfig,
+  options: MigrateOptions,
   nowMs: number,
 ): Promise<ConvertGuildResult> => {
   const collection = db.collection(MESSAGES_COLLECTION);
@@ -142,21 +210,21 @@ const convertGuild = async (
 
   const base = {
     mode: 'convert' as const,
-    dryRun: config.dryRun,
+    dryRun: options.dry_run,
     total,
     stringTypedBefore,
     numericStringBefore,
     nonNumericString,
   };
 
-  if (config.dryRun) {
+  if (options.dry_run) {
     return {
       ...base,
       status: 'dry-run',
       backupCollection: null,
       modifiedCount: 0,
       numericStringAfter: numericStringBefore,
-      sample: await sampleConvertibleIds(db, config.sampleLimit),
+      sample: await sampleConvertibleIds(db, options.sample_limit),
     };
   }
 
@@ -212,32 +280,24 @@ const indexGuild = async (db: GuildDb): Promise<IndexGuildResult> => {
   return { mode: 'index', ensured };
 };
 
-const runGuild = async (
-  config: MigrateConfig,
-  guildId: string,
-  nowMs: number,
-): Promise<GuildResult> => {
-  const uri = buildGuildMongoUri(config.mongoUri, guildId);
-  const connection = await mongoose.createConnection(uri).asPromise();
-  try {
-    const db = dbOf(connection, guildId);
-    switch (config.mode) {
-      case 'audit':
-        return await auditGuild(db);
-      case 'convert':
-        return await convertGuild(db, config, nowMs);
-      case 'index':
-        return await indexGuild(db);
-    }
-  } finally {
-    await connection.close();
+const runMode = (db: GuildDb, options: MigrateOptions, nowMs: number): Promise<GuildResult> => {
+  switch (options.mode) {
+    case 'audit':
+      return auditGuild(db);
+    case 'convert':
+      return convertGuild(db, options, nowMs);
+    case 'index':
+      return indexGuild(db);
   }
 };
 
 /** Whether the run, given its outcomes, should exit non-zero. */
-const computeFailure = (config: MigrateConfig, outcomes: readonly GuildOutcome[]): boolean => {
+export const computeFailure = (
+  options: MigrateOptions,
+  outcomes: readonly GuildOutcome<GuildResult>[],
+): boolean => {
   if (outcomes.some((o) => !o.ok)) return true;
-  if (config.mode === 'convert' && !config.dryRun) {
+  if (options.mode === 'convert' && !options.dry_run) {
     return outcomes.some(
       (o) =>
         o.result?.mode === 'convert' &&
@@ -248,12 +308,12 @@ const computeFailure = (config: MigrateConfig, outcomes: readonly GuildOutcome[]
 };
 
 /** One human-readable recommendation/summary line per mode. */
-const summaryLine = (
-  config: MigrateConfig,
-  outcomes: readonly GuildOutcome[],
+export const summaryLine = (
+  options: MigrateOptions,
+  outcomes: readonly GuildOutcome<GuildResult>[],
   failed: boolean,
 ): string => {
-  if (config.mode === 'audit') {
+  if (options.mode === 'audit') {
     const needConvert = outcomes
       .filter((o) => o.result?.mode === 'audit' && o.result.numericString > 0)
       .map((o) => o.guildId);
@@ -269,8 +329,8 @@ const summaryLine = (
     }
     return parts.join('; ');
   }
-  if (config.mode === 'convert') {
-    if (config.dryRun) {
+  if (options.mode === 'convert') {
+    if (options.dry_run) {
       return 'CONVERT (dry-run): no writes performed; review the per-guild sample/counts above.';
     }
     return failed
@@ -282,54 +342,38 @@ const summaryLine = (
     : 'INDEX: PASS — indexes ensured on every guild.';
 };
 
-const main = async (): Promise<void> => {
-  // A one-shot ops tool must not pollute `logs/<bot>/...` with synthetic
-  // records — `createBootstrapLogger` honours `LOG_DIR=''` as the toggle
-  // that skips the file sink (matching verify_db / msg_backup).
-  process.env['LOG_DIR'] = '';
-  const logger = createBootstrapLogger({ component: 'migrate_timestamp' });
+export const migrateTimestampCommand = defineCommand<MigrateOptions>({
+  name: 'migrate-timestamp',
+  description: 'Migrate Message.timestamp String -> numeric (modes: audit | convert | index).',
+  optionsSchema: migrateTimestampOptionsSchema,
+  run: async ({ shared, options, logger, withGuildConnection }): Promise<DbCommandResult> => {
+    const nowMs = Date.now();
+    logger.info(
+      { mode: options.mode, dryRun: options.dry_run, guilds: shared.guilds.length },
+      'db migrate-timestamp: start',
+    );
 
-  const config = parseConfig(CONFIG_PATH);
-  const nowMs = Date.now();
-  logger.info(
-    { mode: config.mode, dryRun: config.dryRun, guilds: config.guilds.length },
-    'migrate_timestamp: start',
-  );
+    const outcomes = await runPerGuild<GuildResult>(
+      shared.guilds,
+      (guildId) =>
+        withGuildConnection(guildId, (connection) =>
+          runMode(dbOf(connection, guildId), options, nowMs),
+        ),
+      logger,
+      'db migrate-timestamp',
+    );
 
-  const outcomes: GuildOutcome[] = [];
-  for (const guildId of config.guilds) {
-    try {
-      const result = await runGuild(config, guildId, nowMs);
-      outcomes.push({ guildId, ok: true, result, error: null });
-      logger.info({ guildId, result }, 'migrate_timestamp: guild done');
-    } catch (err: unknown) {
-      const error = err instanceof Error ? err.message : String(err);
-      outcomes.push({ guildId, ok: false, result: null, error });
-      logger.error({ guildId, error }, 'migrate_timestamp: guild failed');
-    }
-  }
-
-  const failed = computeFailure(config, outcomes);
-  const report = {
-    mode: config.mode,
-    dryRun: config.dryRun,
-    generatedAt: new Date(nowMs).toISOString(),
-    guilds: outcomes,
-  };
-  const serialised = `${JSON.stringify(report, null, 2)}\n`;
-  if (config.outputPath !== null) {
-    writeFileSync(config.outputPath, serialised, 'utf8');
-    logger.info({ outputPath: config.outputPath }, 'migrate_timestamp: report written');
-  } else {
-    process.stdout.write(serialised);
-  }
-
-  process.stdout.write(`${summaryLine(config, outcomes, failed)}\n`);
-  process.exitCode = failed ? 1 : 0;
-};
-
-main().catch((err: unknown) => {
-  const message = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`[migrate_timestamp] FAIL: ${message}\n`);
-  process.exit(1);
+    const failed = computeFailure(options, outcomes);
+    const report = {
+      mode: options.mode,
+      dryRun: options.dry_run,
+      generatedAt: new Date(nowMs).toISOString(),
+      guilds: outcomes,
+    };
+    return {
+      report,
+      summaryLine: summaryLine(options, outcomes, failed),
+      exitCode: failed ? 1 : 0,
+    };
+  },
 });

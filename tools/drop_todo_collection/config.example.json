@@ -1,6 +1,0 @@
-{
-  "mongo_uri": "mongodb://user:pass@host:port/?authSource=admin",
-  "guilds": ["<guild id>"],
-  "dry_run": true,
-  "output_path": null
-}

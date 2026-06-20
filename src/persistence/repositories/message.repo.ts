@@ -212,7 +212,7 @@ export class MongoMessageRepo implements MessageRepo {
       );
     }
     try {
-      // `timestamp` is a numeric epoch (the one-time tools/migrate_timestamp
+      // `timestamp` is a numeric epoch (the one-time `db migrate-timestamp`
       // backfill removed the legacy String rows that once required a
       // `$toLong` projection), so this plain half-open range is sargable
       // and served by the `{ timestamp: 1 }` index instead of a collection scan.

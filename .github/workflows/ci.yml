@@ -43,8 +43,8 @@ jobs:
       - run: yarn test:i18n
 
   test-tools:
-    # Unit tests for the standalone ops scripts under `tools/<name>/`
-    # (msg_backup / verify_db). They run the `tools` vitest project,
+    # Unit tests for the ops scripts under `tools/<name>/`
+    # (msg_backup / db). They run the `tools` vitest project,
     # which exercises pure internals only — no Discord/Mongo boot — so
     # no `seed-bot-config` is needed.
     runs-on: ubuntu-latest

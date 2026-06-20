@@ -16,7 +16,7 @@ the script in
 
 Use `msg_backup` when a guild's `messages` collection has drifted
 from Discord-side truth and needs a one-shot reconciliation —
-typically signalled by `verify_db` reporting non-zero violations
+typically signalled by `yarn db verify` reporting non-zero violations
 for any of `messageId-null`, `messageId-empty-string`, or
 `messageId-duplicate`, OR by a report that reaction counts /
 edited message content in the DB no longer match Discord.

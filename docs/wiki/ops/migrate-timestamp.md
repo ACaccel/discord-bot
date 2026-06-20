@@ -4,9 +4,10 @@ A multi-guild ops tool that migrates the `Message.timestamp` field to a
 uniform numeric type so the `MessageRepo` range queries can drop the
 non-sargable `$toLong` predicate and become index-served.
 
-This page is a quick-reference runbook; the field-by-field reference and
-the full safety/restore notes live next to the script in
-[`tools/migrate_timestamp/README.md`](../../../tools/migrate_timestamp/README.md).
+`migrate-timestamp` is one subcommand of the unified `db` ops CLI. This
+page is a quick-reference runbook; the field-by-field reference and the
+full safety/restore notes live next to the script in
+[`tools/db/README.md`](../../../tools/db/README.md).
 
 ## Rationale
 
@@ -31,17 +32,17 @@ are declared on the schema (C4) and pre-built by this tool's `index` mode.
 
 ## Invocation
 
-1. Copy `tools/migrate_timestamp/config.example.json` to
-   `tools/migrate_timestamp/config.json`.
-2. Fill in `mongo_uri`, `guilds`, and `mode`
-   (`audit` | `convert` | `index`).
+1. Copy `tools/db/config.example.json` to `tools/db/config.json`.
+2. Fill in the shared `mongo_uri` and `guilds`, plus
+   `operations.migrate-timestamp.mode` (`audit` | `convert` | `index`).
 3. Run:
    ```
-   yarn migrate_timestamp
+   yarn db migrate-timestamp
    ```
 
-`config.json` is `.gitignore`d. There are **no CLI arguments** — every
-input lives in the config file; change `mode` between phases.
+`config.json` is `.gitignore`d. The only CLI input is the subcommand
+(and an optional `--config <path>`); every other input lives in the
+config file — change `operations.migrate-timestamp.mode` between phases.
 
 ## Workflow
 
@@ -78,11 +79,12 @@ input lives in the config file; change `mode` between phases.
 
 ## Tests
 
-The pure internals (`parseConfig`, the audit/convert/index builders) are
-covered by a unit suite that needs no live Mongo:
+The pure internals (the config loader, the audit/convert/index builders,
+the failure/summary derivation) are covered by the unified `tools/db`
+unit suite that needs no live Mongo:
 
 ```
-yarn migrate_timestamp:test
+yarn db:test
 ```
 
 ## Exit codes

@@ -4,9 +4,9 @@ A **read-only** ops tool that runs a fixed battery of structural
 validity checks against a guild's `messages` Mongo collection and
 produces a JSON report.
 
-This page is a quick-reference runbook; the field-by-field reference
-lives next to the script in
-[`tools/verify_db/README.md`](../../../tools/verify_db/README.md).
+`verify` is one subcommand of the unified `db` ops CLI. This page is a
+quick-reference runbook; the field-by-field reference lives next to the
+script in [`tools/db/README.md`](../../../tools/db/README.md).
 
 ## Rationale
 
@@ -35,26 +35,27 @@ hidden until they crash a downstream report.
 
 ## Invocation
 
-1. Copy `tools/verify_db/config.example.json` to
-   `tools/verify_db/config.json`.
-2. Fill in `mongo_uri` and `guild_id` (and optionally `sample_limit`
-   / `output_path`).
+1. Copy `tools/db/config.example.json` to `tools/db/config.json`.
+2. Fill in the shared `mongo_uri` and a **single-element** `guilds`
+   array (`verify` operates on exactly one guild), plus optionally
+   `operations.verify.sample_limit` and the shared `output_path`.
 3. Run:
    ```
-   yarn verify_db
+   yarn db verify
    ```
 
-`config.json` is `.gitignore`d. There are **no CLI arguments** —
-every input lives in the config file.
+`config.json` is `.gitignore`d. The only CLI input is the subcommand
+(and an optional `--config <path>`); every other input lives in the
+config file.
 
 ## Tests
 
-The pure internals (`parseConfig`, `buildGuildUri`, the
-progress-writer factory) are covered by a dedicated unit suite under
-`tools/verify_db/verify_db.test.ts`:
+The pure internals (the config loader, the per-command contract, the
+progress-writer factory) are covered by the unified `tools/db` unit
+suite:
 
 ```
-yarn verify_db:test
+yarn db:test
 ```
 
 The suite runs in the `tools` vitest project and does not require a

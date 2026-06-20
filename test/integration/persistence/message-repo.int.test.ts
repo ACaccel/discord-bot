@@ -243,7 +243,7 @@ describe('MongoMessageRepo (integration)', () => {
 
       // Insert a legacy String-typed timestamp via the raw driver, bypassing
       // mongoose's Number cast — the exact shape the pre-refactor schema left
-      // behind and that tools/migrate_timestamp backfills.
+      // behind and that `db migrate-timestamp` backfills.
       await raw.insertOne({
         channelId: String(channelId),
         channelName: 'general',
@@ -265,9 +265,9 @@ describe('MongoMessageRepo (integration)', () => {
       const before = unwrap(await repo.findByTimestampRange(startMs, endMs));
       expect(before.map((d) => d.messageId)).not.toContain('legacy');
 
-      // Apply the same conversion tools/migrate_timestamp runs
+      // Apply the same conversion `db migrate-timestamp` runs
       // (buildConvertFilter + buildConvertPipeline, asserted shape-for-shape
-      // in tools/migrate_timestamp/migrate_timestamp.test.ts).
+      // in tools/db/commands/migrate-timestamp.test.ts).
       await raw.updateMany({ timestamp: { $type: 'string', $regex: /^[0-9]+$/ } }, [
         {
           $set: {

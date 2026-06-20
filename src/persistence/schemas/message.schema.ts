@@ -46,7 +46,7 @@ export const messageSchema = new Schema({
 // `findRecentByChannel`'s reverse sort). These only become sargable once
 // stored timestamps are uniformly numeric — the `MessageRepo` predicates
 // were `$toLong`-wrapped for legacy String rows until the one-time
-// `tools/migrate_timestamp` backfill made every timestamp numeric.
+// `db migrate-timestamp` backfill made every timestamp numeric.
 messageSchema.index({ timestamp: 1 });
 messageSchema.index({ channelId: 1, timestamp: 1 });
 

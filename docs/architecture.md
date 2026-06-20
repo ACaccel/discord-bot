@@ -318,7 +318,7 @@ options, lives in [`docs/history/`](history/README.md).
   fail-safe when an ancestor is uncached
   (→ [0002](history/0002-channel-aware-full-ancestry-rank.md)).
 - **Index-served numeric timestamps** over a computed `$toLong` predicate, after
-  a one-time `migrate_timestamp` backfill
+  a one-time `db migrate-timestamp` backfill
   (→ [0003](history/0003-migrate-timestamp-numeric-migration.md),
   [0004](history/0004-index-served-timestamp-range-reads.md)).
 - **Fail-fast zod configuration** validated at startup; a malformed
