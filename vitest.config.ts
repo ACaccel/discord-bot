@@ -3,26 +3,17 @@ import path from 'path';
 
 /**
  * Root Vitest config — coverage / shared settings only. The project
- * layout (unit / integration / contract / i18n) lives in
+ * layout (unit / integration / contract / i18n / tools) lives in
  * `vitest.workspace.ts`. Yarn scripts pick a project via `--project`.
  *
- * Coverage thresholds enforce the plan §5.1 floors WHERE the layer
- * actually exists today:
- *   - `src/core/**` is at 100% line / branch / func; the 90% floor
- *     locks in the audit baseline.
- *   - Overall lines floor (`lines: 46`) is the post-PR-G5 baseline.
- *     `src/core/**` and the persistence repos are well-covered (90% /
- *     integration tests via mongodb-memory-server); the remaining gap
- *     to the plan's ≥ 75% target is in `src/handlers/**` and
- *     `src/bot/**` — handler-side fixtures
- *     ship in PR-G5 (audit C-12) and the targeted unit tests for the
- *     pure helpers in `core/plugin/host/topology.ts` +
- *     `core/plugin/host/contributes-merger.ts` land alongside. The
- *     remaining raise to ≥ 75% is a multi-day effort on the legacy
- *     layers and is deferred to a follow-up after the final
- *     `refactor/architecture-overhaul → main` merge.
- *   - `domain/` + `application/` layers are intentionally absent (see
- *     audit 1.4); no thresholds defined for them.
+ * Coverage thresholds:
+ *   - `src/core/**` carries a high floor (90% line / func / statement,
+ *     89% branch); core is pure infrastructure and is kept
+ *     well-covered.
+ *   - The overall floors (`lines`/`statements: 46`, `functions: 69`,
+ *     `branches: 80`) are the enforced baseline across the whole tree;
+ *     the heavier-to-cover handler and bot layers pull the line /
+ *     statement floor down relative to core.
  */
 export default defineConfig({
   test: {

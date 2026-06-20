@@ -34,7 +34,7 @@
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:int": "vitest run --project integration",
-    "test:contract": "vitest run --project contract --passWithNoTests",
+    "test:contract": "vitest run --project contract",
     "test:i18n": "vitest run --project i18n",
     "test:tools": "vitest run --project tools",
     "test:watch": "vitest",
