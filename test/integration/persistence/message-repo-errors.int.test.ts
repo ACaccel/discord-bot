@@ -1,5 +1,5 @@
 /**
- * Integration regression for the G-2 `Result<T, DatabaseError>`
+ * Integration regression for the `Result<T, DatabaseError>`
  * boundary on `MongoMessageRepo`.
  *
  * The unit tests in `test/unit/persistence/error-translator.test.ts`

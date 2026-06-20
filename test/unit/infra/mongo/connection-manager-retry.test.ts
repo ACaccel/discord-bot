@@ -1,5 +1,5 @@
 /**
- * Unit coverage for the gap-D5 resilience contract of
+ * Unit coverage for the resilience contract of
  * `ConnectionManager`: transient-failure retry with bounded backoff,
  * persistent-failure / retry-exhaustion disabling, and the
  * `isDisabled` query surface.
@@ -45,7 +45,7 @@ const persistentError = (): DatabaseError =>
 const guildConnection = (): GuildConnection =>
   ({ guildId, connection: fakeConnection }) as unknown as GuildConnection;
 
-describe('ConnectionManager — D5 retry / disable', () => {
+describe('ConnectionManager — retry / disable', () => {
   it('retries a transient failure and succeeds within the attempt budget', async () => {
     const sleep = vi.fn(async () => {});
     let calls = 0;

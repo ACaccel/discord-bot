@@ -64,9 +64,9 @@ describe('MongoConnectionManager (integration)', () => {
     }
   });
 
-  it('retries then disables a guild whose Mongo URI is broken (REQ-C3)', async () => {
-    // REQ-C3 acceptance: a deliberately broken base URI (unresolvable
-    // host) makes every `getConnection` attempt fail with a transient
+  it('retries then disables a guild whose Mongo URI is broken', async () => {
+    // A deliberately broken base URI (unresolvable host) makes every
+    // `getConnection` attempt fail with a transient
     // server-selection timeout. The manager retries with bounded
     // backoff, then — once the budget is spent — marks the guild
     // disabled with a generated traceId. A real cluster is not needed:

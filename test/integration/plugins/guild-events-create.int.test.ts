@@ -1,6 +1,6 @@
 /**
  * Integration test for the guild-events plugin's `guildCreate`
- * subscription (gap D1).
+ * subscription.
  *
  * Drives the plugin's real `events.guildCreate` handler with a live
  * IoC container holding a fake {@link GuildOnboardingPort}, and asserts

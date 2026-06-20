@@ -56,9 +56,6 @@ export interface GiveawayDeps {
 
 export const giveawayJobKey = (message_id: string) => `giveaway:${message_id}`;
 
-export const isGiveawayJobKey = (key: string, messageId: string) =>
-  key.startsWith('giveaway:') && key.split(':')[1] === messageId;
-
 export const giveawayAnnouncement = async (
   channel: Channel,
   prize: string,

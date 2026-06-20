@@ -1,5 +1,5 @@
 /**
- * Unit coverage for `requireGuildRepos` (gap D5, C6 slice).
+ * Unit coverage for `requireGuildRepos`.
  *
  * The disabled-guild guard now reads the `ConnectionManager.isDisabled`
  * state straight off `BaseBot.connectionManager` instead of the legacy
@@ -63,7 +63,7 @@ const stubBot = (input: StubBotInput = {}): BaseBot => {
   } as unknown as BaseBot;
 };
 
-describe('requireGuildRepos (gap D5 — reads ConnectionManager.isDisabled)', () => {
+describe('requireGuildRepos — reads ConnectionManager.isDisabled', () => {
   it('replies guild_only and returns null outside a guild', async () => {
     const { interaction, replies } = stubInteraction(undefined);
     const result = await requireGuildRepos(stubBot(), interaction);

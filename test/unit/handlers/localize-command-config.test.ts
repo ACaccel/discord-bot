@@ -1,5 +1,5 @@
 /**
- * Unit coverage for `localizeCommandConfig` (gap D7).
+ * Unit coverage for `localizeCommandConfig`.
  *
  * Handlers no longer carry inline CJK command / option / choice
  * metadata; the descriptions are resolved from the `commands` i18n
@@ -19,7 +19,7 @@ const echoTranslator = (): Translator =>
     tStrict: (key: string) => `[${key}]`,
   }) as unknown as Translator;
 
-describe('localizeCommandConfig (gap D7)', () => {
+describe('localizeCommandConfig', () => {
   it('resolves a chat-input command description from commands:<name>.description', () => {
     const config: CommandConfig = { name: 'add_reply' };
     const localized = localizeCommandConfig(config, echoTranslator());

@@ -1,7 +1,7 @@
 /**
- * ModelCatalog DI integration smoke test (R2).
+ * ModelCatalog DI integration smoke test.
  *
- * After R2 the catalog is no longer a module-scope holder — it is
+ * The catalog is not a module-scope holder — it is
  * built by `LlmChatPlugin.init` and published through
  * `ctx.registerInstance(TOKENS.ModelCatalog, ...)`. This test wires
  * the plugin against a real `PluginLifecycleRunner` + container,
@@ -11,7 +11,7 @@
  *     matching the `bot.modelCatalog` getter's contract.
  *
  * The catalog's HTTP-fetch behaviour is covered elsewhere; here we
- * only care about the DI hop because that is the surface R2 changed.
+ * only care about the DI hop.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -46,7 +46,7 @@ const stubEnv: PartialEnv = {
   GEMINI_API_KEY: 'sk-test-gemini',
 };
 
-describe('ModelCatalog DI wiring (R2)', () => {
+describe('ModelCatalog DI wiring', () => {
   it('LlmChatPlugin.init registers a ModelCatalog the container can resolve', async () => {
     const container = createContainer();
     // The plugin only reads the four provider API keys off the typed

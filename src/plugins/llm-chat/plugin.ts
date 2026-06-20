@@ -170,10 +170,9 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
       const env = ctx.resolve(TOKENS.Env);
       llmService = new LLMService(createDefaultRegistry(env));
       // Build a per-bot ModelCatalog with the typed-Env-derived
-      // API-key map and publish it through the IoC container. R2
-      // replaced the prior `setActiveModelCatalog` module-global with
-      // `ctx.registerInstance` so the catalog reaches handlers via the
-      // bot's typed resolver (`bot.modelCatalog`); encapsulating the
+      // API-key map and publish it through the IoC container via
+      // `ctx.registerInstance` so the catalog reaches handlers through
+      // the bot's typed resolver (`bot.modelCatalog`); encapsulating the
       // cache + api-key map in a class keeps multiple bots in one
       // process from clobbering each other's API keys.
       const modelCatalog = new ModelCatalog({

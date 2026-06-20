@@ -1,5 +1,5 @@
 /**
- * Unit tests for {@link BaseBotGuildOnboardingPort} (gap D1, C11 slice).
+ * Unit tests for {@link BaseBotGuildOnboardingPort}.
  *
  * The port is the typed seam through which the `guild-events` plugin
  * onboards a newly joined guild. These tests drive it against a

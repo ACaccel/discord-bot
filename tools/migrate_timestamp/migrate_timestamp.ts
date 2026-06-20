@@ -19,8 +19,8 @@
  * Per-guild `try/catch` isolation: one guild's failure never aborts the
  * rest of the fleet; re-runs are idempotent. See the sibling README for
  * the full runbook (audit → convert → verify → index → deploy) and the
- * hard gate: the Phase-D repo predicate change must not ship until every
- * guild reports zero String-typed timestamps.
+ * hard gate: the numeric-timestamp repo predicate must not ship until
+ * every guild reports zero String-typed timestamps.
  *
  * Configuration comes from `tools/migrate_timestamp/config.json`
  * (gitignored — never commit operator credentials), validated at startup

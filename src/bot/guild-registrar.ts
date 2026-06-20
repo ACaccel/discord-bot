@@ -5,7 +5,7 @@
  * Single responsibility: pure assembly. The registrar does not open
  * Mongo connections, does not perform Discord I/O beyond reading the
  * local guild / channel / role caches, and never sends a message. It
- * is one of the three R1 collaborators BaseBot composes.
+ * is one of the three collaborators BaseBot composes.
  *
  * Pattern: this is a domain Builder / Assembler — it takes the wide
  * raw cache surface and reduces it to the narrow `GuildInfo` value the

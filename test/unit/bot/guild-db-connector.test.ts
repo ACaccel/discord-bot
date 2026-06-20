@@ -1,7 +1,6 @@
 /**
- * Unit tests for {@link GuildDbConnector} (R1 collaborator).
- *
- * Covers the §6.1 GuildDbConnector test plan from `docs/design/R1.md`:
+ * Unit tests for {@link GuildDbConnector}, the collaborator BaseBot
+ * composes for per-guild database connection. Covers:
  *   1. happy connectOne → repos populated
  *   2. ReposFactory throw → log w/ traceId + re-throw normalised Error
  *   3. ReposFactory throws non-Error → still normalised + re-thrown

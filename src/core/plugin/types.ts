@@ -93,7 +93,7 @@ export interface PluginRuntimeServices {
  * Narrow write surface handed to a plugin's `init` hook. Allows the
  * plugin to publish a pre-built instance under a typed token so the
  * rest of the bot can resolve it through normal DI instead of a
- * module-scope holder (the pattern R2 replaces).
+ * module-scope holder, keeping all wiring on the typed DI path.
  *
  * Legal **only inside `init`**. The host's lifecycle runner captures
  * the current phase in a closure when it builds the init context, so a
@@ -171,9 +171,9 @@ export type HandlerConstructor = new () => unknown;
 
 /**
  * Plugin-contributed handler map keyed by handler name. The map shape
- * (rather than the plan's array shape) keeps duplicate detection
- * trivial without forcing the host to instantiate constructors just
- * to read a `config.name` field.
+ * (rather than an array shape) keeps duplicate detection trivial
+ * without forcing the host to instantiate constructors just to read a
+ * `config.name` field.
  */
 export type ContributedRegistry = Readonly<Record<string, HandlerConstructor>>;
 

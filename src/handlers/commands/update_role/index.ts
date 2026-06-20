@@ -1,4 +1,4 @@
-import type { 
+import type {
     ChatInputCommandInteraction,
 } from 'discord.js';
 import Mee6LevelsApi from 'mee6-levels-api';
@@ -6,7 +6,6 @@ import type { BaseBot, Config } from '@bot';
 import { Command } from '@cmd';
 
 import { replyForError } from '../../reply-for-error';
-// import { Nijika } from 'bot/nijika/nijika';
 
 interface UpdateRoleConfig extends Config {
     level_roles: Record<string, string>;
@@ -25,11 +24,6 @@ export default class update_role extends Command {
     public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
         await interaction.deferReply();
         try {
-            // if (!(bot instanceof Nijika)) return;
-            // if (!bot.config.level_roles) {
-            //     await interaction.editReply({ content: bot.translator?.t('replies:update_role.no_config') ?? '' });
-            //     return;
-            // }
             let botConfig: UpdateRoleConfig;
             if ('level_roles' in bot.config) {
                 botConfig = bot.config as UpdateRoleConfig;
@@ -42,21 +36,13 @@ export default class update_role extends Command {
             const guild = bot.getGuildInfo(interaction.guild?.id as string)!.guild;
             const channel = interaction.channel;
             if (!channel?.isSendable()) return;
-            // let alive_role = guild.roles.cache.find(role => role.name === "活人");
-    
+
             await Promise.all(leaderboard.map(async (member) => {
                 const { id, level } = member;
                 const guildMember = guild.members.cache.get(id);
-    
+
                 if (!guildMember) return;
-                // live people role.
-                // if(level >= 6) {
-                // 	if (!guildMember.roles.cache.some(role => role.name === "活人")) {
-                // 		let _ = await guildMember.roles.add(alive_role);
-                // 		interaction.channel.send(`[ SYSTEM ] 給予 ${guildMember.user.tag} 活人`);
-                // 	}
-                // }
-    
+
                 // find corresponding role
                 let roleToAssign = "";
                 for (const roleLevel in botConfig.level_roles) {
@@ -67,14 +53,14 @@ export default class update_role extends Command {
                     }
                 }
                 if (roleToAssign === "") return;
-    
+
                 // update role
                 const addedRole = guild.roles.cache.find(role => role.name === roleToAssign);
                 const hasRoleToAssign = guildMember.roles.cache.has(addedRole?.id as string);
                 for (const roleLevel in botConfig.level_roles) {
                     const removedRole = guild.roles.cache.find(role => role.name === botConfig.level_roles[roleLevel]);
                     if (!removedRole) continue;
-                    
+
                     if (guildMember.roles.cache.has(removedRole.id) && removedRole.name !== roleToAssign) {
                         await guildMember.roles.remove(removedRole);
                         await channel.send(bot.translator?.t('replies:update_role.removed', { name: guildMember.user.displayName, role: botConfig.level_roles[roleLevel] ?? '' }) ?? '');

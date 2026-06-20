@@ -1,10 +1,9 @@
 /**
  * Contract baseline: `BaseBot.run()` end-to-end startup sequence.
  *
- * Locked in BEFORE the R1 decomposition so the pre-split and post-split
- * BaseBot are observably equivalent. The spec drives a minimal subclass
- * with no plugins through `run()` using a fake Discord client, no
- * Mongo URI, and the default translator, and asserts:
+ * The spec drives a minimal subclass with no plugins through `run()`
+ * using a fake Discord client, no Mongo URI, and the default
+ * translator, and asserts:
  *
  *   - `run()` resolves without throwing.
  *   - The bot exposes `logger`, `translator`, `container`, plugin host.
@@ -15,9 +14,6 @@
  *     events that BaseBot owns (guildCreate listener is conditional on
  *     no plugin owning the event — this spec has no plugins).
  *   - The optional `run(callback)` parameter runs inside `ClientReady`.
- *
- * Post-R1 the same spec must still pass — that is the regression
- * anchor for the decomposition.
  */
 /* eslint-disable import/first */
 import { Events } from 'discord.js';
@@ -148,7 +144,7 @@ describe('BaseBot.run() — contract baseline', () => {
 
     await bot.run();
 
-    // Post-R1 ClientEventBridge installs raw listeners only for the
+    // ClientEventBridge installs raw listeners only for the
     // events BaseBot actually owns (interaction / reaction / guildCreate
     // fallback). Pure-plugin events (messageCreate / messageUpdate /
     // messageDelete / guildMemberUpdate) attach only when a plugin

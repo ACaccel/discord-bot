@@ -21,7 +21,7 @@ const MINUTE_MS = 60 * 1000;
  * collection, per-channel pagination, log file format, stale-Fetch-doc
  * cleanup) lives in {@link createMessageBackupPlugin}. This class
  * registers that plugin and suppresses every interactive listener
- * category through the R1 `eventBridgeSuppression` hook: msg-archive
+ * category through the `eventBridgeSuppression` hook: msg-archive
  * is a worker bot and must not respond to interactions, reactions, or
  * the guildCreate onboarding flow.
  */

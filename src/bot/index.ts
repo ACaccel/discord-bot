@@ -1,8 +1,8 @@
 /**
  * `BaseBot` — thin lifecycle owner.
  *
- * R1: BaseBot's prior 1,000-line surface was decomposed into a small
- * orchestrator plus three single-purpose collaborators:
+ * BaseBot is a small orchestrator composed with three single-purpose
+ * collaborators:
  *
  *   - {@link GuildRegistrar} — assembles `GuildInfo` from the Discord
  *     cache + bot config (`registerAll`).
@@ -218,7 +218,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
   /**
    * Attach a freshly-built repos bag to an existing guild slot. Private
    * to BaseBot. No-op when the slot has not been registered yet — the
-   * R1 design always registers the guild before connecting its DB.
+   * design always registers the guild before connecting its DB.
    */
   private attachRepos(guildId: string, repos: Repos): void {
     const existing = this.#guildInfo.get(guildId);
@@ -236,7 +236,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
 
   /**
    * Bot-scoped voice controller. Resolved from the IoC container on
-   * every access (R2): VoicePlugin's `init` hook publishes its
+   * every access: VoicePlugin's `init` hook publishes its
    * controller under `TOKENS.VoiceController` through
    * `ctx.registerInstance`, and this getter delegates to the
    * container's `tryResolve` so a bot that never registered the
@@ -250,7 +250,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
 
   /**
    * Bot-scoped LLM {@link ModelCatalog}. Resolved from the IoC
-   * container on every access (R2): `LlmChatPlugin.init` publishes
+   * container on every access: `LlmChatPlugin.init` publishes
    * it under `TOKENS.ModelCatalog` through `ctx.registerInstance`,
    * and bots that do not register the plugin see `undefined`. The
    * `/ai_settings` handler reaches the live model list through this
@@ -319,7 +319,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
   private readonly pendingPlugins: Array<{ plugin: Plugin<unknown>; config: unknown }> = [];
   private pluginHost: PluginHost | undefined;
 
-  // ---- collaborators (R1 composition) ----
+  // ---- collaborators ----
   private readonly guildRegistrar: GuildRegistrar;
   private readonly clientEventBridge: ClientEventBridge;
   private readonly guildDbConnector: GuildDbConnector;
@@ -338,11 +338,11 @@ export abstract class BaseBot<TConfig extends Config = Config> {
     this.clientId = clientId;
     this.config = config;
     this.adminIds = config.admin ?? [];
-    // R5: composition root injects the locales path; `core/i18n`
-    // no longer reverse-resolves it from `__dirname`. Subclasses
-    // get the canonical monorepo layout for free via the default
-    // and can override the parameter for bespoke deployments
-    // (e.g. npm-packaged bundle, alternative content root).
+    // The composition root injects the locales path; `core/i18n`
+    // does not resolve it from `__dirname`. Subclasses get the
+    // canonical monorepo layout for free via the default and can
+    // override the parameter for bespoke deployments (e.g.
+    // npm-packaged bundle, alternative content root).
     this.localesDir = localesDir;
 
     this.container = createContainer();
@@ -537,7 +537,7 @@ export abstract class BaseBot<TConfig extends Config = Config> {
   /**
    * Open (or reuse) the per-guild MongoDB connection and populate
    * `guildInfo[g].repos`. Delegates to the {@link GuildDbConnector}
-   * R1 collaborator. Re-throws on failure so existing callers
+   * collaborator. Re-throws on failure so existing callers
    * (`connectGuildDB`, the {@link BaseBotGuildOnboardingPort}) keep
    * their prior control-flow semantics.
    */
@@ -576,9 +576,9 @@ export abstract class BaseBot<TConfig extends Config = Config> {
    * listeners are installed. Default installs every listener. Bots
    * that opt out of an interaction class (the LLM-only `Konata`, the
    * worker-style `MsgArchive`) override this and flip the relevant
-   * flags to `true`. R1 replaced the prior listener-method-override
-   * idiom (`override interactionEventListener = async () => {}`)
-   * because those methods no longer exist on BaseBot.
+   * flags to `true`. Suppression is declared through this single hook
+   * rather than by overriding per-listener methods, so BaseBot keeps
+   * one explicit opt-out surface instead of scattered listener stubs.
    */
   protected eventBridgeSuppression(): ClientEventBridgeSuppression {
     return {};
@@ -742,8 +742,8 @@ export abstract class BaseBot<TConfig extends Config = Config> {
   /**
    * Phase 4: Discord side of the login dance.
    *
-   * R6.2: both failure paths now raise a `ConfigurationError` and
-   * reject so `run()` aborts instead of continuing into `startAll()` /
+   * Both failure paths raise a `ConfigurationError` and reject so
+   * `run()` aborts instead of continuing into `startAll()` /
    * `connectGuildDB()` with a half-attached client. Treated as a
    * startup-time configuration failure (bad token, network, or a
    * gateway handshake that never produced a `client.user`).

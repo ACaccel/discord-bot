@@ -1,9 +1,8 @@
 /**
- * Unit tests for the pure topology helpers extracted in PR-G3
- * (`src/core/plugin/host/topology.ts`). These were previously private
- * methods on `PluginHost`; the host's higher-level tests covered them
- * indirectly, but the pure-function shape now justifies dedicated
- * tests.
+ * Unit tests for the pure topology helpers
+ * (`src/core/plugin/host/topology.ts`). The host's higher-level tests
+ * cover them indirectly, but the pure-function shape justifies
+ * dedicated tests.
  */
 import { describe, expect, it } from 'vitest';
 

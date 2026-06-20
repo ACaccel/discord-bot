@@ -10,11 +10,11 @@
  * signal instead of a stale guess.
  *
  * The cache and API keys are instance state on the `ModelCatalog`
- * class. R2 removed the prior module-scope holder + `setActive` /
- * `getActive` / `listProviderModels` shims: the catalog is now
- * published by `LlmChatPlugin.init` through
- * `ctx.registerInstance(TOKENS.ModelCatalog, ...)` and consumers
- * (the `/ai_settings` handler) reach it via `bot.modelCatalog`.
+ * class (not a module-scope holder), so the catalog carries no
+ * ambient global state. It is published by `LlmChatPlugin.init`
+ * through `ctx.registerInstance(TOKENS.ModelCatalog, ...)` and
+ * consumers (the `/ai_settings` handler) reach it via
+ * `bot.modelCatalog`.
  */
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';

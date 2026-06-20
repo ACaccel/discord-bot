@@ -9,9 +9,9 @@ import type { PluginRuntimeContext } from '../../../src/core/plugin';
 
 const silent = createLogger({ level: 'silent', pretty: false });
 
-// Audit ARCH-BLOCK3 (PR-G4): plugins no longer take a `rebootJobs`
-// callback config — they pull their deps from `ctx.resolve(...)` and
-// call rebootActivityJobs / rebootGiveawayJobs themselves. These tests
+// Plugins do not take a `rebootJobs` callback config — they pull their
+// deps from `ctx.resolve(...)` and call rebootActivityJobs /
+// rebootGiveawayJobs themselves. These tests
 // install no-op stubs for the resolved tokens and verify the plugin
 // onReady swallows internal failures so startup is not aborted.
 
@@ -38,7 +38,7 @@ const buildCtx = (): PluginRuntimeContext => {
   };
 };
 
-describe('createGiveawayPlugin / createActivityPlugin (PR-G4: self-owned reboot)', () => {
+describe('createGiveawayPlugin / createActivityPlugin — self-owned reboot', () => {
   it('giveaway plugin has the expected shape', () => {
     const p = createGiveawayPlugin();
     expect(p.id).toBe('giveaway');

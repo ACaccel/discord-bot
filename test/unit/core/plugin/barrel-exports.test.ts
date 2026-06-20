@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { TOKENS, type Resolver, type ServiceToken } from '../../../../src/core/plugin';
 
 /**
- * R3 contract: plugins must reach the IoC layer only via the
+ * Plugins must reach the IoC layer only via the
  * `core/plugin` barrel. This test pins down the public surface so any
  * accidental removal of the re-export breaks at compile + test time.
  */
-describe('core/plugin barrel — R3 IoC re-exports', () => {
+describe('core/plugin barrel — IoC re-exports', () => {
   it('re-exports the TOKENS map with the canonical plugin keys', () => {
     expect(TOKENS).toBeDefined();
     expect(TOKENS.Logger).toBeDefined();

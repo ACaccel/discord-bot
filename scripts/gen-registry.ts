@@ -127,10 +127,10 @@ ${handlers.map((h, i) => `  ${quoteKey(h.name)}: Handler_${i},`).join('\n')}
 };
 
 /**
- * Quote an object key if it is not a valid bare identifier. Phase 1's
- * handler dir names are simple (`give_score`, `ai_settings`) so this is
- * rarely needed, but Phase 7's kebab-case rename will require quoted
- * keys (`'role-message'`) and the codegen should already handle it.
+ * Quote an object key if it is not a valid bare identifier. Handler
+ * directory names are usually simple identifiers (`give_score`,
+ * `ai_settings`) so this is rarely needed, but a kebab-case name
+ * (`'role-message'`) requires a quoted key and the codegen handles it.
  *
  * Escape order matters: backslashes are escaped first so the second
  * pass's literal `\'` is not re-doubled. Catching both ensures a key

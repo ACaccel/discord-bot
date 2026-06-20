@@ -1,6 +1,6 @@
 /**
- * Unit tests for the `PluginInitContext.registerInstance` stage guard
- * (R2). The guard lives on `PluginLifecycleRunner` and rejects every
+ * Unit tests for the `PluginInitContext.registerInstance` stage guard.
+ * The guard lives on `PluginLifecycleRunner` and rejects every
  * call that lands outside the synchronous body of the `init` phase.
  *
  * Each case wires a `PluginLifecycleRunner` against a real

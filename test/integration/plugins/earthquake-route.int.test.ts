@@ -1,5 +1,5 @@
 /**
- * Integration test for the earthquake plugin's HTTP route (D2).
+ * Integration test for the earthquake plugin's HTTP route.
  *
  * Drives the plugin's real `start` lifecycle hook (a live Express
  * server on a pre-reserved free port), POSTs the webhook, and asserts

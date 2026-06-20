@@ -1,5 +1,5 @@
 /**
- * Unit coverage for the handler-boundary error helper (gap D9).
+ * Unit coverage for the handler-boundary error helper.
  *
  * The helper routes a caught error down two independent channels:
  *   - operator channel: a structured log line, always written;
@@ -80,7 +80,7 @@ const stubInteraction = (state: { deferred: boolean; replied: boolean }) => {
   };
 };
 
-describe('resolveErrorReply (gap D9 channel selection)', () => {
+describe('resolveErrorReply — channel selection', () => {
   it('uses the DomainError messageKey + messageParams for a DomainError', () => {
     const error = new ConflictError({
       code: 'ALREADY_EXISTS',
@@ -127,7 +127,7 @@ describe('resolveErrorReply (gap D9 channel selection)', () => {
   });
 });
 
-describe('replyForError (gap D9 dual-channel boundary)', () => {
+describe('replyForError — dual-channel boundary', () => {
   it('logs the operator channel and replies with the messageKey for a DomainError', async () => {
     const { logger, errorCalls } = stubLogger();
     const { interaction, editReplies } = stubInteraction({ deferred: true, replied: false });

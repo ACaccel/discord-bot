@@ -1,7 +1,6 @@
 /**
- * Unit tests for {@link GuildRegistrar} (R1 collaborator).
- *
- * Covers the §6.1 GuildRegistrar test plan from `docs/design/R1.md`:
+ * Unit tests for {@link GuildRegistrar}, the collaborator BaseBot
+ * composes for guild registration. Covers:
  * happy path, partial config tolerance, empty config, missing cache
  * lookup, `registerAll` fan-out, fan-out resilience to a per-guild
  * throw, and the "no Mongo / no Discord send" purity invariant.

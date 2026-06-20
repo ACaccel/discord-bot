@@ -30,7 +30,7 @@ describe('AutoReplyPlugin.rollDice', () => {
     expect(rollDice('0d6')).toMatch(/^out of range/);
     expect(rollDice('101d6')).toMatch(/^out of range/);
     expect(rollDice('1d0')).toMatch(/^out of range/);
-    // 2^30 + 1 sides — pre-Phase-4b legacy enforced the same ceiling.
+    // 2^30 + 1 sides — the legacy ceiling is enforced.
     expect(rollDice(`1d${(2 ** 30 + 1).toString()}`)).toMatch(/^out of range/);
   });
 

@@ -1,5 +1,5 @@
 /**
- * Interaction-router integration test (audit C-12). Drives a minimal
+ * Interaction-router integration test. Drives a minimal
  * chat-input interaction through `InteractionRouter` with two
  * middlewares and asserts the run order, terminal `next()` semantics,
  * and that the per-interaction context is propagated unchanged.

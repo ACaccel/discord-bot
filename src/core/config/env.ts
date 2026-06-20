@@ -35,7 +35,7 @@ import * as path from 'path';
  * Exported so test suites and a future "scan all bot env files" tool can
  * reuse the same definition without drifting.
  */
-export const PLACEHOLDER_TOKEN_PATTERN =
+const PLACEHOLDER_TOKEN_PATTERN =
   /(your[_-]?(token|client[_-]?id|secret)|xxx{2,}|changeme|placeholder|example|todo)/i;
 
 const nonPlaceholder = (label: string) =>

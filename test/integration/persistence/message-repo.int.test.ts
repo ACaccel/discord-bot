@@ -1,7 +1,7 @@
 /**
  * Reference integration test for the persistence layer.
  *
- * Demonstrates the contract every Phase 2 PR-B repo test will follow:
+ * Demonstrates the contract every repo integration test follows:
  *   1. Open a fresh mongoose connection against the shared memory server.
  *   2. Wrap it in a `StaticConnectionManager` so the production
  *      `MongoMessageRepo` runs against the same `GuildConnection`
@@ -11,7 +11,7 @@
  *   4. The `withFreshConnection` helper drops the database afterwards
  *      so each `it()` is fully isolated.
  *
- * G-2: every repo method returns `Result<T, DatabaseError>`. Happy-path
+ * Every repo method returns `Result<T, DatabaseError>`. Happy-path
  * cases unwrap with the test-only `unwrap`. Programmer errors (a non-
  * positive `limit`) still throw `TypeError` — they are not a domain
  * failure and never enter the `Result` channel.

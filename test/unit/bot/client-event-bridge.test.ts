@@ -1,7 +1,6 @@
 /**
- * Unit tests for {@link ClientEventBridge} (R1 collaborator).
- *
- * Covers the §6.1 ClientEventBridge test plan from `docs/design/R1.md`:
+ * Unit tests for {@link ClientEventBridge}, the collaborator BaseBot
+ * composes to fan Discord raw events out to handlers. Covers:
  *   1. attach wires InteractionCreate; firing routes through router
  *   2. double attach throws (contract violation — TypeError)
  *   3. detach removes every installed listener

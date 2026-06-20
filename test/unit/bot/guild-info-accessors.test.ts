@@ -2,9 +2,9 @@
  * Unit tests for BaseBot's `guildInfo` read accessors and the narrow
  * write seams (`registerGuildSlotInternal`, `updateBotName`, `attachRepos`).
  *
- * Proposal §4.1 item 7: `guildInfo` migrated from a public mutable
- * `Record` to a private `Map` exposed through `getGuildInfo`,
- * `getAllGuildInfo`, and `getRepos`. These tests assert the read /
+ * `guildInfo` is held as a private `Map` exposed through
+ * `getGuildInfo`, `getAllGuildInfo`, and `getRepos`, rather than a
+ * public mutable `Record`. These tests assert the read /
  * write contract from the consumer side without reaching into BaseBot
  * internals.
  */

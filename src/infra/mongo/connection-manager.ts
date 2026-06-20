@@ -10,8 +10,8 @@
  * Why `infra/mongo/` and not `persistence/`:
  *   `persistence/` owns the mapping from domain to storage (schemas +
  *   repositories). Connection acquisition is the SDK boundary, the same
- *   category as a Discord client or LLM HTTP client. Per the layer
- *   contract (plan §1, layer rules, and architecture-reviewer consult).
+ *   category as a Discord client or LLM HTTP client, per the layer
+ *   rules that keep SDK boundaries out of `persistence/`.
  *
  * Resilience:
  *   `getConnection` classifies a failed open via the `persistence/`

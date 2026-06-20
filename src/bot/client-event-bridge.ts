@@ -289,7 +289,7 @@ export class ClientEventBridge {
         }
         const rootLogger = config.container.resolve<Logger>(TOKENS.Logger);
         const clock = config.container.resolve<Clock>(TOKENS.Clock);
-        // R6.1: first 8 chars of a v4 UUID — pure random, no
+        // First 8 chars of a v4 UUID — pure random, no
         // birthday-paradox collisions like `Math.random().toString(36)`.
         const traceId = randomUUID().slice(0, 8);
         const ctx: InteractionContext = {

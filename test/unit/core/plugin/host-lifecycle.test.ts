@@ -1,5 +1,5 @@
 /**
- * Unit tests for PluginLifecycleRunner (D6). Exercises each lifecycle
+ * Unit tests for PluginLifecycleRunner. Exercises each lifecycle
  * phase, cascade-disable, and critical-escalation against a fake
  * LifecycleHost — no PluginHost wiring required.
  */

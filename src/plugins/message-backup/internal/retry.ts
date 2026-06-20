@@ -8,7 +8,7 @@
  * that looks like a transient 5xx, 429, or socket error retries;
  * 4xx / Unknown Channel / validation errors propagate immediately.
  */
-export const isRetryableError = (err: unknown): boolean => {
+const isRetryableError = (err: unknown): boolean => {
   if (err === null || err === undefined) return false;
   const anyErr = err as { status?: number; httpStatus?: number; name?: string; code?: string };
   const status = anyErr.status ?? anyErr.httpStatus;

@@ -13,7 +13,7 @@ import { createLlmChatPlugin } from '@plugins';
  * Discord presence.
  *
  * Listener policy: Konata is a pure LLM-chat bot. It opts out of the
- * reaction and guildCreate raw listeners through the R1
+ * reaction and guildCreate raw listeners through the
  * `eventBridgeSuppression` hook so the bridge does not install them.
  */
 export class Konata extends BaseBot<Config> {

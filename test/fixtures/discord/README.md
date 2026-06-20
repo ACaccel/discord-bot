@@ -2,8 +2,7 @@
 
 Minimal structural builders for the Discord types that handler / plugin
 tests touch. Builders return plain objects shaped to the structural
-minimum the SUT reads — no third-party mock libraries. Added in PR-G5
-(audit C-12).
+minimum the SUT reads — no third-party mock libraries.
 
 ## Files
 
@@ -26,5 +25,5 @@ as X`) — keep test files free of these casts so the shape change
   surface stays one file per type.
 
 See `test/integration/interaction-router/router-dispatch.int.test.ts`
-for the first integration test that exercises the full router chain
-through these fixtures.
+for an integration test that exercises the full router chain through
+these fixtures.

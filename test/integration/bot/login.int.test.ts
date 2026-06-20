@@ -1,10 +1,9 @@
 /**
- * R6.2 integration tests — `BaseBot.run()` aborts with a
- * `ConfigurationError` when the Discord login dance fails (the
- * underlying `client.login` rejects, or it resolves but no `user` was
- * produced). Before R6.2, both paths silently swallowed the failure
- * and continued into `host.startAll()` / guild Mongo fan-out with a
- * half-attached client.
+ * Integration tests for `BaseBot.run()` login failure handling.
+ * `run()` aborts with a `ConfigurationError` when the Discord login
+ * dance fails (the underlying `client.login` rejects, or it resolves
+ * but no `user` was produced) rather than continuing into
+ * `host.startAll()` / guild Mongo fan-out with a half-attached client.
  */
 /* eslint-disable import/first */
 import { describe, expect, it, vi } from 'vitest';
@@ -62,7 +61,7 @@ const buildFake = (init: {
 
 class MinimalBot extends BaseBot<Config> {}
 
-describe('BaseBot.run() — R6.2 login failure', () => {
+describe('BaseBot.run() — login failure', () => {
   it('rejects with ConfigurationError(BOT_LOGIN_FAILED) when client.login throws', async () => {
     const fake = buildFake({
       login: async () => {

@@ -6,24 +6,24 @@ import { I18NextTranslator } from '../../src/core/i18n/i18next-translator';
 import { loadCatalogResources } from '../../src/core/i18n/catalog-loader';
 
 /**
- * R5: the loader no longer reverse-resolves `src/i18n/locales` from
- * its own `__dirname`. This test file is part of the composition
- * surface (it asserts behaviour against the real deployed catalogs),
- * so it owns the path knowledge and injects it explicitly.
+ * The loader does not reverse-resolve `src/i18n/locales` from its own
+ * `__dirname`. This test file is part of the composition surface (it
+ * asserts behaviour against the real deployed catalogs), so it owns the
+ * path knowledge and injects it explicitly.
  */
 const LOCALES_DIR = path.resolve(__dirname, '..', '..', 'src', 'i18n', 'locales');
 
 /**
- * Runtime catalog checks (gaps D7 / D9).
+ * Runtime catalog checks.
  *
  * Unlike `catalog-completeness.test.ts` — which inspects the raw JSON files
  * for cross-locale key/placeholder parity — this suite loads the on-disk
  * catalogs through the real `loadCatalogResources` + `I18NextTranslator`
- * pipeline and asserts the behaviour C6 depends on:
+ * pipeline and asserts:
  *
- * - D7: the `en` locale resolves real keys, and a key missing in `en`
+ * - the `en` locale resolves real keys, and a key missing in `en`
  *   degrades gracefully by falling back to `zh-TW`.
- * - D9: every per-feature `replies:<feature>.failed` fallback string carries
+ * - every per-feature `replies:<feature>.failed` fallback string carries
  *   the `{{traceId}}` interpolation slot so `replyForError` can surface a
  *   trace code for non-DomainError failures.
  */

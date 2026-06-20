@@ -1,5 +1,5 @@
 /**
- * Unit tests for the earthquake plugin (D2). Covers plugin shape,
+ * Unit tests for the earthquake plugin. Covers plugin shape,
  * the broadcast fan-out, per-guild error isolation, and the
  * sendEarthquakeAlert no-op guards.
  */

@@ -81,7 +81,7 @@ describe('MongoActivityRepo (integration)', () => {
     });
   });
 
-  // G-2: a genuine DB failure resolves to `err(DatabaseError)` rather
+  // A genuine DB failure resolves to `err(DatabaseError)` rather
   // than throwing. Driving a closed-connection call exercises that
   // error channel exactly as production would experience it.
   it('listAll resolves to err(DatabaseError) when the connection is closed', async () => {

@@ -58,12 +58,11 @@ const isTrackingParam = (name: string): boolean => {
 
 /**
  * Return a copy of `url` with known tracking / share-attribution query
- * params removed (`mibextid`, `utm_*`, `fbclid`, `igsh`, ...). Pure;
- * exported for unit tests. Applied to every extracted URL so all providers
- * receive a clean link, which also de-duplicates links that differ only by
- * tracking noise.
+ * params removed (`mibextid`, `utm_*`, `fbclid`, `igsh`, ...). Pure.
+ * Applied to every extracted URL so all providers receive a clean link,
+ * which also de-duplicates links that differ only by tracking noise.
  */
-export const stripTrackingParams = (url: URL): URL => {
+const stripTrackingParams = (url: URL): URL => {
   const cleaned = new URL(url.href);
   const tracked = [...cleaned.searchParams.keys()].filter(isTrackingParam);
   for (const name of tracked) cleaned.searchParams.delete(name);

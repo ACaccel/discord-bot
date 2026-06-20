@@ -51,7 +51,7 @@ describe('PluginHost.register', () => {
     expect(() => host.register(plugin({ id: 'a' }))).toThrowError(PluginRegistrationError);
   });
 
-  it('rejects unsupported guild-scoped plugins until Phase 4b', () => {
+  it('rejects unsupported guild-scoped plugins', () => {
     const { host } = buildHost();
     try {
       host.register(plugin({ id: 'g', scope: 'guild' }));

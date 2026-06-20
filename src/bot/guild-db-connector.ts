@@ -9,7 +9,7 @@
  *
  * The shared {@link ConnectionManager} (resolved via the IoC container)
  * still owns the actual classification + disabling logic; this class
- * is a thin orchestration layer. It is one of the three R1
+ * is a thin orchestration layer. It is one of the three
  * collaborators BaseBot composes; it is intentionally NOT registered
  * as an IoC token (no plugin needs to reach it).
  */

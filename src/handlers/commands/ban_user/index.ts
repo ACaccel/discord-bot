@@ -107,7 +107,7 @@ export default class ban_user extends Command {
                     try {
                         await member.timeout(duration * 60 * 1000, bot.translator?.t('replies:ban_user.timeout_reason') ?? '');
                         await judge_msg.reply(bot.translator?.t('replies:ban_user.timed_out', { user: member.user.tag, duration }) ?? '');
-                    } catch (error) {
+                    } catch {
                         await judge_msg.reply(bot.translator?.t('replies:ban_user.cannot_timeout') ?? '');
                         await delete_on_msg_create();
                     }

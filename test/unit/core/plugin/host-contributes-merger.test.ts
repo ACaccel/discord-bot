@@ -1,7 +1,7 @@
 /**
- * Unit tests for the `buildEffectiveRegistries` pure helper extracted
- * in PR-G3. The PluginHost suite covers integration behaviour; this
- * file pins the merge function's own contract.
+ * Unit tests for the `buildEffectiveRegistries` pure helper. The
+ * PluginHost suite covers integration behaviour; this file pins the
+ * merge function's own contract.
  */
 import { describe, expect, it } from 'vitest';
 

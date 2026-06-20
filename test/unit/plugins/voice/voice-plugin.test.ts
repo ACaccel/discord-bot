@@ -1,5 +1,5 @@
 /**
- * VoicePlugin DI smoke test (R2). Verifies that the plugin's `init`
+ * VoicePlugin DI smoke test. Verifies that the plugin's `init`
  * hook publishes its `VoiceController` under `TOKENS.VoiceController`
  * through the `registerInstance` facade so consumers (BaseBot's
  * `voice` getter, the record handler) can resolve it from the

@@ -1,5 +1,5 @@
 /**
- * Contract test for the guild-onboarding port (D1). Verifies the typed
+ * Contract test for the guild-onboarding port. Verifies the typed
  * seam can be implemented and resolved through a typed token without
  * the port pulling in persistence / infra types.
  */

@@ -57,7 +57,7 @@ export type {
 } from './permission-rank-policy';
 
 /*
- * R3: plugin-facing window onto the IoC layer.
+ * Plugin-facing window onto the IoC layer.
  *
  * Plugins must obtain TOKENS / ServiceToken / Resolver via this barrel
  * (`import { TOKENS } from '<path>/core/plugin'`) and never reach into

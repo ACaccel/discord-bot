@@ -1,11 +1,11 @@
 /**
- * Contract baseline: BaseBot's raw `client.on(...)` listeners (the 8
- * branches captured before the R1 ClientEventBridge extraction).
+ * Contract baseline for BaseBot's raw `client.on(...)` listeners (the
+ * 8 branches the ClientEventBridge installs).
  *
  * Drives a minimal BaseBot subclass through `run()`, then fires fake
  * Discord events into the captured listeners and asserts the expected
- * downstream calls. Locked in BEFORE the R1 decomposition so the
- * post-R1 ClientEventBridge tests have a behavioural anchor.
+ * downstream calls. Serves as the behavioural anchor for the
+ * ClientEventBridge tests.
  */
 /* eslint-disable import/first */
 import { Events } from 'discord.js';
@@ -151,8 +151,8 @@ describe('BaseBot raw client.on listeners — contract baseline', () => {
     const bot = new MinimalBot(fake.client, 'tk', '', 'bot-1', {});
     await bot.run();
 
-    // Post-R1: messageCreate / messageUpdate / messageDelete /
-    // guildMemberUpdate are EventDispatcher-driven. The bridge only
+    // messageCreate / messageUpdate / messageDelete / guildMemberUpdate
+    // are EventDispatcher-driven. The bridge only
     // attaches them when a plugin subscribes; this MinimalBot has none.
     for (const event of [
       Events.MessageCreate,

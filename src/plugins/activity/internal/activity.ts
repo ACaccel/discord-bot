@@ -62,9 +62,6 @@ export interface ActivityDeps {
 
 export const activityJobKey = (activity_id: string) => `activity:${activity_id}`;
 
-export const isActivityJobKey = (key: string, activityId: string) =>
-  key.startsWith('activity:') && key.split(':')[1] === activityId;
-
 export const activityAnnouncement = async (
   activity_id: string,
   channel: Channel,

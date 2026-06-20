@@ -11,9 +11,8 @@ import { describe, expect, it } from 'vitest';
  * - Each leaf value's ICU placeholders (i18next {{...}} syntax) must match
  *   across locales.
  *
- * Phase 0 ships only zh-TW; parity checks are inert until a second locale
- * is added, but the test still runs to lock in the schema (and would catch
- * a malformed JSON file or an empty/missing namespace today).
+ * Parity checks run across whichever locales are present, locking in the
+ * schema and catching a malformed JSON file or an empty/missing namespace.
  */
 const LOCALES_DIR = path.resolve(__dirname, '../../src/i18n/locales');
 
