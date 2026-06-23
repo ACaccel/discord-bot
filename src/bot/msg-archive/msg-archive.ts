@@ -12,6 +12,12 @@ interface MsgArchiveConfig extends Config {
      * default one-hour cadence owned by `createMessageBackupPlugin`.
      */
     backup_interval_minutes?: number;
+    /**
+     * Whether each backup pass writes its per-guild transcript to
+     * `logs/backup/`. Optional — defaults to `false`. The backup itself always
+     * runs; this only gates the transcript log file.
+     */
+    backup_log_enabled?: boolean;
 }
 
 const MINUTE_MS = 60 * 1000;
@@ -32,6 +38,7 @@ export class MsgArchive extends BaseBot<MsgArchiveConfig> {
         this.use(
             createMessageBackupPlugin({
                 backupServers: this.config.backup_server,
+                backupLogEnabled: this.config.backup_log_enabled ?? false,
                 ...(intervalMinutes !== undefined
                     ? { backupIntervalMs: intervalMinutes * MINUTE_MS }
                     : {}),

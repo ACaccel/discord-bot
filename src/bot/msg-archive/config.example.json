@@ -9,6 +9,7 @@
             "roles": {}
         }
     },
+    "backup_log_enabled": false,
     "backup_server": [
         "YOUR_GUILD_ID"
     ],

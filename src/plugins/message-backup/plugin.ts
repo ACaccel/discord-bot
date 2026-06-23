@@ -12,6 +12,10 @@
  *   - Reads the optional `backupIntervalMs` config — the delay between
  *     repeat passes. Defaults to one hour when omitted, preserving the
  *     historical hard-coded cadence.
+ *   - Reads the optional `backupLogEnabled` flag — defaults to `false`. The
+ *     backup always runs; this only controls whether each pass writes its
+ *     per-guild transcript to `logs/backup/`. The composition root maps the
+ *     operator-facing `backup_log_enabled` config field onto it.
  *   - Schedules itself on `onReady` (one-shot per guild then a repeat
  *     loop on `backupIntervalMs`). `onShutdown` clears the loop so a
  *     fast restart does not double-trigger.
@@ -43,11 +47,20 @@ export interface MessageBackupPluginConfig {
    * operator-facing `backup_interval_minutes` config field into this.
    */
   readonly backupIntervalMs?: number;
+  /**
+   * Whether each backup pass writes its per-guild transcript to `logs/backup/`.
+   * Defaults to `false` — the backup itself always runs; this only gates the
+   * transcript file. The composition root maps the operator-facing
+   * `backup_log_enabled` config field onto this.
+   */
+  readonly backupLogEnabled?: boolean;
 }
 
 export const createMessageBackupPlugin = (
   rawConfig: MessageBackupPluginConfig,
 ): Plugin => {
+  // Transcript logging is opt-in (default off); the backup pass itself always runs.
+  const backupLogEnabled = rawConfig.backupLogEnabled ?? false;
   const intervalMs = rawConfig.backupIntervalMs ?? DEFAULT_BACKUP_INTERVAL_MS;
   // Contract guard: a non-positive or non-finite interval would turn the
   // repeat loop into a tight spin (0ms) or never fire (NaN/Infinity); a
@@ -84,7 +97,7 @@ export const createMessageBackupPlugin = (
           }
           running.add(guildId);
           try {
-            await performBackup(guildId, registry, client, ctx.logger);
+            await performBackup(guildId, registry, client, ctx.logger, backupLogEnabled);
           } catch (err: unknown) {
             // Isolate a per-guild failure: one guild's error must not
             // abort the remaining guilds in this pass, nor reject the

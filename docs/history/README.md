@@ -11,14 +11,15 @@ Conventions:
   deleted) and the superseding file references it from its `Supersedes` field.
 - `Status` is one of `accepted`, `superseded`, `rejected`.
 
-| #    | Topic                                             | Status   | Supersedes         |
-| ---- | ------------------------------------------------- | -------- | ------------------ |
-| 0000 | Adopt the global documentation-standard structure | accepted | —                  |
-| 0001 | `permission_rank` privacy / clearance model       | accepted | `docs/proposal.md` |
-| 0002 | Channel-aware visibility and full-ancestry rank   | accepted | —                  |
-| 0003 | `migrate_timestamp` numeric-timestamp migration   | accepted | —                  |
-| 0004 | Index-served `Message.timestamp` range reads      | accepted | —                  |
-| 0005 | Tolerate transient network resets, not crash      | accepted | —                  |
-| 0006 | Open, self-claim temporary roles with hard expiry | accepted | —                  |
-| 0007 | Permanently remove the `todo_list` feature        | accepted | —                  |
-| 0008 | Permanently remove the `pin_message` command      | accepted | —                  |
+| #    | Topic                                              | Status   | Supersedes         |
+| ---- | -------------------------------------------------- | -------- | ------------------ |
+| 0000 | Adopt the global documentation-standard structure  | accepted | —                  |
+| 0001 | `permission_rank` privacy / clearance model        | accepted | `docs/proposal.md` |
+| 0002 | Channel-aware visibility and full-ancestry rank    | accepted | —                  |
+| 0003 | `migrate_timestamp` numeric-timestamp migration    | accepted | —                  |
+| 0004 | Index-served `Message.timestamp` range reads       | accepted | —                  |
+| 0005 | Tolerate transient network resets, not crash       | accepted | —                  |
+| 0006 | Open, self-claim temporary roles with hard expiry  | accepted | —                  |
+| 0007 | Permanently remove the `todo_list` feature         | accepted | —                  |
+| 0008 | Permanently remove the `pin_message` command       | accepted | —                  |
+| 0009 | Decouple guild-events local record from disclosure | accepted | —                  |

@@ -74,7 +74,11 @@ const minRank = (a: Rank, b: Rank): Rank => (a <= b ? a : b);
  * parser is caught by the lockstep assertion below.
  *
  * Defaults express the confirmed behaviour:
- *   - `guild_events` / `channel_logging` act only on rank-0 (public) channels;
+ *   - `guild_events` discloses to the Discord `event` channel only for rank-0
+ *     (public) channels. This ceiling gates DISCLOSURE, not recording: the
+ *     guild-events plugin still records every edit/delete to the local
+ *     structured log and archives deleted attachments regardless of rank.
+ *   - `channel_logging` acts only on rank-0 (public) channels;
  *   - `social_preview` has no ceiling (`null`) — it acts on every channel.
  */
 const RAW_DEFAULT_CEILINGS = {
@@ -177,6 +181,11 @@ export interface PermissionRankPolicy {
    * `effectiveChannelRank > ceiling(feature)`. An unbounded (`null`) ceiling
    * never suppresses. The ceilings and their code defaults are private to the
    * policy — a feature passes only its key.
+   *
+   * "Output" is the feature's externally-visible effect, which is
+   * feature-specific: for `guild_events` it is the Discord `event`-channel
+   * mirror, NOT the always-on local audit log / attachment archival. A feature
+   * decides for itself which side effects this gate covers.
    */
   isSuppressed(
     guildId: string,

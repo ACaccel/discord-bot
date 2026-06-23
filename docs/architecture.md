@@ -142,8 +142,11 @@ integer rank (higher = more private; a member's clearance is the max over
 their ranked roles), and each rank-gated feature has a `maxChannelRank`
 ceiling. A feature suppresses a channel when its effective rank — the max over
 the channel and its full ancestry (parent channel → category, so a private
-category lifts every channel and thread nested under it) — exceeds the ceiling;
-the `channelRank` /
+category lifts every channel and thread nested under it) — exceeds the ceiling.
+For `guild-events` this gate is **disclosure-only**: an edit/delete above the
+ceiling is withheld from the Discord `event` channel, yet still written to the
+local structured log and its attachments archived, regardless of rank. The
+`channelRank` /
 `userRank` / `visibilityCeiling` primitives let a visibility-gated feature —
 realized by the `/traffic` commands — show channel `T` only when
 `channelRank(T) <= ceiling`, combined with a native `ViewChannel` check for
@@ -276,13 +279,13 @@ subclass that opts plugins in. Personalities ship with a
 `config.example.json` checked into the repo; the real `config.json`
 is per deployment and `.gitignore`d.
 
-| Personality   | Notable surface                                                                                                                           |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `nijika`      | Web-facing; exposes an Express `/discord/earthquake` webhook                                                                              |
-| `konata`      | Full interactive feature set                                                                                                              |
-| `tomori`      | Full interactive feature set                                                                                                              |
-| `msg-archive` | Worker-style; suppresses interaction / reaction / guildCreate listeners on its `BaseBot` subclass and runs only the `MessageBackupPlugin` |
-| `gopher`      | Database-free ("老鼠人"); self-hosted-LLM auto-reply, an owner-only settings REST API, and a daily avatar/nickname identity sync          |
+| Personality   | Notable surface                                                                                                                                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `nijika`      | Web-facing; exposes an Express `/discord/earthquake` webhook                                                                                                                                                                               |
+| `konata`      | Full interactive feature set                                                                                                                                                                                                               |
+| `tomori`      | Full interactive feature set                                                                                                                                                                                                               |
+| `msg-archive` | Worker-style; suppresses interaction / reaction / guildCreate listeners on its `BaseBot` subclass and runs only the `MessageBackupPlugin` (backup always runs; the per-run transcript log is opt-in via `backup_log_enabled`, default off) |
+| `gopher`      | Database-free ("老鼠人"); self-hosted-LLM auto-reply, an owner-only settings REST API, and a daily avatar/nickname identity sync                                                                                                           |
 
 ## 7. Locales
 

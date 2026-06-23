@@ -118,4 +118,52 @@ describe('createMessageBackupPlugin onReady loop resilience', () => {
 
     await onShutdown(ctx);
   });
+
+  it('threads transcript logging off by default (writeTranscript=false)', async () => {
+    mockedPerformBackup.mockResolvedValue(undefined);
+    // `backupLogEnabled` omitted → defaults to false; the backup still runs.
+    const plugin = createMessageBackupPlugin({ backupServers: ['g1'], backupIntervalMs: 1000 });
+    const { onReady, onShutdown } = plugin;
+    if (onReady === undefined || onShutdown === undefined) {
+      throw new Error('message-backup plugin must expose onReady/onShutdown');
+    }
+    const ctx = buildCtx();
+
+    await onReady(ctx);
+    expect(mockedPerformBackup).toHaveBeenCalledTimes(1);
+    expect(mockedPerformBackup).toHaveBeenCalledWith(
+      'g1',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      false,
+    );
+
+    await onShutdown(ctx);
+  });
+
+  it('threads transcript logging on when backupLogEnabled is set (writeTranscript=true)', async () => {
+    mockedPerformBackup.mockResolvedValue(undefined);
+    const plugin = createMessageBackupPlugin({
+      backupServers: ['g1'],
+      backupIntervalMs: 1000,
+      backupLogEnabled: true,
+    });
+    const { onReady, onShutdown } = plugin;
+    if (onReady === undefined || onShutdown === undefined) {
+      throw new Error('message-backup plugin must expose onReady/onShutdown');
+    }
+    const ctx = buildCtx();
+
+    await onReady(ctx);
+    expect(mockedPerformBackup).toHaveBeenCalledWith(
+      'g1',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      true,
+    );
+
+    await onShutdown(ctx);
+  });
 });
