@@ -68,7 +68,7 @@
     "@kirdock/discordjs-voice-recorder": "^1.1.1",
     "@types/express": "^5.0.0",
     "@types/node-schedule": "^2.1.7",
-    "axios": "^1.15.2",
+    "axios": "^1.19.0",
     "canvas": "^3.2.0",
     "discord.js": "^14.21.0",
     "dotenv": "^16.4.5",
