@@ -32,6 +32,10 @@ routing, and a CJK-literal scanner enforced in strict mode. See
   owner-only settings REST API, and a daily identity sync.
 - `social-link-preview` plugin (nijika): Twitter/X, Instagram, Threads,
   Facebook, Reddit, and Bahamut providers.
+- `tomori` public personality upgraded: now loads the `social-link-preview`
+  and `temp-role` plugins (the `/temp_role` command) and registers a custom
+  ready-time Discord presence — nijika's interactive set minus the
+  self-guild-only surfaces (earthquake webhook, level-role sync).
 - Transient-network resilience
   (→ [0005](history/0005-transient-network-resilience.md)): the Discord client
   gains non-fatal `error` / `shardError` / `shardDisconnect` listeners and the

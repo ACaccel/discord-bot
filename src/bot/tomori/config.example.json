@@ -13,13 +13,29 @@
                 },
                 "features": {
                     "guild_events": { "maxChannelRank": 0 },
-                    "channel_logging": { "maxChannelRank": 0 }
+                    "channel_logging": { "maxChannelRank": 0 },
+                    "social_preview": { "maxChannelRank": null }
                 }
             }
         }
     },
     "commands": [
         "help",
+        "temp_role",
         "COMMAND_NAME"
-    ]
+    ],
+    "social_link_preview": {
+        "enabled": false,
+        "originalMessageStrategy": "suppress",
+        "providers": ["twitter", "instagram", "threads", "facebook", "reddit", "bahamut", "bilibili"],
+        "timeoutMs": 4000,
+        "validationBudgetMs": 8000,
+        "maxUrlsPerMessage": 1,
+        "twitterProxyHosts": ["fxtwitter.com", "vxtwitter.com"],
+        "instagramProxyHosts": ["kkinstagram.com", "uuinstagram.com"],
+        "threadsProxyHosts": ["viewthreads.com", "vxthreads.net"],
+        "facebookProxyHosts": ["facebed.com", "fixacebook.com"],
+        "redditProxyHosts": ["vxreddit.com", "rxddit.com"],
+        "bilibiliProxyHosts": ["vxbilibili.com", "bilibiliez.com"]
+    }
 }

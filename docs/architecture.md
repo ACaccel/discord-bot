@@ -261,14 +261,14 @@ non-critical plugins are marked disabled and the bot keeps running.
 | `AutoReplyPlugin`         | `src/plugins/auto-reply/`          | `messageCreate` keyword + lucky replies and a dice roller                                                    |
 | `GuildEventsPlugin`       | `src/plugins/guild-events/`        | guild / member lifecycle events                                                                              |
 | `GiveawayPlugin`          | `src/plugins/giveaway/`            | scheduled giveaways (modal-driven create, select-menu delete) with reaction-driven winner selection          |
-| `TempRolePlugin`          | `src/plugins/temp-role/`           | temporary, permission-less self-claim notification roles with a hard 30-day expiry (nijika)                  |
+| `TempRolePlugin`          | `src/plugins/temp-role/`           | temporary, permission-less self-claim notification roles with a hard 30-day expiry (nijika, tomori)          |
 | `ActivityPlugin`          | `src/plugins/activity/`            | per-member activity tracking via message / reaction events                                                   |
 | `MessageBackupPlugin`     | `src/plugins/message-backup/`      | message create / delete / update archival (used by the `msg-archive` worker)                                 |
 | `LlmChatPlugin`           | `src/plugins/llm-chat/`            | multi-provider LLM chat with web-search toggle and session persistence                                       |
 | `VoicePlugin`             | `src/plugins/voice/`               | voice channel join + recording controller                                                                    |
 | `EarthquakePlugin`        | `src/plugins/earthquake/`          | earthquake alert broadcast (nijika exposes the HTTP webhook)                                                 |
 | `LlmAutoReplyPlugin`      | `src/plugins/llm-auto-reply/`      | probability-gated, context-aware `messageCreate` reply via a self-hosted LLM (gopher)                        |
-| `SocialLinkPreviewPlugin` | `src/plugins/social-link-preview/` | rewrites/embeds social-media share-link previews and suppresses the original (nijika)                        |
+| `SocialLinkPreviewPlugin` | `src/plugins/social-link-preview/` | rewrites/embeds social-media share-link previews and suppresses the original (nijika, tomori)                |
 | `SettingsApiPlugin`       | `src/plugins/settings-api/`        | owner-only, bearer-authenticated HTTP REST API to update the LLM `endpoint` at runtime + persist it (gopher) |
 | `IdentitySyncPlugin`      | `src/plugins/identity-sync/`       | daily avatar/nickname sync with a source user, or a static fallback identity (gopher)                        |
 
@@ -283,7 +283,7 @@ is per deployment and `.gitignore`d.
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `nijika`      | Web-facing; exposes an Express `/discord/earthquake` webhook                                                                                                                                                                               |
 | `konata`      | Full interactive feature set                                                                                                                                                                                                               |
-| `tomori`      | Full interactive feature set                                                                                                                                                                                                               |
+| `tomori`      | Public-facing; nijika's interactive plugin set minus the self-guild-only surfaces (earthquake webhook, level-role sync), with a custom ready-time presence                                                                                 |
 | `msg-archive` | Worker-style; suppresses interaction / reaction / guildCreate listeners on its `BaseBot` subclass and runs only the `MessageBackupPlugin` (backup always runs; the per-run transcript log is opt-in via `backup_log_enabled`, default off) |
 | `gopher`      | Database-free ("老鼠人"); self-hosted-LLM auto-reply, an owner-only settings REST API, and a daily avatar/nickname identity sync                                                                                                           |
 

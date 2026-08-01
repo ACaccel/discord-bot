@@ -9,6 +9,7 @@
     "help_message": "### Gopher\nOccasionally replies automatically based on the recent conversation."
   },
   "tomori": {
+    "presence_text": "It must be Misumi Uika's conspiracy!",
     "help_message": "Hi, I'm Tomori! Here are the commands you can use, grouped by purpose:"
   },
   "konata": {

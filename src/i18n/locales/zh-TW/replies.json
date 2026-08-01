@@ -9,6 +9,7 @@
     "help_message": "### 老鼠人\n會偶爾根據最近的對話自動回覆訊息。"
   },
   "tomori": {
+    "presence_text": "一定是三角初華的陰謀!",
     "help_message": "嗨,我是 Tomori!以下是你可以使用的指令,依用途分類整理:"
   },
   "konata": {
