@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`yarn security` green again: `nanoid` re-resolved onto a patched release; one unfixable `tar` advisory allowlisted.** Two freshly published HIGH advisories had turned the gate red on an untouched tree. `nanoid` (dev-only transitive, `vitest > vite > postcss > nanoid`) re-resolved 3.3.16 → 3.3.18 inside postcss's existing `^3.3.16` range — a `yarn.lock`-only change, no `resolutions` override — clearing `GHSA-2v37-7h3g-55p8` (CVE-2026-67213, infinite loop in `customAlphabet` / `customRandom`). `GHSA-r292-9mhp-454m` (CVE-2026-73566, tar path handling) joins the `@kirdock/discordjs-voice-recorder` tar block in `audit-ci.jsonc`: upstream ships the fix only on tar's 7.x line (7.5.21) while `@discordjs/node-pre-gyp` pins `tar@^6.1.11`, the same no-in-range-remediation rationale as the nine entries already in that block.
+
 ### Removed
 
 - **Standalone `verify_db` / `migrate_timestamp` / `drop_todo_collection` ops tools removed (breaking).** The three DB-maintenance tools — their `yarn <tool>` / `yarn <tool>:test` scripts and their `tools/<tool>/` directories — are gone, consolidated into the unified `db` ops CLI (see _Changed_). **Operator action required:** before pulling, migrate your gitignored per-tool `tools/<tool>/config.json` files into the single `tools/db/config.json` (a shared `mongo_uri` / `guilds` block plus a per-operation `operations` section — note `verify` now takes a single-element `guilds` array instead of `guild_id`) and switch invocations to `yarn db <subcommand>`.
