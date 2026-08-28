@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Wraps MongoDB access behind the Repository pattern. Seven repositories — `activity`, `fetch`, `giveaway`, `message`, `reply`, `temp-role`, `user-api-setting` — each expose an interface plus a `MongoXRepo` implementation. Consumers depend on the interface; tests inject in-memory fakes.
+Wraps MongoDB access behind the Repository pattern. Eight repositories — `activity`, `fetch`, `giveaway`, `message`, `reply`, `temp-role`, `user-api-setting`, `x-feed-cursor` — each expose an interface plus a `MongoXRepo` implementation. Consumers depend on the interface; tests inject in-memory fakes.
 
 `user-api-setting.schema.ts` schema-level defaults are an xAI-first safety net (provider `xai`, web search on); the authoritative whitelist-entry defaults are written by the `ai_whitelist_add` handler (`buildWhitelistDefaults`), which resolves the live cheapest xAI model. Persistence may not import the infra `DEFAULT_MODELS` constant (layering), so the schema's seed model id is a static literal kept fresh at runtime by `DefaultModelResolver`.
 
@@ -26,6 +26,8 @@ Every repository method returns `Result<T, DatabaseError>`:
 Callers branch on `result.ok` and surface `DatabaseError` upward via `replyForError` (handlers) or structured logs (plugins / jobs).
 
 ## Indexes
+
+`x-feed-cursor.schema.ts` keys documents by a unique `handle`. The guild is implicit (each guild owns its database), and `last_seen_id` is a **String** because X post ids are 64-bit and exceed `Number.MAX_SAFE_INTEGER` — storing them numerically would collapse distinct ids and break the feed's de-duplication. Comparisons go through `BigInt` at the read site.
 
 `message.schema.ts` declares, beyond the `messageId` unique index:
 

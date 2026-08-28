@@ -115,3 +115,33 @@ export class LinkPreviewError<
     super(init);
   }
 }
+
+/**
+ * An X (Twitter) timeline read failed. Like {@link LinkPreviewError}
+ * this is a log-only failure — the x-media-feed poller skips the
+ * affected account and retries on its next pass rather than reporting
+ * to a channel — so the `messageKey` exists for catalog uniformity.
+ *
+ * Sub-code drives diagnostics and the caller's response:
+ * `TIMEOUT` / `UPSTREAM_5XX` / `RATE_LIMITED` are transient and worth
+ * another pass; `NOT_FOUND` means the handle no longer exists (renamed,
+ * suspended, or a typo) and stays broken until an operator edits the
+ * config, so it is logged distinctly; `INVALID_RESPONSE` means the body
+ * did not match the expected schema; `FETCH_FAILED` covers transport.
+ */
+export type XFeedErrorCode =
+  | 'X_FEED_FETCH_FAILED'
+  | 'X_FEED_TIMEOUT'
+  | 'X_FEED_UPSTREAM_5XX'
+  | 'X_FEED_RATE_LIMITED'
+  | 'X_FEED_NOT_FOUND'
+  | 'X_FEED_INVALID_RESPONSE';
+
+export class XFeedError<
+  P extends Readonly<Record<string, string | number>> | undefined = undefined,
+> extends ExternalServiceError<XFeedErrorCode, P> {
+  public override readonly kind = 'XFeedError';
+  public constructor(init: DomainErrorInit<XFeedErrorCode, P>) {
+    super(init);
+  }
+}

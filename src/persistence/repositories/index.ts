@@ -17,6 +17,7 @@ import { MongoMessageRepo, type MessageRepo } from './message.repo';
 import { MongoReplyRepo, type ReplyRepo } from './reply.repo';
 import { MongoTempRoleRepo, type TempRoleRepo } from './temp-role.repo';
 import { MongoUserApiSettingRepo, type UserApiSettingRepo } from './user-api-setting.repo';
+import { MongoXFeedCursorRepo, type XFeedCursorRepo } from './x-feed-cursor.repo';
 
 export { MongoActivityRepo, type ActivityRepo, type ActivityInput } from './activity.repo';
 export { MongoFetchRepo, type FetchRepo } from './fetch.repo';
@@ -30,6 +31,7 @@ export {
   type UserApiSettingDefaults,
   type UserApiSettingPatch,
 } from './user-api-setting.repo';
+export { MongoXFeedCursorRepo, type XFeedCursorRepo } from './x-feed-cursor.repo';
 
 /**
  * Per-guild repository bag. Composition roots build one of these per
@@ -44,6 +46,7 @@ export interface Repos {
   readonly reply: ReplyRepo;
   readonly tempRole: TempRoleRepo;
   readonly userApiSetting: UserApiSettingRepo;
+  readonly xFeedCursor: XFeedCursorRepo;
 }
 
 /**
@@ -60,4 +63,5 @@ export const buildRepos = (conn: GuildConnection): Repos => ({
   reply: new MongoReplyRepo(conn),
   tempRole: new MongoTempRoleRepo(conn),
   userApiSetting: new MongoUserApiSettingRepo(conn),
+  xFeedCursor: new MongoXFeedCursorRepo(conn),
 });

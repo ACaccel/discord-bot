@@ -22,3 +22,8 @@ export {
 } from './social-link-preview';
 export { createSettingsApiPlugin, type SettingsApiPluginConfig } from './settings-api';
 export { createIdentitySyncPlugin, type IdentitySyncPluginConfig } from './identity-sync';
+export {
+  createXMediaFeedPlugin,
+  type CreateXMediaFeedDeps,
+  type XMediaFeedPluginConfig,
+} from './x-media-feed';

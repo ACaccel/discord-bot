@@ -365,6 +365,9 @@
   "social_link_preview": {
     "embed_footer": "預覽來源:{{provider}}"
   },
+  "x_media_feed": {
+    "post": "**@{{author}}** 在 X 發布了新的圖片 / 影片\n{{url}}"
+  },
   "common": {
     "empty_value": "無"
   },

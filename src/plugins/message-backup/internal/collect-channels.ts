@@ -12,7 +12,7 @@
 import { ChannelType, type Guild, type TextBasedChannel } from 'discord.js';
 
 import { logError, type Logger } from '../../../core/logger';
-import { retryFetch } from './retry';
+import { retryFetch } from '../../../core/retry';
 
 const ALLOWED_CHANNEL_TYPES = new Set<ChannelType>([
   ChannelType.GuildText,

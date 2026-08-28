@@ -12,7 +12,7 @@ import type { TextBasedChannel } from 'discord.js';
 
 import { logError, type Logger } from '../../../core/logger';
 import type { Repos } from '../../../persistence/repositories';
-import { retryFetch } from './retry';
+import { retryFetch } from '../../../core/retry';
 import { saveBatch, type BatchResult } from './save-batch';
 
 export interface ChannelBackupStats {

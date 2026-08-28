@@ -365,6 +365,9 @@
   "social_link_preview": {
     "embed_footer": "Preview via {{provider}}"
   },
+  "x_media_feed": {
+    "post": "**@{{author}}** posted new media on X\n{{url}}"
+  },
   "common": {
     "empty_value": "None"
   },

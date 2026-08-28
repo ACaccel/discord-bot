@@ -202,6 +202,21 @@ SSRF guard, host allow-list).
 Failures map into `LinkPreviewError`. `LinkPreviewProviderRegistry`
 matches by URL in registration order.
 
+### X-Feed Strategy ([src/infra/x-feed/](../src/infra/x-feed/))
+
+A third Provider Strategy, for the `XMediaFeedPlugin`, following the same
+shape as the two above. `XTimelineSource.fetchTimeline(handle)`
+returns a `Result<readonly XPost[], XFeedFailure>` of neutral, normalised
+posts; the plugin owns all Discord assembly. The shipped
+`FxTwitterTimelineSource` reads an FxTwitter-compatible JSON API — chosen
+because X's official API has no free tier and bills per post read, which a
+five-minute poller cannot justify. The Strategy, an operator-configurable
+`apiBaseUrl` (so a self-hosted instance can replace the public host), and a
+default-disabled plugin together absorb the risk of depending on a
+community-run upstream. `XPost.id` stays a **string**: X post ids are 64-bit
+and exceed `Number.MAX_SAFE_INTEGER`, so comparisons go through `BigInt`.
+Failures map into `XFeedError`.
+
 ## 3. Interaction request flow
 
 ```
@@ -271,6 +286,7 @@ non-critical plugins are marked disabled and the bot keeps running.
 | `SocialLinkPreviewPlugin` | `src/plugins/social-link-preview/` | rewrites/embeds social-media share-link previews and suppresses the original (nijika, tomori)                |
 | `SettingsApiPlugin`       | `src/plugins/settings-api/`        | owner-only, bearer-authenticated HTTP REST API to update the LLM `endpoint` at runtime + persist it (gopher) |
 | `IdentitySyncPlugin`      | `src/plugins/identity-sync/`       | daily avatar/nickname sync with a source user, or a static fallback identity (gopher)                        |
+| `XMediaFeedPlugin`        | `src/plugins/x-media-feed/`        | polls followed X (Twitter) accounts and forwards their new image / video posts to a feed channel (nijika)    |
 
 ## 6. Personalities
 
@@ -281,7 +297,7 @@ is per deployment and `.gitignore`d.
 
 | Personality   | Notable surface                                                                                                                                                                                                                            |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `nijika`      | Web-facing; exposes an Express `/discord/earthquake` webhook                                                                                                                                                                               |
+| `nijika`      | Web-facing; exposes an Express `/discord/earthquake` webhook, and polls followed X (Twitter) accounts into a media-feed channel                                                                                                            |
 | `konata`      | Full interactive feature set                                                                                                                                                                                                               |
 | `tomori`      | Public-facing; nijika's interactive plugin set minus the self-guild-only surfaces (earthquake webhook, level-role sync), with a custom ready-time presence                                                                                 |
 | `msg-archive` | Worker-style; suppresses interaction / reaction / guildCreate listeners on its `BaseBot` subclass and runs only the `MessageBackupPlugin` (backup always runs; the per-run transcript log is opt-in via `backup_log_enabled`, default off) |
@@ -309,9 +325,13 @@ options, lives in [`docs/history/`](history/README.md).
 - **Repository pattern + in-memory fakes** over raw Mongoose — handlers and
   plugins depend on `<X>Repo` interfaces, so tests inject fakes without a
   database.
-- **Provider Strategy mirrored for LLM and Link-Preview** — both external
-  surfaces share the same "interface + ordered registry + per-provider SDK
-  error translation" shape (`src/infra/llm/`, `src/infra/link-preview/`).
+- **Provider Strategy mirrored for LLM, Link-Preview, and X-Feed** — every
+  outbound surface shares the same "interface + selection + per-provider SDK
+  error translation" shape (`src/infra/llm/`, `src/infra/link-preview/`,
+  `src/infra/x-feed/`), so a new one is a directory here rather than a new
+  pattern. The first two carry an ordered registry because they pick among
+  several providers per call; `x-feed` has a single implementation and so
+  selects at composition time instead.
 - **`PermissionRankPolicy` as a static, discord.js-free core service** built
   once in the `BaseBot` constructor, chosen over binding rank into
   `GuildRegistry` to avoid event-before-registration races

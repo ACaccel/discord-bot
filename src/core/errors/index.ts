@@ -14,6 +14,7 @@ import type {
   DatabaseError,
   LlmProviderError,
   LinkPreviewError,
+  XFeedError,
 } from './external-service-error';
 import type { NotFoundError } from './not-found-error';
 import type { PermissionError } from './permission-error';
@@ -38,6 +39,8 @@ export {
   type LlmProviderErrorCode,
   LinkPreviewError,
   type LinkPreviewErrorCode,
+  XFeedError,
+  type XFeedErrorCode,
 } from './external-service-error';
 
 /**
@@ -54,4 +57,5 @@ export type AnyDomainError =
   | DiscordApiError
   | DatabaseError
   | LlmProviderError
-  | LinkPreviewError;
+  | LinkPreviewError
+  | XFeedError;

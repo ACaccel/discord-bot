@@ -52,6 +52,14 @@
     "invalid_response": "The link preview source `{{provider}}` returned an unexpected response (status {{status}}).",
     "unknown": "An unexpected error occurred while building the link preview from `{{provider}}` (status {{status}})."
   },
+  "x_feed": {
+    "fetch_failed": "Could not read `@{{handle}}`'s posts from X (status {{status}}).",
+    "timeout": "Reading `@{{handle}}`'s posts from X timed out (status {{status}}).",
+    "upstream_failure": "The X feed source is temporarily unavailable while reading `@{{handle}}` (status {{status}}). Please try again later.",
+    "rate_limited": "The X feed source is rate limited while reading `@{{handle}}` (status {{status}}). Please try again later.",
+    "not_found": "The X account `@{{handle}}` was not found (status {{status}}). It may have been renamed, suspended, or misspelled in the configuration.",
+    "invalid_response": "The X feed source returned an unexpected response for `@{{handle}}` (status {{status}})."
+  },
   "configuration": {
     "missing_env": "The environment variable `{{envVar}}` is not set. Please contact an administrator."
   },

@@ -23,3 +23,4 @@ Conventions:
 | 0007 | Permanently remove the `todo_list` feature         | accepted | —                  |
 | 0008 | Permanently remove the `pin_message` command       | accepted | —                  |
 | 0009 | Decouple guild-events local record from disclosure | accepted | —                  |
+| 0010 | Read X timelines via a third-party mirror          | accepted | —                  |

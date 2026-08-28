@@ -77,6 +77,7 @@ describe('Nijika composition', () => {
         'temp-role',
         'activity',
         'voice',
+        'x-media-feed',
         'earthquake',
       ]),
     );

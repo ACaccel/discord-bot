@@ -11,6 +11,7 @@ import { messageSchema, type MessageDoc } from './message.schema';
 import { replySchema, type ReplyDoc } from './reply.schema';
 import { tempRoleSchema, type TempRoleDoc } from './temp-role.schema';
 import { userApiSettingSchema, type UserApiSettingDoc } from './user-api-setting.schema';
+import { xFeedCursorSchema, type XFeedCursorDoc } from './x-feed-cursor.schema';
 
 export { activitySchema, type ActivityDoc } from './activity.schema';
 export { fetchSchema, type FetchDoc } from './fetch.schema';
@@ -19,6 +20,7 @@ export { messageSchema, type MessageDoc } from './message.schema';
 export { replySchema, type ReplyDoc } from './reply.schema';
 export { tempRoleSchema, type TempRoleDoc } from './temp-role.schema';
 export { userApiSettingSchema, type UserApiSettingDoc } from './user-api-setting.schema';
+export { xFeedCursorSchema, type XFeedCursorDoc } from './x-feed-cursor.schema';
 
 export const SCHEMAS = {
   Fetch: fetchSchema,
@@ -28,6 +30,7 @@ export const SCHEMAS = {
   Activity: activitySchema,
   TempRole: tempRoleSchema,
   UserApiSetting: userApiSettingSchema,
+  XFeedCursor: xFeedCursorSchema,
 } as const;
 
 export type SchemaName = keyof typeof SCHEMAS;
@@ -44,4 +47,5 @@ export interface DocByName {
   Activity: ActivityDoc;
   TempRole: TempRoleDoc;
   UserApiSetting: UserApiSettingDoc;
+  XFeedCursor: XFeedCursorDoc;
 }

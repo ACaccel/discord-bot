@@ -10,6 +10,7 @@ import {
     createSocialLinkPreviewPlugin,
     createTempRolePlugin,
     createVoicePlugin,
+    createXMediaFeedPlugin,
 } from '@plugins';
 
 interface NijikaConfig extends Config {
@@ -20,6 +21,12 @@ interface NijikaConfig extends Config {
      * `unknown` here and may be omitted entirely.
      */
     social_link_preview?: unknown;
+    /**
+     * Raw `x_media_feed` block. Parsed and defaulted by the plugin
+     * (see `createXMediaFeedPlugin`), so it is intentionally `unknown`
+     * here and may be omitted entirely.
+     */
+    x_media_feed?: unknown;
 }
 
 export class Nijika extends BaseBot<NijikaConfig> {
@@ -60,6 +67,9 @@ export class Nijika extends BaseBot<NijikaConfig> {
         // button and a hard 30-day expiry (see `createTempRolePlugin`).
         this.use(createTempRolePlugin());
         this.use(createVoicePlugin());
+        // Polls the configured X (Twitter) accounts and forwards their new
+        // image / video posts to the guild's feed channel.
+        this.use(createXMediaFeedPlugin(this.config.x_media_feed));
         // The earthquake webhook server + per-guild broadcast is a
         // bot-scoped plugin; its `start` hook owns the Express route.
         this.use(createEarthquakePlugin({ port: webhookPort }));

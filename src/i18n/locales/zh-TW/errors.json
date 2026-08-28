@@ -52,6 +52,14 @@
     "invalid_response": "連結預覽來源 `{{provider}}` 回傳了非預期的內容(狀態 {{status}})。",
     "unknown": "建立 `{{provider}}` 連結預覽時發生未預期的錯誤(狀態 {{status}})。"
   },
+  "x_feed": {
+    "fetch_failed": "無法讀取 `@{{handle}}` 在 X 的貼文(狀態 {{status}})。",
+    "timeout": "讀取 `@{{handle}}` 在 X 的貼文逾時(狀態 {{status}})。",
+    "upstream_failure": "讀取 `@{{handle}}` 時 X 貼文來源暫時無法存取(狀態 {{status}}),請稍後再試。",
+    "rate_limited": "讀取 `@{{handle}}` 時 X 貼文來源觸發限流(狀態 {{status}}),請稍後再試。",
+    "not_found": "找不到 X 帳號 `@{{handle}}`(狀態 {{status}}),可能已改名、被停權,或設定中拼錯。",
+    "invalid_response": "X 貼文來源對 `@{{handle}}` 回傳了非預期的內容(狀態 {{status}})。"
+  },
   "configuration": {
     "missing_env": "環境變數 `{{envVar}}` 未設定,請聯絡管理員。"
   },
