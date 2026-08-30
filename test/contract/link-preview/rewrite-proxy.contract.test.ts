@@ -14,6 +14,7 @@ import {
   createTwitterProvider,
   createFacebookProvider,
   createBilibiliProvider,
+  createThreadsProvider,
 } from '../../../src/infra/link-preview';
 import { isOk } from '../../../src/core/result';
 import type { LinkPreviewProvider, LinkPreviewResult } from '../../../src/infra/link-preview';
@@ -291,5 +292,250 @@ describe('bilibili b23.tv resolution contract', () => {
       .reply(200, '<html><head><title>live</title></head><body>x</body></html>');
 
     expect(await buildB23(B23)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Threads share-link resolution — minimal UA + hop scanning, at the wire
+// ---------------------------------------------------------------------------
+
+describe('threads share-link resolution contract', () => {
+  const SHARE_PATH = '/share/BAc3zqH7qQ/';
+  const SHARE = new URL(`https://www.threads.com${SHARE_PATH}`);
+  const LEGACY_SHARE = new URL(`https://www.threads.net${SHARE_PATH}`);
+  const POST_PATH = '/@ajit86403/post/Dcp0Ly0iOIq';
+  const PERMALINK = `https://www.threads.com${POST_PATH}`;
+  const PROXY_PERMALINK = `https://vxthreads.net${POST_PATH}`;
+  /** Single-use share attribution Threads mints into the first hop's target. */
+  const SHARE_QUERY = { xmt: 'AQG0S6Tr0-abc', slof: '1' };
+  const SHARE_SEARCH = `?xmt=${SHARE_QUERY.xmt}&slof=${SHARE_QUERY.slof}`;
+  /** Where replaying the spent `xmt` token lands the chase. */
+  const BOUNCE_QUERY = { error: 'invalid_post' };
+  const BOUNCE = 'https://www.threads.com/?error=invalid_post';
+
+  /**
+   * Threads answers a full desktop-browser UA (the Chrome string
+   * `resolveCanonical` sends) with a client-side-routed app shell — 200, no
+   * `Location` — so a server-side chase observes no redirect at all. Only this
+   * minimal UA gets the 30x chain. Matched exactly: the Chrome string extends
+   * this one, so a prefix match would not tell the two apart.
+   */
+  const MINIMAL_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
+  const chase = (origin: string): ReturnType<typeof nock> =>
+    nock(origin, { reqheaders: { 'user-agent': MINIMAL_UA } });
+
+  const buildThreads = async (url: URL): Promise<LinkPreviewResult | null> => {
+    const provider = createThreadsProvider({
+      proxyHosts: ['vxthreads.net'],
+      ogClient: new OgClient(),
+    });
+    const result = await provider.build(url, { timeoutMs: 4000, budgetMs: 8000 });
+    if (!isOk(result)) throw new Error('expected ok');
+    return result.value;
+  };
+
+  beforeAll(() => {
+    if (!nock.isActive()) nock.activate();
+    nock.disableNetConnect();
+  });
+  afterEach(() => {
+    expect(nock.pendingMocks()).toEqual([]);
+    nock.cleanAll();
+  });
+  afterAll(() => {
+    nock.enableNetConnect();
+    nock.restore();
+  });
+
+  it('chases the minimal-UA redirect chain, picks the permalink hop, then proxies it for a playable video', async () => {
+    chase('https://www.threads.com')
+      .get(SHARE_PATH)
+      .reply(302, '', { Location: `${PERMALINK}${SHARE_SEARCH}` });
+    // The `xmt` token is spent by the hop that carried it, so Threads bounces
+    // the chase onward: the permalink exists only as an INTERMEDIATE hop and
+    // the chain lands on the error page.
+    chase('https://www.threads.com')
+      .get(POST_PATH)
+      .query(SHARE_QUERY)
+      .reply(302, '', { Location: BOUNCE });
+    chase('https://www.threads.com')
+      .get('/')
+      .query(BOUNCE_QUERY)
+      .reply(200, ogHtml('<title>Threads</title>'));
+    // The Discord-crawler-UA probe must hit the bare permalink path — no share
+    // attribution reaches the proxy, and the landing URL is never probed.
+    nock('https://vxthreads.net', { reqheaders: { 'user-agent': /Discordbot\/2\.0/ } })
+      .get(POST_PATH)
+      .reply(200, ogHtml(VIDEO_HEAD));
+
+    expect(await buildThreads(SHARE)).toEqual({
+      kind: 'rewritten-url',
+      url: PROXY_PERMALINK,
+      sourceUrl: SHARE.href, // original share link carried, not the permalink
+    });
+  });
+
+  it('posts nothing when the chase never passes through a post permalink (no proxy probe)', async () => {
+    chase('https://www.threads.com').get(SHARE_PATH).reply(302, '', { Location: BOUNCE });
+    chase('https://www.threads.com')
+      .get('/')
+      .query(BOUNCE_QUERY)
+      .reply(200, ogHtml('<title>Threads</title>'));
+    // No proxy interceptor: with no permalink hop there is nothing previewable,
+    // so the provider skips silently rather than probing the `/share/` token or
+    // the error page. The leftover check still proves both chase hops ran.
+
+    expect(await buildThreads(SHARE)).toBeNull();
+  });
+
+  it('absorbs the legacy threads.net 301 before the permalink hop', async () => {
+    // threads.net redirects onto threads.com before the expansion, so the
+    // permalink is the SECOND hop and the chain uses all three of the
+    // SAFE_MAX_REDIRECTS budget.
+    chase('https://www.threads.net').get(SHARE_PATH).reply(301, '', { Location: SHARE.href });
+    chase('https://www.threads.com')
+      .get(SHARE_PATH)
+      .reply(302, '', { Location: `${PERMALINK}${SHARE_SEARCH}` });
+    chase('https://www.threads.com')
+      .get(POST_PATH)
+      .query(SHARE_QUERY)
+      .reply(302, '', { Location: BOUNCE });
+    chase('https://www.threads.com')
+      .get('/')
+      .query(BOUNCE_QUERY)
+      .reply(200, ogHtml('<title>Threads</title>'));
+    nock('https://vxthreads.net', { reqheaders: { 'user-agent': /Discordbot\/2\.0/ } })
+      .get(POST_PATH)
+      .reply(200, ogHtml(IMAGE_HEAD));
+
+    expect(await buildThreads(LEGACY_SHARE)).toEqual({
+      kind: 'rewritten-url',
+      url: PROXY_PERMALINK,
+      sourceUrl: LEGACY_SHARE.href,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Threads host selection — the weak-image tier, at the wire
+// ---------------------------------------------------------------------------
+
+describe('threads weak-image host selection contract', () => {
+  // Priority-ordered as the operator configures them: the proxy that resolves
+  // the real post asset first, then the two video-capable ones. A plain
+  // permalink is used so no share-link redirect chase is involved and the
+  // probe sequence is exactly one request per host.
+  const HOSTS = ['viewthreads.com', 'fzthreads.com', 'fixthreads.seria.moe'];
+  const POST_PATH = '/@ajit86403/post/Dcp0Ly0iOIq';
+  const PERMALINK = new URL(`https://www.threads.com${POST_PATH}`);
+  const proxyUrl = (host: string): string => `https://${host}${POST_PATH}`;
+
+  /** An fbcdn rendition path that carries the post's own media. */
+  const POST_IMAGE = 'https://scontent.cdninstagram.com/v/t39.92108-6/501_n.jpg';
+  /** The author's profile avatar — what a proxy serves when it has no post media. */
+  const AVATAR_IMAGE = 'https://scontent.cdninstagram.com/v/t51.2885-19/338_n.jpg';
+  /** A second avatar rendition, identified by its size segment instead. */
+  const AVATAR_THUMB = 'https://scontent.cdninstagram.com/v/t51.12442-19/s150x150/338_n.jpg';
+
+  const cardHead = (...images: readonly string[]): string =>
+    [
+      '<meta property="og:title" content="ajit86403 on Threads">',
+      ...images.map((image) => `<meta property="og:image" content="${image}">`),
+    ].join('');
+
+  const crawler = (host: string): ReturnType<typeof nock> =>
+    nock(`https://${host}`, { reqheaders: { 'user-agent': /Discordbot\/2\.0/ } });
+
+  /** Stub one proxy host answering the permalink probe with an OpenGraph head. */
+  const serves = (host: string, head: string): void => {
+    crawler(host).get(POST_PATH).reply(200, ogHtml(head));
+  };
+
+  /** Stub one proxy host as degraded, so the loop must fall through it. */
+  const isDown = (host: string): void => {
+    crawler(host).get(POST_PATH).reply(503, 'down');
+  };
+
+  const buildThreads = async (): Promise<string | null> => {
+    const provider = createThreadsProvider({ proxyHosts: HOSTS, ogClient: new OgClient() });
+    const result = await provider.build(PERMALINK, { timeoutMs: 4000, budgetMs: 8000 });
+    if (!isOk(result)) throw new Error('expected ok');
+    if (result.value === null) return null;
+    if (result.value.kind !== 'rewritten-url') throw new Error('expected rewritten-url');
+    return result.value.url;
+  };
+
+  beforeAll(() => {
+    if (!nock.isActive()) nock.activate();
+    nock.disableNetConnect();
+  });
+  afterEach(() => {
+    expect(nock.pendingMocks()).toEqual([]);
+    nock.cleanAll();
+  });
+  afterAll(() => {
+    nock.enableNetConnect();
+    nock.restore();
+  });
+
+  it('prefers the host serving the real post image over one serving only the avatar', async () => {
+    // All three hosts are probed: neither image tier short-circuits, because a
+    // later host may still hold the video. The avatar-only candidate is the
+    // one the weak-image tier exists to demote.
+    serves('viewthreads.com', cardHead(POST_IMAGE));
+    serves('fzthreads.com', cardHead(AVATAR_IMAGE));
+    serves('fixthreads.seria.moe', cardHead(AVATAR_THUMB));
+
+    expect(await buildThreads()).toBe(proxyUrl('viewthreads.com'));
+  });
+
+  it('posts an avatar-only host when it is the only one that responds', async () => {
+    // A weak image still beats posting nothing: the alternative is silence on
+    // a post that does have a readable title and author.
+    isDown('viewthreads.com');
+    serves('fzthreads.com', cardHead(AVATAR_IMAGE));
+    isDown('fixthreads.seria.moe');
+
+    expect(await buildThreads()).toBe(proxyUrl('fzthreads.com'));
+  });
+
+  it('passes over an avatar-only first host for a later one holding the real asset', async () => {
+    // Probe order alone would post the first host; only the tier separation
+    // keeps the avatar behind a real post image found further down the list.
+    serves('viewthreads.com', cardHead(AVATAR_IMAGE));
+    serves('fzthreads.com', cardHead(POST_IMAGE));
+    serves('fixthreads.seria.moe', cardHead(AVATAR_THUMB));
+
+    expect(await buildThreads()).toBe(proxyUrl('fzthreads.com'));
+  });
+
+  it('promotes a later host whose images mix the avatar with the real asset', async () => {
+    // One non-avatar image is enough: the candidate carries a real post asset,
+    // so it scores as a plain image and outranks the earlier avatar-only host
+    // despite being probed second.
+    serves('viewthreads.com', cardHead(AVATAR_IMAGE));
+    serves('fzthreads.com', cardHead(AVATAR_IMAGE, POST_IMAGE));
+    isDown('fixthreads.seria.moe');
+
+    expect(await buildThreads()).toBe(proxyUrl('fzthreads.com'));
+  });
+
+  it('lets a later host with og:video win over an earlier host that served an image', async () => {
+    // Video short-circuits from any position, which is why listing the
+    // real-asset proxy first costs a video post nothing. The third host is
+    // never probed — a leftover interceptor would fail the afterEach check.
+    serves('viewthreads.com', cardHead(POST_IMAGE));
+    serves('fzthreads.com', VIDEO_HEAD);
+
+    expect(await buildThreads()).toBe(proxyUrl('fzthreads.com'));
+  });
+
+  it('posts nothing when every host serves only the avatar behind a login wall', async () => {
+    // The junk filter runs ahead of both image tiers, so a gated page scores
+    // `none` however many images it carries — weak-image must not resurrect it.
+    const gated = ['<meta property="og:title" content="Threads • Log in">', cardHead(AVATAR_IMAGE)];
+    for (const host of HOSTS) serves(host, gated.join(''));
+
+    expect(await buildThreads()).toBeNull();
   });
 });

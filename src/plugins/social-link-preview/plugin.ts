@@ -13,7 +13,10 @@
  *
  * Factory pattern (mirrors `createLlmAutoReplyPlugin`): per-bot settings
  * are parsed once and the provider registry is captured in the closure,
- * so the returned object is pure data. Channel suppression is resolved
+ * so the returned object is pure data. The registry exists only when the
+ * feature is enabled, because the embed-proxy host lists it is built from
+ * are operator configuration that a disabled bot never supplies. Channel
+ * suppression is resolved
  * per-event from the {@link PermissionRankPolicy} (the `social_preview`
  * feature; its default ceiling is unbounded, so previews fire everywhere
  * unless an operator sets a finite ceiling). `deps` exposes an injectable
@@ -50,15 +53,17 @@ export const createSocialLinkPreviewPlugin = (
   const config = parseSocialLinkPreviewConfig(rawConfig);
   const registry =
     deps.registry ??
-    createDefaultLinkPreviewRegistry({
-      twitterProxyHosts: config.twitterProxyHosts,
-      instagramProxyHosts: config.instagramProxyHosts,
-      threadsProxyHosts: config.threadsProxyHosts,
-      facebookProxyHosts: config.facebookProxyHosts,
-      redditProxyHosts: config.redditProxyHosts,
-      bilibiliProxyHosts: config.bilibiliProxyHosts,
-      enabledProviders: config.providers,
-    });
+    (config.enabled
+      ? createDefaultLinkPreviewRegistry({
+          twitterProxyHosts: config.twitterProxyHosts,
+          instagramProxyHosts: config.instagramProxyHosts,
+          threadsProxyHosts: config.threadsProxyHosts,
+          facebookProxyHosts: config.facebookProxyHosts,
+          redditProxyHosts: config.redditProxyHosts,
+          bilibiliProxyHosts: config.bilibiliProxyHosts,
+          enabledProviders: config.providers,
+        })
+      : undefined);
 
   return {
     id: PLUGIN_ID,
@@ -68,7 +73,10 @@ export const createSocialLinkPreviewPlugin = (
 
     events: {
       messageCreate: async (ctx, message): Promise<void> => {
-        if (!config.enabled) return;
+        // Disabled configs carry no proxy hosts and therefore no registry;
+        // both halves are checked because nothing ties them together at
+        // this point beyond how the factory built them.
+        if (!config.enabled || registry === undefined) return;
         if (message.author.bot) return; // self-loop + bot-feedback guard
         if (message.guildId === null) return; // guild-only
         // Channels above the social_preview rank ceiling are suppressed.

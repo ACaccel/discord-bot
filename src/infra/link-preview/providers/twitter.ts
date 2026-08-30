@@ -1,9 +1,16 @@
 /**
- * Twitter / X provider. Rewrites a tweet URL onto an embed-proxy domain
- * (defaults `fxtwitter.com` → `vxtwitter.com`) so Discord renders a playable
- * video / rich embed. Each candidate host is validated (OG probe) before
- * being posted. Only original tweet hosts match — proxy hosts are excluded
- * so an already-fixed link the user posted is left untouched.
+ * Twitter / X provider. Rewrites a tweet URL onto one of the operator's
+ * configured embed-proxy domains so Discord renders a playable video / rich
+ * embed. Each candidate host is validated (OG probe) before being posted.
+ * Only original tweet hosts match — proxy hosts are excluded so an
+ * already-fixed link the user posted is left untouched.
+ *
+ * Host order matters more here than for the other sources: the FxEmbed
+ * family (`fxtwitter.com` and its aliases) publishes media through an
+ * `application/activity+json` alternate link rather than OpenGraph, so the
+ * validation probe sees no `og:video` and grades a video tweet text-tier. A
+ * host that does serve `og:video` therefore belongs ahead of it, or every
+ * video scores as a bare title.
  */
 import { createRewriteProvider } from './rewrite-provider';
 import type { OgClient } from '../og-client';

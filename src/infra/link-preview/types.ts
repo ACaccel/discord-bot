@@ -27,7 +27,12 @@
  *      in `src/infra/link-preview/providers/`.
  *   2. Append the name to {@link LinkPreviewProviderName} below.
  *   3. Add one line to `createDefaultLinkPreviewRegistry`
- *      (`src/infra/link-preview/default-registry.ts`).
+ *      (`src/infra/link-preview/default-registry.ts`) plus its required
+ *      proxy-host field on `LinkPreviewRegistryDeps`, the matching
+ *      `<source>ProxyHosts` key on the plugin's config schema, and a
+ *      recommended list in each bot's `config.example.json` — proxy hosts
+ *      are operator configuration, so a rewrite source is not usable until
+ *      an operator can supply them.
  * The plugin's orchestrator does not branch on provider names internally.
  *
  * Error contract: a fetching provider's `build()` MUST translate

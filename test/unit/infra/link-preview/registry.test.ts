@@ -1,9 +1,10 @@
 /**
  * Unit tests for {@link LinkPreviewProviderRegistry} (first-match-wins by
  * registration order) and {@link createDefaultLinkPreviewRegistry}
- * (per-platform routing, the `enabledProviders` kill-switch, and proxy
- * host-list overrides). Routing uses only the pure `canHandle`; the
- * override test injects a fake `OgClient` so it stays offline.
+ * (per-platform routing, the `enabledProviders` kill-switch, and the routing
+ * of each operator-supplied proxy-host list to the provider that owns it).
+ * Routing uses only the pure `canHandle`; every probing test injects a fake
+ * `OgClient` so the suite stays offline.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -17,6 +18,37 @@ import {
 import { ok } from '../../../../src/core/result';
 
 const u = (href: string): URL => new URL(href);
+
+/**
+ * One distinct proxy host per source, so an assertion on the probed host
+ * proves which list the provider was handed.
+ */
+const PROXY_HOSTS = {
+  twitterProxyHosts: ['vxtwitter.com'],
+  instagramProxyHosts: ['uuinstagram.com'],
+  threadsProxyHosts: ['viewthreads.com'],
+  facebookProxyHosts: ['facebed.com'],
+  redditProxyHosts: ['vxreddit.com'],
+  bilibiliProxyHosts: ['vxbilibili.com'],
+} as const;
+
+/** An OG stub answering every candidate with a playable video. */
+const videoOgClient = (): OgClient => {
+  const fetch = vi.fn(() => Promise.resolve(ok({ images: [], video: 'v.mp4' } as OpenGraphMeta)));
+  return { fetch } as unknown as OgClient;
+};
+
+/** Probe `source` through the registry and return the rewritten proxy URL. */
+const rewriteOf = async (
+  registry: LinkPreviewProviderRegistry,
+  source: string,
+): Promise<string> => {
+  const result = await registry.findProvider(u(source))?.build(u(source), { timeoutMs: 1_000 });
+  if (result?.ok !== true || result.value?.kind !== 'rewritten-url') {
+    throw new Error(`expected a rewritten-url result for ${source}`);
+  }
+  return result.value.url;
+};
 
 const stubProvider = (
   name: LinkPreviewProvider['name'],
@@ -43,7 +75,7 @@ describe('LinkPreviewProviderRegistry.findProvider', () => {
 
 describe('createDefaultLinkPreviewRegistry', () => {
   it('routes each platform URL to its provider', () => {
-    const registry = createDefaultLinkPreviewRegistry();
+    const registry = createDefaultLinkPreviewRegistry({ ...PROXY_HOSTS });
     expect(registry.findProvider(u('https://x.com/a/status/1'))?.name).toBe('twitter');
     expect(registry.findProvider(u('https://www.instagram.com/p/abc/'))?.name).toBe('instagram');
     expect(registry.findProvider(u('https://www.threads.net/@a/post/1'))?.name).toBe('threads');
@@ -61,27 +93,50 @@ describe('createDefaultLinkPreviewRegistry', () => {
   });
 
   it('honours the enabledProviders allow-list', () => {
-    const registry = createDefaultLinkPreviewRegistry({ enabledProviders: ['twitter'] });
+    const registry = createDefaultLinkPreviewRegistry({
+      ...PROXY_HOSTS,
+      enabledProviders: ['twitter'],
+    });
     expect(registry.findProvider(u('https://x.com/a/status/1'))?.name).toBe('twitter');
     expect(registry.findProvider(u('https://forum.gamer.com.tw/C.php?bsn=1'))).toBeUndefined();
   });
 
+  it('hands every source its own proxy-host list', async () => {
+    const registry = createDefaultLinkPreviewRegistry({
+      ...PROXY_HOSTS,
+      ogClient: videoOgClient(),
+    });
+    const probed = {
+      twitter: await rewriteOf(registry, 'https://x.com/a/status/1'),
+      instagram: await rewriteOf(registry, 'https://www.instagram.com/p/abc/'),
+      threads: await rewriteOf(registry, 'https://www.threads.net/@a/post/1'),
+      facebook: await rewriteOf(registry, 'https://www.facebook.com/a/posts/1'),
+      reddit: await rewriteOf(registry, 'https://www.reddit.com/r/aww/comments/abc123/'),
+      bilibili: await rewriteOf(registry, 'https://www.bilibili.com/video/BV1xx411c7mD'),
+    };
+    expect(Object.values(probed).map((href) => new URL(href).hostname)).toEqual([
+      'vxtwitter.com',
+      'uuinstagram.com',
+      'viewthreads.com',
+      'facebed.com',
+      'vxreddit.com',
+      'vxbilibili.com',
+    ]);
+  });
+
   it('applies a custom proxy-host list (validated offline via injected OgClient)', async () => {
-    const candidate = 'https://vxtwitter.com/a/status/1';
-    const fetch = vi.fn(async (url: string) =>
-      ok((url === candidate ? { images: [], video: 'v.mp4' } : { images: [] }) as OpenGraphMeta),
+    const candidate = 'https://fixupx.com/a/status/1';
+    const fetch = vi.fn((url: string) =>
+      Promise.resolve(
+        ok((url === candidate ? { images: [], video: 'v.mp4' } : { images: [] }) as OpenGraphMeta),
+      ),
     );
     const ogClient = { fetch } as unknown as OgClient;
     const registry = createDefaultLinkPreviewRegistry({
-      twitterProxyHosts: ['vxtwitter.com'],
+      ...PROXY_HOSTS,
+      twitterProxyHosts: ['fixupx.com'],
       ogClient,
     });
-    const provider = registry.findProvider(u('https://x.com/a/status/1'));
-    const result = await provider?.build(u('https://x.com/a/status/1'), { timeoutMs: 1000 });
-    if (result?.ok === true && result.value?.kind === 'rewritten-url') {
-      expect(result.value.url).toBe(candidate);
-    } else {
-      throw new Error('expected a rewritten-url result');
-    }
+    expect(await rewriteOf(registry, 'https://x.com/a/status/1')).toBe(candidate);
   });
 });

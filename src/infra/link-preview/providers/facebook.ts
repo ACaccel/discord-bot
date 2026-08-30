@@ -1,14 +1,10 @@
 /**
- * Facebook provider. Rewrites a post / video / reel URL onto an
- * embed-proxy domain (defaults `facebed.com` -> `fixacebook.com`) so Discord
- * renders a richer embed. Each candidate is validated before posting.
+ * Facebook provider. Rewrites a post / photo / video / reel URL onto an
+ * embed-proxy domain so Discord renders a richer embed. The proxy hosts are
+ * operator configuration, probed in priority order, and each candidate is
+ * validated before posting.
  *
- * `facebed.com` is primary because it covers text / photo / album posts as
- * well as video; `fixacebook.com` is a video/reel-only fallback. The earlier
- * default `facebookez.com` was dropped — it became defunct and now redirects
- * to an ad network.
- *
- * Two Facebook-specific wrinkles this provider handles on top of the generic
+ * Three Facebook-specific wrinkles this provider handles on top of the generic
  * rewrite template:
  *
  *   1. Share short links (`/share/<type>/<token>/`, e.g. `/share/r/<token>`)
@@ -18,7 +14,10 @@
  *      {@link OgClient.resolveCanonical} (a browser-UA redirect chase) and
  *      probe the proxies with THAT — the only form that yields a playable
  *      video.
- *   2. When no proxy can preview a Facebook link (the probe returns `null`),
+ *   2. A legacy album-photo permalink is normalised to the `/photo/?fbid=&set=`
+ *      query form before the probe, because the proxies mis-resolve the path
+ *      form (see {@link normalizeAlbumPhotoUrl}).
+ *   3. When no proxy can preview a Facebook link (the probe returns `null`),
  *      we fall back to a static card built from Facebook's OWN OpenGraph,
  *      which Facebook reliably serves to the Discord crawler UA (title /
  *      description / thumbnail). A login-wall / removed-post placeholder is
@@ -53,18 +52,56 @@ const FACEBOOK_HOSTS: ReadonlySet<string> = new Set([
 /** Path shapes that carry a previewable post/video/reel. */
 const POST_PATH = /\/(?:posts|videos|reel|reels|share|watch|permalink\.php|story\.php)\b/i;
 
+/**
+ * Legacy album-photo permalink: `/<owner>/photos/<album>/<photoId>/`, where the
+ * album segment always carries the `a.` prefix (optionally followed by further
+ * numeric id parts) and the photo id is numeric. The prefix and the numeric
+ * shape are what separate this permalink from an ordinary `/photos/` listing,
+ * which carries no single photo to preview.
+ */
+const LEGACY_ALBUM_PHOTO_PATH = /^\/[^/]+\/photos\/(a\.\d+(?:\.\d+)*)\/(\d+)\/?$/i;
+
+/** A path that points at one previewable piece of content, not a listing or profile. */
+const isContentPath = (pathname: string): boolean =>
+  POST_PATH.test(pathname) || LEGACY_ALBUM_PHOTO_PATH.test(pathname);
+
 /** `fb.watch` short links are always a single video, regardless of path. */
 const isFbWatch = (host: string): boolean => host === 'fb.watch' || host === 'www.fb.watch';
 
 const matches = (url: URL): boolean => {
   const host = url.hostname.toLowerCase();
   if (isFbWatch(host)) return true;
-  return FACEBOOK_HOSTS.has(host) && POST_PATH.test(url.pathname);
+  return FACEBOOK_HOSTS.has(host) && isContentPath(url.pathname);
 };
 
 /** A `facebook.com/share/<type>/<token>` short link that proxies cannot resolve. */
 const isShareLink = (url: URL): boolean =>
   FACEBOOK_HOSTS.has(url.hostname.toLowerCase()) && /^\/share\//i.test(url.pathname);
+
+/**
+ * Address a legacy album-photo permalink by id — `/photo/?fbid=<photoId>&set=<album>`
+ * — and return every other URL unchanged.
+ *
+ * The embed proxies resolve the legacy path form to a DIFFERENT, unrelated
+ * post: the response carries genuine content (real title, real media, another
+ * author), so no junk-marker filter can tell it apart from a true preview and
+ * the bot would embed a stranger's post under the poster's link. The id form
+ * names the photo unambiguously and resolves to the right one. The rest of the
+ * query is dropped with the path it belonged to — the two ids are all the
+ * proxy needs to resolve the photo.
+ */
+const normalizeAlbumPhotoUrl = (url: URL): URL => {
+  if (!FACEBOOK_HOSTS.has(url.hostname.toLowerCase())) return url;
+  const match = LEGACY_ALBUM_PHOTO_PATH.exec(url.pathname);
+  const album = match?.[1];
+  const photoId = match?.[2];
+  if (album === undefined || photoId === undefined) return url;
+
+  const normalized = new URL(url.href);
+  normalized.pathname = '/photo/';
+  normalized.search = `?fbid=${photoId}&set=${album}`;
+  return normalized;
+};
 
 /** Build the candidate proxy URL for one host. Keep the query (FB ids live there). */
 const toProxyUrl = (url: URL, host: string): string =>
@@ -98,7 +135,7 @@ const resolveShareLink = async (
   // Only trust a resolution that lands on a real Facebook content permalink
   // (not another /share/ hop, a profile, or an off-site host).
   if (!FACEBOOK_HOSTS.has(canonical.hostname.toLowerCase())) return undefined;
-  if (isShareLink(canonical) || !POST_PATH.test(canonical.pathname)) return undefined;
+  if (isShareLink(canonical) || !isContentPath(canonical.pathname)) return undefined;
   // The resolved id lives in the path; the redirect's `share_url` / `rdid`
   // query is attribution noise that can only confuse the proxy.
   canonical.search = '';
@@ -155,9 +192,11 @@ export const createFacebookProvider = (opts: {
     canHandle: matches,
     build: async (url, ctx) => {
       // Expand a share short link before probing; otherwise probe as-is.
-      const base = isShareLink(url)
+      const canonical = isShareLink(url)
         ? ((await resolveShareLink(url, ctx, opts.ogClient)) ?? url)
         : url;
+      // A share link can expand onto the album-photo shape, so normalise last.
+      const base = normalizeAlbumPhotoUrl(canonical);
 
       const probe = await rewrite.build(base, ctx);
       if (!probe.ok) return probe;

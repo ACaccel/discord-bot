@@ -361,6 +361,143 @@ describe('OgClient.resolveCanonical', () => {
   });
 });
 
+describe('OgClient.resolveRedirectChain', () => {
+  // A Threads share link: the legacy host 301s to the current one, that hop
+  // 302s to the permalink, and the single-use `xmt` token in it is rejected on
+  // the follow-up request — so the permalink survives only as an intermediate
+  // hop and the chase lands on a generic error page.
+  const share = 'https://www.threads.net/share/BAc3zqH7qQ/';
+  const currentHost = 'https://www.threads.com/share/BAc3zqH7qQ/';
+  const permalink = 'https://www.threads.com/@ajit86403/post/Dcp0Ly0iOIq?xmt=AQG0S6Tr0&slof=1';
+  const landing = 'https://www.threads.com/?error=invalid_post';
+  // Threads answers a full desktop-browser UA with its client-side-routed app
+  // shell (200, no Location); a plainer UA still gets the 30x.
+  const minimalUa = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
+
+  /** A `beforeRedirect` options bag as the http adapter builds it for one hop. */
+  const hopOptions = (target: string): Record<string, string> => {
+    const url = new URL(target);
+    return {
+      protocol: url.protocol,
+      hostname: url.hostname,
+      host: url.host,
+      path: `${url.pathname}${url.search}`,
+    };
+  };
+
+  /**
+   * Fake `axios.get` that replays `hops` through the caller's `beforeRedirect`
+   * — exactly as the http adapter does on each 30x — before settling with
+   * `settle` (a response, or a throw standing in for a transport failure).
+   */
+  const setChasingGet = (
+    hops: readonly string[],
+    settle: () => Promise<unknown>,
+  ): ReturnType<typeof vi.fn> =>
+    setGet(async (...args: unknown[]) => {
+      const { beforeRedirect } = args[1] as {
+        beforeRedirect: (options: Record<string, string>) => void;
+      };
+      for (const hop of hops) beforeRedirect(hopOptions(hop));
+      return settle();
+    });
+
+  it('returns every recorded hop in order', async () => {
+    const response = streamResponse([Buffer.from('error page')], 'text/html', landing);
+    setChasingGet([currentHost, permalink, landing], async () => response);
+    const result = await new OgClient().resolveRedirectChain(share, 4000, 'threads');
+
+    expect(isOk(result)).toBe(true);
+    if (isOk(result)) expect(result.value).toEqual([currentHost, permalink, landing]);
+  });
+
+  it('returns an empty array when the response did not redirect', async () => {
+    setChasingGet([], async () => streamResponse([Buffer.from('shell')], 'text/html', share));
+    const result = await new OgClient().resolveRedirectChain(share, 4000, 'threads');
+
+    expect(isOk(result)).toBe(true);
+    if (isOk(result)) expect(result.value).toEqual([]);
+  });
+
+  it('discards the destination body — only the hop URLs matter', async () => {
+    const response = streamResponse([Buffer.alloc(64 * 1024, 0x78)], 'text/html', landing);
+    setChasingGet([permalink, landing], async () => response);
+    await new OgClient().resolveRedirectChain(share, 4000, 'threads');
+
+    expect(response.data.destroyed).toBe(true);
+  });
+
+  it('refuses a hop targeting a private / loopback host (SSRF guard)', async () => {
+    setChasingGet(['http://127.0.0.1/admin'], async () =>
+      streamResponse([Buffer.from('never reached')], 'text/html', landing),
+    );
+    const result = await new OgClient().resolveRedirectChain(share, 4000, 'threads');
+
+    // The guard throws before the hop is recorded, so nothing can be salvaged.
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error.code).toBe('LINK_PREVIEW_FETCH_FAILED');
+      expect((result.error.cause as Error).message).toContain(
+        'refusing redirect to disallowed host',
+      );
+    }
+  });
+
+  it('salvages the recorded hops when the chase fails after a hop', async () => {
+    // The load-bearing Threads case: the permalink hop is already recorded when
+    // the rejected share token bounces the chase, so the caller still gets it.
+    setChasingGet([currentHost, permalink], async () => {
+      throw Object.assign(new Error('reset'), { code: 'ECONNRESET' });
+    });
+    const result = await new OgClient().resolveRedirectChain(share, 4000, 'threads');
+
+    expect(isOk(result)).toBe(true);
+    if (isOk(result)) expect(result.value).toEqual([currentHost, permalink]);
+  });
+
+  it('maps a transport failure with no recorded hop to LINK_PREVIEW_FETCH_FAILED', async () => {
+    setChasingGet([], async () => {
+      throw Object.assign(new Error('dns'), { code: 'ENOTFOUND' });
+    });
+    const result = await new OgClient().resolveRedirectChain(share, 1000, 'threads');
+
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) expect(result.error.code).toBe('LINK_PREVIEW_FETCH_FAILED');
+  });
+
+  it('honours the userAgent argument and keeps the house request options', async () => {
+    const get = setChasingGet([permalink], async () =>
+      streamResponse([Buffer.from('page')], 'text/html', permalink),
+    );
+    await new OgClient().resolveRedirectChain(share, 4000, 'threads', minimalUa);
+
+    expect(get).toHaveBeenCalledWith(
+      share,
+      expect.objectContaining({
+        timeout: 4000,
+        maxRedirects: 3,
+        beforeRedirect: expect.any(Function),
+        responseType: 'stream',
+        headers: expect.objectContaining({ 'User-Agent': minimalUa, Accept: 'text/html' }),
+      }),
+    );
+  });
+
+  it('defaults to the same browser UA resolveCanonical sends', async () => {
+    const get = setChasingGet([], async () =>
+      streamResponse([Buffer.from('page')], 'text/html', share),
+    );
+    await new OgClient().resolveCanonical(share, 1000);
+    await new OgClient().resolveRedirectChain(share, 1000, 'threads');
+
+    const uaOf = (call: number): string =>
+      (get.mock.calls[call]?.[1] as { headers: Record<string, string> }).headers['User-Agent'] ??
+      '';
+    expect(uaOf(1)).toBe(uaOf(0));
+    expect(uaOf(1)).toContain('Chrome/');
+  });
+});
+
 describe('OgClient cache', () => {
   // A fresh single-use stream per call so a cache hit is observable as a
   // SKIPPED network call (Readable is consumed once).

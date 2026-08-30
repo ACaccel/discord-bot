@@ -4,10 +4,14 @@
  * non-sendable). The injected registry's `findProvider` is the probe: it is
  * reached only when every guard passes.
  *
- * Channel suppression now comes from a real {@link PermissionRankPolicy}
- * (built by the production factory from static config) resolved off the event
- * context, not a `blockedChannels` list. The `social_preview` default ceiling
- * is unbounded, so a channel previews unless an operator sets a finite ceiling.
+ * Channel suppression comes from a real {@link PermissionRankPolicy} (built by
+ * the production factory from static config) resolved off the event context.
+ * The `social_preview` default ceiling is unbounded, so a channel previews
+ * unless an operator sets a finite ceiling.
+ *
+ * Enabling the feature obliges the operator to supply all six embed-proxy host
+ * lists, so every enabled fixture here is built from {@link enabledConfig}; a
+ * disabled one carries none of them and must never reach the registry factory.
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { Message } from 'discord.js';
@@ -57,6 +61,26 @@ const makeLogger = (): Logger => {
 /** An empty policy: `social_preview` ceiling defaults to unbounded, so nothing is suppressed. */
 const emptyPolicy = createPermissionRankPolicy({});
 
+/**
+ * The six operator-supplied embed-proxy host lists. Placeholder hosts: no test
+ * here probes the network, and the registry factory only stores them.
+ */
+const PROXY_HOSTS = {
+  twitterProxyHosts: ['tw.example'],
+  instagramProxyHosts: ['ig.example'],
+  threadsProxyHosts: ['th.example'],
+  facebookProxyHosts: ['fb.example'],
+  redditProxyHosts: ['rd.example'],
+  bilibiliProxyHosts: ['bili.example'],
+};
+
+/** A minimal valid enabled config: the master switch plus every mandatory list. */
+const enabledConfig = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  enabled: true,
+  ...PROXY_HOSTS,
+  ...overrides,
+});
+
 const ctx = (policy: PermissionRankPolicy): PluginEventContext => {
   const container = createContainer();
   container.registerSingleton(TOKENS.PermissionRankPolicy, () => policy);
@@ -103,23 +127,34 @@ const makeMessage = (opts: MsgOpts = {}): Message =>
     },
   }) as unknown as Message;
 
-const fire = async (
-  rawConfig: unknown,
+/**
+ * Deliver one `messageCreate` to a constructed plugin. A plugin that declares
+ * no subscription is already inert, so an absent handler is a no-op rather
+ * than a failure — the assertions below measure what the plugin *does*, which
+ * keeps them honest whichever way an inert path is expressed.
+ */
+const deliver = async (
+  plugin: ReturnType<typeof createSocialLinkPreviewPlugin>,
   message: Message,
-  deps: Parameters<typeof createSocialLinkPreviewPlugin>[1],
   policy: PermissionRankPolicy = emptyPolicy,
 ): Promise<void> => {
-  const plugin = createSocialLinkPreviewPlugin(rawConfig, deps);
   const handler = plugin.events?.messageCreate;
-  if (handler === undefined) throw new Error('no messageCreate handler');
+  if (handler === undefined) return;
   // The discord.js event arg is OmitPartialGroupDMChannel<Message>; our fake
   // is structurally a Message, so narrow it to the handler's exact param type.
   await handler(ctx(policy), message as Parameters<typeof handler>[1]);
 };
 
+const fire = async (
+  rawConfig: unknown,
+  message: Message,
+  deps: Parameters<typeof createSocialLinkPreviewPlugin>[1],
+  policy: PermissionRankPolicy = emptyPolicy,
+): Promise<void> => deliver(createSocialLinkPreviewPlugin(rawConfig, deps), message, policy);
+
 describe('createSocialLinkPreviewPlugin shape', () => {
   it('declares id, version, bot scope, non-critical, and a messageCreate subscription', () => {
-    const plugin = createSocialLinkPreviewPlugin({ enabled: true });
+    const plugin = createSocialLinkPreviewPlugin(enabledConfig());
     expect(plugin.id).toBe('social-link-preview');
     expect(plugin.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(plugin.scope).toBe('bot');
@@ -127,45 +162,62 @@ describe('createSocialLinkPreviewPlugin shape', () => {
     expect(plugin.events?.messageCreate).toBeTypeOf('function');
   });
 
-  it('forwards every configured proxy-host list (incl. bilibili) to the registry factory', () => {
+  it('forwards all six configured proxy-host lists and the provider allow-list to the registry factory', () => {
     const spy = vi.mocked(createDefaultLinkPreviewRegistry);
     spy.mockClear();
-    createSocialLinkPreviewPlugin({
-      enabled: true,
-      twitterProxyHosts: ['custom-tw.example'],
-      bilibiliProxyHosts: ['custom-bili.example'],
+    createSocialLinkPreviewPlugin(enabledConfig({ providers: ['twitter', 'bilibili'] }));
+    expect(spy).toHaveBeenCalledWith({
+      ...PROXY_HOSTS,
+      enabledProviders: ['twitter', 'bilibili'],
     });
-    expect(spy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        twitterProxyHosts: ['custom-tw.example'],
-        bilibiliProxyHosts: ['custom-bili.example'],
-      }),
-    );
+  });
+
+  it('builds no registry when the feature is disabled and no host list is configured', () => {
+    const spy = vi.mocked(createDefaultLinkPreviewRegistry);
+    spy.mockClear();
+    const plugin = createSocialLinkPreviewPlugin({ enabled: false });
+    expect(plugin.id).toBe('social-link-preview');
+    expect(spy).not.toHaveBeenCalled();
   });
 });
 
 describe('createSocialLinkPreviewPlugin guards', () => {
   it('reaches the registry when every guard passes', async () => {
     const { registry, findProvider } = makeRegistry();
-    await fire({ enabled: true }, makeMessage(), { registry });
+    await fire(enabledConfig(), makeMessage(), { registry });
     expect(findProvider).toHaveBeenCalledTimes(1);
   });
 
-  it('does nothing when disabled', async () => {
+  it('does nothing when disabled, even with a registry injected', async () => {
     const { registry, findProvider } = makeRegistry();
     await fire({ enabled: false }, makeMessage(), { registry });
     expect(findProvider).not.toHaveBeenCalled();
   });
 
+  it('stays inert on a preview-worthy message when disabled with no registry at all', async () => {
+    const spy = vi.mocked(createDefaultLinkPreviewRegistry);
+    spy.mockClear();
+    // The only externally visible act of a preview is the reply it posts, so a
+    // never-called `reply` is the proof that a disabled plugin does nothing —
+    // regardless of whether it declines to subscribe or returns early.
+    const reply = vi.fn();
+    const message = { ...makeMessage(), reply } as unknown as Message;
+
+    await deliver(createSocialLinkPreviewPlugin({ enabled: false }), message);
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(reply).not.toHaveBeenCalled();
+  });
+
   it('skips bot-authored messages', async () => {
     const { registry, findProvider } = makeRegistry();
-    await fire({ enabled: true }, makeMessage({ bot: true }), { registry });
+    await fire(enabledConfig(), makeMessage({ bot: true }), { registry });
     expect(findProvider).not.toHaveBeenCalled();
   });
 
   it('skips direct messages (no guild)', async () => {
     const { registry, findProvider } = makeRegistry();
-    await fire({ enabled: true }, makeMessage({ guildId: null }), { registry });
+    await fire(enabledConfig(), makeMessage({ guildId: null }), { registry });
     expect(findProvider).not.toHaveBeenCalled();
   });
 
@@ -174,7 +226,7 @@ describe('createSocialLinkPreviewPlugin guards', () => {
     const policy = createPermissionRankPolicy({
       g1: { channels: { 'c-secret': 1 }, features: { social_preview: { maxChannelRank: 0 } } },
     });
-    await fire({ enabled: true }, makeMessage({ channelId: 'c-secret' }), { registry }, policy);
+    await fire(enabledConfig(), makeMessage({ channelId: 'c-secret' }), { registry }, policy);
     expect(findProvider).not.toHaveBeenCalled();
   });
 
@@ -186,7 +238,7 @@ describe('createSocialLinkPreviewPlugin guards', () => {
     // thread 'th' → channel 'ch-cat' (unlisted) → category 'cat' (rank 1);
     // the cache resolves the intermediate channel so the walk reaches the category.
     await fire(
-      { enabled: true },
+      enabledConfig(),
       makeMessage({ channelId: 'th', parentId: 'ch-cat', ancestors: { 'ch-cat': 'cat' } }),
       { registry },
       policy,
@@ -200,13 +252,13 @@ describe('createSocialLinkPreviewPlugin guards', () => {
     // 1 here) now receives a preview, because social_preview defaults to no
     // ceiling. Suppressing it again requires an explicit finite ceiling.
     const policy = createPermissionRankPolicy({ g1: { channels: { 'c-secret': 1 } } });
-    await fire({ enabled: true }, makeMessage({ channelId: 'c-secret' }), { registry }, policy);
+    await fire(enabledConfig(), makeMessage({ channelId: 'c-secret' }), { registry }, policy);
     expect(findProvider).toHaveBeenCalledTimes(1);
   });
 
   it('skips non-sendable channels', async () => {
     const { registry, findProvider } = makeRegistry();
-    await fire({ enabled: true }, makeMessage({ sendable: false }), { registry });
+    await fire(enabledConfig(), makeMessage({ sendable: false }), { registry });
     expect(findProvider).not.toHaveBeenCalled();
   });
 });

@@ -31,11 +31,11 @@
         "timeoutMs": 4000,
         "validationBudgetMs": 8000,
         "maxUrlsPerMessage": 1,
-        "twitterProxyHosts": ["fxtwitter.com", "vxtwitter.com"],
-        "instagramProxyHosts": ["kkinstagram.com", "uuinstagram.com"],
-        "threadsProxyHosts": ["viewthreads.com", "vxthreads.net"],
-        "facebookProxyHosts": ["facebed.com", "fixacebook.com"],
-        "redditProxyHosts": ["vxreddit.com", "rxddit.com"],
-        "bilibiliProxyHosts": ["vxbilibili.com", "bilibiliez.com"]
+        "twitterProxyHosts": ["vxtwitter.com", "fxtwitter.com", "fixupx.com"],
+        "instagramProxyHosts": ["uuinstagram.com", "mbdinstagram.com", "kkinstagram.com"],
+        "threadsProxyHosts": ["viewthreads.com", "fzthreads.com", "fixthreads.seria.moe"],
+        "facebookProxyHosts": ["facebed.com"],
+        "redditProxyHosts": ["vxreddit.com", "redditez.com"],
+        "bilibiliProxyHosts": ["vxbilibili.com", "fxbilibili.seria.moe", "bilibiliez.com", "bembedfix.vercel.app"]
     }
 }

@@ -192,15 +192,25 @@ A second Provider Strategy, mirroring the LLM layer, for the
 of `rewritten-url` (an embed-proxy link Discord unfurls into a playable
 video) and `card` (neutral OpenGraph data the plugin renders into a
 static embed). The six rewrite providers (Twitter/X, Instagram, Threads,
-Facebook, Reddit, Bilibili) are mostly pure host-swaps, but Facebook and
-Bilibili are composed providers that first expand an opaque short link
-(`facebook.com/share/<token>` / `fb.watch`, `b23.tv`) to its canonical
-permalink via `OgClient.resolveCanonical` before probing the proxies;
+Facebook, Reddit, Bilibili) are mostly pure host-swaps, but Facebook,
+Bilibili, and Threads are composed providers that first expand an opaque
+short link (`facebook.com/share/<token>` / `fb.watch`, `b23.tv`,
+`threads.com/share/<token>`) to its canonical permalink before probing
+the proxies — the first two via `OgClient.resolveCanonical`, which
+returns the URL the redirect chain lands on, Threads via
+`OgClient.resolveRedirectChain`, because Threads rejects the consumed
+share token on the follow-up request and bounces the chase to an error
+page, leaving the permalink reachable only as an intermediate hop;
 `bahamut` scrapes OpenGraph via the SSRF-safe
 `OgClient` (streamed, bounded redirect-following behind a `beforeRedirect`
 SSRF guard, host allow-list).
 Failures map into `LinkPreviewError`. `LinkPreviewProviderRegistry`
-matches by URL in registration order.
+matches by URL in registration order. The per-source proxy-host lists are
+operator configuration (the bot's `social_link_preview` block), not code
+defaults — embed-proxy domains change availability faster than releases
+ship — and each host is probed and ranked before anything is posted
+(`video > image > weak-image > text`), so a dead or media-less proxy ends
+in a silent skip rather than a bare link.
 
 ### X-Feed Strategy ([src/infra/x-feed/](../src/infra/x-feed/))
 

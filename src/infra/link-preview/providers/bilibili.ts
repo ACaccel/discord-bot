@@ -1,6 +1,6 @@
 /**
- * Bilibili provider. Rewrites a video URL onto an embed-proxy domain
- * (defaults `vxbilibili.com` → `bilibiliez.com`) so Discord renders a
+ * Bilibili provider. Rewrites a video URL onto one of the operator's
+ * configured embed-proxy domains so Discord renders a
  * playable video / rich embed. Each candidate host is validated (OG probe)
  * before being posted. Only original bilibili video hosts match — proxy
  * hosts are excluded so an already-fixed link the user posted is left

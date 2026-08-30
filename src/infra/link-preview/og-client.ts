@@ -99,7 +99,8 @@ const DEFAULT_MAX_CONTENT_LENGTH = 512 * 1024;
  */
 const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)';
 /**
- * A plain desktop-browser User-Agent used only by {@link OgClient.resolveCanonical}.
+ * A plain desktop-browser User-Agent — the default for the redirect-chasing
+ * methods ({@link OgClient.resolveCanonical}, {@link OgClient.resolveRedirectChain}).
  * Facebook serves the Discord crawler UA a ready-made OpenGraph card at the
  * share-link URL itself (HTTP 200, no redirect), so the crawler UA can never
  * observe the canonical permalink. A non-crawler UA instead receives Facebook's
@@ -506,21 +507,86 @@ export class OgClient {
     provider: string = 'facebook',
   ): Promise<Result<string, LinkPreviewFailure>> {
     try {
-      const response = await axios.get<Readable>(url, {
-        responseType: 'stream',
-        timeout: timeoutMs,
-        maxRedirects: SAFE_MAX_REDIRECTS,
-        beforeRedirect: (options) => assertSafeRedirect(options),
-        // A non-crawler UA: the source only emits the short -> canonical
-        // redirect for a browser-like UA (the crawler UA gets a 200 page).
-        headers: { 'User-Agent': RESOLVE_USER_AGENT, Accept: 'text/html' },
-      });
-      discardStream(response.data);
-      return ok(readFinalUrl(response, url));
+      return ok(await this.chaseRedirects(url, timeoutMs, RESOLVE_USER_AGENT, []));
     } catch (e: unknown) {
       destroyResponseStream(e);
       return err(translateLinkPreviewError(provider, e));
     }
+  }
+
+  /**
+   * Follow `url`'s redirect chain and return EVERY hop's target URL, in order
+   * (an empty array when the response did not redirect). The body is never
+   * read.
+   *
+   * Why the whole chain rather than the landing URL {@link resolveCanonical}
+   * returns: a source may mint a single-use token into its short link and
+   * reject that token on the follow-up request, bouncing the chase to a
+   * generic error page. The permalink then exists only as an INTERMEDIATE hop,
+   * and the landing URL carries nothing a proxy can preview. Scanning every
+   * hop also absorbs a legacy-domain 301 that precedes the real expansion, so
+   * a short link needing two hops costs the caller nothing extra.
+   *
+   * `userAgent` overrides the default browser UA because redirect behaviour is
+   * routinely UA-discriminated: a source may answer a full desktop-browser UA
+   * with a client-side-routed application shell (HTTP 200, no `Location` at
+   * all) that resolves the link in the browser, where no server-side chase can
+   * observe it, while a plainer UA still receives the 30x. The caller picks
+   * the UA its source is known to redirect for.
+   *
+   * Contract mirrors {@link fetch}: the caller MUST have matched `url` against
+   * its own host allow-list first (so the initial host is never arbitrary user
+   * input), and every hop is screened by the same {@link assertSafeRedirect}
+   * SSRF guard. A transport failure after at least one hop was recorded still
+   * returns `Ok` — the recorded hops already identify the permalink, the same
+   * salvage {@link fetch} performs for a media-file redirect — so only a
+   * failure with no hops at all lands on the Err rail.
+   */
+  public async resolveRedirectChain(
+    url: string,
+    timeoutMs: number,
+    provider: string,
+    userAgent: string = RESOLVE_USER_AGENT,
+  ): Promise<Result<readonly string[], LinkPreviewFailure>> {
+    const hops: string[] = [];
+    try {
+      await this.chaseRedirects(url, timeoutMs, userAgent, hops);
+      return ok(hops);
+    } catch (e: unknown) {
+      destroyResponseStream(e);
+      if (hops.length > 0) return ok(hops);
+      return err(translateLinkPreviewError(provider, e));
+    }
+  }
+
+  /**
+   * The redirect chase both public resolvers are built on: one GET with the
+   * given UA, at most {@link SAFE_MAX_REDIRECTS} hops (each screened by the
+   * SSRF guard and appended to `hops`), the destination body discarded
+   * unread, and the post-redirect URL returned. Throws the transport error so
+   * each caller can apply its own salvage and Err mapping.
+   */
+  private async chaseRedirects(
+    url: string,
+    timeoutMs: number,
+    userAgent: string,
+    hops: string[],
+  ): Promise<string> {
+    const response = await axios.get<Readable>(url, {
+      responseType: 'stream',
+      timeout: timeoutMs,
+      maxRedirects: SAFE_MAX_REDIRECTS,
+      beforeRedirect: (options) => {
+        assertSafeRedirect(options);
+        hops.push(redirectTargetUrl(options));
+      },
+      // A non-crawler UA by default: the source only emits the short ->
+      // canonical redirect for a browser-like UA (the crawler UA gets a 200
+      // page).
+      headers: { 'User-Agent': userAgent, Accept: 'text/html' },
+    });
+    discardStream(response.data);
+    return readFinalUrl(response, url);
   }
 
   /**

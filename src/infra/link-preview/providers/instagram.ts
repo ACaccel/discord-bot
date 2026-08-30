@@ -1,7 +1,7 @@
 /**
- * Instagram provider. Rewrites a post / reel / TV URL onto an embed-proxy
- * domain (defaults `kkinstagram.com` → `uuinstagram.com`) so Discord renders
- * a playable embed. The priority list + per-host validation mitigates
+ * Instagram provider. Rewrites a post / reel / TV URL onto one of the
+ * operator's configured embed-proxy domains so Discord renders a playable
+ * embed. The priority list + per-host validation mitigates
  * Instagram's intermittent reel-video availability (bot-blocking): if the
  * first proxy returns only an image, a later one may yield the video.
  * Both the canonical `/reel/<id>` form and the author-prefixed

@@ -10,7 +10,12 @@
  * crawler UA so it sees exactly what Discord will), and picks the best:
  *
  *   - first host whose OG has a video  -> return immediately (playable);
- *   - else the first host with an image (remembered, keep looking for video);
+ *   - else the first host with a post image (remembered, keep looking for video);
+ *   - else the first host whose only images are low-value stand-ins — some
+ *     proxies fall back to the author's avatar when they cannot resolve the
+ *     post's own media, which is technically an image but carries none of the
+ *     post's content, so it must lose to a proxy holding the real asset while
+ *     still beating a bare title;
  *   - else the first host with a title  (text-only, weakest fallback);
  *   - else nothing usable -> `ok(null)` so the orchestrator skips silently
  *     and NO bare/dead link is ever posted.
@@ -35,7 +40,7 @@ import type {
 } from '../types';
 
 /** Preview quality of a probed candidate, best to worst. */
-export type CandidateQuality = 'video' | 'image' | 'text' | 'none';
+export type CandidateQuality = 'video' | 'image' | 'weak-image' | 'text' | 'none';
 
 /**
  * Placeholder text a proxy / source serves when the post is login-gated,
@@ -43,8 +48,11 @@ export type CandidateQuality = 'video' | 'image' | 'text' | 'none';
  * preview. Matched case-insensitively as a substring of `og:title` OR
  * `og:description`. Facebook's gated posts return "Log in or sign up to
  * view" (no media); vxReddit's error page returns the description "Failed
- * to get data from Reddit". Scoring either as a usable card would post a
- * broken embed.
+ * to get data from Reddit". Threads and its embed proxies serve a login
+ * wall — in English or zh-TW depending on the page — that still carries a
+ * generic Instagram logo as `og:image`, so without a marker it would score
+ * as a usable image card. Scoring any of these as a usable card would post
+ * a broken embed.
  */
 const JUNK_MARKERS: readonly string[] = [
   'log in or sign up',
@@ -52,6 +60,10 @@ const JUNK_MARKERS: readonly string[] = [
   'see posts, photos and more on facebook',
   'log in to instagram',
   'login • instagram',
+  'log in with your instagram',
+  '使用你的 instagram 登入',
+  'threads • 登入',
+  'threads • log in',
   "this content isn't available",
   'content not found',
   'page not found',
@@ -88,18 +100,41 @@ export const isJunkPreview = (meta: OpenGraphMeta): boolean =>
   (meta.description !== undefined && matchesJunkMarker(meta.description));
 
 /**
- * Rank a candidate proxy's OpenGraph: a playable video beats a static
- * image beats a text-only embed beats nothing usable. A login-wall /
- * not-found / proxy-error placeholder (with no video) scores `none` so a
- * broken card is never posted. Pure + exported so the selection policy can
- * be tested in isolation from the probe loop.
+ * True when every image the candidate offers matches a low-value pattern,
+ * i.e. none of them is the post's own media. A single non-matching image is
+ * enough to treat the candidate as carrying a real asset.
  */
-export const scoreMeta = (meta: OpenGraphMeta): CandidateQuality => {
+const hasOnlyLowValueImages = (images: readonly string[], patterns: readonly RegExp[]): boolean =>
+  images.every((image) => patterns.some((pattern) => pattern.test(image)));
+
+/**
+ * Rank a candidate proxy's OpenGraph: a playable video beats a post image
+ * beats a low-value image beats a text-only embed beats nothing usable. A
+ * login-wall / not-found / proxy-error placeholder (with no video) scores
+ * `none` so a broken card is never posted. Pure + exported so the selection
+ * policy can be tested in isolation from the probe loop.
+ *
+ * `lowValueImagePatterns` (per-source, optional) match image URLs that a
+ * proxy serves as a stand-in for missing post media — an author avatar, say.
+ * A candidate offering nothing but those scores `weak-image` so it yields to
+ * any proxy that resolved the real asset. Without patterns every image is
+ * taken at face value.
+ */
+export const scoreMeta = (
+  meta: OpenGraphMeta,
+  lowValueImagePatterns?: readonly RegExp[],
+): CandidateQuality => {
   if (meta.video !== undefined && meta.video.length > 0) return 'video';
   // A login-wall / not-found / proxy-error page carries no real content even
   // if it serves a generic logo image, so reject it before the image/text tiers.
   if (isJunkPreview(meta)) return 'none';
-  if (meta.images.length > 0) return 'image';
+  if (meta.images.length > 0) {
+    const weak =
+      lowValueImagePatterns !== undefined &&
+      lowValueImagePatterns.length > 0 &&
+      hasOnlyLowValueImages(meta.images, lowValueImagePatterns);
+    return weak ? 'weak-image' : 'image';
+  }
   if (meta.title !== undefined && meta.title.length > 0) return 'text';
   return 'none';
 };
@@ -112,6 +147,12 @@ export interface RewriteSpec {
   readonly proxyHosts: readonly string[];
   /** Build the candidate proxy URL for one host (e.g. host-swap, keep/drop query). */
   readonly toProxyUrl: (url: URL, host: string) => string;
+  /**
+   * Image URLs matching any of these are stand-ins a proxy serves when it has
+   * no post media (e.g. the author's avatar), demoting a candidate offering
+   * only such images to `weak-image`. Omit where every image is post media.
+   */
+  readonly lowValueImagePatterns?: readonly RegExp[];
   /** Shared validation fetcher. */
   readonly ogClient: OgClient;
 }
@@ -124,7 +165,8 @@ const validate = async (
   const now = ctx.now ?? Date.now;
   const deadline = ctx.budgetMs !== undefined ? now() + ctx.budgetMs : undefined;
 
-  let bestImage: string | undefined; // candidate whose OG had >=1 image
+  let bestImage: string | undefined; // candidate whose OG had >=1 post image
+  let bestWeakImage: string | undefined; // candidate whose images were all stand-ins
   let bestText: string | undefined; // candidate whose OG had only a title
   let probed = 0;
 
@@ -142,19 +184,22 @@ const validate = async (
       );
       continue;
     }
-    const quality = scoreMeta(res.value);
+    const quality = scoreMeta(res.value, spec.lowValueImagePatterns);
     if (quality === 'video') {
       // Best possible — playable video. Short-circuit.
       return ok({ kind: 'rewritten-url', url: candidate, sourceUrl: url.href });
     }
+    // Neither image tier short-circuits: a later host may still hold the video.
     if (quality === 'image' && bestImage === undefined) {
-      bestImage = candidate; // remember, but keep probing for a video
-    } else if (quality === 'text' && bestImage === undefined && bestText === undefined) {
+      bestImage = candidate;
+    } else if (quality === 'weak-image' && bestWeakImage === undefined) {
+      bestWeakImage = candidate; // only worth posting if no real image turns up
+    } else if (quality === 'text' && bestText === undefined) {
       bestText = candidate; // weakest fallback
     }
   }
 
-  const chosen = bestImage ?? bestText;
+  const chosen = bestImage ?? bestWeakImage ?? bestText;
   return ok(
     chosen === undefined ? null : { kind: 'rewritten-url', url: chosen, sourceUrl: url.href },
   );

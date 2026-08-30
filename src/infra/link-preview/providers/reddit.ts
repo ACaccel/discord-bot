@@ -1,14 +1,13 @@
 /**
- * Reddit provider. Rewrites a post URL onto an embed-proxy domain (defaults
- * `vxreddit.com` → `rxddit.com`) so Discord renders a playable video / rich
+ * Reddit provider. Rewrites a post URL onto one of the operator's configured
+ * embed-proxy domains so Discord renders a playable video / rich
  * embed. Reddit videos live on `v.redd.it` and Discord does not unfurl them
  * natively, so the proxy (which serves the post's OpenGraph / Twitter-card
  * via Reddit's API) is the only path to a real preview.
  *
- * `vxreddit.com` leads because it is the verified-working instance;
- * `rxddit.com` (FixReddit) trails as a best-effort fallback — both are
- * subject to Reddit's API restrictions, so the per-host validation skips a
- * proxy that returns an error placeholder instead of media (see
+ * Every Reddit proxy is subject to Reddit's API restrictions and degrades by
+ * serving an error placeholder rather than by failing outright, so the
+ * per-host validation is what keeps a broken card off the channel (see
  * `scoreMeta` / `isJunkPreviewTitle`). Matches comment permalinks
  * (`/r/<sub>/comments/<id>`, the bare `/comments/<id>`) and the mobile
  * share form (`/r/<sub>/s/<token>`); bare subreddit / profile URLs are

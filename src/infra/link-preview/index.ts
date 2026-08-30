@@ -20,11 +20,7 @@ export type {
 export { LINK_PREVIEW_PROVIDER_NAMES } from './types';
 
 export { LinkPreviewProviderRegistry } from './registry';
-export {
-  createDefaultLinkPreviewRegistry,
-  DEFAULT_PROXY_HOSTS,
-  type LinkPreviewRegistryDeps,
-} from './default-registry';
+export { createDefaultLinkPreviewRegistry, type LinkPreviewRegistryDeps } from './default-registry';
 
 export { OgClient, parseOpenGraph, type OpenGraphMeta, type OgClientOptions } from './og-client';
 export { translateLinkPreviewError, invalidResponseError } from './error-translator';
