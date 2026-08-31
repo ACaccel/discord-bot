@@ -8,7 +8,7 @@ This project follows
 **breaking** need an operator action described in [`README.md`](README.md)
 or [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-## [Unreleased]
+## [1.1.0] - 2026-08-31
 
 ### Added
 
@@ -182,4 +182,5 @@ that rebuild:
 
 - Allowlist GHSA-r5fr-rjxr-66jc, which has no in-range remediation via `@discordjs/builders` ([30e670c](https://github.com/ACaccel/BotFleet/commit/30e670c)).
 
+[1.1.0]: https://github.com/ACaccel/BotFleet/releases/tag/v1.1.0
 [1.0.0]: https://github.com/ACaccel/BotFleet/releases/tag/v1.0.0
