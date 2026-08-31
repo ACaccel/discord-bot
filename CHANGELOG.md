@@ -24,12 +24,12 @@ lines marked **breaking** need an operator action described in
 
 ### Changed
 
-- feat(auto-reply): move the per-user lucky replies into the `auto_reply` config block (**breaking** — `luckyReplies` / `globalLuckyProbability` replace the compiled-in user ids, and the `auto_reply.fatcat_line` / `mubaimu_line` catalog keys are gone).
-- feat(weather-forecast): read the AccuWeather location from `weather_forecast.locationKey` (**breaking** — required whenever the command is enabled).
-- feat(random-restaurant): read the recommendation endpoint from `random_restaurant.apiUrl` (**breaking** — required whenever the command is enabled).
-- refactor(handlers): read slash-command options through typed accessors and a shared timeout-bounded HTTP client instead of unchecked casts and bare `axios`.
-- refactor(architecture): move the option accessors, the error-to-reply boundary, and the bounded HTTP client into `infra/`, and fail the build on a `plugins` → `handlers` import.
-- refactor(handlers): validate third-party JSON responses against a schema at the boundary, so a changed upstream shape stops surfacing as a friendly empty result.
+- a6e8a12 feat(auto-reply): move the per-user lucky replies into the `auto_reply` config block (**breaking** — `luckyReplies` / `globalLuckyProbability` replace the compiled-in user ids, and the `auto_reply.fatcat_line` / `mubaimu_line` catalog keys are gone).
+- a6e8a12 feat(weather-forecast): read the AccuWeather location from `weather_forecast.locationKey` (**breaking** — required whenever the command is enabled).
+- a6e8a12 feat(random-restaurant): read the recommendation endpoint from `random_restaurant.apiUrl` (**breaking** — required whenever the command is enabled).
+- a6e8a12 refactor(handlers): read slash-command options through typed accessors and a shared timeout-bounded HTTP client instead of unchecked casts and bare `axios`.
+- a6e8a12 refactor(architecture): move the option accessors, the error-to-reply boundary, and the bounded HTTP client into `infra/`, and fail the build on a `plugins` → `handlers` import.
+- a6e8a12 refactor(handlers): validate third-party JSON responses against a schema at the boundary, so a changed upstream shape stops surfacing as a friendly empty result.
 - 16cb24f chore: rename the last remaining `discord-bot` reference to BotFleet.
 - 7fabeca feat(permission-rank): fold effective channel rank over the full ancestry, so a ranked category gates every channel and thread beneath it.
 - 7629d45 perf(persistence): drop the `$toLong` predicate and index-serve `Message.timestamp` range reads.
@@ -37,42 +37,42 @@ lines marked **breaking** need an operator action described in
 - e476c4c feat(roll-call): expand role mentions in `/roll_call`'s `users` option, capped at 50 unique members.
 - 8a9c2cc refactor(tools): consolidate the three DB ops tools into one `yarn db <subcommand>` CLI (**breaking** — one merged `tools/db/config.json`).
 - 971f923 feat(guild-events): narrow the `guild_events` rank ceiling to Discord disclosure only, so every edit/delete is recorded locally; make the msg-archive transcript log opt-in.
-- refactor(plugin): collapse the plugin contract to `id` + `version` + lifecycle hooks + `events`, with config parsed by each plugin's own factory.
-- refactor(plugin): run every lifecycle phase in registration order and isolate failures per plugin, so no plugin can abort startup.
-- refactor(ioc): move the service-token catalog to `src/bot/tokens.ts`, fixing the layering violation that had `core` importing `infra`, `persistence`, and `plugins`.
-- refactor(ioc): reduce the container to a single singleton lifetime.
-- refactor(errors): make `instanceof` the sole dispatch contract for `DomainError` and drop the parallel `kind` tag from the log record.
-- chore(knip): fail the build on an unused export or type, and extend the scan to `tools/`.
-- chore(deps): replace the unmaintained `sodium` voice-encryption backend with `libsodium-wrappers`, removing the native build step from `yarn install`.
+- a6e8a12 refactor(plugin): collapse the plugin contract to `id` + `version` + lifecycle hooks + `events`, with config parsed by each plugin's own factory.
+- a6e8a12 refactor(plugin): run every lifecycle phase in registration order and isolate failures per plugin, so no plugin can abort startup.
+- a6e8a12 refactor(ioc): move the service-token catalog to `src/bot/tokens.ts`, fixing the layering violation that had `core` importing `infra`, `persistence`, and `plugins`.
+- a6e8a12 refactor(ioc): reduce the container to a single singleton lifetime.
+- a6e8a12 refactor(errors): make `instanceof` the sole dispatch contract for `DomainError` and drop the parallel `kind` tag from the log record.
+- a6e8a12 chore(knip): fail the build on an unused export or type, and extend the scan to `tools/`.
+- a6e8a12 chore(deps): replace the unmaintained `sodium` voice-encryption backend with `libsodium-wrappers`, removing the native build step from `yarn install`.
 
 ### Fixed
 
-- fix(lifecycle): handle `SIGINT` and `SIGTERM`, so Ctrl+C runs the graceful shutdown instead of hard-killing the process mid-backup; a second signal exits immediately.
-- fix(lifecycle): exit non-zero when a personality's startup fails, so a bad token no longer leaves a live process with nothing registered.
-- fix(plugins): tear down and unsubscribe plugins that were disabled after `start`, which previously leaked their HTTP listeners and event subscriptions.
-- fix(plugins): close the earthquake and settings-api HTTP servers under a bounded timeout instead of waiting on idle keep-alive sockets.
-- fix(env): return `ACCUWEATHER_KEY` from `loadEnv`, which silently disabled `/weather_forecast` on every deployment.
-- fix(i18n): reply with localised copy instead of raw English reasons when a giveaway or activity delete fails.
-- fix(i18n): match the `/roll_call` reaction tally against the catalog prefix, so the tally works on an English-locale bot.
-- fix(i18n): localise the `/ai_settings` modal labels and the LLM usage footer's unknown-price text.
-- fix(record): stamp the trace id on the `/record` failure reply the copy promises.
-- fix(logging): degrade to stderr when a log file cannot be written, instead of escalating a full disk to a fatal crash.
-- fix(llm): bound every model-list fetch, so a stalled provider no longer wedges the `/ai_settings` model menu for the process lifetime.
-- fix(llm-chat): cap session history and evict idle sessions, bounding both request size and memory growth.
-- fix(guild-events): stream deleted attachments to disk with a timeout, a size cap, and a concurrency bound.
-- fix(mongo): discard a connection whose open finishes after `closeAll`, which previously leaked a socket no teardown knew about.
-- fix(scheduling): log a rejected scheduled job instead of dropping it into an untraceable unhandled rejection.
-- fix(commands): register commands independently so one misconfigured handler no longer aborts the rest, and report the failure at error level with its cause.
-- fix(random-restaurant): distinguish a real upstream failure from an empty result set instead of reporting both as "no restaurants found".
-- fix(update-role): answer unregistered guilds and malformed `level_roles` blocks instead of crashing.
-- fix(guild-onboarding): report the real command-registration outcome for a newly joined guild rather than always claiming success.
-- fix(ban-user): log the failed timeout and the deleted-message fallback's own errors.
-- fix(gopher): report no connection manager for the database-free personality instead of throwing on every null check.
-- fix(lifecycle): escalate the exit status when a fault lands mid-teardown, so a crash during a clean stop is no longer reported to the supervisor as success.
-- fix(lifecycle): abort the deferred `ClientReady` body when startup failed, instead of registering guilds on a half-wired bot that is about to exit.
-- fix(lifecycle): release a partially started bot's port and connections before exiting on a failed startup.
-- fix(mongo): bound the shutdown drain and refuse new connections while `closeAll` runs, so a database outage during Ctrl+C no longer forces the hard-timeout kill.
-- fix(update-role): log a malformed `level_roles` block instead of reporting it as an unconfigured feature.
+- a6e8a12 fix(lifecycle): handle `SIGINT` and `SIGTERM`, so Ctrl+C runs the graceful shutdown instead of hard-killing the process mid-backup; a second signal exits immediately.
+- a6e8a12 fix(lifecycle): exit non-zero when a personality's startup fails, so a bad token no longer leaves a live process with nothing registered.
+- a6e8a12 fix(plugins): tear down and unsubscribe plugins that were disabled after `start`, which previously leaked their HTTP listeners and event subscriptions.
+- a6e8a12 fix(plugins): close the earthquake and settings-api HTTP servers under a bounded timeout instead of waiting on idle keep-alive sockets.
+- a6e8a12 fix(env): return `ACCUWEATHER_KEY` from `loadEnv`, which silently disabled `/weather_forecast` on every deployment.
+- a6e8a12 fix(i18n): reply with localised copy instead of raw English reasons when a giveaway or activity delete fails.
+- a6e8a12 fix(i18n): match the `/roll_call` reaction tally against the catalog prefix, so the tally works on an English-locale bot.
+- a6e8a12 fix(i18n): localise the `/ai_settings` modal labels and the LLM usage footer's unknown-price text.
+- a6e8a12 fix(record): stamp the trace id on the `/record` failure reply the copy promises.
+- a6e8a12 fix(logging): degrade to stderr when a log file cannot be written, instead of escalating a full disk to a fatal crash.
+- a6e8a12 fix(llm): bound every model-list fetch, so a stalled provider no longer wedges the `/ai_settings` model menu for the process lifetime.
+- a6e8a12 fix(llm-chat): cap session history and evict idle sessions, bounding both request size and memory growth.
+- a6e8a12 fix(guild-events): stream deleted attachments to disk with a timeout, a size cap, and a concurrency bound.
+- a6e8a12 fix(mongo): discard a connection whose open finishes after `closeAll`, which previously leaked a socket no teardown knew about.
+- a6e8a12 fix(scheduling): log a rejected scheduled job instead of dropping it into an untraceable unhandled rejection.
+- a6e8a12 fix(commands): register commands independently so one misconfigured handler no longer aborts the rest, and report the failure at error level with its cause.
+- a6e8a12 fix(random-restaurant): distinguish a real upstream failure from an empty result set instead of reporting both as "no restaurants found".
+- a6e8a12 fix(update-role): answer unregistered guilds and malformed `level_roles` blocks instead of crashing.
+- a6e8a12 fix(guild-onboarding): report the real command-registration outcome for a newly joined guild rather than always claiming success.
+- a6e8a12 fix(ban-user): log the failed timeout and the deleted-message fallback's own errors.
+- a6e8a12 fix(gopher): report no connection manager for the database-free personality instead of throwing on every null check.
+- a6e8a12 fix(lifecycle): escalate the exit status when a fault lands mid-teardown, so a crash during a clean stop is no longer reported to the supervisor as success.
+- a6e8a12 fix(lifecycle): abort the deferred `ClientReady` body when startup failed, instead of registering guilds on a half-wired bot that is about to exit.
+- a6e8a12 fix(lifecycle): release a partially started bot's port and connections before exiting on a failed startup.
+- a6e8a12 fix(mongo): bound the shutdown drain and refuse new connections while `closeAll` runs, so a database outage during Ctrl+C no longer forces the hard-timeout kill.
+- a6e8a12 fix(update-role): log a malformed `level_roles` block instead of reporting it as an unconfigured feature.
 - 683c130 fix(social-link-preview): expand Facebook share short links to their canonical permalink before proxying.
 - 2b0384b fix(gopher): unbreak the typecheck and unit-test gates after the gopher landing.
 - 8992fec fix(reliability): tolerate a transient network reset instead of crashing, and stop `message-backup`'s repeat loop dying on a failed pass.
@@ -84,20 +84,20 @@ lines marked **breaking** need an operator action described in
 - 1b8f144 feat(pin-message): remove the deprecated `/pin_message` command, superseded by Discord's native thread-pin permission (**breaking**).
 - 65eb7b6 refactor(i18n): drop the completed phased-rollout scaffolding.
 - ecbe555 chore: strip refactoring-process residue and dead code.
-- refactor(commands): remove `/inspect_member_ids` (**breaking** — see the `commands` field in [`README.md`](README.md) for the operator step).
-- refactor(plugin): remove the unused `contributes` registries, plugin dependency graph, `critical` flag, `configSchema`, and `'guild'` scope; the codegen registry is the only handler-registration mechanism.
-- refactor(ioc): remove the transient and scoped container lifetimes and `createScope`, which had no callers.
-- refactor(errors): remove the zero-reference `ValidationError`, `NotFoundError`, `ConflictError`, `PermissionError`, and `DiscordApiError` classes and their orphaned catalog keys.
-- refactor(ids): remove the unused `MessageId` / `UserId` / `RoleId` brands.
-- refactor(i18n): remove seven orphaned `replies:*` keys.
+- a6e8a12 refactor(commands): remove `/inspect_member_ids` (**breaking** — see the `commands` field in [`README.md`](README.md) for the operator step).
+- a6e8a12 refactor(plugin): remove the unused `contributes` registries, plugin dependency graph, `critical` flag, `configSchema`, and `'guild'` scope; the codegen registry is the only handler-registration mechanism.
+- a6e8a12 refactor(ioc): remove the transient and scoped container lifetimes and `createScope`, which had no callers.
+- a6e8a12 refactor(errors): remove the zero-reference `ValidationError`, `NotFoundError`, `ConflictError`, `PermissionError`, and `DiscordApiError` classes and their orphaned catalog keys.
+- a6e8a12 refactor(ids): remove the unused `MessageId` / `UserId` / `RoleId` brands.
+- a6e8a12 refactor(i18n): remove seven orphaned `replies:*` keys.
 
 ### Security
 
-- fix(ci): set `pipefail` on the dependency-audit step, which reported success for every advisory because the pipeline's exit status came from `tee`.
-- fix(logging): redact `XAI_API_KEY`, `ACCUWEATHER_KEY`, and `GOPHER_SETTINGS_API_KEY`, and strip credentials from URL query strings before they reach a log.
-- fix(llm): send the Gemini API key in a header instead of the request URL.
-- fix(logging): redact the `user:password@` credentials of a connection string, which reached the log verbatim inside a Mongo error message.
-- fix(auto-reply): send operator-configured replies with mentions disabled, so a stray `@everyone` in `config.json` cannot ping.
+- a6e8a12 fix(ci): set `pipefail` on the dependency-audit step, which reported success for every advisory because the pipeline's exit status came from `tee`.
+- a6e8a12 fix(logging): redact `XAI_API_KEY`, `ACCUWEATHER_KEY`, and `GOPHER_SETTINGS_API_KEY`, and strip credentials from URL query strings before they reach a log.
+- a6e8a12 fix(llm): send the Gemini API key in a header instead of the request URL.
+- a6e8a12 fix(logging): redact the `user:password@` credentials of a connection string, which reached the log verbatim inside a Mongo error message.
+- a6e8a12 fix(auto-reply): send operator-configured replies with mentions disabled, so a stray `@everyone` in `config.json` cannot ping.
 
 - 2a37a09 chore(deps): upgrade vitest / vite and pin `ws` + `form-data` to clear four HIGH/CRITICAL advisories in the test toolchain.
 - f8a72fb fix(deps): bump transitive `undici` to 6.27.0 to clear GHSA-vxpw-j846-p89q.
