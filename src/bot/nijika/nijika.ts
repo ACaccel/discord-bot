@@ -33,6 +33,12 @@ interface NijikaConfig extends Config {
    * here and may be omitted entirely.
    */
   x_media_feed?: unknown;
+  /**
+   * Raw `guild_events` block. Parsed and defaulted by the plugin
+   * (see `createGuildEventsPlugin`), so it is intentionally `unknown`
+   * here and may be omitted entirely.
+   */
+  guild_events?: unknown;
 }
 
 export class Nijika extends BaseBot<NijikaConfig> {
@@ -63,7 +69,7 @@ export class Nijika extends BaseBot<NijikaConfig> {
     // dependencies through `ctx`, so the composition root does not
     // deep-import `plugins/*/internal`.
     this.use(createAutoReplyPlugin(this.config.auto_reply));
-    this.use(createGuildEventsPlugin());
+    this.use(createGuildEventsPlugin(this.config.guild_events));
     // Social-link preview: detect share links, post a richer preview,
     // and suppress the user's original auto-embed.
     this.use(createSocialLinkPreviewPlugin(this.config.social_link_preview));

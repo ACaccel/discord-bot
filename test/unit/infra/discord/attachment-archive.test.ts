@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import axios from 'axios';
-import { existsSync, readdirSync, readFileSync, rmSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, rmSync, promises as fsPromises } from 'fs';
 import { Readable } from 'node:stream';
 import { resolve } from 'path';
 
@@ -23,6 +23,24 @@ const fakeLogger = (): Logger =>
 
 const attachmentNamed = (name: string) =>
   ({ name, url: `https://example.invalid/${name}` }) as never;
+
+/** Attachment carrying the `media.discordapp.net` mirror the fallback retries. */
+const attachmentWithProxy = (name: string) =>
+  ({
+    name,
+    url: `https://cdn.invalid/${name}`,
+    proxyURL: `https://media.invalid/${name}`,
+  }) as never;
+
+/** An axios-shaped rejection: the helper reads `response.status` off it. */
+const httpError = (status: number): Error =>
+  Object.assign(new Error(`Request failed with status code ${status}`), { response: { status } });
+
+/** URLs `axios.get` was called with, in order. */
+const requestedUrls = (): string[] =>
+  (axios.get as unknown as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[0] as string);
+
+const callCount = (fn: unknown): number => (fn as ReturnType<typeof vi.fn>).mock.calls.length;
 
 /** Archive directory the helper writes into for guild `g-1`. */
 const ARCHIVE_DIR = resolve('data/deleted_attachments/g-1');
@@ -52,13 +70,60 @@ describe('archiveDeletedAttachment', () => {
     rmSync(ARCHIVE_DIR, { recursive: true, force: true });
   });
 
-  it('logs warn when the upstream fetch fails (no disk write attempted past mkdir)', async () => {
+  it('logs warn and does not retry when the fetch fails with no proxy URL to fall back to', async () => {
     const logger = fakeLogger();
     setAxiosGet(async () => {
       throw new Error('upstream 404');
     });
     await archiveDeletedAttachment(logger, 'g-1', attachmentNamed('pic.png'));
     expect((logger.warn as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+    expect(requestedUrls()).toHaveLength(1);
+  });
+
+  it('does not retry a proxy URL identical to the one that just failed', async () => {
+    const logger = fakeLogger();
+    setAxiosGet(async () => {
+      throw httpError(404);
+    });
+    const same = 'https://cdn.invalid/same.png';
+
+    await archiveDeletedAttachment(logger, 'g-1', {
+      name: 'same.png',
+      url: same,
+      proxyURL: same,
+    } as never);
+
+    expect(requestedUrls()).toEqual([same]);
+    expect(callCount(logger.warn)).toBe(1);
+  });
+
+  it('does not retry an empty proxy URL', async () => {
+    const logger = fakeLogger();
+    setAxiosGet(async () => {
+      throw httpError(404);
+    });
+
+    await archiveDeletedAttachment(logger, 'g-1', {
+      name: 'blank.png',
+      url: 'https://cdn.invalid/blank.png',
+      proxyURL: '',
+    } as never);
+
+    expect(requestedUrls()).toHaveLength(1);
+  });
+
+  it('logs error and never reaches the network when the archive directory cannot be created', async () => {
+    const logger = fakeLogger();
+    setAxiosGet(async () => ({ data: Readable.from(['payload']) }));
+    vi.spyOn(fsPromises, 'mkdir').mockRejectedValueOnce(
+      Object.assign(new Error('permission denied'), { code: 'EACCES' }),
+    );
+
+    await archiveDeletedAttachment(logger, 'g-1', attachmentNamed('pic.png'));
+
+    expect(callCount(logger.error)).toBe(1);
+    expect(requestedUrls()).toEqual([]);
+    vi.restoreAllMocks();
   });
 
   it('requests the download with a wall-clock deadline and a size ceiling', async () => {
@@ -104,6 +169,126 @@ describe('archiveDeletedAttachment', () => {
     await archiveDeletedAttachment(logger, 'g-1', attachmentNamed('truncated.bin'));
 
     expect((logger.error as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+    expect(listArchiveFiles()).toEqual([]);
+  });
+});
+
+/**
+ * Discord purges an attachment's CDN object nearly synchronously with
+ * the message deletion, so `attachment.url` 404s even while its
+ * signature is still valid. `attachment.proxyURL` points at
+ * `media.discordapp.net`, whose cache often still holds recently
+ * displayed media — one retry there is the difference between an
+ * archived file and nothing.
+ */
+describe('archiveDeletedAttachment proxyURL fallback', () => {
+  afterEach(() => {
+    rmSync(ARCHIVE_DIR, { recursive: true, force: true });
+  });
+
+  it('retries the proxy URL and archives the body when the primary URL is purged', async () => {
+    const logger = fakeLogger();
+    setAxiosGet(async (url: unknown) => {
+      if (String(url).startsWith('https://cdn.invalid/')) throw httpError(404);
+      return { data: Readable.from(['recovered']) };
+    });
+
+    await archiveDeletedAttachment(logger, 'g-1', attachmentWithProxy('pic.png'));
+
+    expect(requestedUrls()).toEqual([
+      'https://cdn.invalid/pic.png',
+      'https://media.invalid/pic.png',
+    ]);
+    expect(readFileSync(resolve(ARCHIVE_DIR, findOnlyFileName()), 'utf8')).toBe('recovered');
+  });
+
+  it('logs the expected purge race at info, not warn, when the fallback recovers the file', async () => {
+    const logger = fakeLogger();
+    setAxiosGet(async (url: unknown) => {
+      if (String(url).startsWith('https://cdn.invalid/')) throw httpError(404);
+      return { data: Readable.from(['recovered']) };
+    });
+
+    await archiveDeletedAttachment(logger, 'g-1', attachmentWithProxy('pic.png'));
+
+    // A 404 at delete time is the documented race, not an incident;
+    // warning on it trains operators to ignore the channel.
+    expect(callCount(logger.info)).toBe(1);
+    expect(callCount(logger.warn)).toBe(0);
+  });
+
+  it('logs at info when both ends 404 — the object is simply gone', async () => {
+    const logger = fakeLogger();
+    setAxiosGet(async () => {
+      throw httpError(404);
+    });
+
+    await archiveDeletedAttachment(logger, 'g-1', attachmentWithProxy('pic.png'));
+
+    expect(requestedUrls()).toHaveLength(2);
+    expect(callCount(logger.info)).toBe(1);
+    expect(callCount(logger.warn)).toBe(0);
+    expect(listArchiveFiles()).toEqual([]);
+  });
+
+  it('logs at warn when the fallback fails with anything other than a 404', async () => {
+    const logger = fakeLogger();
+    setAxiosGet(async (url: unknown) => {
+      throw String(url).startsWith('https://cdn.invalid/') ? httpError(404) : httpError(503);
+    });
+
+    await archiveDeletedAttachment(logger, 'g-1', attachmentWithProxy('pic.png'));
+
+    // A proxy that is failing rather than empty is a real transport
+    // problem and must stay visible.
+    expect(callCount(logger.warn)).toBe(1);
+    expect(callCount(logger.info)).toBe(0);
+  });
+
+  it('logs at warn when a non-404 primary failure is rescued by the fallback', async () => {
+    const logger = fakeLogger();
+    setAxiosGet(async (url: unknown) => {
+      if (String(url).startsWith('https://cdn.invalid/')) throw new Error('ECONNRESET');
+      return { data: Readable.from(['recovered']) };
+    });
+
+    await archiveDeletedAttachment(logger, 'g-1', attachmentWithProxy('pic.png'));
+
+    // The file was saved, but a reset connection to the primary CDN is a
+    // real transport fault — downgrading it to info would hide it.
+    expect(readFileSync(resolve(ARCHIVE_DIR, findOnlyFileName()), 'utf8')).toBe('recovered');
+    expect(callCount(logger.warn)).toBe(1);
+    expect(callCount(logger.info)).toBe(0);
+  });
+
+  it('logs at warn when the primary failure was never the purge race', async () => {
+    const logger = fakeLogger();
+    setAxiosGet(async () => {
+      throw new Error('ECONNRESET');
+    });
+
+    await archiveDeletedAttachment(logger, 'g-1', attachmentWithProxy('pic.png'));
+
+    expect(requestedUrls()).toHaveLength(2);
+    expect(callCount(logger.warn)).toBe(1);
+    expect(callCount(logger.info)).toBe(0);
+  });
+
+  it('does not retry a local write failure — a second fetch cannot fix the disk', async () => {
+    const logger = fakeLogger();
+    setAxiosGet(async () => ({
+      data: new Readable({
+        read(): void {
+          this.push('partial');
+          this.destroy(new Error('CDN connection reset'));
+        },
+      }),
+    }));
+
+    await archiveDeletedAttachment(logger, 'g-1', attachmentWithProxy('truncated.bin'));
+
+    expect(requestedUrls()).toHaveLength(1);
+    expect(callCount(logger.error)).toBe(1);
     expect(listArchiveFiles()).toEqual([]);
   });
 });

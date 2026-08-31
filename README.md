@@ -172,7 +172,9 @@ the channel and its full ancestry — exceeds that feature's ceiling;
 Feature blocks are per-personality and every one is optional. Each is
 zod-validated with `.strict()` at startup, so an unknown key fails the
 boot, and every scalar has a code default — the block may be partial or
-omitted entirely.
+omitted entirely. Note that `guild_events` names two unrelated things:
+the top-level block below, and a rank-gated feature key inside each
+guild's `permission_rank.features` map.
 
 | Block                     | Loaded by      | Fields (default)                                                                                                                                                                                                                                                                                 |
 | ------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -181,6 +183,7 @@ omitted entirely.
 | `identity_sync`           | gopher         | `enabled` (`false`), `syncWithSource` (`false`), `sourceUserId` (**required** when `enabled && syncWithSource`), `schedule` (`0 4 * * *`), `syncAvatar` / `syncNickname` (`true`), `fallbackNickname` (empty = leave untouched), `fallbackAvatarPath` (`assets/gopher.png`)                      |
 | `social_link_preview`     | nijika, tomori | `enabled` (`false`), `originalMessageStrategy` (`suppress`), `providers` (all), `timeoutMs` (`4000`), `validationBudgetMs` (`8000`), `maxUrlsPerMessage` (`1`), plus six `*ProxyHosts` lists — see below                                                                                         |
 | `x_media_feed`            | nijika         | `enabled` (`false`), `accounts` (`{ handle, channel? }[]`), `defaultChannel` (`x_feed`), `pollIntervalMs` (`300000`, floor `60000`), `fullSweepEveryPolls` (`12`), `apiBaseUrl` (`https://api.fxtwitter.com`), `timeoutMs` (`8000`), `maxPostsPerPoll` (`5`), `embedProxyHost` (`fxtwitter.com`) |
+| `guild_events`            | nijika, tomori | `attachment_cache.enabled` (`true`), `attachment_cache.ttlHours` (`24`), `attachment_cache.minFreeDiskMb` (`5120`) — the pre-delete attachment cache; see below                                                                                                                                  |
 | `level_roles`             | nijika         | `level_<n>` → role name for the level-role sync. Required by `/update_role`; a malformed block disables the command with `replies:update_role.no_config`.                                                                                                                                        |
 | `auto_reply`              | nijika, tomori | `luckyReplies` (`{ userId, probability, reply }[]`, default `[]`) and `globalLuckyProbability` (`0.005`). Each entry fires `reply` verbatim for `userId` at `probability`; the lines are operator data, not catalog copy.                                                                        |
 | `weather_forecast`        | nijika, tomori | `locationKey` (**required** when `/weather_forecast` is enabled) — the AccuWeather location id, e.g. `315078` for Taipei. The API key stays in `ACCUWEATHER_KEY`.                                                                                                                                |
@@ -210,6 +213,24 @@ Several fields carry a required-when rule worth calling out:
 - `x_media_feed.accounts[].channel` / `defaultChannel` — a symbolic
   channel name, so the guild's `channels` map must carry a matching
   entry. A guild without it silently opts out.
+- `guild_events.attachment_cache` — Discord purges an attachment's CDN
+  object nearly synchronously with the message deletion, so downloading
+  it at delete time usually fails. With the cache on (the default), the
+  bot downloads every non-bot guild attachment when its message is
+  posted, into `./data/attachment_cache/`, and archives the local copy
+  when the message is deleted. **This means a copy of every recent
+  attachment — not only deleted ones — sits on the bot host for
+  `ttlHours`** (default `24`, swept hourly); size that against your
+  disk and your privacy posture, and set `enabled: false` to go back to
+  downloading only on delete. There is no total-size cap; the per-file
+  ceiling is 100 MB, and the bot stops writing new cache entries while
+  the volume holding the cache tree (`./data/attachment_cache/`) has
+  less than `minFreeDiskMb` free (default `5120`, i.e. 5 GiB) — a pause
+  logged once and lifted once space returns. The floor is checked per
+  message rather than per byte, so leave it comfortably above the
+  ~400 MB that can already be downloading when it trips. That floor protects the host, not the archive:
+  archiving an attachment that was already cached, and the delete-time
+  download fallback, both keep running below it.
 
 ## Adding a command, button, modal, or plugin
 

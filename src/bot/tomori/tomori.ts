@@ -34,6 +34,12 @@ interface TomoriConfig extends Config {
    * here and may be omitted entirely.
    */
   auto_reply?: unknown;
+  /**
+   * Raw `guild_events` block. Parsed and defaulted by the plugin
+   * (see `createGuildEventsPlugin`), so it is intentionally `unknown`
+   * here and may be omitted entirely.
+   */
+  guild_events?: unknown;
 }
 
 export class Tomori extends BaseBot<TomoriConfig> {
@@ -59,7 +65,7 @@ export class Tomori extends BaseBot<TomoriConfig> {
     // it the ClientEventBridge never wires those Discord events and
     // no audit log / channel mirror is produced.
     this.use(createAutoReplyPlugin(this.config.auto_reply));
-    this.use(createGuildEventsPlugin());
+    this.use(createGuildEventsPlugin(this.config.guild_events));
     // Social-link preview: detect share links, post a richer preview,
     // and suppress the user's original auto-embed (mirrors nijika).
     this.use(createSocialLinkPreviewPlugin(this.config.social_link_preview));

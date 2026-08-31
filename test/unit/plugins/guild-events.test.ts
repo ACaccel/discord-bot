@@ -36,12 +36,14 @@ import { createLogger } from '../../../src/core/logger';
 import { systemClock } from '../../../src/core/time';
 
 describe('createGuildEventsPlugin', () => {
-  it('declares its event subscriptions (no config)', () => {
+  it('declares its event subscriptions (config block optional)', () => {
     const plugin = createGuildEventsPlugin();
     expect(plugin.id).toBe('guild-events');
     expect(plugin.init).toBeTypeOf('function');
+    expect(plugin.events?.messageCreate).toBeTypeOf('function');
     expect(plugin.events?.messageUpdate).toBeTypeOf('function');
     expect(plugin.events?.messageDelete).toBeTypeOf('function');
+    expect(plugin.events?.messageDeleteBulk).toBeTypeOf('function');
     expect(plugin.events?.guildMemberUpdate).toBeTypeOf('function');
     expect(plugin.events?.guildCreate).toBeTypeOf('function');
   });
@@ -174,7 +176,10 @@ describe('guild-events disclosure gating by permission_rank', () => {
     registry: GuildRegistry,
     policy: PermissionRankPolicy,
   ): Promise<{ plugin: ReturnType<typeof createGuildEventsPlugin>; ctx: PluginEventContext }> => {
-    const plugin = createGuildEventsPlugin();
+    // These cases are about rank gating, not caching. Disabling the
+    // cache keeps them on the download path they were written for and
+    // stops them reading the developer's real `data/` tree.
+    const plugin = createGuildEventsPlugin({ attachment_cache: { enabled: false } });
     const ctx = buildCtx(registry, policy);
     await plugin.init?.(ctx as unknown as PluginInitContext);
     return { plugin, ctx };

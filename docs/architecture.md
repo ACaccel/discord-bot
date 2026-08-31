@@ -273,7 +273,34 @@ Discord-side disclosure, while the host is an unconditional sink, so
 private-channel message content lands in `logs/<bot>/<guildId>/<date>.log` and
 deleted attachments in `./data/deleted_attachments/<guildId>/`. Anyone with
 file-system access to the bot host can read them — treat host access as
-equivalent to full channel access. The
+equivalent to full channel access.
+
+That sink now reaches wider still. Discord purges an attachment's CDN object
+nearly synchronously with the message deletion, so downloading at
+`messageDelete` — the original design — usually 404s on a URL whose signature
+is still valid, and the archive stayed mostly empty. The fix is a **pre-delete
+attachment cache** ([src/infra/discord/attachment-cache.ts](../src/infra/discord/attachment-cache.ts)):
+`guild-events` downloads every non-bot guild attachment on `messageCreate`
+into `./data/attachment_cache/<guildId>/<messageId>/`, and on deletion moves the
+cached copy into the archive instead of racing the CDN — never overwriting an
+existing archive file, since the archive name is timestamped only to the second
+and a batch moved in one pass would otherwise collide with itself. The
+consequence for
+the note above is that a copy of **every recent attachment lives on disk**, not
+only the deleted ones; an hourly TTL sweep (default 24 h, `guild_events.attachment_cache`)
+bounds that window, and setting `enabled: false` restores the
+download-on-delete-only behaviour. The cache is bounded on the disk axis too:
+before each message it probes the cache volume with `statfs` and writes nothing
+new while free space is under `minFreeDiskMb` (default 5 GiB), logging the pause
+and the resume once each rather than once per attachment. That floor gates new
+cache writes only — the delete-time paths (moving a cached file into the archive,
+and the network fallback) run regardless, because declining to archive loses
+evidence rather than deferring it. An unreadable volume fails open: the floor is
+best-effort availability protection, not proof that a disk is full. `attachment-archive.ts` remains the fallback
+for messages the cache never saw and retries once against `attachment.proxyURL`
+(`media.discordapp.net`), whose cache often still holds recently displayed
+media; a 404 on both ends is the expected race and logs at `info` rather than
+`warn`. The
 `channelRank` /
 `userRank` / `visibilityCeiling` primitives let a visibility-gated feature —
 realized by the `/traffic` commands — show channel `T` only when
@@ -456,7 +483,7 @@ consume the whole shutdown budget the signal handler is working within.
 | Plugin                    | Path                               | Summary                                                                                                      |
 | ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `AutoReplyPlugin`         | `src/plugins/auto-reply/`          | `messageCreate` keyword replies, operator-configured per-user lucky replies, and a dice roller               |
-| `GuildEventsPlugin`       | `src/plugins/guild-events/`        | guild / member lifecycle events                                                                              |
+| `GuildEventsPlugin`       | `src/plugins/guild-events/`        | guild / member lifecycle events, plus the pre-delete attachment cache that beats Discord's CDN purge race    |
 | `GiveawayPlugin`          | `src/plugins/giveaway/`            | scheduled giveaways (modal-driven create, select-menu delete) with reaction-driven winner selection          |
 | `TempRolePlugin`          | `src/plugins/temp-role/`           | temporary, permission-less self-claim notification roles with a hard 30-day expiry (nijika, tomori)          |
 | `ActivityPlugin`          | `src/plugins/activity/`            | per-member activity tracking via message / reaction events                                                   |

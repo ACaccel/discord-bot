@@ -32,7 +32,10 @@ import { logError, logGuildEvent, logSystem, ops, type Logger } from '../core/lo
 // Audit-log coverage note (proposal-derived event table):
 //   - `interaction_create` lines emit from `createChannelLoggingMiddleware`.
 //   - `message_update` / `message_delete` / `guild_member_update` /
-//     `guild_create` lines emit from `GuildEventsPlugin`.
+//     `guild_create` lines emit from `GuildEventsPlugin`. A bulk purge
+//     emits a `message_delete` line tagged `source: 'bulk'` for each
+//     message whose cached attachments were rescued — Discord sends no
+//     per-message delete for those, so it is the only record of them.
 //   - `MESSAGE_REACTION_ADD` / `MESSAGE_REACTION_REMOVE` are
 //     intentionally NOT audit-logged here. Reaction throughput on busy
 //     guilds dwarfs every other event; an audit line per reaction would
