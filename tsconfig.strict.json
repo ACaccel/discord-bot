@@ -1,34 +1,13 @@
 {
+  // Strict type-check project (`yarn typecheck`). Everything about
+  // module resolution — target, `baseUrl`, the path-alias table — is
+  // inherited from `tsconfig.json`, which stays the single place an
+  // alias is declared. This file adds only the strictness flags and
+  // widens the include to the trees the base config leaves out.
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
-    "rootDir": ".",
-    "baseUrl": ".",
-    // D8: the strict config now covers the whole `src` tree, including
-    // `src/bot` / `src/handlers` which use the path aliases. Mirror the
-    // base tsconfig's aliases (rebased onto this config's `.` baseUrl).
-    "paths": {
-      "@bot": ["src/bot/index"],
-      "@cmd": ["src/handlers/commands/index"],
-      "@button": ["src/handlers/buttons/index"],
-      "@select-menu": ["src/handlers/select-menus/index"],
-      "@modal": ["src/handlers/modals/index"],
-      "@reaction": ["src/handlers/reactions/index"],
-      "@core/*": ["src/core/*"],
-      "@plugins": ["src/plugins/index"],
-      // The handler `index.ts` files import `HandlerFactory` via the
-      // bare specifier `'handlers'`, which the base tsconfig resolves
-      // through `baseUrl: 'src'`. This strict config keeps `baseUrl`
-      // at the repo root, so the alias is mapped explicitly.
-      "handlers": ["src/handlers/index"]
-    },
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-
     "noEmit": true,
-    "strict": true,
+
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
@@ -36,14 +15,10 @@
     "noUnusedParameters": true,
     "useUnknownInCatchVariables": true,
 
-    "skipDefaultLibCheck": true,
-    "skipLibCheck": true,
     "types": ["node"]
   },
-  // Strict-mode scope. D8 (gaps.md): strict typecheck now covers the
-  // whole `src` tree — every layer migrated. `src/db/**` retired in
-  // PR-E (audit C-2): schemas live in `src/persistence/schemas/**` and
-  // the legacy shim was deleted.
+  // Strict-mode scope: the whole `src` tree plus every first-party
+  // tree the base config omits (`tools/**` holds the ops CLIs).
   "include": ["src/**/*", "scripts/**/*", "test/**/*", "tools/**/*"],
   "exclude": ["node_modules", "dist"]
 }

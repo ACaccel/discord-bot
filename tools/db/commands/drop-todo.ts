@@ -2,10 +2,10 @@
  * `db drop-todo` — permanently drop the retired `todo_list` feature's
  * data.
  *
- * The `todo_list` command was removed; its `todos` collection lived in
- * each guild's own database (`{baseUri}{guildId}`). This command connects
- * to every configured guild and drops that guild's `todos` collection so
- * no orphaned data remains.
+ * The bot has no `todo_list` command, but its `todos` collection lives
+ * on in each guild's own database (`{baseUri}{guildId}`). This command
+ * connects to every configured guild and drops that collection so no
+ * orphaned data remains.
  *
  * Safety: `dry_run` defaults to `true` — a dry run only counts the
  * documents it *would* remove and writes nothing. Set `dry_run: false`

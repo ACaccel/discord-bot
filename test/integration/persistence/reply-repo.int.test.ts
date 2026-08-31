@@ -101,7 +101,6 @@ describe('MongoReplyRepo (integration)', () => {
     });
   });
 
-  // A genuine DB failure resolves to `err(DatabaseError)`.
   it('findByInput resolves to err(DatabaseError) when the connection is closed', async () => {
     const baseUri = (() => {
       const uri = process.env.INTEGRATION_MONGO_URI;

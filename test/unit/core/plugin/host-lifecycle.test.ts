@@ -1,7 +1,7 @@
 /**
- * Unit tests for PluginLifecycleRunner. Exercises each lifecycle
- * phase, cascade-disable, and critical-escalation against a fake
- * LifecycleHost — no PluginHost wiring required.
+ * Unit tests for PluginLifecycleRunner. Exercises each lifecycle phase
+ * and the failure-isolation contract against a fake LifecycleHost — no
+ * PluginHost wiring required.
  */
 import { describe, expect, it } from 'vitest';
 import { createLogger } from '../../../../src/core/logger';
@@ -13,26 +13,20 @@ import {
   type LifecycleHost,
   type RegisteredPlugin,
 } from '../../../../src/core/plugin/host/lifecycle';
-import { CriticalPluginFailureError } from '../../../../src/core/plugin/host/errors';
-import { buildDependentsIndex } from '../../../../src/core/plugin/host/topology';
 import type { DisabledPlugin, Plugin, PluginId } from '../../../../src/core/plugin/types';
 
 const silent = createLogger({ level: 'silent', pretty: false });
 const fakeTranslator = { t: (k: string) => k } as LifecycleHost['translator'];
 
-const plugin = (p: Partial<Plugin<unknown>> & { id: string }): Plugin<unknown> =>
-  ({ version: '1.0.0', scope: 'bot', ...p }) as Plugin<unknown>;
+const plugin = (p: Partial<Plugin> & { id: string }): Plugin =>
+  ({ version: '1.0.0', ...p }) as Plugin;
 
-const buildHost = (plugins: readonly Plugin<unknown>[]): LifecycleHost => {
+const buildHost = (plugins: readonly Plugin[]): LifecycleHost => {
   const registered = new Map<PluginId, RegisteredPlugin>();
-  for (const p of plugins) registered.set(p.id, { plugin: p, config: undefined });
-  const order = plugins.map((p) => p.id);
-  const dependents = buildDependentsIndex(registered);
+  for (const p of plugins) registered.set(p.id, { plugin: p });
   return {
     registered,
-    order,
     disabled: new Map<PluginId, DisabledPlugin>(),
-    dependents,
     resolve: (() => {
       throw new Error('not used');
     }) as LifecycleHost['resolve'],
@@ -45,7 +39,7 @@ const buildHost = (plugins: readonly Plugin<unknown>[]): LifecycleHost => {
 };
 
 describe('PluginLifecycleRunner', () => {
-  it('runs init / start / onReady hooks in topological order', async () => {
+  it('runs init / start / onReady hooks in registration order', async () => {
     const calls: string[] = [];
     const host = buildHost([
       plugin({
@@ -66,7 +60,7 @@ describe('PluginLifecycleRunner', () => {
     expect(calls).toEqual(['a.init', 'b.init', 'a.start', 'a.ready']);
   });
 
-  it('disables a non-critical plugin that throws and continues the phase', async () => {
+  it('disables a plugin that throws and continues the phase', async () => {
     const calls: string[] = [];
     const host = buildHost([
       plugin({
@@ -83,51 +77,6 @@ describe('PluginLifecycleRunner', () => {
     expect(calls).toEqual(['b.init']);
   });
 
-  it('cascade-disables dependents of a failed plugin', async () => {
-    const host = buildHost([
-      plugin({
-        id: 'a',
-        init: async () => {
-          throw new Error('boom');
-        },
-      }),
-      plugin({ id: 'b', dependencies: [{ id: 'a', versionRange: '*' }] }),
-    ]);
-    const runner = new PluginLifecycleRunner(host);
-    await runner.runInit();
-    expect(host.disabled.has('a')).toBe(true);
-    expect(host.disabled.has('b')).toBe(true);
-  });
-
-  it('rethrows the first critical failure at the end of the phase', async () => {
-    const host = buildHost([
-      plugin({
-        id: 'a',
-        critical: true,
-        init: async () => {
-          throw new Error('critical boom');
-        },
-      }),
-    ]);
-    const runner = new PluginLifecycleRunner(host);
-    await expect(runner.runInit()).rejects.toBeInstanceOf(CriticalPluginFailureError);
-    expect(host.disabled.has('a')).toBe(true);
-  });
-
-  it('escalates a critical cascade victim into the rethrow', async () => {
-    const host = buildHost([
-      plugin({
-        id: 'a',
-        init: async () => {
-          throw new Error('boom');
-        },
-      }),
-      plugin({ id: 'b', critical: true, dependencies: [{ id: 'a', versionRange: '*' }] }),
-    ]);
-    const runner = new PluginLifecycleRunner(host);
-    await expect(runner.runInit()).rejects.toBeInstanceOf(CriticalPluginFailureError);
-  });
-
   it('runs onShutdown in reverse order and swallows shutdown failures', async () => {
     const calls: string[] = [];
     const host = buildHost([
@@ -142,5 +91,74 @@ describe('PluginLifecycleRunner', () => {
     const runner = new PluginLifecycleRunner(host);
     await expect(runner.runShutdown()).resolves.toBeUndefined();
     expect(calls).toEqual(['a.shutdown']);
+  });
+
+  it('still tears down a plugin disabled after start completed', async () => {
+    const calls: string[] = [];
+    const host = buildHost([
+      plugin({
+        id: 'a',
+        start: async () => void calls.push('a.start'),
+        onReady: async () => {
+          throw new Error('ready boom');
+        },
+        onShutdown: async () => void calls.push('a.shutdown'),
+      }),
+    ]);
+    const runner = new PluginLifecycleRunner(host);
+    await runner.runStart();
+    await runner.runReady();
+    expect(host.disabled.has('a')).toBe(true);
+
+    await runner.runShutdown();
+    // `start` already opened whatever the plugin owns (a listener, a
+    // timer); skipping teardown by disabled status leaked it.
+    expect(calls).toEqual(['a.start', 'a.shutdown']);
+  });
+
+  it('never subscribes a plugin whose init threw', async () => {
+    // The invariant every plugin that resolves its dependencies in
+    // `init` relies on (see the `init` contract in core/plugin/types.ts):
+    // a failed init means no event can ever reach the subscription, which
+    // is what lets those subscriptions treat init-assigned state as
+    // present and raise instead of degrading when it is not.
+    const host = buildHost([
+      plugin({
+        id: 'a',
+        init: async () => {
+          throw new Error('init boom');
+        },
+        events: { messageCreate: async () => undefined },
+      }),
+      plugin({ id: 'b', events: { messageCreate: async () => undefined } }),
+    ]);
+    const runner = new PluginLifecycleRunner(host);
+
+    await runner.runInit();
+    await runner.runStart();
+
+    expect(host.disabled.has('a')).toBe(true);
+    // Only the healthy plugin's subscription is attached.
+    expect(host.dispatcher.listenerCount('messageCreate')).toBe(1);
+  });
+
+  it('detaches event subscriptions for a plugin disabled after it subscribed', async () => {
+    const host = buildHost([
+      plugin({
+        id: 'a',
+        events: { messageCreate: async () => undefined },
+        onReady: async () => {
+          throw new Error('ready boom');
+        },
+      }),
+    ]);
+    const runner = new PluginLifecycleRunner(host);
+    await runner.runStart();
+    expect(host.dispatcher.listenerCount('messageCreate')).toBe(1);
+
+    await runner.runReady();
+    await runner.runShutdown();
+
+    expect(host.dispatcher.listenerCount('messageCreate')).toBe(0);
   });
 });

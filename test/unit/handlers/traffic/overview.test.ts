@@ -9,11 +9,9 @@ import type { EmbedBuilder } from 'discord.js';
 import { describe, expect, it } from 'vitest';
 
 import { buildOverviewEmbed } from '../../../../src/handlers/commands/traffic/overview';
-import type {
-  TFn,
-  TrafficAggregate,
-  TrafficTrend,
-} from '../../../../src/handlers/commands/traffic/types';
+import type { TrafficAggregate } from '../../../../src/handlers/commands/traffic/aggregation';
+import type { TrafficTrend } from '../../../../src/handlers/commands/traffic/trend';
+import type { TFn } from '../../../../src/handlers/commands/traffic-shared/types';
 
 const echo: TFn = (key) => key;
 

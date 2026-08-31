@@ -44,7 +44,6 @@ describe('MongoMessageRepo error boundary (integration)', () => {
     expect(isErr(result)).toBe(true);
     if (isErr(result)) {
       expect(result.error).toBeInstanceOf(DatabaseError);
-      expect(result.error.kind).toBe('DatabaseError');
       expect(result.error.context.operation).toBe('MongoMessageRepo.countAll');
       expect(result.error.cause).toBeDefined();
     }

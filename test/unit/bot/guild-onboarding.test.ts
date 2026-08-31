@@ -121,7 +121,7 @@ describe('BaseBotGuildOnboardingPort', () => {
     expect(commandsSet).toHaveBeenCalled();
   });
 
-  it('does not abort onboarding when command registration rejects', async () => {
+  it('reports commandsRegistered=false when the Discord call rejects', async () => {
     const { bot } = makeBot({
       commandsSet: async () => {
         throw new Error('discord 503');
@@ -129,10 +129,11 @@ describe('BaseBotGuildOnboardingPort', () => {
     });
     const port = new BaseBotGuildOnboardingPort(bot);
 
-    // The rejected `commands.set` promise is caught internally; the
-    // onboarding call resolves successfully.
+    // The rejection is caught, so onboarding still resolves — but the
+    // result must report what actually happened. The fire-and-forget
+    // form this replaces always claimed success.
     const result = await port.onboardGuild(GUILD_ID);
-    expect(result.commandsRegistered).toBe(true);
+    expect(result.commandsRegistered).toBe(false);
     expect(result.databaseConnected).toBe(true);
   });
 

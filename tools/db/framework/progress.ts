@@ -9,7 +9,7 @@
  * sees one line per step). When false, each call writes a fresh line
  * terminated by `\n` so CI / file-redirected logs stay readable.
  */
-export interface ProgressSink {
+interface ProgressSink {
   write(text: string): void;
 }
 

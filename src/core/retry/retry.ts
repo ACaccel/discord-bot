@@ -25,7 +25,7 @@ const DEFAULT_MAX_ATTEMPTS = 5;
 const DEFAULT_INITIAL_DELAY_MS = 2000;
 
 /** Tunables for {@link retryFetch}. Every field has a production default. */
-export interface RetryOptions {
+interface RetryOptions {
   /** Total attempts, including the first. Values below 1 disable retrying. */
   readonly maxAttempts?: number;
   /** Backoff wait before the second attempt, in milliseconds. */

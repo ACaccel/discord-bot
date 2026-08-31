@@ -16,8 +16,10 @@
  *   - `cause`: the original Error preserved via ES2022 `Error.cause`.
  *     Pino serialises it natively.
  *
+ * Dispatch: callers narrow with `instanceof`. That is the contract —
+ * there is no discriminant string field to switch on.
+ *
  * Subclass rules:
- *   - Override the `kind` discriminant string with the subclass name.
  *   - Hand-pick a default `messageKey` per subclass; allow override.
  *   - Never add ad-hoc fields outside `context` — every additional
  *     attribute weakens the redactor's job. If a field deserves
@@ -46,8 +48,6 @@ export abstract class DomainError<
   Code extends string = string,
   Params extends Readonly<Record<string, string | number>> | undefined = undefined,
 > extends Error {
-  /** Discriminant for narrowing across the DomainError union. */
-  public abstract readonly kind: string;
   public readonly code: Code;
   public readonly messageKey: string;
   public readonly context: ErrorContext;
@@ -72,7 +72,6 @@ export abstract class DomainError<
   public toJSON(): Readonly<Record<string, unknown>> {
     return {
       name: this.name,
-      kind: this.kind,
       code: this.code,
       messageKey: this.messageKey,
       messageParams: this.messageParams,

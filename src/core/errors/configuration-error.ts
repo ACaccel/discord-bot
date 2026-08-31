@@ -5,7 +5,7 @@
  */
 import { DomainError, type DomainErrorInit } from './domain-error';
 
-export type ConfigurationErrorCode =
+type ConfigurationErrorCode =
   | 'MISSING_ENV'
   | 'INVALID_ENV'
   | 'INVALID_CONFIG_JSON'
@@ -35,7 +35,6 @@ export type ConfigurationErrorCode =
 export class ConfigurationError<
   P extends Readonly<Record<string, string | number>> | undefined = undefined,
 > extends DomainError<ConfigurationErrorCode, P> {
-  public override readonly kind = 'ConfigurationError';
   public constructor(init: DomainErrorInit<ConfigurationErrorCode, P>) {
     super(init);
   }

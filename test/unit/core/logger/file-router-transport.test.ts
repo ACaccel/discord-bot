@@ -5,13 +5,24 @@
  * loop here; we simply pump JSON Lines through it and assert on the
  * files that land under a per-test temp directory.
  */
-import { mkdtempSync, readdirSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  existsSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createFileRouterStream } from '../../../../src/core/logger/file-router-transport';
+import {
+  createFileRouterStream,
+  createFixedPathFileStream,
+} from '../../../../src/core/logger/file-router-transport';
 
 let rootDir: string;
 
@@ -29,6 +40,26 @@ const dateKey = (d: Date): string => {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+};
+
+/**
+ * Redirect `process.stderr.write` for the duration of a case. The sinks
+ * report disk failures there rather than through the logger they just
+ * failed to serve.
+ */
+const captureStderr = (): { text: () => string; restore: () => void } => {
+  const chunks: string[] = [];
+  const original = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((chunk: string | Uint8Array): boolean => {
+    chunks.push(String(chunk));
+    return true;
+  }) as typeof process.stderr.write;
+  return {
+    text: () => chunks.join(''),
+    restore: () => {
+      process.stderr.write = original;
+    },
+  };
 };
 
 /** Pump `lines` through the sink and await graceful close. */
@@ -146,5 +177,75 @@ describe('file-router stream', () => {
 
   it('rejects an empty rootDir option', () => {
     expect(() => createFileRouterStream({ rootDir: '' })).toThrow(/rootDir/);
+  });
+
+  it('degrades to stderr when the target file cannot be opened', async () => {
+    // A file where a directory must go reproduces the disk-level failure
+    // class (ENOSPC / EACCES / a removed mount) without needing root:
+    // `mkdirSync` rejects it with ENOTDIR.
+    writeFileSync(join(rootDir, 'bot-A'), 'not a directory');
+    const stderr = captureStderr();
+
+    try {
+      // Must not throw: an unopenable log file would otherwise surface as
+      // an uncaughtException and the process-level net treats that as fatal.
+      await expect(
+        drain([JSON.stringify({ level: 30, bot: 'bot-A', msg: 'hello' })]),
+      ).resolves.toBeUndefined();
+    } finally {
+      stderr.restore();
+    }
+
+    expect(stderr.text()).toContain('log sink');
+  });
+});
+
+describe('fixed-path file stream', () => {
+  it('invokes the write callback exactly once per chunk', async () => {
+    const filePath = join(rootDir, 'error.log');
+    const sink = createFixedPathFileStream(filePath);
+    const callbackCounts: number[] = [];
+
+    // A chunk large enough to exceed the default high-water mark takes
+    // the backpressure branch, where the previous double/missing
+    // callback bug lived.
+    for (const chunk of ['small\n', `${'x'.repeat(128 * 1024)}\n`]) {
+      let calls = 0;
+      await new Promise<void>((resolve, reject) => {
+        sink.write(chunk, (err) => {
+          calls += 1;
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      // Give any stray second invocation a chance to land.
+      await new Promise<void>((r) => setImmediate(r));
+      callbackCounts.push(calls);
+    }
+
+    await new Promise<void>((resolve) => sink.end(() => resolve()));
+    expect(callbackCounts).toEqual([1, 1]);
+    expect(readFileSync(filePath, 'utf8')).toContain('small');
+  });
+
+  it('reports a sink failure on stderr instead of escalating to uncaughtException', async () => {
+    // Opening a path that is a directory fails asynchronously with
+    // EISDIR — the same event shape as ENOSPC / EACCES on a real disk.
+    const targetPath = join(rootDir, 'is-a-directory');
+    mkdirSync(targetPath);
+    const stderr = captureStderr();
+
+    try {
+      const sink = createFixedPathFileStream(targetPath);
+      sink.write('record\n');
+      // Let the failed open surface. Without the 'error' listener Node
+      // rethrows it as an uncaughtException and the process-level net
+      // treats that as fatal.
+      await new Promise<void>((r) => setTimeout(r, 20));
+    } finally {
+      stderr.restore();
+    }
+
+    expect(stderr.text()).toContain('log sink');
   });
 });

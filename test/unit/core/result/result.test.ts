@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ValidationError, ConflictError } from '../../../../src/core/errors';
+import { ConfigurationError, DatabaseError } from '../../../../src/core/errors';
 import {
   andThen,
   err,
@@ -12,10 +12,10 @@ import {
   unwrapOr,
 } from '../../../../src/core/result';
 
-const buildErr = (): ValidationError =>
-  new ValidationError({
-    code: 'FIELD_REQUIRED',
-    messageKey: 'errors.validation.field_required',
+const buildErr = (): DatabaseError =>
+  new DatabaseError({
+    code: 'DATABASE_TIMEOUT',
+    messageKey: 'errors:db.timeout',
     context: { operation: 'test' },
   });
 
@@ -51,13 +51,13 @@ describe('Result', () => {
     const replaced = mapErr(
       err(a),
       () =>
-        new ConflictError({
-          code: 'ALREADY_EXISTS',
-          messageKey: 'errors.conflict.already_exists',
+        new ConfigurationError({
+          code: 'MISSING_ENV',
+          messageKey: 'errors:configuration.missing_env',
           context: { operation: 'test' },
         }),
     );
-    expect(isErr(replaced) && replaced.error.kind).toBe('ConflictError');
+    expect(isErr(replaced) && replaced.error).toBeInstanceOf(ConfigurationError);
     const v = mapErr(ok(1), () => buildErr());
     expect(isOk(v) && v.value).toBe(1);
   });
@@ -76,6 +76,6 @@ describe('Result', () => {
 
   it('unwrap throws on Err (test-only escape hatch)', () => {
     expect(unwrap(ok('y'))).toBe('y');
-    expect(() => unwrap(err(buildErr()))).toThrowError(ValidationError);
+    expect(() => unwrap(err(buildErr()))).toThrowError(DatabaseError);
   });
 });

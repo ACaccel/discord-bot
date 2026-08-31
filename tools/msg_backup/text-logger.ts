@@ -1,8 +1,8 @@
 /**
  * Pure-text run-log writer for `msg_backup`.
  *
- * Produces the human-readable single-file log specified in
- * `docs/proposal.md`. Lives next to the tool, not under
+ * Produces the human-readable single-file run log an operator reads
+ * after a backup. Lives next to the tool, not under
  * `src/core/logger/**`, because the format is tightly coupled to one
  * ops workflow and has no reusable contract with the rest of the
  * codebase.
@@ -15,7 +15,7 @@
  *   - `append` is synchronous (`writeSync`) for deterministic ordering
  *     against the parallel pino-pretty stdout. Throughput is not a
  *     concern: at peak, a handful of lines per second.
- *   - Every write is wrapped in try/catch (R-09). On the first I/O
+ *   - Every write is wrapped in try/catch. On the first I/O
  *     failure we fall back to `console.error`, set `broken=true`, and
  *     subsequent calls no-op the file write while still mirroring to
  *     stderr. `wasBroken()` reports the final state so `main()` can
@@ -92,7 +92,7 @@ export const maskMongoUri = (uri: string): string =>
   uri.replace(/^(mongodb(?:\+srv)?:\/\/[^:@/]+:)([^@]*)(@)/i, '$1****$3');
 
 /** Format an elapsed millisecond duration as `HHh MMm SSs` / `MMmSSs` / `SSs`. */
-export const formatElapsed = (ms: number): string => {
+const formatElapsed = (ms: number): string => {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
@@ -111,7 +111,7 @@ const formatNumber = (n: number): string => n.toLocaleString('en-US');
 /** Right-align a numeric value inside a fixed-width column. */
 const padNumber = (n: number, width: number): string => formatNumber(n).padStart(width);
 
-export interface ConfigHeaderInput {
+interface ConfigHeaderInput {
   readonly startedAt: Date;
   readonly mongoUri: string;
   readonly guilds: readonly string[];
@@ -145,7 +145,7 @@ export const formatGuildBanner = (guildId: string, guildName: string): string =>
 /**
  * Per-check tallies for the cleanup pass. Each numeric field counts
  * documents deleted by that check. `errors[checkName] = reason` is
- * populated when a check itself threw (R-03) — in that case the
+ * populated when a check itself threw — in that case the
  * corresponding count stays at `0` and the summary line is rendered as
  * `ERROR (<reason>)`.
  */
@@ -206,7 +206,7 @@ export interface DiscoveredChannelInfo {
   readonly parentName?: string;
 }
 
-export interface ChannelDiscoveryInput {
+interface ChannelDiscoveryInput {
   readonly total: number;
   readonly parents: readonly DiscoveredChannelInfo[];
   readonly activeThreads: readonly DiscoveredChannelInfo[];
@@ -253,7 +253,7 @@ export const formatChannelHeader = (
     CHANNEL_SEPARATOR,
   ].join('\n');
 
-export interface MonthLineInput {
+interface MonthLineInput {
   readonly month: string;
   readonly processed: number;
   readonly upserted: number;
@@ -274,7 +274,7 @@ export const formatMonthLine = (input: MonthLineInput): string =>
   `skipped-reactions ${formatNumber(input.skippedReactions)}, ` +
   `skipped-stickers ${formatNumber(input.skippedStickers)}`;
 
-export interface ChannelSummaryInput {
+interface ChannelSummaryInput {
   readonly processed: number;
   readonly upserted: number;
   readonly botDeleted: number;
@@ -296,7 +296,7 @@ export const formatChannelSummary = (input: ChannelSummaryInput): string =>
   `skipped-stickers: ${formatNumber(input.skippedStickers)}  ` +
   `elapsed: ${formatElapsed(input.elapsedMs)}`;
 
-export interface GuildSummaryInput {
+interface GuildSummaryInput {
   readonly guildId: string;
   readonly cleanup: CleanupCounts;
   readonly channelsProcessed: number;
@@ -330,7 +330,7 @@ const summaryLine = (label: string, value: string): string => {
  * final status are always listed; channels that finished `ok` but
  * triggered the retry path are listed as `retried-but-ok`.
  */
-export interface AnomalyEntry {
+interface AnomalyEntry {
   readonly status:
     | 'aborted'
     | 'no-permission'
@@ -428,7 +428,7 @@ export interface PerChannelBreakdownRow {
   readonly elapsedMs: number;
 }
 
-export interface OverallSummaryInput {
+interface OverallSummaryInput {
   readonly guildsTotal: number;
   readonly guildsSucceeded: number;
   readonly guildsFailed: number;
@@ -502,7 +502,7 @@ export const formatEndOfRun = (
  * Handle on the single per-run log file. Construct one at process
  * start and pass it through the call tree.
  *
- * Failure handling (R-09): the first `writeSync` failure flips the
+ * Failure handling: the first `writeSync` failure flips the
  * handle into a broken state. From then on, `append` mirrors output
  * to `console.error` instead of trying the file again. `wasBroken()`
  * lets `main()` print a final stderr warning so the operator knows
@@ -528,7 +528,6 @@ export const createRunLogFile = (rootDir: string, now: Date = new Date()): RunLo
     if (!broken) {
       broken = true;
       const reason = err instanceof Error ? err.message : String(err);
-      // eslint-disable-next-line no-console
       console.error(
         `[msg_backup] run-log ${op} failed (${reason}); subsequent log lines mirrored to stderr only.`,
       );

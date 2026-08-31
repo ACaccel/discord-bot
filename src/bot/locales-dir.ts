@@ -13,5 +13,4 @@
 import * as path from 'node:path';
 
 /** Canonical locales root for every bot in this monorepo. */
-export const resolveLocalesDir = (): string =>
-  path.resolve(__dirname, '..', 'i18n', 'locales');
+export const resolveLocalesDir = (): string => path.resolve(__dirname, '..', 'i18n', 'locales');

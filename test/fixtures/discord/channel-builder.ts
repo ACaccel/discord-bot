@@ -8,9 +8,56 @@
  * grants ViewChannel when the subject's id is in `viewableBy` (or when
  * `viewableByAll` is set, the default for an ordinary public channel).
  */
-import { ChannelType, type GuildBasedChannel, type GuildMember, type Role } from 'discord.js';
+import { vi, type Mock } from 'vitest';
+import {
+  ChannelType,
+  type Channel,
+  type GuildBasedChannel,
+  type GuildMember,
+  type Role,
+} from 'discord.js';
 
-export interface BuildChannelInput {
+/**
+ * A channel a plugin can post to, plus handles on what it posted.
+ *
+ * Separate from {@link buildTextChannel}, whose shape is tuned to the
+ * `/traffic` visibility filter: what a posting path needs is
+ * `isSendable()` and a `send()` that resolves to a deletable message.
+ */
+interface SendableChannelFake {
+  readonly channel: Channel;
+  readonly send: Mock;
+  /** The message `send` resolves with; its `delete` is a spy. */
+  readonly message: { readonly id: string; readonly delete: Mock };
+}
+
+interface BuildSendableChannelInput {
+  readonly id?: string;
+  /** When false, `isSendable()` returns false and `send` is never reached. */
+  readonly sendable?: boolean;
+  readonly messageId?: string;
+}
+
+export const buildSendableChannel = (
+  input: BuildSendableChannelInput = {},
+): SendableChannelFake => {
+  const message = {
+    id: input.messageId ?? 'msg-1',
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
+  const send = vi.fn().mockResolvedValue(message);
+  return {
+    message,
+    send,
+    channel: {
+      id: input.id ?? 'chan-1',
+      isSendable: () => input.sendable ?? true,
+      send,
+    } as unknown as Channel,
+  };
+};
+
+interface BuildChannelInput {
   readonly id: string;
   readonly name?: string;
   readonly type?: ChannelType;

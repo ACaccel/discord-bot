@@ -9,7 +9,7 @@
  */
 import { type Client, DiscordAPIError } from 'discord.js';
 
-import type { GuildRegistry } from '../../../core/guild-registry';
+import type { GuildRegistry } from '../../../bot/guild-registry';
 import { logError, type Logger } from '../../../core/logger';
 import { BackupLog, NullBackupLog, type BackupTranscript } from './backup-log';
 import { buildBackupLogPath } from './log-path';

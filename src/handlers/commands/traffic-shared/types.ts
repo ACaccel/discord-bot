@@ -1,7 +1,7 @@
 /**
  * Cross-cutting types shared by the `/traffic` command family
- * (`/traffic`, `/traffic_me`). Command-specific shapes (e.g. each
- * command's options / aggregate) stay in the command's own folder.
+ * (`/traffic`, `/traffic_me`, `/traffic_user`). Command-specific shapes
+ * (e.g. each command's aggregate) stay in the command's own folder.
  */
 export type Visibility = 'ephemeral' | 'public';
 export type TrafficRange = '24h' | '7d' | '30d';
@@ -24,3 +24,10 @@ export interface BucketCount {
 
 /** Translator function compatible with `bot.translator.t`. */
 export type TFn = (key: string, params?: Record<string, string | number>) => string;
+
+/** Parsed and clamped `visibility` / `range` / `top_n` command options. */
+export interface TrafficOptions {
+  readonly visibility: Visibility;
+  readonly range: TrafficRange;
+  readonly topN: number;
+}

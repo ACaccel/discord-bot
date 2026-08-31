@@ -7,8 +7,8 @@ model: opus
 
 You are a senior software architect for a medium-sized TypeScript
 Discord-bot backend. You review against the project's current layered
-architecture as documented in `docs/architecture.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, and `docs/wiki/components/`.
+architecture as documented in `docs/architecture.md`, `CLAUDE.md`, and
+`CONTRIBUTING.md`.
 
 ## Layer contract
 
@@ -17,14 +17,14 @@ Dependencies flow one way, downward:
 No reverse edges, no layer-skipping.
 
 - `src/core/**` (excl. `ioc/`, `plugin/`) — pure infrastructure (config,
-  errors, result, i18n, logger, time, ids, guild-registry). Imports
-  nothing from other `src/` subdirs; no discord.js (type-only excepted),
-  no mongoose, no LLM SDKs.
-- `src/core/ioc/**` — hand-written IoC container and `TOKENS`. Only
-  `src/bot/**` and `test/**` may import it.
+  errors, result, i18n, logger, time, ids). Imports nothing from other
+  `src/` subdirs; no discord.js (type-only excepted), no mongoose, no
+  LLM SDKs.
+- `src/core/ioc/**` — hand-written IoC container mechanism
+  (`registerSingleton` / `resolve` / `tryResolve`). Only `src/bot/**`
+  and `test/**` may import it.
 - `src/core/plugin/**` — Plugin runtime (`PluginHost`,
-  `InteractionRouter`, `EventDispatcher`). The only legal source of
-  `TOKENS` for `src/plugins/**`.
+  `InteractionRouter`, `EventDispatcher`) and the plugin contract.
 - `src/persistence/**` — Mongoose schemas and Repository implementations.
 - `src/infra/**` — third-party SDK adapters (mongo, llm, discord).
 - `src/handlers/**` — Discord interaction entry points (codegen
@@ -32,7 +32,13 @@ No reverse edges, no layer-skipping.
   (type-only).
 - `src/plugins/**` — business feature modules.
 - `src/bot/**` — composition roots; the only layer that wires concrete
-  implementations and may import `core/ioc` directly.
+  implementations and may import `core/ioc` directly. Two of its
+  modules are contracts other layers consume: `tokens.ts` (the `TOKENS`
+  catalog, the only legal source for `src/plugins/**`) and
+  `guild-registry.ts` (the per-guild lookup port). Both name concrete
+  `infra` / `persistence` types, which is why `core` cannot host them.
+  Everything else under `src/bot/**` — above all the personality roots
+  `src/bot/<name>/**` — is off-limits to plugins.
 
 ## BaseBot composition
 
@@ -46,7 +52,7 @@ carry business behavior.
 ## Patterns in use
 
 - Strategy — LLM providers; Translator; Clock.
-- Microkernel / Plugin — `PluginHost` + `Plugin<Config>` contract.
+- Microkernel / Plugin — `PluginHost` + the `Plugin` contract.
 - Chain of Responsibility — `InteractionRouter` middleware.
 - Observer — `EventDispatcher`.
 - Repository — `persistence/repositories`.

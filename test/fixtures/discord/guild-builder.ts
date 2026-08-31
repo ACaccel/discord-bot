@@ -1,10 +1,50 @@
 /**
  * Minimal Guild builder for unit / integration tests. Returns the
  * structural subset that handler / plugin code touches — id, name,
- * `channels.cache`, `members.cache`. Tests that need more can spread
- * extra fields into the return.
+ * `channels.cache`, `members.cache`, `roles`. Tests that need more can
+ * spread extra fields into the return.
  */
+import { vi, type Mock } from 'vitest';
 import type { Guild } from 'discord.js';
+
+/**
+ * Role manager stand-in. `create` / `delete` stay `vi.fn()` mocks
+ * rather than call-recording arrays so a test can drive the failure
+ * branches with `mockRejectedValue`.
+ */
+interface GuildRolesFake {
+  /** Backs both `roles.cache.size` (role-ceiling checks) and `.get(id)`. */
+  readonly cache: Map<string, { readonly id: string; readonly name: string }>;
+  readonly create: Mock;
+  readonly delete: Mock;
+  readonly everyone: { readonly id: string };
+}
+
+interface BuildGuildRolesInput {
+  /** How many roles the guild already has; drives `roles.cache.size`. */
+  readonly roleCount?: number;
+  /** Roles resolvable by id through `roles.cache.get`. */
+  readonly roles?: readonly { readonly id: string; readonly name: string }[];
+  /** Id of the role `roles.create` resolves with. */
+  readonly createdRoleId?: string;
+  readonly everyoneRoleId?: string;
+}
+
+export const buildGuildRoles = (input: BuildGuildRolesInput = {}): GuildRolesFake => {
+  const cache = new Map<string, { id: string; name: string }>();
+  for (let i = 0; i < (input.roleCount ?? 0); i += 1) {
+    cache.set(`filler-${String(i)}`, { id: `filler-${String(i)}`, name: `filler-${String(i)}` });
+  }
+  for (const role of input.roles ?? []) {
+    cache.set(role.id, { id: role.id, name: role.name });
+  }
+  return {
+    cache,
+    create: vi.fn().mockResolvedValue({ id: input.createdRoleId ?? 'role-1' }),
+    delete: vi.fn().mockResolvedValue(undefined),
+    everyone: { id: input.everyoneRoleId ?? 'everyone' },
+  };
+};
 
 interface BuildGuildInput {
   readonly id?: string;
@@ -13,7 +53,9 @@ interface BuildGuildInput {
   readonly channels?: readonly { id: string; name?: string; type?: number }[];
   /** Pre-populated member cache. Tests pass members built by `buildGuildMember`. */
   readonly members?: readonly { id: string; displayName?: string }[];
-  /** Id of the synthetic `@everyone` role exposed at `roles.everyone`. */
+  /** Role manager from {@link buildGuildRoles}; defaults to an empty one. */
+  readonly roles?: GuildRolesFake;
+  /** Id of the synthetic `@everyone` role. Ignored when `roles` is given. */
   readonly everyoneRoleId?: string;
 }
 
@@ -26,12 +68,11 @@ export const buildGuild = (input: BuildGuildInput = {}): Guild => {
   for (const m of input.members ?? []) {
     memberCache.set(m.id, m);
   }
-  const everyoneId = input.everyoneRoleId ?? 'everyone';
   return {
     id: input.id ?? 'g-1',
     name: input.name ?? 'TestGuild',
     channels: { cache: channelCache },
     members: { cache: memberCache },
-    roles: { everyone: { id: everyoneId } },
+    roles: input.roles ?? buildGuildRoles({ everyoneRoleId: input.everyoneRoleId }),
   } as unknown as Guild;
 };

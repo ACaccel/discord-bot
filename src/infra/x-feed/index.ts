@@ -16,5 +16,5 @@ export type {
   XFeedFailure,
 } from './types';
 
-export { FxTwitterTimelineSource, type FxTwitterTimelineSourceOptions } from './fxtwitter-source';
+export { FxTwitterTimelineSource } from './fxtwitter-source';
 export { translateXFeedError, invalidResponseError } from './error-translator';

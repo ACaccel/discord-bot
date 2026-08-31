@@ -13,6 +13,20 @@ re-alignment hammer** — use it when the DB has drifted from
 Discord-side truth (legacy `messageId: null` rows, stale reaction
 counts, missing attachment metadata, etc.).
 
+## When to use it
+
+Run `msg_backup` when a guild's `messages` collection has drifted from
+Discord-side truth and needs a one-shot reconciliation — typically
+signalled by `yarn db verify` reporting non-zero violations for
+`messageId-null`, `messageId-empty-string`, or `messageId-duplicate`, or
+by a report that DB-side reaction counts / edited content no longer
+match Discord.
+
+**Do not** schedule it as a nightly job: it is a recovery hammer, not a
+maintenance task, and it must not run alongside the runtime
+`message-backup` plugin — both write the same collection, and a
+concurrent incremental pass will fight the full re-ingest.
+
 ## Layout
 
 ```
@@ -198,7 +212,7 @@ file with the `FAILED` status in the footer.
 - After the tool finishes, restart the affected bot. On startup
   the bot's `Model.init()` should build the `messages.messageId_1`
   unique index cleanly (the symptom this tool is designed to fix).
-  Re-run `verify_db` to confirm.
+  Re-run `yarn db verify` to confirm.
 
 ## Field-skip behaviour
 

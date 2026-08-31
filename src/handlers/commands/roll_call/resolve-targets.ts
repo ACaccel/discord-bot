@@ -1,5 +1,7 @@
 import type { GuildMember } from 'discord.js';
 
+import { requireCapture } from '../../../core/regex-capture';
+
 /**
  * Maximum unique (non-bot) members a single `/roll_call` may target after
  * role expansion and de-duplication, matching the project's feature-ceiling
@@ -40,7 +42,7 @@ export const parseRollCallMentions = (raw: string): ParsedMentions | null => {
   const userIds = new Set<string>();
   const roleIds = new Set<string>();
   for (const match of raw.matchAll(MENTION_TOKEN_PATTERN)) {
-    const id = match[2] as string;
+    const id = requireCapture(match, 2);
     if (match[1] === '&') {
       roleIds.add(id);
     } else {

@@ -62,7 +62,6 @@ describe('MongoGiveawayRepo (integration)', () => {
     });
   });
 
-  // A genuine DB failure resolves to `err(DatabaseError)`.
   it('listAll resolves to err(DatabaseError) when the connection is closed', async () => {
     const baseUri = (() => {
       const uri = process.env.INTEGRATION_MONGO_URI;

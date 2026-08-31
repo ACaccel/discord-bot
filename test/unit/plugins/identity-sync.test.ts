@@ -14,7 +14,7 @@ import {
   runIdentitySync,
   type IdentitySyncState,
 } from '../../../src/plugins/identity-sync/internal/sync';
-import { TOKENS } from '../../../src/core/plugin';
+import { TOKENS } from '../../../src/bot/tokens';
 import { createLogger } from '../../../src/core/logger';
 import { systemClock } from '../../../src/core/time';
 import type { Translator } from '../../../src/core/i18n';
@@ -342,15 +342,6 @@ describe('createIdentitySyncPlugin lifecycle', () => {
         throw new Error('unexpected token');
       },
     }) as unknown as PluginRuntimeContext;
-
-  it('has the expected plugin shape', () => {
-    const plugin = createIdentitySyncPlugin({});
-    expect(plugin.id).toBe('identity-sync');
-    expect(plugin.scope).toBe('bot');
-    expect(plugin.critical).toBe(false);
-    expect(plugin.onReady).toBeTypeOf('function');
-    expect(plugin.onShutdown).toBeTypeOf('function');
-  });
 
   it('does not schedule a job when disabled', async () => {
     const jobMap = new Map<string, unknown>();

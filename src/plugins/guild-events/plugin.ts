@@ -16,11 +16,14 @@
  *     IoC container, so no plugin code reaches into `BaseBot`
  *     internals.
  *
+ * Dependencies are resolved once in `init` into a typed bundle the event
+ * subscriptions close over, rather than per event.
+ *
  * Rank gates DISCLOSURE only. For `messageUpdate` / `messageDelete` the
- * handlers resolve the {@link PermissionRankPolicy} from `ctx` at event time
- * and ask whether the `guild_events` feature is suppressed for the message's
+ * handlers ask the {@link PermissionRankPolicy} whether the `guild_events`
+ * feature is suppressed for the message's
  * channel. Suppression withholds the Discord `event`-channel embed, but the
- * local record — the `logGuildEvent` audit line and `archiveDeletedAttachment`
+ * local record — the `logGuildEvent` audit line and `archiveDeletedAttachments`
  * forensic download — runs UNCONDITIONALLY for every non-bot guild message.
  * Private (rank-1+) channels are therefore fully recorded server-side yet
  * never mirrored to Discord. A no-arg factory (consistent with the sibling
@@ -35,12 +38,12 @@ import {
   type TextChannel,
 } from 'discord.js';
 
-import { TOKENS } from '../../core/plugin';
-import type { GuildRegistry } from '../../core/guild-registry';
+import { TOKENS } from '../../bot/tokens';
+import type { GuildRegistry } from '../../bot/guild-registry';
 import type { Plugin } from '../../core/plugin';
 import type { GuildOnboardingPort, PermissionRankPolicy } from '../../core/plugin';
 import { logError, logGuildEvent, logSystem, type Logger } from '../../core/logger';
-import { archiveDeletedAttachment, ancestorChannelIdsOf } from '../../infra/discord';
+import { archiveDeletedAttachments, ancestorChannelIdsOf } from '../../infra/discord';
 
 const PLUGIN_ID = 'guild-events';
 const PLUGIN_VERSION = '1.0.0';
@@ -88,44 +91,57 @@ const safeSendEmbed = async (
   }
 };
 
-/** Build the guild-events plugin. Takes no config; suppression is resolved
- * per-event from {@link PermissionRankPolicy}. */
+/** Everything the event handlers read, resolved once in `init`. */
+interface GuildEventsDeps {
+  readonly registry: GuildRegistry;
+  readonly policy: PermissionRankPolicy;
+  readonly onboardingPort: GuildOnboardingPort;
+  /** The bot-root logger, not the plugin child: audit lines are per-guild. */
+  readonly logger: Logger;
+}
+
+/** Build the guild-events plugin. Takes no config; suppression is decided
+ * per event by the {@link PermissionRankPolicy} resolved in `init`. */
 export const createGuildEventsPlugin = (): Plugin => {
+  let resolved: GuildEventsDeps | undefined;
+  /** See the `init` contract in `core/plugin/types.ts`: unreachable. */
+  const deps = (): GuildEventsDeps => {
+    if (resolved === undefined) {
+      throw new TypeError('guild-events: event dispatched before init resolved dependencies');
+    }
+    return resolved;
+  };
+
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    critical: false,
+
+    async init(ctx): Promise<void> {
+      resolved = {
+        registry: ctx.resolve(TOKENS.GuildRegistry),
+        policy: ctx.resolve(TOKENS.PermissionRankPolicy),
+        onboardingPort: ctx.resolve(TOKENS.GuildOnboardingPort),
+        logger: ctx.resolve(TOKENS.Logger),
+      };
+    },
 
     events: {
-      messageUpdate: async (ctx, oldMessage, newMessage) => {
-        await handleMessageUpdate(
-          ctx.resolve(TOKENS.GuildRegistry),
-          ctx.resolve(TOKENS.PermissionRankPolicy),
-          ctx.resolve(TOKENS.Logger),
-          oldMessage,
-          newMessage,
-        );
+      messageUpdate: async (_ctx, oldMessage, newMessage) => {
+        const { registry, policy, logger } = deps();
+        await handleMessageUpdate(registry, policy, logger, oldMessage, newMessage);
       },
-      messageDelete: async (ctx, message) => {
-        await handleMessageDelete(
-          ctx.resolve(TOKENS.GuildRegistry),
-          ctx.resolve(TOKENS.PermissionRankPolicy),
-          ctx.resolve(TOKENS.Logger),
-          message,
-        );
+      messageDelete: async (_ctx, message) => {
+        const { registry, policy, logger } = deps();
+        await handleMessageDelete(registry, policy, logger, message);
       },
-      guildCreate: async (ctx, guild) => {
-        await handleGuildCreate(
-          ctx.resolve(TOKENS.GuildOnboardingPort),
-          ctx.resolve(TOKENS.Logger),
-          guild,
-        );
+      guildCreate: async (_ctx, guild) => {
+        const { onboardingPort, logger } = deps();
+        await handleGuildCreate(onboardingPort, logger, guild);
       },
-      guildMemberUpdate: async (ctx, oldMember, newMember) => {
+      guildMemberUpdate: async (_ctx, oldMember, newMember) => {
+        const { registry, logger } = deps();
         const guildId = newMember.guild.id;
-        const logger = ctx.resolve(TOKENS.Logger);
-        const eventChannel = resolveEventChannel(ctx.resolve(TOKENS.GuildRegistry), guildId);
+        const eventChannel = resolveEventChannel(registry, guildId);
         const oldRoles = oldMember.roles.cache;
         const newRoles = newMember.roles.cache;
         const addedRoles = newRoles.filter((role) => !oldRoles.has(role.id));
@@ -340,11 +356,11 @@ const handleMessageDelete = async (
   // Forensic attachment download — unconditional, regardless of rank, runs for
   // every attachment including images the embed separately previews. URLs are
   // signed CDN links that expire, so the binary download is what makes the
-  // local record durable. Fire-and-forget; the helper has its own try/catch.
+  // local record durable. Fire-and-forget; the helper bounds its own
+  // concurrency (a bulk delete can carry a hundred attachments) and has its
+  // own try/catch per file.
   if (message.attachments.size > 0) {
-    message.attachments.forEach((attachment) => {
-      void archiveDeletedAttachment(logger, message.guildId as string, attachment);
-    });
+    void archiveDeletedAttachments(logger, message.guildId as string, message.attachments.values());
   }
 
   // Local audit record — unconditional, regardless of rank or event-channel

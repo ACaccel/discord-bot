@@ -77,7 +77,12 @@ export const collectChannels = async (
         let before: Date | undefined;
         // fetchArchived is paginated — drain both visibility classes.
         for (;;) {
-          const opts: { type: 'public' | 'private'; limit: number; fetchAll: boolean; before?: Date } = {
+          const opts: {
+            type: 'public' | 'private';
+            limit: number;
+            fetchAll: boolean;
+            before?: Date;
+          } = {
             type,
             limit: 100,
             fetchAll: type === 'private',

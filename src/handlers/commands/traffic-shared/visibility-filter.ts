@@ -29,7 +29,7 @@ import { ancestorChannelIdsOf } from '../../../infra/discord';
 
 import type { Visibility } from './types';
 
-export interface VisibilityFilterInput {
+interface VisibilityFilterInput {
   readonly guild: Guild;
   readonly member: GuildMember;
   readonly policy: PermissionRankPolicy;

@@ -10,9 +10,12 @@ import {
 
 const scheduleJobMock = vi.fn();
 
+// `discord-helpers` fetches through the shared bounded instance
+// (`boundedHttp`), so the mock has to provide `axios.create`.
 const axiosGetMock = vi.fn();
 vi.mock('axios', () => ({
   default: {
+    create: () => ({ get: (...args: unknown[]) => axiosGetMock(...args) }),
     get: (...args: unknown[]) => axiosGetMock(...args),
   },
 }));

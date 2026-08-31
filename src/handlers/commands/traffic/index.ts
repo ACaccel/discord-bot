@@ -2,16 +2,16 @@ import { type ChatInputCommandInteraction, MessageFlags } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { replyForError } from '../../reply-for-error';
+import { replyForError } from '../../../infra/discord/reply-for-error';
 
 import { renderTrafficCharts } from '../traffic-shared/chart';
+import { readTrafficOptions } from '../traffic-shared/options';
+import type { TFn } from '../traffic-shared/types';
 import { buildAllowedChannelSet } from '../traffic-shared/visibility-filter';
 import { resolveWindow } from '../traffic-shared/window';
 
 import { aggregateTraffic } from './aggregation';
-import { readTrafficOptions } from './options';
 import { computeTrend, countTrafficMessages } from './trend';
-import type { TFn } from './types';
 import { buildTrafficView } from './view';
 
 /**

@@ -28,7 +28,7 @@ import { DEFAULT_LOCALE, type Locale, type Translator } from './translator';
 const NAMESPACES = ['commands', 'errors', 'replies'] as const;
 type Namespace = (typeof NAMESPACES)[number];
 
-export interface LoadCatalogOptions {
+interface LoadCatalogOptions {
   /**
    * Filesystem path to the locales root. Required: the composition
    * root must inject it so `core` stays ignorant of the deployment

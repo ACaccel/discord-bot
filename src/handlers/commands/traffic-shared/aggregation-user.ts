@@ -5,14 +5,21 @@
  * built from the invoker's clearance — never the focus user's) it
  * accumulates the focus user's per-channel / per-time-bucket counts, plus
  * a global per-user tally so the user's share of visible traffic and
- * their rank among active users can be derived. Day-sized chunks bound
- * heap use (mirrors `/traffic`'s aggregation).
+ * their rank among active users can be derived. The window layout and
+ * the day-sized fetch loop come from `./aggregation-common`.
  */
 import type { MessageDoc } from '../../../persistence/schemas/message.schema';
 import type { Repos } from '../../../persistence/repositories';
 
+import {
+  bucketExtremes,
+  bump,
+  bumpBucket,
+  createBuckets,
+  forEachDayChunk,
+  windowDaysOf,
+} from './aggregation-common';
 import type { BucketCount, BucketGranularity, TimeWindow } from './types';
-import { DAY_MS } from './window';
 
 export interface UserTrafficAggregate {
   readonly userTotal: number;
@@ -36,23 +43,13 @@ interface Accumulator {
   readonly buckets: BucketCount[];
 }
 
-const initAccumulator = (window: TimeWindow): Accumulator => {
-  const buckets: BucketCount[] = [];
-  for (let i = 0; i < window.bucketCount; i++) {
-    buckets.push({ startMs: window.startMs + i * window.bucketMs, count: 0 });
-  }
-  return {
-    userTotal: 0,
-    perUserGlobal: new Map(),
-    perChannel: new Map(),
-    channelNames: new Map(),
-    buckets,
-  };
-};
-
-const bump = (map: Map<string, number>, key: string): void => {
-  map.set(key, (map.get(key) ?? 0) + 1);
-};
+const initAccumulator = (window: TimeWindow): Accumulator => ({
+  userTotal: 0,
+  perUserGlobal: new Map(),
+  perChannel: new Map(),
+  channelNames: new Map(),
+  buckets: createBuckets(window),
+});
 
 const accumulateChunk = (
   messages: readonly MessageDoc[],
@@ -68,19 +65,12 @@ const accumulateChunk = (
     acc.userTotal++;
     bump(acc.perChannel, m.channelId);
     acc.channelNames.set(m.channelId, m.channelName);
-    const idx = Math.floor((m.timestamp - window.startMs) / window.bucketMs);
-    if (idx >= 0 && idx < acc.buckets.length) {
-      const bucket = acc.buckets[idx];
-      if (bucket) bucket.count++;
-    }
+    bumpBucket(acc.buckets, window, m.timestamp);
   }
 };
 
 const finalize = (acc: Accumulator, window: TimeWindow, userId: string): UserTrafficAggregate => {
-  let busiest: BucketCount | null = null;
-  for (const bucket of acc.buckets) {
-    if (busiest === null || bucket.count > busiest.count) busiest = bucket;
-  }
+  const { busiest } = bucketExtremes(acc.buckets);
   let guildTotal = 0;
   let rankedAbove = 0;
   const mine = acc.perUserGlobal.get(userId) ?? 0;
@@ -88,7 +78,7 @@ const finalize = (acc: Accumulator, window: TimeWindow, userId: string): UserTra
     guildTotal += count;
     if (count > mine) rankedAbove++;
   }
-  const windowDays = Math.max(1, (window.endMs - window.startMs) / DAY_MS);
+  const windowDays = windowDaysOf(window);
   return {
     userTotal: acc.userTotal,
     guildTotal,
@@ -111,11 +101,8 @@ export const aggregateUserTraffic = async (
   userId: string,
 ): Promise<UserTrafficAggregate> => {
   const acc = initAccumulator(window);
-  for (let chunkStart = window.startMs; chunkStart < window.endMs; chunkStart += DAY_MS) {
-    const chunkEnd = Math.min(chunkStart + DAY_MS, window.endMs);
-    const result = await repos.message.findByTimestampRange(chunkStart, chunkEnd);
-    if (!result.ok) throw result.error;
-    accumulateChunk(result.value, acc, allowed, window, userId);
-  }
+  await forEachDayChunk(repos, window, (messages) =>
+    accumulateChunk(messages, acc, allowed, window, userId),
+  );
   return finalize(acc, window, userId);
 };

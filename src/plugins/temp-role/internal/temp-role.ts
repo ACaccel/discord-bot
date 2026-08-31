@@ -16,7 +16,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, DiscordAPIError } from 'd
 import type { Channel, Client, Guild, Message, Role } from 'discord.js';
 import type { Job } from 'node-schedule';
 
-import type { GuildRegistry } from '../../../core/guild-registry';
+import type { GuildRegistry } from '../../../bot/guild-registry';
 import { bindTranslator, type Translator } from '../../../core/i18n';
 import { logError, type Logger } from '../../../core/logger';
 import { JobManager } from '@core/scheduling';
@@ -62,13 +62,13 @@ export const tempRoleJobKey = (roleId: string): string => `temp-role:${roleId}`;
 const discordTimestamp = (epochMs: number): string => `<t:${Math.floor(epochMs / 1000)}:f>`;
 
 /** Outcome of {@link createTempRole}; the handler maps it to i18n copy. */
-export type CreateTempRoleOutcome =
+type CreateTempRoleOutcome =
   | { readonly status: 'created'; readonly roleId: string; readonly expiresAt: number }
   | { readonly status: 'role_limit' }
   | { readonly status: 'no_db' }
   | { readonly status: 'announce_failed' };
 
-export interface CreateTempRoleArgs {
+interface CreateTempRoleArgs {
   readonly guild: Guild;
   readonly channel: Channel;
   readonly creatorId: string;
@@ -197,7 +197,7 @@ const scheduleExpiryJob = (
     runExpiryDetached(deps, guildId, roleId);
     return;
   }
-  new JobManager(deps.jobMap).schedule(tempRoleJobKey(roleId), when, () =>
+  new JobManager(deps.jobMap, deps.logger).schedule(tempRoleJobKey(roleId), when, () =>
     runExpiryDetached(deps, guildId, roleId),
   );
 };
@@ -210,6 +210,13 @@ const scheduleExpiryJob = (
  * Best-effort rollback keeps the three side effects consistent: if the
  * announcement or the DB write fails after the role exists, the orphan
  * role (and message) are removed so no never-expiring role is leaked.
+ *
+ * Security invariant: the command is open to every member *because* the
+ * role it creates is powerless — `permissions: []`, `mentionable: true`.
+ * That coupling is load-bearing, and the guild role ceiling is the only
+ * abuse bound enforced. Granting the created role any permission makes
+ * unrestricted creation a privilege-escalation path, so such a change
+ * must revisit the open-access decision first.
  */
 export const createTempRole = async (
   deps: TempRoleDeps,

@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { LinkPreviewError } from '../../../../src/core/errors';
 import {
   translateLinkPreviewError,
   invalidResponseError,
@@ -43,7 +44,7 @@ describe('translateLinkPreviewError', () => {
   it('builds a LinkPreviewError with provider + status params and preserves cause', () => {
     const cause = Object.assign(new Error('boom'), { response: { status: 500 } });
     const e = translateLinkPreviewError('bahamut', cause);
-    expect(e.kind).toBe('LinkPreviewError');
+    expect(e).toBeInstanceOf(LinkPreviewError);
     expect(e.code).toBe('LINK_PREVIEW_UPSTREAM_5XX');
     expect(e.messageKey).toBe('errors:link_preview.upstream_failure');
     expect(e.messageParams).toEqual({ provider: 'bahamut', status: '500' });

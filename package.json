@@ -27,13 +27,13 @@
     "konata": "ts-node src/bot/konata/index.ts",
     "gopher": "ts-node src/bot/gopher/index.ts",
     "typecheck": "tsc -p tsconfig.strict.json",
-    "lint": "eslint src scripts test eslint.config.mjs vitest.config.ts",
-    "lint:fix": "eslint src scripts test --fix",
-    "format": "prettier --write src/core src/persistence src/infra scripts test tools eslint.config.mjs vitest.config.ts vitest.workspace.ts tsconfig.strict.json tsconfig.build.json knip.json *.md docs",
-    "format:check": "prettier --check src/core src/persistence src/infra scripts test tools eslint.config.mjs vitest.config.ts vitest.workspace.ts tsconfig.strict.json tsconfig.build.json knip.json *.md docs",
+    "lint": "eslint src scripts test tools eslint.config.mjs vitest.config.ts vitest.workspace.ts",
+    "lint:fix": "eslint src scripts test tools --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
-    "test:int": "vitest run --project integration",
+    "test:int": "vitest run --project integration --project integration-nodb",
     "test:contract": "vitest run --project contract",
     "test:i18n": "vitest run --project i18n",
     "test:tools": "vitest run --project tools",
@@ -74,12 +74,12 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "i18next": "^23.15.1",
+    "libsodium-wrappers": "^0.7.15",
     "mee6-levels-api": "^1.3.1",
     "mongoose": "^8.22.1",
     "node-schedule": "^2.1.1",
     "openai": "^6.36.0",
     "pino": "^10.3.1",
-    "sodium": "^3.0.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.6.2",
@@ -104,8 +104,6 @@
     "vitest": "^3.2.6"
   },
   "resolutions": {
-    "form-data": "^4.0.6",
-    "undici": "^6.27.0",
-    "ws": "^8.21.0"
+    "undici": "^6.27.0"
   }
 }

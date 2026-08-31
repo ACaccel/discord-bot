@@ -1,1 +1,2 @@
-export { AutoReplyPlugin, rollDice, lookupReply } from './plugin';
+export { createAutoReplyPlugin, rollDice } from './plugin';
+export type {} from './config';

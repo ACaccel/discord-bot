@@ -13,13 +13,24 @@ const doc: UserApiDoc = {
   web_search: true,
 };
 
-// Stub translator that returns a short, non-empty label so each
-// underlying builder passes its min/max length validators. The actual
-// i18n key wiring is exercised in formatLeaderboard / inspect_member_ids
-// unit tests; here we only care about the modal's structural shape.
+// Stub translator echoing the key's last segment: short and non-empty
+// so each underlying builder passes its min/max length validators, and
+// traceable back to the key that produced it.
 const stubTranslator = {
   t: (key: string): string => key.split('.').pop() ?? key,
 } as unknown as BaseBot['translator'];
+
+/**
+ * Every label rendered on the modal, in declaration order. discord.js
+ * v14 keeps the label-component list on the builder root and each
+ * component's own state under `data`.
+ */
+const labelsOf = (modal: ModalBuilder): string[] => {
+  const root = modal as unknown as { components?: { data?: { label?: string } }[] };
+  const nested = modal as unknown as { data?: { components?: { data?: { label?: string } }[] } };
+  const components = root.components ?? nested.data?.components ?? [];
+  return components.map((c) => c.data?.label ?? '');
+};
 
 describe('buildSettingsModal', () => {
   it('returns a ModalBuilder instance', () => {
@@ -43,5 +54,17 @@ describe('buildSettingsModal', () => {
     const components = fromData ?? fromRoot;
     expect(components).toBeDefined();
     expect(components).toHaveLength(4);
+  });
+
+  it('resolves every label through the translator', () => {
+    // The four labels and the temperature placeholder were hardcoded
+    // English, which the CJK scanner cannot see because they are Latin.
+    const modal = buildSettingsModal('openai', doc, ['gpt-4'], stubTranslator);
+    expect(labelsOf(modal)).toEqual([
+      'label_model',
+      'label_temperature',
+      'label_web_search',
+      'label_system_prompt',
+    ]);
   });
 });

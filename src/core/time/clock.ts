@@ -34,7 +34,7 @@ export const systemClock: Clock = Object.freeze({
  * starts at `initial` ms and advances only via {@link FakeClock.advance};
  * `now()` calls are pure reads.
  */
-export interface FakeClock extends Clock {
+interface FakeClock extends Clock {
   /** Move the clock forward by `ms` milliseconds. */
   advance(ms: number): void;
   /** Hard-set the clock to `ms` milliseconds since epoch. */

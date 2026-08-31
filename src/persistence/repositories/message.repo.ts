@@ -6,7 +6,7 @@
  * stays domain-shaped: a future swap to a different storage layer would
  * not change call sites.
  *
- * Inputs use branded ID types from `@core/ids` so a `UserId` cannot be
+ * Inputs use branded ID types from `@core/ids` so a `GuildId` cannot be
  * passed where a `ChannelId` is expected. Returned `MessageDoc` carries
  * the raw stored shape; the embedded id fields are not rebranded.
  *
@@ -29,7 +29,7 @@ import { err, ok, type Result } from '../../core/result';
 import type { DatabaseError } from '../../core/errors/external-service-error';
 import type { GuildConnection } from '../../infra/mongo/connection-manager';
 import { databaseErrorFrom } from '../error-translator';
-import type { MessageDoc } from '../schemas/message.schema';
+import type { MessageDoc, NewMessageDoc } from '../schemas/message.schema';
 
 export interface InsertResult {
   /** How many of the requested docs were actually written. */
@@ -67,7 +67,7 @@ export interface MessageRepo {
    * other Mongo error resolves to `err`.
    */
   insertManyIgnoringDuplicates(
-    docs: readonly MessageDoc[],
+    docs: readonly NewMessageDoc[],
   ): Promise<Result<InsertResult, DatabaseError>>;
 
   /**
@@ -165,7 +165,7 @@ export class MongoMessageRepo implements MessageRepo {
   }
 
   public async insertManyIgnoringDuplicates(
-    docs: readonly MessageDoc[],
+    docs: readonly NewMessageDoc[],
   ): Promise<Result<InsertResult, DatabaseError>> {
     if (docs.length === 0) {
       return ok({ inserted: 0, duplicates: 0 });

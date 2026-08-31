@@ -32,7 +32,7 @@ const PLUGIN_ID = 'llm-auto-reply';
 const PLUGIN_VERSION = '1.0.0';
 
 /** Collaborators wired by the composition root. */
-export interface CreateLlmAutoReplyDeps {
+interface CreateLlmAutoReplyDeps {
   /**
    * The bot's Discord application/client id. Used to detect an @-mention,
    * which fires a reply deterministically (mirrors konata's llm-chat).
@@ -87,8 +87,6 @@ export const createLlmAutoReplyPlugin = (
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    critical: false,
 
     events: {
       messageCreate: async (ctx, message): Promise<void> => {
@@ -135,5 +133,3 @@ export const createLlmAutoReplyPlugin = (
     },
   };
 };
-
-export type { LlmAutoReplyPluginConfig } from './config';

@@ -27,8 +27,6 @@ import type {
   RegisterInstance,
   TypedResolver,
 } from '../types';
-import { CriticalPluginFailureError } from './errors';
-import { cascadeDisable } from './topology';
 
 /**
  * Discrete lifecycle phases the runner walks through. `'idle'` is the
@@ -38,17 +36,14 @@ import { cascadeDisable } from './topology';
  * non-`'init'` phase. `'shutdown'` is set for the duration of
  * `runShutdown`.
  */
-export type LifecyclePhase = 'idle' | 'init' | 'start' | 'ready' | 'running' | 'shutdown';
+type LifecyclePhase = 'idle' | 'init' | 'start' | 'ready' | 'running' | 'shutdown';
 
 /**
- * A registered plugin together with its validated config. Mirrors the
- * host's internal entry; declared here so the runner does not depend on
- * a host-private type.
+ * A registered plugin. Mirrors the host's internal entry; declared here
+ * so the runner does not depend on a host-private type.
  */
 export interface RegisteredPlugin {
-  readonly plugin: Plugin<unknown>;
-  /** Validated config from `configSchema.parse(rawConfig)`. */
-  readonly config: unknown;
+  readonly plugin: Plugin;
 }
 
 /**
@@ -58,14 +53,14 @@ export interface RegisteredPlugin {
  * `lifecycle.ts` from becoming a "second half of host".
  */
 export interface LifecycleHost {
-  /** Registered plugins, keyed by id. Read-only for the runner. */
+  /**
+   * Registered plugins, keyed by id. Read-only for the runner. `Map`
+   * iteration order is registration order, which is the order every
+   * phase walks (reversed for shutdown).
+   */
   readonly registered: ReadonlyMap<PluginId, RegisteredPlugin>;
-  /** Topological order computed at finalize time. */
-  readonly order: readonly PluginId[];
   /** Disabled-plugin map — the runner both reads and writes this. */
   readonly disabled: Map<PluginId, DisabledPlugin>;
-  /** Forward dependency edges for cascade-disable. */
-  readonly dependents: ReadonlyMap<PluginId, ReadonlySet<PluginId>>;
   /** Typed-token resolver handed to plugin contexts. */
   readonly resolve: TypedResolver;
   /**
@@ -85,13 +80,9 @@ export interface LifecycleHost {
 /**
  * Runs plugin lifecycle phases against a {@link LifecycleHost}.
  *
- * Error isolation contract (unchanged from the previous inline
- * implementation):
- *  - Non-critical plugin failure -> plugin disabled, cascade-disable its
- *    dependents, continue the phase.
- *  - Critical plugin failure -> collected and the first is rethrown at
- *    the end of the phase.
- *  - `onShutdown` failures are always non-fatal.
+ * Error isolation contract: a plugin failure disables that plugin and
+ * the phase continues with the rest. No plugin failure aborts startup.
+ * `onShutdown` failures are likewise logged and swallowed.
  */
 export class PluginLifecycleRunner {
   /**
@@ -108,25 +99,25 @@ export class PluginLifecycleRunner {
 
   constructor(private readonly host: LifecycleHost) {}
 
-  /** Run `init` on every enabled plugin in topological order. */
+  /** Run `init` on every enabled plugin in registration order. */
   public async runInit(): Promise<void> {
     this.phase = 'init';
     try {
       await this.runPhase('init', async (entry, ctx) => {
         if (entry.plugin.init !== undefined) {
-          await entry.plugin.init(ctx as PluginInitContext<unknown>);
+          await entry.plugin.init(ctx as PluginInitContext);
         }
       });
     } finally {
-      // Switch off the init guard even when a critical plugin failure
-      // bubbles up — otherwise a late-resolving async tail from inside
-      // a failed init could still sneak a registerInstance through.
+      // Switch off the init guard on every path — otherwise a
+      // late-resolving async tail from inside a failed init could still
+      // sneak a registerInstance through.
       this.phase = 'running';
     }
   }
 
   /**
-   * Run `start` on every enabled plugin in topological order, then
+   * Run `start` on every enabled plugin in registration order, then
    * attach every enabled plugin's event subscriptions to the host's
    * event dispatcher.
    */
@@ -144,7 +135,7 @@ export class PluginLifecycleRunner {
     this.attachEventSubscriptions();
   }
 
-  /** Run `onReady` on every enabled plugin in topological order. */
+  /** Run `onReady` on every enabled plugin in registration order. */
   public async runReady(): Promise<void> {
     this.phase = 'ready';
     try {
@@ -159,15 +150,22 @@ export class PluginLifecycleRunner {
   }
 
   /**
-   * Run `onShutdown` in reverse topological order. Failures are always
-   * non-fatal — the bot is shutting down regardless. Event
-   * subscriptions are detached for every enabled plugin.
+   * Run `onShutdown` in reverse registration order. Failures are always
+   * non-fatal — the bot is shutting down regardless.
+   *
+   * Disabled status does not gate either step. Disabling happens when a
+   * hook throws, which is precisely when a plugin is most likely to be
+   * holding a half-released resource: one disabled during `onReady` has
+   * already opened whatever `start` opened (an HTTP listener, a poll
+   * timer) and already has live event subscriptions. Skipping it leaked
+   * both. Teardown is best-effort by contract — every `onShutdown`
+   * failure is caught and logged — so running it on a plugin that never
+   * got far enough to need it costs a warning at worst.
    */
   public async runShutdown(): Promise<void> {
     this.phase = 'shutdown';
-    const reverse = [...this.host.order].reverse();
+    const reverse = [...this.host.registered.keys()].reverse();
     for (const id of reverse) {
-      if (this.host.disabled.has(id)) continue;
       const entry = this.host.registered.get(id);
       if (entry === undefined) continue;
       if (entry.plugin.onShutdown !== undefined) {
@@ -183,8 +181,6 @@ export class PluginLifecycleRunner {
           );
         }
       }
-      // Always detach subscriptions — even for plugins that only
-      // subscribed to events without registering an onShutdown hook.
       this.host.dispatcher.unsubscribeAll(id);
     }
   }
@@ -197,14 +193,11 @@ export class PluginLifecycleRunner {
     phase: 'init' | 'start' | 'onReady',
     invoke: (
       entry: RegisteredPlugin,
-      ctx: PluginInitContext<unknown> | PluginRuntimeContext,
+      ctx: PluginInitContext | PluginRuntimeContext,
     ) => Promise<void>,
   ): Promise<void> {
-    const criticalFailures: CriticalPluginFailureError[] = [];
-    for (const id of this.host.order) {
+    for (const [id, entry] of this.host.registered) {
       if (this.host.disabled.has(id)) continue;
-      const entry = this.host.registered.get(id);
-      if (entry === undefined) continue;
       try {
         const ctx =
           phase === 'init' ? this.buildInitContext(entry) : this.buildRuntimeContext(entry);
@@ -213,57 +206,16 @@ export class PluginLifecycleRunner {
         const error = err instanceof Error ? err : new Error(String(err));
         this.host.disabled.set(id, { id, phase, error });
         this.host.logger.error(
-          {
-            plugin: id,
-            phase,
-            critical: entry.plugin.critical === true,
-            err: error,
-          },
+          { plugin: id, phase, err: error },
           'plugin lifecycle hook threw; plugin disabled',
         );
-        if (entry.plugin.critical === true) {
-          criticalFailures.push(new CriticalPluginFailureError(id, phase, error));
-        }
-        // Cascade-disable every plugin that (transitively) depended on
-        // this one — their lifecycle hooks would observe a partly
-        // initialised world otherwise.
-        const cascaded = cascadeDisable(
-          id,
-          phase,
-          error,
-          this.host.dependents,
-          this.host.registered,
-          {
-            isDisabled: (victim) => this.host.disabled.has(victim),
-            disable: (victim, descriptor) => this.host.disabled.set(victim, descriptor),
-            onVictim: (victim, rootCause) => {
-              this.host.logger.warn(
-                {
-                  plugin: victim,
-                  phase,
-                  dependency: id,
-                  cause: { message: rootCause.message },
-                },
-                'plugin disabled because its dependency failed; lifecycle hook will not run',
-              );
-            },
-          },
-        );
-        criticalFailures.push(...cascaded);
       }
-    }
-    if (criticalFailures.length > 0) {
-      // Surface the first critical failure (preserving cause). The
-      // remaining critical failures stay visible in disabledPlugins.
-      throw criticalFailures[0];
     }
   }
 
   private attachEventSubscriptions(): void {
-    for (const id of this.host.order) {
+    for (const [id, entry] of this.host.registered) {
       if (this.host.disabled.has(id)) continue;
-      const entry = this.host.registered.get(id);
-      if (entry === undefined) continue;
       const subs: PluginEventSubscriptions | undefined = entry.plugin.events;
       if (subs === undefined) continue;
       this.host.dispatcher.subscribe(id, this.buildRuntimeServices(entry), subs);
@@ -283,7 +235,7 @@ export class PluginLifecycleRunner {
     return this.buildRuntimeServices(entry);
   }
 
-  private buildInitContext(entry: RegisteredPlugin): PluginInitContext<unknown> {
+  private buildInitContext(entry: RegisteredPlugin): PluginInitContext {
     const pluginId = entry.plugin.id;
     // The closure captures `this` (and thereby the live `phase`) so
     // every call site reads the phase at *invocation* time. A plugin
@@ -298,9 +250,8 @@ export class PluginLifecycleRunner {
     };
     return Object.freeze({
       ...this.buildRuntimeServices(entry),
-      config: entry.config,
       registerInstance,
-    }) as PluginInitContext<unknown>;
+    });
   }
 
   /**
@@ -312,9 +263,8 @@ export class PluginLifecycleRunner {
    * Failure raises a {@link ConfigurationError} with code
    * `'LIFECYCLE_PHASE_VIOLATION'` and the i18n key
    * `errors:plugin.lifecycle_phase_violation`. The runner's existing
-   * try/catch turns this into the normal "plugin disabled" /
-   * "critical aborts the bot" flow; nothing about the error path is
-   * special-cased.
+   * try/catch turns this into the normal "plugin disabled" flow;
+   * nothing about the error path is special-cased.
    */
   private assertInitPhase<T>(pluginId: PluginId, token: ServiceToken<T>): void {
     if (this.phase === 'init') return;

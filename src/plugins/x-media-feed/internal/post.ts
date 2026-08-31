@@ -49,9 +49,6 @@ export const buildFeedMessage = (
   });
 
 /** Post one announcement. The caller has already checked sendability. */
-export const sendFeedPost = async (
-  channel: SendableChannels,
-  content: string,
-): Promise<void> => {
+export const sendFeedPost = async (channel: SendableChannels, content: string): Promise<void> => {
   await channel.send({ content, allowedMentions: NO_MENTIONS });
 };

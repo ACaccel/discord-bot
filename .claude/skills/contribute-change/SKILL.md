@@ -1,6 +1,6 @@
 ---
 name: contribute-change
-description: Standard workflow to add / delete / modify code or docs in this repo: understand the area, plan, implement, self-check against project-conventions and coding-standards, run quality gates, update the wiki and changelog, commit.
+description: Standard workflow to add / delete / modify code or docs in this repo: understand the area, plan, implement, self-check against project-conventions and coding-standards, run quality gates, sync the documentation surfaces, commit.
 ---
 
 # Contribute a Change (contribute-change)
@@ -15,13 +15,15 @@ Authoritative public sources:
 [`README.md`](../../../README.md),
 [`CONTRIBUTING.md`](../../../CONTRIBUTING.md),
 [`CLAUDE.md`](../../../CLAUDE.md),
-[`docs/architecture.md`](../../../docs/architecture.md),
-[`docs/wiki/components/`](../../../docs/wiki/components/).
+[`docs/architecture.md`](../../../docs/architecture.md).
 
 ## Step 1 — Understand the area
 
-- Read the relevant component page under `docs/wiki/components/`.
-- Read `docs/architecture.md` for the layer in which the change lands.
+- Read `docs/architecture.md` for the layer in which the change lands
+  and the abstraction it touches.
+- Read the source of the contract itself — the interface, the schema, or
+  the plugin factory. `docs/architecture.md` describes the shape; the
+  code is the authority.
 - Use `Read` / `Grep` / `Glob` to locate the files involved; map every
   inbound import to a layer; identify the contract you are changing.
 
@@ -33,9 +35,9 @@ Decide before writing:
   handlers / plugins / bot / scripts / docs / config).
 - The smallest set of files that must change.
 - The smallest set of tests that must be added or updated.
-- Whether the change is structural (interface, dependency, public
-  contract, file or directory rename) — if yes, the wiki must be
-  synced in step 7.
+- Which documentation surfaces the change touches (step 7). Decide this
+  up front — a doc update discovered after the gates are green usually
+  means the change was scoped wrong.
 
 ## Step 3 — Implement
 
@@ -88,14 +90,30 @@ yarn knip
 Do not bypass `--no-verify`, do not skip tests, do not loosen a
 threshold. Root-cause any failure.
 
-## Step 7 — Update wiki and changelog (if structural)
+## Step 7 — Sync the documentation surfaces
 
-If the change is structural (file added / deleted / renamed, public
-interface or contract changed, config / CI / quality rule changed,
-or any `docs/` file changed), follow
-[`update-wiki`](../update-wiki/SKILL.md) within the same unit of work
-— update the affected component pages, append a CHANGELOG entry,
-refresh the Home index.
+Documentation lands in the **same commit** as the code. There are five
+surfaces; update each one the change actually touches, and no others —
+each fact lives in exactly one place, everywhere else links to it.
+
+| Surface                              | Update it when                                                                |
+| ------------------------------------ | ----------------------------------------------------------------------------- |
+| `docs/architecture.md`               | A layer, abstraction, contract, lifecycle order, or design trade-off changed. |
+| `README.md`                          | A user-visible feature, an `.env` key, or a `config.json` field changed.      |
+| `CONTRIBUTING.md`                    | A recipe, convention, quality gate, or architectural rule changed.            |
+| `src/bot/<name>/config.example.json` | A config field was added, removed, renamed, or its default changed.           |
+| `CHANGELOG.md`                       | Any notable change — **one line** under `[Unreleased]`.                       |
+
+The changelog line format is
+`- <7-char commit hash> <type(scope)>: <one sentence>`, filed under
+Added / Changed / Fixed / Removed / Security. The hash only exists once
+the commit does, so the line is written against the commit that
+introduced the change — the next commit, or the release preparation,
+carries it. Mark a change that needs operator action as **breaking**
+and describe the action in README or CONTRIBUTING; the changelog stays
+one line.
+
+Missing documentation is a defect, exactly like a missing test.
 
 ## Step 8 — Commit (only when the user asks)
 

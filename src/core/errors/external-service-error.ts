@@ -1,12 +1,13 @@
 /**
  * Failure originating outside the bot process — Discord API, MongoDB
  * cluster, an LLM provider, etc. Use one of the typed subclasses
- * ({@link DiscordApiError}, {@link DatabaseError}, {@link LlmProviderError})
- * so consumers can match on the boundary they care about.
+ * ({@link DatabaseError}, {@link LlmProviderError}, {@link LinkPreviewError},
+ * {@link XFeedError}) so consumers can match on the boundary they care
+ * about.
  *
  * Direct instantiation of `ExternalServiceError` is allowed but
- * discouraged: prefer one of the subclasses below so logs carry the
- * `kind` discriminant readers expect.
+ * discouraged: prefer one of the subclasses below so `instanceof`
+ * narrowing at the call site can name the boundary.
  */
 import { DomainError, type DomainErrorInit } from './domain-error';
 
@@ -20,25 +21,7 @@ export class ExternalServiceError<
   Code extends string = ExternalServiceErrorCode,
   P extends Readonly<Record<string, string | number>> | undefined = undefined,
 > extends DomainError<Code, P> {
-  public override readonly kind: string = 'ExternalServiceError';
   public constructor(init: DomainErrorInit<Code, P>) {
-    super(init);
-  }
-}
-
-/** Discord API surfaced an error response or a connection failure. */
-export type DiscordApiErrorCode =
-  | 'DISCORD_API_FAILURE'
-  | 'DISCORD_RATE_LIMITED'
-  | 'DISCORD_TIMEOUT'
-  | 'DISCORD_PERMISSION_MISSING'
-  | 'DISCORD_INTERACTION_EXPIRED';
-
-export class DiscordApiError<
-  P extends Readonly<Record<string, string | number>> | undefined = undefined,
-> extends ExternalServiceError<DiscordApiErrorCode, P> {
-  public override readonly kind = 'DiscordApiError';
-  public constructor(init: DomainErrorInit<DiscordApiErrorCode, P>) {
     super(init);
   }
 }
@@ -63,7 +46,6 @@ export type DatabaseErrorCode =
 export class DatabaseError<
   P extends Readonly<Record<string, string | number>> | undefined = undefined,
 > extends ExternalServiceError<DatabaseErrorCode, P> {
-  public override readonly kind = 'DatabaseError';
   public constructor(init: DomainErrorInit<DatabaseErrorCode, P>) {
     super(init);
   }
@@ -81,7 +63,6 @@ export type LlmProviderErrorCode =
 export class LlmProviderError<
   P extends Readonly<Record<string, string | number>> | undefined = undefined,
 > extends ExternalServiceError<LlmProviderErrorCode, P> {
-  public override readonly kind = 'LlmProviderError';
   public constructor(init: DomainErrorInit<LlmProviderErrorCode, P>) {
     super(init);
   }
@@ -110,7 +91,6 @@ export type LinkPreviewErrorCode =
 export class LinkPreviewError<
   P extends Readonly<Record<string, string | number>> | undefined = undefined,
 > extends ExternalServiceError<LinkPreviewErrorCode, P> {
-  public override readonly kind = 'LinkPreviewError';
   public constructor(init: DomainErrorInit<LinkPreviewErrorCode, P>) {
     super(init);
   }
@@ -140,7 +120,6 @@ export type XFeedErrorCode =
 export class XFeedError<
   P extends Readonly<Record<string, string | number>> | undefined = undefined,
 > extends ExternalServiceError<XFeedErrorCode, P> {
-  public override readonly kind = 'XFeedError';
   public constructor(init: DomainErrorInit<XFeedErrorCode, P>) {
     super(init);
   }

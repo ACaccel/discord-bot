@@ -42,12 +42,12 @@ const ResponseSchema = z
  * mirror the SDK providers' shape so the shared `errors:llm.*` catalog
  * templates render even though an auto-reply failure is only logged.
  */
-export type SelfHostedLlmError = ExternalServiceError<
+type SelfHostedLlmError = ExternalServiceError<
   ExternalServiceErrorCode,
   { provider: string; status: string }
 >;
 
-export interface SelfHostedLlmClientOptions {
+interface SelfHostedLlmClientOptions {
   /**
    * Fully-qualified chat endpoint URL (e.g. `https://host/chat`), or a
    * provider read on every {@link SelfHostedLlmClient.reply} call. The

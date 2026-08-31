@@ -13,7 +13,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { GuildDbConnector } from '../../../src/bot/guild-db-connector';
 import type { GuildInfo } from '../../../src/bot/index';
-import { createContainer, TOKENS, type ReposFactory } from '../../../src/core/ioc';
+import { createContainer } from '../../../src/core/ioc';
+import { TOKENS, type ReposFactory } from '../../../src/bot/tokens';
 import { createLogger } from '../../../src/core/logger';
 import { DatabaseError } from '../../../src/core/errors/external-service-error';
 import type { ConnectionManager } from '../../../src/infra/mongo/connection-manager';

@@ -1,5 +1,1 @@
-export {
-  createSocialLinkPreviewPlugin,
-  type CreateSocialLinkPreviewDeps,
-  type SocialLinkPreviewPluginConfig,
-} from './plugin';
+export { createSocialLinkPreviewPlugin } from './plugin';

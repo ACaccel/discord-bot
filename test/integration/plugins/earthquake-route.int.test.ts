@@ -11,8 +11,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Channel, Client } from 'discord.js';
 import { createEarthquakePlugin } from '../../../src/plugins/earthquake';
 import { createContainer } from '../../../src/core/ioc';
-import { TOKENS } from '../../../src/core/ioc/tokens';
-import type { GuildRegistry } from '../../../src/core/guild-registry';
+import { TOKENS } from '../../../src/bot/tokens';
+import type { GuildRegistry } from '../../../src/bot/guild-registry';
 import type { Translator } from '../../../src/core/i18n';
 import { createLogger } from '../../../src/core/logger';
 import { systemClock } from '../../../src/core/time';
@@ -77,9 +77,12 @@ describe('earthquake plugin HTTP route', () => {
     });
     expect(res.status).toBe(200);
 
-    // The broadcast is detached; let the event loop flush it.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(send).toHaveBeenCalled();
+    // The broadcast is detached from the request; poll for it instead of
+    // sleeping a guessed interval, which either flakes on a slow runner
+    // or wastes the difference on a fast one.
+    await vi.waitFor(() => {
+      expect(send).toHaveBeenCalled();
+    });
   });
 
   it('serves the health check on GET /discord/', async () => {

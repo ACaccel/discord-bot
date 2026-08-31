@@ -15,7 +15,7 @@ import {
   invalidResponseError,
   translateXFeedError,
 } from '../../../../src/infra/x-feed/error-translator';
-import type { XFeedErrorCode } from '../../../../src/core/errors';
+import { XFeedError, type XFeedErrorCode } from '../../../../src/core/errors';
 
 const { normalise, codeFor, statusLabel } = __test;
 
@@ -120,7 +120,7 @@ describe('translateXFeedError', () => {
     expect(error.context.operation).toBe('FxTwitterTimelineSource.fetchTimeline');
     expect(error.context.input).toEqual({ handle: HANDLE, status: '503' });
     expect(error.cause).toBe(cause);
-    expect(error.kind).toBe('XFeedError');
+    expect(error).toBeInstanceOf(XFeedError);
   });
 });
 

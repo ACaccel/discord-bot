@@ -1,9 +1,9 @@
 /**
  * Unit coverage for `localizeCommandConfig`.
  *
- * Handlers no longer carry inline CJK command / option / choice
- * metadata; the descriptions are resolved from the `commands` i18n
- * namespace by key derived from the command + option names.
+ * Handlers carry no inline CJK command / option / choice metadata: the
+ * descriptions are resolved from the `commands` i18n namespace by a key
+ * derived from the command + option names.
  */
 import { describe, expect, it } from 'vitest';
 

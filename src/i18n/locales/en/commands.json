@@ -187,14 +187,6 @@
   "help": {
     "description": "Show the command list and help"
   },
-  "inspect_member_ids": {
-    "description": "Check whether multiple IDs are in this guild and list available info",
-    "options": {
-      "ids": {
-        "description": "Paste multiple IDs (separated by comma/space/newline)"
-      }
-    }
-  },
   "level_detail": {
     "description": "View detailed level information",
     "options": {

@@ -62,7 +62,7 @@ export interface OpenGraphMeta {
   readonly siteName?: string;
 }
 
-export interface OgClientOptions {
+interface OgClientOptions {
   /**
    * Cap on the bytes read from an HTML body while scanning for `</head>`,
    * in bytes. The body is streamed and reading stops at the head close or

@@ -11,6 +11,7 @@ import { createBootstrapLogger } from '../../../src/core/config';
 import type { Logger } from '../../../src/core/logger';
 
 export const bootstrapToolLogger = (component: string): Logger => {
+  // eslint-disable-next-line no-restricted-syntax -- writing LOG_DIR is how the bootstrap factory is told to skip the file sink; it is not a config read.
   process.env['LOG_DIR'] = '';
   return createBootstrapLogger({ component }, { fileRouter: false });
 };

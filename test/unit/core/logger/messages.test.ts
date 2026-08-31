@@ -7,7 +7,10 @@ describe('ops messages catalog', () => {
     expect(ops.command.registerStart()).toMatch(/^ops:command\.register_start/);
     expect(ops.command.registerEmpty()).toMatch(/^ops:command\.register_empty/);
     expect(ops.command.registerSuccess(7)).toMatch(/registered 7/);
-    expect(ops.command.registerFailed('boom')).toMatch(/Failed to register commands: boom/);
+    expect(ops.command.registerFailed('weather_forecast')).toMatch(
+      /Failed to register command weather_forecast/,
+    );
+    expect(ops.command.guildSyncFailed('g1')).toMatch(/Failed to sync commands for guild g1/);
     expect(ops.command.handlerMissingConfig('foo')).toMatch(/Command foo has no config/);
   });
 

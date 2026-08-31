@@ -85,6 +85,15 @@ const DEFAULT_RETRY_POLICY: RetryPolicy = Object.freeze({
   maxDelayMs: 2_000,
 });
 
+/**
+ * Upper bound on how long {@link ConnectionManager.closeAll} waits for
+ * an in-flight open to settle. An open caught mid-retry against a dead
+ * cluster can hold for tens of seconds — which is exactly when a
+ * SIGTERM arrives — and the process-level shutdown budget is 5s. Better
+ * to abandon the drain than to have the whole graceful path force-exit.
+ */
+const CLOSE_DRAIN_TIMEOUT_MS = 1_500;
+
 /** Injectable sleep so tests advance backoff without real wall time. */
 type SleepFn = (ms: number) => Promise<void>;
 
@@ -160,6 +169,56 @@ const initModelsBestEffort = async (models: Models, guildId: GuildId): Promise<v
 };
 
 /**
+ * Await `promises`, giving up after `timeoutMs`. Rejections are
+ * expected here (a discarded open rejects by design), so they are
+ * absorbed rather than propagated.
+ */
+const drainWithTimeout = async (
+  promises: readonly Promise<unknown>[],
+  timeoutMs: number,
+): Promise<void> => {
+  if (promises.length === 0) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, timeoutMs);
+    timer.unref?.();
+  });
+  try {
+    await Promise.race([Promise.allSettled(promises).then(() => undefined), deadline]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+};
+
+/**
+ * Raised when an open finishes after a {@link ConnectionManager.closeAll}
+ * that started while it was in flight.
+ *
+ * `closeAll` closes exactly the connections it can see; one still being
+ * opened is invisible to it. Caching the late arrival would leave a
+ * socket open that no later teardown knows about, so the open is
+ * discarded instead (the caller's `catch` closes the raw connection).
+ *
+ * A dedicated class because this is a *shutdown race*, not a connection
+ * failure: `retryOpen` rethrows it untouched, so the guild is not
+ * marked disabled and no `[mongo] guild … disabled` line is written for
+ * what is an ordinary Ctrl+C.
+ */
+class ShutdownRaceError extends Error {
+  public constructor(guildId: GuildId) {
+    super(
+      `connection for guild ${guildId} was discarded: the manager was closed while it was opening`,
+    );
+    this.name = 'ShutdownRaceError';
+  }
+}
+
+const assertSameGeneration = (opened: number, current: number, guildId: GuildId): void => {
+  if (opened === current) return;
+  throw new ShutdownRaceError(guildId);
+};
+
+/**
  * Shared transient-retry / persistent-disable loop for both
  * {@link ConnectionManager} implementations.
  *
@@ -191,6 +250,10 @@ const retryOpen = async (params: {
     try {
       return await open(guildId);
     } catch (raw: unknown) {
+      // A teardown race is not a cluster failure: retrying or disabling
+      // the guild would both be wrong, and the caller is already going
+      // away.
+      if (raw instanceof ShutdownRaceError) throw raw;
       const dbError =
         raw instanceof DatabaseError
           ? raw
@@ -242,7 +305,12 @@ export interface ConnectionManager {
    * classified failure when the guild has been disabled.
    */
   isDisabled(guildId: GuildId): DisabledGuildState | undefined;
-  /** Close every open guild connection. Safe to call multiple times. */
+  /**
+   * Close every open guild connection. Safe to call multiple times, and
+   * the manager is reusable afterwards — a `getConnection` issued once
+   * `closeAll` has resolved opens a fresh connection. While it is
+   * running, `getConnection` rejects.
+   */
   closeAll(): Promise<void>;
   /** Close a single guild connection if open; no-op otherwise. */
   close(guildId: GuildId): Promise<void>;
@@ -261,6 +329,21 @@ export class MongoConnectionManager implements ConnectionManager {
   private readonly disabled = new Map<GuildId, DisabledGuildState>();
   private readonly retryPolicy: RetryPolicy;
   private readonly sleep: SleepFn;
+  /**
+   * Bumped by every {@link closeAll}. An `open` that started before a
+   * teardown and finishes after it belongs to a previous generation:
+   * caching that connection would resurrect a socket the shutdown has
+   * already accounted for, and nothing would ever close it.
+   */
+  private generation = 0;
+  /**
+   * True for the duration of {@link closeAll}. `closeAll` yields twice
+   * (draining the in-flight opens, then closing the cached ones), and
+   * the generation counter only protects opens that *started* before
+   * it. Refusing new work for the window closes the "started during"
+   * hole; the flag clears afterwards so the manager stays reusable.
+   */
+  private closing = false;
 
   /**
    * @param baseUri    Base MongoDB URI; the guild id + `authSource` are
@@ -280,6 +363,8 @@ export class MongoConnectionManager implements ConnectionManager {
   }
 
   public async getConnection(guildId: GuildId): Promise<GuildConnection> {
+    if (this.closing) throw new ShutdownRaceError(guildId);
+
     const cached = this.cache.get(guildId);
     if (cached !== undefined) return cached;
 
@@ -294,8 +379,12 @@ export class MongoConnectionManager implements ConnectionManager {
     const inFlight = this.pending.get(guildId);
     if (inFlight !== undefined) return inFlight;
 
-    const promise = this.openWithRetry(guildId).finally(() => {
-      this.pending.delete(guildId);
+    // Deleted by identity, not by key: `closeAll` clears the map while
+    // this promise is still settling, and a key-based delete would
+    // evict a *successor* entry installed in the meantime, letting a
+    // third caller start a duplicate open for the same guild.
+    const promise: Promise<GuildConnection> = this.openWithRetry(guildId).finally(() => {
+      if (this.pending.get(guildId) === promise) this.pending.delete(guildId);
     });
     this.pending.set(guildId, promise);
     return promise;
@@ -316,10 +405,24 @@ export class MongoConnectionManager implements ConnectionManager {
   }
 
   public async closeAll(): Promise<void> {
-    this.disabled.clear();
-    const entries = [...this.cache.values()];
-    this.cache.clear();
-    await Promise.all(entries.map((e) => e.connection.close()));
+    this.generation += 1;
+    this.closing = true;
+    try {
+      // Drain in-flight opens first. Each one sees the bumped
+      // generation, closes its own socket, and rejects, so the teardown
+      // does not race a connection into the cache behind its back. The
+      // drain is bounded: an open retrying against a dead cluster must
+      // not consume the process-level shutdown budget.
+      const inFlight = [...this.pending.values()];
+      this.pending.clear();
+      await drainWithTimeout(inFlight, CLOSE_DRAIN_TIMEOUT_MS);
+      this.disabled.clear();
+      const entries = [...this.cache.values()];
+      this.cache.clear();
+      await Promise.all(entries.map((e) => e.connection.close()));
+    } finally {
+      this.closing = false;
+    }
   }
 
   /** Open with bounded-backoff retry for transient failures (see {@link retryOpen}). */
@@ -350,6 +453,7 @@ export class MongoConnectionManager implements ConnectionManager {
   }
 
   private async open(guildId: GuildId): Promise<GuildConnection> {
+    const generation = this.generation;
     const uri = buildGuildMongoUri(this.baseUri, guildId);
     const connection = await mongoose.createConnection(uri).asPromise();
     try {
@@ -359,6 +463,7 @@ export class MongoConnectionManager implements ConnectionManager {
       // serving. The bot's structured logger separately reports
       // "MongoDB for guild ... connected".
       await initModelsBestEffort(models, guildId);
+      assertSameGeneration(generation, this.generation, guildId);
       const entry: GuildConnection = { guildId, connection, models };
       this.cache.set(guildId, entry);
       return entry;
@@ -395,6 +500,9 @@ export class StaticConnectionManager implements ConnectionManager {
   private readonly retryPolicy: RetryPolicy;
   private readonly sleep: SleepFn;
   private readonly openOverride?: (guildId: GuildId) => Promise<GuildConnection>;
+  /** See {@link MongoConnectionManager}'s generation counter and closing flag. */
+  private generation = 0;
+  private closing = false;
 
   /**
    * @param underlying  Externally-managed mongoose connection.
@@ -415,6 +523,8 @@ export class StaticConnectionManager implements ConnectionManager {
   }
 
   public async getConnection(guildId: GuildId): Promise<GuildConnection> {
+    if (this.closing) throw new ShutdownRaceError(guildId);
+
     const cached = this.cache.get(guildId);
     if (cached !== undefined) return cached;
 
@@ -426,8 +536,8 @@ export class StaticConnectionManager implements ConnectionManager {
     const inFlight = this.pending.get(guildId);
     if (inFlight !== undefined) return inFlight;
 
-    const promise = this.openWithRetry(guildId).finally(() => {
-      this.pending.delete(guildId);
+    const promise: Promise<GuildConnection> = this.openWithRetry(guildId).finally(() => {
+      if (this.pending.get(guildId) === promise) this.pending.delete(guildId);
     });
     this.pending.set(guildId, promise);
     return promise;
@@ -443,8 +553,17 @@ export class StaticConnectionManager implements ConnectionManager {
   }
 
   public async closeAll(): Promise<void> {
-    this.disabled.clear();
-    this.cache.clear();
+    this.generation += 1;
+    this.closing = true;
+    try {
+      const inFlight = [...this.pending.values()];
+      this.pending.clear();
+      await drainWithTimeout(inFlight, CLOSE_DRAIN_TIMEOUT_MS);
+      this.disabled.clear();
+      this.cache.clear();
+    } finally {
+      this.closing = false;
+    }
   }
 
   /**
@@ -481,11 +600,15 @@ export class StaticConnectionManager implements ConnectionManager {
    * silently do not enforce.
    */
   private async open(guildId: GuildId): Promise<GuildConnection> {
+    const generation = this.generation;
     if (this.openOverride !== undefined) {
-      return this.openOverride(guildId);
+      const overridden = await this.openOverride(guildId);
+      assertSameGeneration(generation, this.generation, guildId);
+      return overridden;
     }
     const models = buildModels(this.underlying);
     await Promise.all(Object.values(models).map((m) => m.init()));
+    assertSameGeneration(generation, this.generation, guildId);
     const entry: GuildConnection = {
       guildId,
       connection: this.underlying,

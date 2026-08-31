@@ -1,72 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import {
   ConfigurationError,
-  ConflictError,
   DatabaseError,
-  DiscordApiError,
+  DomainError,
+  ExternalServiceError,
   LinkPreviewError,
   LlmProviderError,
-  NotFoundError,
-  PermissionError,
-  ValidationError,
-  type AnyDomainError,
+  XFeedError,
 } from '../../../../src/core/errors';
 
 describe('DomainError subclasses', () => {
-  it('each subclass sets the kind discriminant + name + code', () => {
-    const cases: Array<[AnyDomainError, string]> = [
-      [
-        new ValidationError({
-          code: 'FIELD_REQUIRED',
-          messageKey: 'errors.validation.field_required',
-          context: { operation: 'test' },
-        }),
-        'ValidationError',
-      ],
-      [
-        new NotFoundError({
-          code: 'RECORD_NOT_FOUND',
-          messageKey: 'errors.not_found.record',
-          context: { operation: 'test' },
-        }),
-        'NotFoundError',
-      ],
-      [
-        new ConflictError({
-          code: 'ALREADY_EXISTS',
-          messageKey: 'errors.conflict.already_exists',
-          context: { operation: 'test' },
-        }),
-        'ConflictError',
-      ],
-      [
-        new PermissionError({
-          code: 'PERMISSION_DENIED',
-          messageKey: 'errors.permission.denied',
-          context: { operation: 'test' },
-        }),
-        'PermissionError',
-      ],
+  it('each subclass sets name + code and narrows by instanceof', () => {
+    const cases: Array<[DomainError, string]> = [
       [
         new ConfigurationError({
           code: 'MISSING_ENV',
-          messageKey: 'errors.config.missing_env',
+          messageKey: 'errors:configuration.missing_env',
           context: { operation: 'test' },
         }),
         'ConfigurationError',
       ],
       [
-        new DiscordApiError({
-          code: 'DISCORD_API_FAILURE',
-          messageKey: 'errors.discord.api_failure',
-          context: { operation: 'test' },
-        }),
-        'DiscordApiError',
-      ],
-      [
         new DatabaseError({
           code: 'DATABASE_UNKNOWN',
-          messageKey: 'errors.db.unavailable',
+          messageKey: 'errors:db.unavailable',
           context: { operation: 'test' },
         }),
         'DatabaseError',
@@ -74,7 +31,7 @@ describe('DomainError subclasses', () => {
       [
         new LlmProviderError({
           code: 'LLM_UNKNOWN',
-          messageKey: 'errors.llm.unknown',
+          messageKey: 'errors:llm.unknown',
           context: { operation: 'test' },
         }),
         'LlmProviderError',
@@ -87,40 +44,66 @@ describe('DomainError subclasses', () => {
         }),
         'LinkPreviewError',
       ],
+      [
+        new XFeedError({
+          code: 'X_FEED_FETCH_FAILED',
+          messageKey: 'errors:x_feed.fetch_failed',
+          context: { operation: 'test' },
+        }),
+        'XFeedError',
+      ],
     ];
-    for (const [e, kind] of cases) {
-      expect(e.kind).toBe(kind);
-      expect(e.name).toBe(kind);
+    for (const [e, name] of cases) {
+      expect(e.name).toBe(name);
+      expect(e).toBeInstanceOf(DomainError);
       expect(e).toBeInstanceOf(Error);
     }
+  });
+
+  it('groups every boundary failure under ExternalServiceError', () => {
+    const dbError = new DatabaseError({
+      code: 'DATABASE_TIMEOUT',
+      messageKey: 'errors:db.timeout',
+      context: { operation: 'test' },
+    });
+    const configError = new ConfigurationError({
+      code: 'MISSING_ENV',
+      messageKey: 'errors:configuration.missing_env',
+      context: { operation: 'test' },
+    });
+    // `instanceof` is the dispatch contract: the boundary group narrows,
+    // and a non-boundary error stays outside it.
+    expect(dbError).toBeInstanceOf(ExternalServiceError);
+    expect(configError).not.toBeInstanceOf(ExternalServiceError);
   });
 
   it('preserves cause via ES2022 Error.cause', () => {
     const root = new Error('boom');
     const e = new DatabaseError({
       code: 'DATABASE_NETWORK',
-      messageKey: 'errors.db.network',
+      messageKey: 'errors:db.network',
       context: { operation: 'MongoMessageRepo.findRecentByChannel' },
       cause: root,
     });
     expect(e.cause).toBe(root);
   });
 
-  it('toJSON includes kind / code / messageKey / context / cause', () => {
-    const e = new ValidationError({
-      code: 'FIELD_OUT_OF_RANGE',
-      messageKey: 'errors.validation.range',
+  it('toJSON includes name / code / messageKey / context / cause', () => {
+    const cause = new Error('original');
+    const e = new DatabaseError({
+      code: 'DATABASE_VALIDATION',
+      messageKey: 'errors:db.validation',
       context: { operation: 'modal.ai_settings', input: { temperature: 5 } },
       messageParams: { field: 'temperature' },
-      cause: new Error('original'),
+      cause,
     });
-    const json = e.toJSON();
-    expect(json).toMatchObject({
-      kind: 'ValidationError',
-      code: 'FIELD_OUT_OF_RANGE',
-      messageKey: 'errors.validation.range',
+    expect(e.toJSON()).toMatchObject({
+      name: 'DatabaseError',
+      code: 'DATABASE_VALIDATION',
+      messageKey: 'errors:db.validation',
       messageParams: { field: 'temperature' },
       context: { operation: 'modal.ai_settings' },
+      cause,
     });
   });
 });

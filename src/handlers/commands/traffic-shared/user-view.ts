@@ -24,7 +24,7 @@ const EMBED_COLOR = 0x5865f2;
 const TIME_FILE = 'traffic-time.png';
 const CHANNELS_FILE = 'traffic-channels.png';
 
-export interface UserTrafficView {
+interface UserTrafficView {
   readonly embeds: EmbedBuilder[];
   readonly files: AttachmentBuilder[];
 }

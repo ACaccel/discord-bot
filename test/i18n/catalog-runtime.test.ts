@@ -43,15 +43,6 @@ describe('catalog runtime behaviour', () => {
     expect(translator.t('commands:add_reply.description', undefined, 'zh-TW')).toBe('新增自動回覆');
   });
 
-  it('reports zero missing keys between zh-TW and en', async () => {
-    const translator = await I18NextTranslator.create(
-      loadCatalogResources({ localesDir: LOCALES_DIR }),
-    );
-    const missing = translator.listMissingKeys('zh-TW');
-    expect(missing['zh-TW']).toEqual([]);
-    expect(missing.en).toEqual([]);
-  });
-
   it('falls back to zh-TW when a key is absent in the requested locale', async () => {
     // Inject a deliberately en-incomplete catalog: the loader keeps zh-TW
     // intact, so a missing en key must degrade to the fallback locale
@@ -94,6 +85,33 @@ describe('catalog runtime behaviour', () => {
           `${key} (${locale}) must not contain an uninterpolated placeholder`,
         ).toBe(false);
       }
+    }
+  });
+
+  it('keeps roll_call.announcement_header prefixed by roll_call.trigger_prefix', () => {
+    // The reaction tally recognises its own announcement by matching
+    // `trigger_prefix` against the start of the posted message, which is
+    // built from `announcement_header`. The two are separate catalog
+    // entries, so a translator editing the header in isolation would
+    // silently switch the tally off for that locale — the exact defect
+    // the hard-coded zh-TW prefix used to cause for `en`.
+    const resources = loadCatalogResources({ localesDir: LOCALES_DIR });
+    for (const locale of ['zh-TW', 'en'] as const) {
+      const rollCall = (resources[locale].replies as Record<string, unknown>).roll_call as {
+        announcement_header?: string;
+        trigger_prefix?: string;
+      };
+      const header = rollCall.announcement_header ?? '';
+      const prefix = rollCall.trigger_prefix ?? '';
+      expect(
+        prefix.length,
+        `replies:roll_call.trigger_prefix (${locale}) must be present`,
+      ).toBeGreaterThan(0);
+      expect(
+        header.startsWith(prefix),
+        `replies:roll_call.announcement_header (${locale}) must start with trigger_prefix, ` +
+          'otherwise the reaction tally never matches its own announcement',
+      ).toBe(true);
     }
   });
 

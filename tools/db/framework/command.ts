@@ -35,7 +35,7 @@ export interface DbRunContext {
 }
 
 /** The run context, extended with this command's validated options. */
-export interface DbCommandContext<TOptions> extends DbRunContext {
+interface DbCommandContext<TOptions> extends DbRunContext {
   readonly options: TOptions;
 }
 
@@ -53,7 +53,7 @@ export interface DbCommandResult {
  * slice; `optionsSchema` declares `Input = unknown` so any concrete zod
  * schema (which validates an `unknown` input) is assignable here.
  */
-export interface DbCommandSpec<TOptions> {
+interface DbCommandSpec<TOptions> {
   /** Subcommand token, e.g. `verify`. Must be unique in the registry. */
   readonly name: string;
   /** One-line help text, surfaced by `db` with no/unknown subcommand. */

@@ -9,17 +9,17 @@ vi.mock('@core/logger', async (importOriginal) => ({
   logGuildEvent: vi.fn(),
 }));
 
-// Mock archiveDeletedAttachment so the unconditional-archival test can assert
+// Mock archiveDeletedAttachments so the unconditional-archival test can assert
 // it fires even when the embed is rank-suppressed; importOriginal keeps
 // ancestorChannelIdsOf (the real ancestry walk) intact for the suppression tests.
 vi.mock('../../../src/infra/discord', async (importOriginal) => ({
   ...((await importOriginal()) as Record<string, unknown>),
-  archiveDeletedAttachment: vi.fn(async () => undefined),
+  archiveDeletedAttachments: vi.fn(async () => undefined),
 }));
 
 import { EmbedBuilder, type Guild, type Message, type TextChannel } from 'discord.js';
 import { logGuildEvent } from '@core/logger';
-import { archiveDeletedAttachment } from '../../../src/infra/discord';
+import { archiveDeletedAttachments } from '../../../src/infra/discord';
 import { createGuildEventsPlugin } from '../../../src/plugins/guild-events';
 import { __test as guildEventsTest } from '../../../src/plugins/guild-events/plugin';
 import {
@@ -27,22 +27,33 @@ import {
   type GuildOnboardingPort,
   type PermissionRankPolicy,
   type PluginEventContext,
+  type PluginInitContext,
 } from '../../../src/core/plugin';
-import type { GuildRegistry } from '../../../src/core/guild-registry';
+import type { GuildRegistry } from '../../../src/bot/guild-registry';
 import { createContainer } from '../../../src/core/ioc';
-import { TOKENS } from '../../../src/core/ioc/tokens';
+import { TOKENS } from '../../../src/bot/tokens';
 import { createLogger } from '../../../src/core/logger';
 import { systemClock } from '../../../src/core/time';
 
 describe('createGuildEventsPlugin', () => {
-  it('declares its bot-scoped event subscriptions (no config)', () => {
+  it('declares its event subscriptions (no config)', () => {
     const plugin = createGuildEventsPlugin();
     expect(plugin.id).toBe('guild-events');
-    expect(plugin.scope).toBe('bot');
+    expect(plugin.init).toBeTypeOf('function');
     expect(plugin.events?.messageUpdate).toBeTypeOf('function');
     expect(plugin.events?.messageDelete).toBeTypeOf('function');
     expect(plugin.events?.guildMemberUpdate).toBeTypeOf('function');
     expect(plugin.events?.guildCreate).toBeTypeOf('function');
+  });
+
+  it('refuses to run an event that somehow precedes init', async () => {
+    // The host never dispatches to a plugin whose init did not run, so
+    // this pins the invariant rather than a reachable code path.
+    const handler = createGuildEventsPlugin().events?.messageDelete;
+    if (handler === undefined) throw new Error('no messageDelete handler');
+    await expect(
+      handler({} as unknown as PluginEventContext, {} as Parameters<typeof handler>[1]),
+    ).rejects.toThrow(/dispatched before init/);
   });
 });
 
@@ -113,7 +124,7 @@ describe('handleGuildCreate', () => {
  * `messageDelete` handlers with a live IoC container holding a real
  * (static-config) policy and a fake event channel; the channel's `send` spy is
  * the disclosure probe (fires only when NOT suppressed) while the mocked
- * `logGuildEvent` / `archiveDeletedAttachment` are the local-record probes
+ * `logGuildEvent` / `archiveDeletedAttachments` are the local-record probes
  * (fire regardless of rank).
  */
 describe('guild-events disclosure gating by permission_rank', () => {
@@ -139,12 +150,34 @@ describe('guild-events disclosure gating by permission_rank', () => {
     container.registerSingleton(TOKENS.Logger, () => silent);
     container.registerSingleton(TOKENS.GuildRegistry, () => registry);
     container.registerSingleton(TOKENS.PermissionRankPolicy, () => policy);
+    container.registerSingleton(TOKENS.GuildOnboardingPort, () => ({
+      onboardGuild: async () => ({
+        guildId: 'g1',
+        databaseConnected: true,
+        commandsRegistered: true,
+      }),
+    }));
     return {
       logger: silent,
       translator: undefined,
       clock: systemClock,
       resolve: container.resolve.bind(container),
     } as unknown as PluginEventContext;
+  };
+
+  /**
+   * The host resolves a plugin's dependencies in `init` and only then
+   * attaches its event subscriptions, so a hand-driven dispatch has to
+   * run the same two steps in the same order.
+   */
+  const initedPlugin = async (
+    registry: GuildRegistry,
+    policy: PermissionRankPolicy,
+  ): Promise<{ plugin: ReturnType<typeof createGuildEventsPlugin>; ctx: PluginEventContext }> => {
+    const plugin = createGuildEventsPlugin();
+    const ctx = buildCtx(registry, policy);
+    await plugin.init?.(ctx as unknown as PluginInitContext);
+    return { plugin, ctx };
   };
 
   const author = {
@@ -174,16 +207,22 @@ describe('guild-events disclosure gating by permission_rank', () => {
       guildId: 'g1',
       channel: { id: channelId, parentId },
       partial: false,
-      attachments: { size: 0, map: () => [], forEach: () => undefined },
+      attachments: {
+        size: 0,
+        map: () => [],
+        forEach: () => undefined,
+        values: () => [][Symbol.iterator](),
+      },
     }) as unknown as Message;
 
   type AttachmentStub = { id: string; name: string; url: string; contentType: string | null };
 
-  // Minimal discord.js Collection surface the handlers touch: `size`, `map`, `forEach`.
+  // Minimal discord.js Collection surface the handlers touch.
   const attachmentCollection = (items: readonly AttachmentStub[]): unknown => ({
     size: items.length,
     map: (fn: (a: AttachmentStub) => unknown): unknown[] => items.map(fn),
     forEach: (fn: (a: AttachmentStub) => void): void => items.forEach(fn),
+    values: (): IterableIterator<AttachmentStub> => items[Symbol.iterator](),
   });
 
   // A delete/edit message carrying attachments — drives the archival and the
@@ -231,22 +270,21 @@ describe('guild-events disclosure gating by permission_rank', () => {
     parentId: string | null = null,
     lookup?: { get: (id: string) => ChannelStub | undefined },
   ): Promise<void> => {
-    const handler = createGuildEventsPlugin().events?.messageUpdate;
+    const { plugin, ctx } = await initedPlugin(registryWith(channel), policy);
+    const handler = plugin.events?.messageUpdate;
     if (handler === undefined) throw new Error('no messageUpdate handler');
     await handler(
-      buildCtx(registryWith(channel), policy),
+      ctx,
       message(channelId, 'old', parentId, lookup) as Parameters<typeof handler>[1],
       message(channelId, 'new', parentId, lookup) as Parameters<typeof handler>[2],
     );
   };
 
   const fireDelete = async (channelId: string, channel: TextChannel): Promise<void> => {
-    const handler = createGuildEventsPlugin().events?.messageDelete;
+    const { plugin, ctx } = await initedPlugin(registryWith(channel), policy);
+    const handler = plugin.events?.messageDelete;
     if (handler === undefined) throw new Error('no messageDelete handler');
-    await handler(
-      buildCtx(registryWith(channel), policy),
-      message(channelId, 'gone') as Parameters<typeof handler>[1],
-    );
+    await handler(ctx, message(channelId, 'gone') as Parameters<typeof handler>[1]);
   };
 
   beforeEach(() => {
@@ -300,7 +338,8 @@ describe('guild-events disclosure gating by permission_rank', () => {
 
   it('archives a deleted attachment in a suppressed channel — disclosure withheld, file still saved', async () => {
     const channel = fakeEventChannel();
-    const handler = createGuildEventsPlugin().events?.messageDelete;
+    const { plugin, ctx } = await initedPlugin(registryWith(channel), policy);
+    const handler = plugin.events?.messageDelete;
     if (handler === undefined) throw new Error('no messageDelete handler');
     const att: AttachmentStub = {
       id: 'a1',
@@ -309,17 +348,18 @@ describe('guild-events disclosure gating by permission_rank', () => {
       contentType: 'image/png',
     };
     await handler(
-      buildCtx(registryWith(channel), policy),
+      ctx,
       messageWithAttachments('private', 'gone', [att]) as Parameters<typeof handler>[1],
     );
     expect(channel.send).not.toHaveBeenCalled(); // not disclosed to Discord
-    expect(archiveDeletedAttachment).toHaveBeenCalledTimes(1); // binary archived
+    expect(archiveDeletedAttachments).toHaveBeenCalledTimes(1); // binary archived
     expect(logGuildEvent).toHaveBeenCalledTimes(1); // audit recorded
   });
 
   it('records attachment metadata in the local audit for a suppressed edit', async () => {
     const channel = fakeEventChannel();
-    const handler = createGuildEventsPlugin().events?.messageUpdate;
+    const { plugin, ctx } = await initedPlugin(registryWith(channel), policy);
+    const handler = plugin.events?.messageUpdate;
     if (handler === undefined) throw new Error('no messageUpdate handler');
     const att: AttachmentStub = {
       id: 'a1',
@@ -328,7 +368,7 @@ describe('guild-events disclosure gating by permission_rank', () => {
       contentType: 'application/octet-stream',
     };
     await handler(
-      buildCtx(registryWith(channel), policy),
+      ctx,
       messageWithAttachments('private', 'old', [att]) as Parameters<typeof handler>[1],
       messageWithAttachments('private', 'new', [att]) as Parameters<typeof handler>[2],
     );
@@ -340,13 +380,11 @@ describe('guild-events disclosure gating by permission_rank', () => {
 
   it('still records a partial delete whose fetch rejects (no throw escapes the handler)', async () => {
     const channel = fakeEventChannel();
-    const handler = createGuildEventsPlugin().events?.messageDelete;
+    const { plugin, ctx } = await initedPlugin(registryWith(channel), policy);
+    const handler = plugin.events?.messageDelete;
     if (handler === undefined) throw new Error('no messageDelete handler');
     await expect(
-      handler(
-        buildCtx(registryWith(channel), policy),
-        partialDeleteThatRejectsFetch('public') as Parameters<typeof handler>[1],
-      ),
+      handler(ctx, partialDeleteThatRejectsFetch('public') as Parameters<typeof handler>[1]),
     ).resolves.toBeUndefined();
     expect(logGuildEvent).toHaveBeenCalledTimes(1);
   });

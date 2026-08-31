@@ -111,10 +111,19 @@ export function calculateCost(model: string, usage: LLMUsage): number | null {
  *
  * `-#` is Discord's small-text prefix so the footer renders muted under the
  * main reply. Returns empty string when usage is null (no metadata).
+ *
+ * @param unknownCostLabel - already-localised text shown in place of the
+ *   price when the model is absent from the pricing table. Passed in
+ *   rather than resolved here: `infra/` has no translator, and the
+ *   caller owns the display locale.
  */
-export function formatUsageFooter(model: string, usage: LLMUsage | null): string {
+export function formatUsageFooter(
+  model: string,
+  usage: LLMUsage | null,
+  unknownCostLabel: string,
+): string {
   if (!usage) return '';
   const cost = calculateCost(model, usage);
-  const costStr = cost === null ? '~$? (未知 model 計價)' : `~$${cost.toFixed(6)}`;
+  const costStr = cost === null ? unknownCostLabel : `~$${cost.toFixed(6)}`;
   return `-# ${usage.inputTokens} in / ${usage.outputTokens} out · ${costStr}`;
 }

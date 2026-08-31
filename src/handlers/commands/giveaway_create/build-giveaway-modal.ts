@@ -1,9 +1,4 @@
-import {
-  LabelBuilder,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-} from 'discord.js';
+import { LabelBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import type { BaseBot } from '@bot';
 
 /**
@@ -12,10 +7,10 @@ import type { BaseBot } from '@bot';
  * — but pulls the component assembly out of the command handler so
  * `index.ts` stays well under the 150-line cap.
  *
- * The four text inputs replace the former slash-command options
- * (duration / prize / winner_num / description). `winner_num` is a
- * free-text field here because modals have no numeric input type; the
- * submit handler parses and validates it.
+ * The four text inputs carry the whole command payload (duration /
+ * prize / winner_num / description). `winner_num` is a free-text field
+ * because modals have no numeric input type; the submit handler parses
+ * and validates it.
  */
 export const buildGiveawayModal = (translator: BaseBot['translator']): ModalBuilder => {
   const t = (key: string, params?: Record<string, string | number>): string =>

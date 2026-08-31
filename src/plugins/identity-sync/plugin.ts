@@ -11,7 +11,7 @@
  * Factory pattern (mirrors the other bot-scoped plugins): config is parsed
  * once and the cross-run state + job handle are captured in the closure.
  */
-import { TOKENS } from '../../core/plugin';
+import { TOKENS } from '../../bot/tokens';
 import type { Plugin } from '../../core/plugin';
 import { JobManager } from '@core/scheduling';
 import { logError, logSystem } from '../../core/logger';
@@ -31,9 +31,6 @@ export const createIdentitySyncPlugin = (rawConfig: unknown): Plugin => {
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    // Not critical: a failed identity sync must not abort the bot.
-    critical: false,
 
     async onReady(ctx): Promise<void> {
       if (!config.enabled) {
@@ -42,7 +39,7 @@ export const createIdentitySyncPlugin = (rawConfig: unknown): Plugin => {
       }
       try {
         const client = ctx.resolve(TOKENS.DiscordClient);
-        jobManager = new JobManager(ctx.resolve(TOKENS.JobMap));
+        jobManager = new JobManager(ctx.resolve(TOKENS.JobMap), ctx.logger);
 
         // Apply once now so the identity is correct immediately at boot.
         await runIdentitySync({ client, config, logger: ctx.logger }, state);
@@ -73,5 +70,3 @@ export const createIdentitySyncPlugin = (rawConfig: unknown): Plugin => {
     },
   };
 };
-
-export type { IdentitySyncPluginConfig } from './config';

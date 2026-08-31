@@ -13,6 +13,9 @@
  * Scope rationale:
  *   - `src/handlers/**` (commands / buttons / modals / SSMs / reactions)
  *     and `src/plugins/**` reach Discord users directly.
+ *   - `src/infra/**` reaches users indirectly: an adapter that formats
+ *     a string for a Discord reply (the LLM usage footer) must take the
+ *     already-translated text from its caller rather than inline it.
  *   - `src/bot/**` (composition roots + bot subclasses) is scanned too:
  *     personalities route their help / presence text through translator
  *     keys (e.g. Nijika's `helpMessageKey`, Konata's
@@ -33,7 +36,12 @@ const ROOT = path.resolve(__dirname, '..', '..');
  * catalog sweep WILL fail in strict mode — coordinate with the
  * migration PR.
  */
-const SCOPED_DIRECTORIES: readonly string[] = ['src/handlers', 'src/plugins', 'src/bot'];
+const SCOPED_DIRECTORIES: readonly string[] = [
+  'src/handlers',
+  'src/plugins',
+  'src/bot',
+  'src/infra',
+];
 
 /**
  * Per-file allowlist. Use sparingly — every entry should carry a
@@ -51,7 +59,16 @@ const FILE_ALLOWLIST: ReadonlySet<string> = new Set<string>([]);
  */
 const SKIP_PATH_PATTERNS: readonly RegExp[] = [];
 
-const CJK_REGEX = /[぀-ゟ゠-ヿ一-鿿가-힯]/;
+// Ideographs, kana and hangul, plus the blocks a Taiwan-facing bot can
+// realistically reach for: Bopomofo (U+3100–312F), Hangul Jamo
+// (U+3130–318F), CJK Ext-A (U+3400–4DBF), compatibility ideographs
+// (U+F900–FAFF), and the two punctuation blocks that carry CJK-only
+// forms — U+3000–U+303F (、。「」) and U+FF00–U+FFEF (fullwidth ：！（）).
+// Fullwidth punctuation reads as CJK copy to a user even when the
+// surrounding words are Latin, so `Bug Report from X：${content}`
+// belongs in the catalog too.
+const CJK_REGEX =
+  /[぀-ゟ゠-ヿ一-鿿가-힯\u3000-\u303f\u3100-\u318f\u3400-\u4dbf\uf900-\ufaff\uff00-\uffef]/;
 // Require a non-empty reason after the colon so reviewers see WHY a
 // literal stayed inline. The reason-less form `// i18n-ignore` is
 // rejected on purpose — it defeats the audit trail this whitelist
@@ -81,8 +98,8 @@ const walk = (dir: string): readonly string[] => {
 /**
  * Skip lines that are pure comments. The scanner targets user-facing
  * string literals; CJK inside JSDoc / line comments is documentation
- * (e.g. an inline example of the legacy reply text) and is not part
- * of the translation contract. Tracking is line-based with a small
+ * (e.g. an inline example of a reply's text) and is not part of the
+ * translation contract. Tracking is line-based with a small
  * block-comment cursor so unbalanced `/* … *\/` does not leak.
  */
 const isCommentLine = (line: string, inBlockComment: boolean): boolean => {

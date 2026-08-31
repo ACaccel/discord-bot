@@ -25,9 +25,10 @@ import {
   createPermissionRankPolicy,
   type PermissionRankPolicy,
   type PluginEventContext,
+  type PluginInitContext,
 } from '../../../../src/core/plugin';
 import { createContainer } from '../../../../src/core/ioc';
-import { TOKENS } from '../../../../src/core/ioc/tokens';
+import { TOKENS } from '../../../../src/bot/tokens';
 import type { Logger } from '../../../../src/core/logger';
 import type { Translator } from '../../../../src/core/i18n';
 import type * as LinkPreviewModule from '../../../../src/infra/link-preview';
@@ -140,9 +141,13 @@ const deliver = async (
 ): Promise<void> => {
   const handler = plugin.events?.messageCreate;
   if (handler === undefined) return;
+  // The host resolves a plugin's dependencies in `init` and only then
+  // attaches its subscriptions, so a hand-driven dispatch runs both steps.
+  const context = ctx(policy);
+  await plugin.init?.(context as unknown as PluginInitContext);
   // The discord.js event arg is OmitPartialGroupDMChannel<Message>; our fake
   // is structurally a Message, so narrow it to the handler's exact param type.
-  await handler(ctx(policy), message as Parameters<typeof handler>[1]);
+  await handler(context, message as Parameters<typeof handler>[1]);
 };
 
 const fire = async (
@@ -153,15 +158,6 @@ const fire = async (
 ): Promise<void> => deliver(createSocialLinkPreviewPlugin(rawConfig, deps), message, policy);
 
 describe('createSocialLinkPreviewPlugin shape', () => {
-  it('declares id, version, bot scope, non-critical, and a messageCreate subscription', () => {
-    const plugin = createSocialLinkPreviewPlugin(enabledConfig());
-    expect(plugin.id).toBe('social-link-preview');
-    expect(plugin.version).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(plugin.scope).toBe('bot');
-    expect(plugin.critical === true).toBe(false);
-    expect(plugin.events?.messageCreate).toBeTypeOf('function');
-  });
-
   it('forwards all six configured proxy-host lists and the provider allow-list to the registry factory', () => {
     const spy = vi.mocked(createDefaultLinkPreviewRegistry);
     spy.mockClear();
@@ -170,6 +166,17 @@ describe('createSocialLinkPreviewPlugin shape', () => {
       ...PROXY_HOSTS,
       enabledProviders: ['twitter', 'bilibili'],
     });
+  });
+
+  it('refuses to run an event that somehow precedes init', async () => {
+    // The host never dispatches to a plugin whose init did not run. The
+    // guard raises rather than defaulting because the dependency it is
+    // missing is the channel-privacy gate.
+    const handler = createSocialLinkPreviewPlugin(enabledConfig()).events?.messageCreate;
+    if (handler === undefined) throw new Error('no messageCreate handler');
+    await expect(
+      handler(ctx(emptyPolicy), makeMessage() as Parameters<typeof handler>[1]),
+    ).rejects.toThrow(/dispatched before init/);
   });
 
   it('builds no registry when the feature is disabled and no host list is configured', () => {

@@ -28,7 +28,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ClientEventBridge, type ReactionHandlerPort } from '../../../src/bot/client-event-bridge';
 import type { GuildInfo } from '../../../src/bot/index';
-import { createContainer, TOKENS } from '../../../src/core/ioc';
+import { createContainer } from '../../../src/core/ioc';
+import { TOKENS } from '../../../src/bot/tokens';
 import { createLogger } from '../../../src/core/logger';
 import { systemClock } from '../../../src/core/time';
 import type {

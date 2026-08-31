@@ -29,6 +29,7 @@ import type { Server } from 'node:http';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import { z } from 'zod';
 
+import { closeServerBounded } from '../../core/http';
 import { logError, logSystem } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
 import { parseSettingsApiConfig } from './config';
@@ -40,7 +41,7 @@ const PLUGIN_VERSION = '1.0.0';
 const EndpointBodySchema = z.object({ endpoint: z.string().url() }).strict();
 
 /** Collaborators wired by the composition root. */
-export interface CreateSettingsApiDeps {
+interface CreateSettingsApiDeps {
   /** TCP port the API server listens on (sourced from the validated `Env.PORT`). */
   readonly port: number;
   /**
@@ -85,10 +86,6 @@ export const createSettingsApiPlugin = (
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    // Not critical: a failed/disabled settings API must not abort the bot —
-    // auto-reply and identity sync stay available.
-    critical: false,
 
     async start(ctx): Promise<void> {
       if (!config.enabled) {
@@ -151,6 +148,11 @@ export const createSettingsApiPlugin = (
             ctx.logger,
             `settings-api server listening on ${config.host}:${deps.port}${config.basePath}`,
           );
+          // Startup is settled. A socket error from here on is a runtime
+          // event, and `reject` would silently discard it against an
+          // already-settled promise — swap in a logging handler.
+          listening.removeListener('error', reject);
+          listening.on('error', (err: Error) => logError(ctx.logger, null, err));
           resolve();
         });
         listening.on('error', reject);
@@ -160,13 +162,15 @@ export const createSettingsApiPlugin = (
 
     async onShutdown(ctx): Promise<void> {
       if (server === undefined) return;
-      await new Promise<void>((resolve) => {
-        server?.close(() => resolve());
-      });
+      const listening = server;
       server = undefined;
+      await closeServerBounded(listening, () => {
+        logSystem(
+          ctx.logger,
+          'settings-api server did not close within the shutdown budget; continuing',
+        );
+      });
       logSystem(ctx.logger, 'settings-api server closed');
     },
   };
 };
-
-export type { SettingsApiPluginConfig } from './config';

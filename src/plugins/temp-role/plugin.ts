@@ -6,7 +6,7 @@
  * `./internal`. The `/temp_role` command handler bridges into the same
  * internals via its own `BaseBot` reference.
  */
-import { TOKENS } from '../../core/plugin';
+import { TOKENS } from '../../bot/tokens';
 import type { Plugin } from '../../core/plugin';
 import { type TempRoleDeps, rebootTempRoleJobs } from './internal/temp-role';
 
@@ -16,8 +16,6 @@ const PLUGIN_VERSION = '1.0.0';
 export const createTempRolePlugin = (): Plugin => ({
   id: PLUGIN_ID,
   version: PLUGIN_VERSION,
-  scope: 'bot',
-  critical: false,
 
   async onReady(ctx): Promise<void> {
     try {

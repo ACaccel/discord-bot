@@ -66,6 +66,36 @@ failure never aborts the rest of the fleet (`migrate-timestamp` /
 Read-only validation of one guild's `messages` collection against eight
 structural checks.
 
+### Why it exists
+
+`message.schema.ts` declares
+`messageId: { type: String, required: true, unique: true }`. Documents
+written before `required: true` was introduced persist with
+`messageId: null` or `''`, and a few collections carry duplicate
+`messageId`s left by earlier ingest bugs. In either case the
+unique-index build aborts:
+
+```
+MongoServerError: E11000 duplicate key error collection: ...
+  index: messageId_1 dup key: { messageId: null }
+```
+
+and the collection ends up **without** the `messageId_1` index at all —
+the schema invariant production code relies on is silently absent, with
+no runtime symptom until a downstream report breaks.
+
+`verify` is the standard way to measure how bad that is before running
+the `msg_backup` remediation tool, and to confirm afterwards that the
+cleanup worked. It also catches related integrity problems (empty
+`channelId` / `userId` / `userName`, non-numeric or non-positive
+`timestamp`) that would otherwise stay hidden.
+
+Read the report as a workflow: note the `messageId-null`,
+`messageId-empty-string`, and `messageId-duplicate` counts, run
+[`msg_backup`](../msg_backup/README.md) against the affected guild to
+re-ingest history, restart the bot so `Model.init()` builds the unique
+index without `E11000`, then re-run `verify` and expect `PASS`.
+
 | Check                    | Detects                                                            |
 | ------------------------ | ------------------------------------------------------------------ |
 | `messageId-null`         | `messageId === null`                                               |
@@ -91,6 +121,18 @@ The tool never writes, updates, or deletes any document.
 Migrates `Message.timestamp` to a uniform numeric type across every guild
 so the `MessageRepo` range queries can drop `$toLong` and become
 index-served.
+
+### Why it exists
+
+`message.schema.ts` declares `timestamp: { type: Number }`, but the
+pre-refactor schema stored it as a **String**, so legacy rows may hold
+String values while every current write is numeric. To span both,
+`findByTimestampRange` / `findByChannelAndTimestampRange` wrapped each
+comparison in `$expr: { $toLong: '$timestamp' }` — a computed predicate
+no btree index can serve, forcing a full collection scan on every
+`/traffic`, `/traffic_me`, and `db_list_message` read. Making the data
+uniformly numeric is what lets that predicate become a plain,
+index-served range.
 
 > **Hard gate.** The repo predicate change (drop `$toLong`, add the
 > indexes) MUST NOT ship to any guild whose data still has String-typed

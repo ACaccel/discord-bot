@@ -156,7 +156,7 @@ const toPost = (raw: RawStatus): XPost => ({
 });
 
 /** Construction-time settings for {@link FxTwitterTimelineSource}. */
-export interface FxTwitterTimelineSourceOptions {
+interface FxTwitterTimelineSourceOptions {
   /** API origin, without a trailing slash. Defaults to the public host. */
   readonly apiBaseUrl?: string;
   /** Per-request hard timeout, in milliseconds. */

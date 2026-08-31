@@ -98,18 +98,18 @@ All gates run in CI; please run them locally before opening a PR.
 | `yarn format:check`       | Prettier (use `yarn format` to fix)                                                                                                            |
 | `yarn handlers:gen:check` | Codegen registries match the on-disk handler layout                                                                                            |
 | `yarn test:unit`          | Unit tests (Vitest project `unit`)                                                                                                             |
-| `yarn test:int`           | Integration tests with `mongodb-memory-server`                                                                                                 |
+| `yarn test:int`           | Integration tests: the `integration` project (`mongodb-memory-server`) plus `integration-nodb` (real TCP ports, no database)                   |
 | `yarn test:contract`      | LLM provider contract tests via `nock`                                                                                                         |
 | `yarn test:i18n`          | Catalog parity + CJK-literal scanner                                                                                                           |
-| `yarn test`               | All four test projects                                                                                                                         |
-| `yarn security`           | `yarn npm audit` + `gitleaks detect`                                                                                                           |
-| `yarn knip`               | Unused files / dependencies / unlisted imports (errors); unused exports / types (warns)                                                        |
+| `yarn test`               | All six Vitest projects                                                                                                                        |
+| `yarn security`           | `audit-ci` against the documented allowlist (HIGH+). The `gitleaks` secret scan and CodeQL run on GitHub only                                  |
+| `yarn knip`               | Unused files, dependencies, unlisted imports, exports and types — all errors                                                                   |
 | `yarn smoke`              | Pre-deploy boundary probe: `.env` load + Mongo `admin.ping` + Discord login until `ready`. Manual; not in the CI matrix.                       |
 
 ## Architectural rules
 
 The full picture is in [`docs/architecture.md`](docs/architecture.md).
-Three rules are load-bearing — a CI gate or a reviewer will catch
+Four rules are load-bearing — a CI gate or a reviewer will catch
 violations:
 
 1. **No CJK literals in user-facing layers.** Every user-visible
@@ -119,11 +119,22 @@ violations:
    genuinely not user-facing (e.g. a trigger-match regex).
 2. **No `process.env.X` outside `src/core/config/env.ts`.** Env
    access goes through the zod-parsed `Env` object so missing
-   variables fail at boot, not at the first request.
+   variables fail at boot, not at the first request. The rule covers
+   `tools/` too; the two writes that switch the file-log sink off carry
+   an explanatory inline disable.
 3. **No new handler/plugin without a test.** New public functions in
    `core/` and `plugins/` need at least one happy-path and one
    error-path test; new repository methods need an integration test
    against `mongodb-memory-server`.
+4. **No code change without its documentation.** A change to
+   user-visible behaviour, a config field, a public contract, or a
+   command updates every documentation surface it touches — in the same
+   commit as the code. The surfaces are
+   [`docs/architecture.md`](docs/architecture.md),
+   [`README.md`](README.md), this file, the matching
+   `src/bot/<name>/config.example.json`, and one line in
+   [`CHANGELOG.md`](CHANGELOG.md). A missing doc update is a defect,
+   like a missing test.
 
 ## Adding a slash command
 
@@ -230,10 +241,19 @@ Discord.
    `src/bot/<name>/config.json` `commands` array.
 
 5. **Add a test.** The minimum is a unit test asserting one happy and
-   one failure path; if the command touches MongoDB, add an integration
-   test under `test/integration/` that uses the `withFreshConnection`
-   helper from `test/integration/helpers/mongo.ts` (it reuses the
-   shared `mongodb-memory-server` started in `test/integration/setup.ts`).
+   one failure path. Build the Discord objects with the shared builders
+   in [`test/fixtures/discord/`](test/fixtures/discord/README.md) —
+   `buildFakeBot`, `buildGuild`, `buildSendableChannel` and friends —
+   rather than hand-rolling another `as unknown as BaseBot` literal.
+
+   If the command touches MongoDB, add an integration test under
+   `test/integration/` that uses the `withFreshConnection` helper from
+   `test/integration/helpers/mongo.ts` (it reuses the shared
+   `mongodb-memory-server` started in `test/integration/setup.ts`).
+   A suite that binds a real port but needs no database belongs in the
+   `integration-nodb` project instead — add its path to
+   `NO_DB_INTEGRATION` in `vitest.workspace.ts` so a memory-server
+   failure cannot take it down.
 
 6. **Register with Discord.** `yarn deploy -t <bot-name>` after the bot
    has been started at least once. Default is global; `--dev-guild <id>`
@@ -252,7 +272,10 @@ deferrals.
 2. **Overflow goes to sibling files in the same directory.** Pure
    helpers (anything that does not touch Discord objects) move to
    kebab-cased files (e.g. `parse-range.ts`, `render-reactions.ts`)
-   with **named** exports. Do not use `export default`.
+   with **named** exports. Do not use `export default`. Every export
+   from `src/` names its return type — `explicit-module-boundary-types`
+   is an error, so an omitted annotation fails `yarn lint`. `any` is an
+   error everywhere in `src/`; reach for `unknown` and narrow.
 3. **Do NOT extract Discord I/O, permission checks, or `Translator`
    calls to compress the line count.** Those four belong in
    `index.ts`: interaction input extraction; guild / repos / permission
@@ -266,6 +289,105 @@ deferrals.
    `src/handlers/shared/` or a new common folder; they are
    implementation details of this handler. Promote only when a second
    handler legitimately needs the same logic.
+
+### Shared handler utilities
+
+These cross-handler modules already exist. Use them rather than
+re-deriving the behaviour:
+
+- **`src/infra/discord/options.ts`** — `getRequiredString` /
+  `getRequiredNumber` / `getOptionalString` / `getOptionalNumber` /
+  `getOptionalChoice`. Never write
+  `interaction.options.get('x')?.value as string`: that cast types a
+  missing option as a present `string`, so the failure surfaces far
+  from the read. Mirror the option's declared `required` flag — a
+  `getRequired*` on an absent option throws a `TypeError`, which the
+  handler's `replyForError` boundary turns into a trace-id-stamped
+  reply and an operator log line.
+- **`src/infra/http/`** — `boundedHttp` (an axios instance carrying a
+  request timeout, a response-size ceiling and a redirect cap) plus
+  `getJson` / `postJson`, which validate the body against a zod schema.
+  Bare `axios` has no default timeout, so an upstream that accepts the
+  connection and stalls leaves the deferred reply hanging for the life
+  of the process — and its `response.data` is `any`, so a changed
+  upstream shape surfaces as a `TypeError` somewhere far from the read.
+  Prefer the JSON helpers; keep the raw instance for non-JSON bodies.
+
+  Both of these live in `infra/`, not `handlers/`, because `handlers`
+  and `plugins` are **sibling** layers: neither may import the other,
+  and both may import `infra`. An ESLint rule enforces the
+  `plugins -> handlers` half.
+
+- **`src/core/regex-capture.ts`** — `requireCapture(match, group)`.
+  Never write `match[1] as string`: under `noUncheckedIndexedAccess` a
+  capture group is `string | undefined`, and the cast turns a pattern
+  that later gains a `?` into an `undefined` flowing silently
+  downstream. It lives in `core/` rather than `infra/` because it
+  touches nothing but the standard library.
+
+- **`Command.validateBotConfig(botConfig)`** — implement it when the
+  handler needs a per-bot `config.json` block, and throw when the block
+  is missing or malformed. `registerCommands` calls it once per enabled
+  command, logs the failure with its cause, and skips just that
+  command, so a misconfiguration shows up in the boot log instead of a
+  puzzling reply. `weather_forecast` and `random_restaurant` are the
+  worked examples; each keeps its zod schema in a sibling `config.ts`.
+
+### Privacy-aware data commands
+
+A command that surfaces aggregated guild data (message counts,
+rankings, traffic) must not reveal activity from channels the invoker
+cannot see. `/traffic`, `/traffic_me`, and `/traffic_user` realise the
+pattern; follow it for any new one. The two per-user commands share one
+body in `src/handlers/commands/traffic-shared/user-traffic-command.ts`,
+so a third per-user report is a spec (`command` + `resolveSubject`),
+not a fourth copy of the filter.
+
+1. **Dual filter.** A channel's data is included only when it clears
+   BOTH the operator-defined `permission_rank` ceiling AND the
+   Discord-native `ViewChannel` check for the invoking member. Either
+   one alone is insufficient: an unconfigured rank map must still never
+   leak a Discord-private channel. Resolve the policy through
+   `bot.permissionRankPolicy` (handlers never touch the container or
+   `TOKENS`) and fetch the invoking `GuildMember` via
+   `guild.members.fetch(...)` so `roles.cache` and permission
+   overwrites are populated.
+2. **The reply audience sets the ceiling.** A `public` reply is posted
+   into the room, so it caps at
+   `visibilityCeiling(guildId, roles, commandChannelId, ancestors)` =
+   `min(userRank, channelRank(commandChannel))` — never above the
+   command channel's own ancestry-aware rank. An `ephemeral` reply only
+   the invoker sees caps at `userRank` alone. Either way the invoker is
+   bounded by their own clearance.
+3. **Gate the invoker, not the subject.** When a command reports on a
+   named target, build the visible-channel set from the **invoker** and
+   count the target's activity only within it, so the target's own
+   clearance never widens the view. A target with no visible activity —
+   including a non-member — must yield the same neutral no-data reply.
+4. **Build the allowed set from the live cache and fail safe.** Walk
+   `guild.channels.cache`; a channel present only in archived data
+   (deleted or uncached) is never added. Each channel's effective rank
+   is the max over its full ancestry, so a ranked category gates every
+   channel and thread beneath it. Apply the filter _before_ aggregation
+   so an excluded channel contributes nothing.
+5. **Every derived statistic uses the filtered set — including
+   cross-window ones.** A "change vs previous period" trend must
+   re-count the preceding window through the _same_ allowed set, or the
+   comparison leaks an unseen channel's volume.
+6. **Keep the copy neutral.** Option labels and the empty-result
+   message must not hint that restricted channels exist (`visibility`
+   choices read "Only you" / "Everyone", not "your full clearance
+   view"), so a low-clearance user cannot infer higher-clearance
+   channels from the wording.
+7. **Split emoji by surface.** The chart font has no emoji glyphs, so
+   `stripEmoji` (`traffic-shared/chart-common`) removes them from every
+   canvas label and header, falling back to the original when stripping
+   would empty the label. Discord-native **embed** text keeps its
+   emoji, rendering a custom emoji as its `<:name:id>` (animated
+   `<a:…>`) token and a unicode one as the character itself.
+
+When an embed builder outgrows the 150-line cap, split it into a
+sibling file rather than thinning the privacy logic.
 
 ## Adding a plugin
 
@@ -291,7 +413,8 @@ listeners, etc.
    ```ts
    // src/plugins/<plugin-name>/plugin.ts
    import { z } from 'zod';
-   import { type Plugin, TOKENS } from '../../core/plugin';
+   import { type Plugin } from '../../core/plugin';
+   import { TOKENS } from '../../bot/tokens';
 
    const PLUGIN_ID = 'xxx';
    const PLUGIN_VERSION = '1.0.0';
@@ -314,8 +437,6 @@ listeners, etc.
      return {
        id: PLUGIN_ID,
        version: PLUGIN_VERSION,
-       scope: 'bot',
-       critical: false, // false = soft-disable on init/start failure
 
        events: {
          messageCreate: async (ctx, message): Promise<void> => {
@@ -342,12 +463,18 @@ listeners, etc.
    ```
 
    `init` / `start` / `onReady` / `onShutdown` are all optional. Add
-   them only when the plugin has actual setup work.
+   them only when the plugin has actual setup work. A hook that throws
+   marks the plugin disabled and the bot keeps running — a plugin
+   cannot abort startup.
 
-   Tip: if your plugin contributes slash commands or other handlers,
-   `Plugin.contributes.<type>` is a `Record<string, HandlerConstructor>`
-   keyed by the handler name. Most plugins do not use this — handlers
-   live under `src/handlers/` and are picked up by the codegen registry.
+   The plugin object carries no config field: the factory parses the
+   raw block up front (`parse<X>Config`) and the returned object closes
+   over the result, so a malformed block fails the boot rather than the
+   first event.
+
+   Slash commands and other handlers are **not** declared here. They
+   live under `src/handlers/` and are picked up by the codegen registry,
+   which is the single registration mechanism.
 
 3. **Export the factory.**
 
@@ -385,16 +512,18 @@ listeners, etc.
 
 ### Plugin ↔ IoC contract
 
-A plugin's only legal channel to the IoC container is the
-`@core/plugin` barrel:
+A plugin reads the token catalog from the composition root:
 
 ```ts
-import { TOKENS, type ServiceToken } from '../../core/plugin';
+import { TOKENS } from '../../bot/tokens';
 ```
 
-Any direct import of `@core/ioc` from `src/plugins/**` is rejected by
-ESLint at lint time. From `init`, `start`, `onReady`, `onShutdown`,
-and event handlers, plugins:
+The catalog lives at `src/bot/tokens.ts` rather than in `core` because
+it names concrete `infra` / `persistence` / `plugins` types, and `core`
+may depend on nothing outside itself. Any direct import of `@core/ioc`
+from `src/plugins/**` is rejected by ESLint at lint time, as is any
+import of a personality composition root (`src/bot/<name>/**`). From
+`init`, `start`, `onReady`, `onShutdown`, and event handlers, plugins:
 
 - **Read** dependencies with `ctx.resolve(token)`.
 - **Publish** instances with `ctx.registerInstance(token, instance)` —
@@ -403,9 +532,25 @@ and event handlers, plugins:
 There is no escape hatch to the `ServiceContainer`'s write face. Do
 not cast `ctx` to gain access; tests and review will catch it.
 
-New tokens go in [`src/core/ioc/tokens.ts`](src/core/ioc/tokens.ts);
-the `@core/plugin` barrel re-exports `TOKENS`, so a token registered
-in the central directory is automatically visible to plugins.
+New tokens go in [`src/bot/tokens.ts`](src/bot/tokens.ts), the single
+catalog every layer resolves against.
+
+## Adding or removing a persisted model
+
+`Models` is derived from `SchemaName`, so a model is not a single
+file — adding or removing one touches three places together, and
+missing any of them breaks the build or leaves a dangling registration:
+
+1. the schema registry in `src/persistence/schemas/`,
+2. the repository bundle (`buildRepos` / `Repos` in
+   `src/persistence/repositories/index.ts`),
+3. the connection manager's model registration in
+   `src/infra/mongo/`.
+
+Removing a model does **not** delete the data. A collection left behind
+in every guild's database is an operator action — ship a dry-run-first
+subcommand under `tools/db/` (see [`tools/db/README.md`](tools/db/README.md))
+rather than a startup migration inside the long-lived runtime.
 
 ## Pre-deploy smoke
 
@@ -437,6 +582,30 @@ The script does NOT register slash commands, start plugins, or open
 HTTP routes — keep it cheap so it can sit in front of every deploy.
 Exit status: `0` on full success, `1` on any failure (the failed step
 is printed to stderr).
+
+## Dependency overrides
+
+`package.json` carries a single `resolutions` entry:
+
+- **`undici: ^6.27.0`** — `discord.js` depends on `undici` at an exact
+  pin (`6.24.1`), which sits below the fix for the advisory `yarn
+security` reports. Because the pin is exact, nothing else in the tree
+  can lift it; the resolution is the only lever. Re-verify it on every
+  `discord.js` bump: if the new release pins a version at or above the
+  override, drop the entry rather than leaving a resolution that no
+  longer does anything.
+
+A resolution that merely restates what the dependency's own range
+already permits is dead weight — it hides which overrides are
+load-bearing. Check with `yarn why <pkg>` before adding one.
+
+## Reporting a security vulnerability
+
+Do not open a public issue for a suspected vulnerability. Report it
+privately through the repository's GitHub Security Advisory workflow
+(<https://github.com/ACaccel/BotFleet/security/advisories/new>),
+describing the affected code paths, the conditions needed to reproduce
+it, and the impact.
 
 ## Commit conventions
 

@@ -6,7 +6,7 @@
 const MAX_TOP_N = 30;
 const MAX_LAST_N_MONTHS = 24;
 
-export interface EmojiFrequencyOptions {
+interface EmojiFrequencyOptions {
   readonly topN: number;
   readonly lastNMonths: number;
 }

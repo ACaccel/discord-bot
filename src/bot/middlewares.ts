@@ -30,7 +30,6 @@ import type {
   InteractionMiddleware,
   PermissionRankPolicy,
 } from '../core/plugin';
-import { replyTranslated } from '../handlers/reply-translated';
 
 /**
  * Routes the inbound interaction to the matching dispatcher. Calls
@@ -60,7 +59,7 @@ export const createDispatchMiddleware = (bot: BaseBot): InteractionMiddleware =>
   },
 });
 
-export interface ChannelLoggingMiddlewareConfig {
+interface ChannelLoggingMiddlewareConfig {
   /**
    * Privacy / clearance ranking. A command whose channel (or its parent
    * thread) is suppressed for the `channel_logging` feature stays out of
@@ -127,7 +126,3 @@ export const createChannelLoggingMiddleware = (
     }
   },
 });
-
-// Re-export so consumers needing the helper to construct a fallback
-// reply have one canonical path.
-export { replyTranslated };

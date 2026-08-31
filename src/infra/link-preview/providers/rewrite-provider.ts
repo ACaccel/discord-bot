@@ -40,7 +40,7 @@ import type {
 } from '../types';
 
 /** Preview quality of a probed candidate, best to worst. */
-export type CandidateQuality = 'video' | 'image' | 'weak-image' | 'text' | 'none';
+type CandidateQuality = 'video' | 'image' | 'weak-image' | 'text' | 'none';
 
 /**
  * Placeholder text a proxy / source serves when the post is login-gated,
@@ -61,7 +61,9 @@ const JUNK_MARKERS: readonly string[] = [
   'log in to instagram',
   'login • instagram',
   'log in with your instagram',
+  // i18n-ignore: upstream login-wall page titles matched verbatim, not bot copy.
   '使用你的 instagram 登入',
+  // i18n-ignore: upstream login-wall page title matched verbatim, not bot copy.
   'threads • 登入',
   'threads • log in',
   "this content isn't available",
@@ -139,7 +141,7 @@ export const scoreMeta = (
   return 'none';
 };
 
-export interface RewriteSpec {
+interface RewriteSpec {
   readonly name: LinkPreviewProviderName;
   /** Pure predicate: does this URL point at a previewable post on this source? */
   readonly matches: (url: URL) => boolean;

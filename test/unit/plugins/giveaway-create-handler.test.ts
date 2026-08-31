@@ -47,10 +47,14 @@ const makeBot = (
   ({
     client: { guilds: { cache: new Map([[GUILD_ID, {}]]) } },
     getRepos: (guildId: string) => (guildId === GUILD_ID ? repos : undefined),
-    getGuildInfo: () => undefined,
-    getAllGuildInfo: () => new Map(),
-    jobs: jobMap,
-    logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+    guildRegistry: {
+      getRepos: (guildId: string) => (guildId === GUILD_ID ? repos : undefined),
+      getChannel: () => undefined,
+      getRole: () => undefined,
+      listGuildIds: () => [],
+    },
+    jobMap,
+    requireLogger: () => ({ error: vi.fn(), info: vi.fn(), warn: vi.fn() }),
     translator,
   }) as unknown as BaseBot;
 

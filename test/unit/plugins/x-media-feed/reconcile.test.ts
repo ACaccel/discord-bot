@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { reconcileCursors, type FeedPassDeps } from '../../../../src/plugins/x-media-feed/internal';
 import { parseXMediaFeedConfig } from '../../../../src/plugins/x-media-feed/config';
 import type { XTimelineSource } from '../../../../src/infra/x-feed';
-import type { GuildRegistry } from '../../../../src/core/guild-registry';
+import type { GuildRegistry } from '../../../../src/bot/guild-registry';
 import type { Translator } from '../../../../src/core/i18n';
 import type { Logger } from '../../../../src/core/logger';
 import type { Repos } from '../../../../src/persistence/repositories';

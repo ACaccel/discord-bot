@@ -9,7 +9,15 @@ import type { Repos } from '../../../persistence/repositories';
 
 import { DAY_MS } from '../traffic-shared/window';
 
-import type { TrafficTrend } from './types';
+/**
+ * Volume comparison against the immediately preceding equal-length
+ * window. `percentChange` is `null` when the previous window held no
+ * visible messages (no baseline to grow from).
+ */
+export interface TrafficTrend {
+  readonly previousTotal: number;
+  readonly percentChange: number | null;
+}
 
 /**
  * Count visible messages in `[startMs, endMs)`, fetched a day at a time

@@ -14,9 +14,11 @@ import { err, ok } from '../../../src/core/result';
 import { databaseErrorFrom } from '../../../src/persistence/error-translator';
 import temp_role from '../../../src/handlers/commands/temp_role';
 import type { BaseBot } from '../../../src/bot';
+import { buildFakeBot } from '../../fixtures/discord/bot-fake';
+import { buildGuild, buildGuildRoles } from '../../fixtures/discord/guild-builder';
+import { buildSendableChannel } from '../../fixtures/discord/channel-builder';
 
 const GUILD_ID = 'guild-1';
-const translator = { t: (key: string) => key } as unknown as BaseBot['translator'];
 
 const makeRepos = (createResult: unknown) => ({
   tempRole: {
@@ -27,40 +29,26 @@ const makeRepos = (createResult: unknown) => ({
   },
 });
 
-const makeGuild = () => ({
-  id: GUILD_ID,
-  roles: {
-    cache: { size: 10 },
-    create: vi.fn().mockResolvedValue({ id: 'role-1' }),
-    delete: vi.fn().mockResolvedValue(undefined),
-  },
-});
+const makeGuild = () => buildGuild({ id: GUILD_ID, roles: buildGuildRoles({ roleCount: 10 }) });
 
-const makeChannel = () => ({
-  id: 'chan-1',
-  isSendable: () => true,
-  send: vi.fn().mockResolvedValue({ id: 'msg-1', delete: vi.fn().mockResolvedValue(undefined) }),
-});
+const makeChannel = () => buildSendableChannel().channel;
 
 const scheduledJobs = new Map<string, Job>();
 
-// A logger whose `child(...)` returns itself, so replyForError's
-// `logError` (which scopes via `logger.child({ guildId })`) works.
-const makeLogger = () => {
-  const logger = { error: vi.fn(), info: vi.fn(), warn: vi.fn(), child: () => logger };
-  return logger;
-};
-
-const makeBot = (repos: ReturnType<typeof makeRepos>): BaseBot =>
-  ({
+const makeBot = (repos: ReturnType<typeof makeRepos>): BaseBot => {
+  const lookup = (guildId: string): unknown => (guildId === GUILD_ID ? repos : undefined);
+  return buildFakeBot({
     client: { guilds: { cache: new Map() }, channels: { fetch: vi.fn() } },
-    getRepos: (guildId: string) => (guildId === GUILD_ID ? repos : undefined),
-    getGuildInfo: () => undefined,
-    getAllGuildInfo: () => new Map(),
-    jobs: scheduledJobs,
-    logger: makeLogger(),
-    translator,
-  }) as unknown as BaseBot;
+    getRepos: lookup,
+    guildRegistry: {
+      getRepos: lookup,
+      getChannel: () => undefined,
+      getRole: () => undefined,
+      listGuildIds: () => [],
+    },
+    jobMap: scheduledJobs,
+  }).bot;
+};
 
 const makeInteraction = (): ChatInputCommandInteraction =>
   ({

@@ -21,7 +21,7 @@
  *     is cleaned up — every doc failing any of the seven validity
  *     checks (mirrors `verify_db`) is deleted. Each
  *     check runs in its own try/catch so a single failed check does
- *     not abort the others (R-03).
+ *     not abort the others.
  *   - Each guild's Mongo connection is opened with the project's
  *     `MongoConnectionManager`, so the production retry / disable
  *     behaviour applies.
@@ -29,13 +29,11 @@
  *     becomes one `bulkWrite` `updateOne({messageId},{$set:doc},
  *     {upsert:true})`. DB is left aligned to Discord truth — reaction
  *     counts, content edits, attachment metadata refresh on every run.
- *     The pre-check / dup-detect path from the old skip-if-exists
- *     design is gone (R-23, R-25).
  *   - Channels are enumerated as `(text-like guild channels) ∪
  *     (active threads) ∪ (archived public threads) ∪ (archived private
  *     threads)`. Active threads come from one cursorless guild-wide
  *     fetch; each archived visibility is paginated by Discord's
- *     `hasMore` flag (R-08), not a `pageSize < limit` guess that both
+ *     `hasMore` flag, not a `pageSize < limit` guess that both
  *     misses threads on a full page and loops on the final one. The
  *     archived-private pass is explicit (`fetchArchived` defaults to
  *     public-only) and gated on MANAGE_THREADS; if it fails the channel
@@ -46,11 +44,10 @@
  *   - Transient Discord errors on `messages.fetch` retry with an
  *     exponential backoff (1s, 2s, 4s). Hard non-transient codes
  *     (50001/50013/10003/10004) bypass retries entirely and surface
- *     as the dedicated `no-permission` / `channel-not-found` status
- *     (R-04, R-11).
+ *     as the dedicated `no-permission` / `channel-not-found` status.
  *   - Empty channels still get a `Fetch` cursor row (`lastMessageID:
  *     ''`) so msg-archive's incremental path has something to read
- *     against (R-22).
+ *     against.
  *
  * Logging
  * -------
@@ -61,7 +58,7 @@
  *     — a pure-text, single-file-per-run log produced by
  *     `text-logger.ts`. Filename is pinned at process start. Each
  *     write is wrapped in try/catch and falls back to stderr on
- *     failure (R-09).
+ *     failure.
  *
  * Time handling
  * -------------
@@ -69,7 +66,7 @@
  * `start_date: "2024-01-01"` in `config.json` means the local
  * midnight the operator typed. The run-log header records the
  * timezone offset so monthly buckets across multiple runs are
- * comparable only when the server timezone is consistent (R-15).
+ * comparable only when the server timezone is consistent.
  */
 import { resolve } from 'node:path';
 
@@ -84,6 +81,8 @@ import {
   type Message,
   type AnyThreadChannel,
 } from 'discord.js';
+
+import type { Types } from 'mongoose';
 
 import { createBootstrapLogger } from '../../src/core/config';
 import type { Logger } from '../../src/core/logger';
@@ -133,7 +132,7 @@ import {
 const CONFIG_PATH = resolve(__dirname, 'config.json');
 const LOG_ROOT_DIR = resolve(__dirname, 'logs');
 
-/** 60-second cap on `guild.channels.fetch()` (R-07). */
+/** 60-second cap on `guild.channels.fetch()`. */
 const GUILD_CHANNELS_FETCH_TIMEOUT_MS = 60_000;
 
 interface ChannelStats {
@@ -196,7 +195,7 @@ type CleanupCheckKey = (typeof CLEANUP_CHECK_KEYS)[number];
 
 /**
  * Run a single cleanup check, isolating its failure from the rest
- * (R-03). Failures get logged to the run log and stored in
+ * Failures get logged to the run log and stored in
  * `errors[key]` so the summary line renders as `ERROR (<reason>)`.
  */
 const runCleanupCheck = async (
@@ -236,7 +235,7 @@ const runCleanupCheck = async (
 /**
  * Delete every doc failing any of the seven validity checks. Each
  * check is isolated — a single failing query does not abort the
- * others (R-03). Returns the per-category counts and the per-check
+ * others. Returns the per-category counts and the per-check
  * error map for the summary renderer.
  */
 const runCleanup = async (
@@ -313,14 +312,14 @@ const runCleanup = async (
     type DupGroup = {
       readonly _id: string;
       readonly count: number;
-      readonly ids: readonly import('mongoose').Types.ObjectId[];
+      readonly ids: readonly Types.ObjectId[];
     };
     const dupGroups = (await Message.aggregate([
       { $match: { messageId: { $ne: null } } },
       { $group: { _id: '$messageId', count: { $sum: 1 }, ids: { $push: '$_id' } } },
       { $match: { count: { $gt: 1 } } },
     ]).exec()) as DupGroup[];
-    const victims: import('mongoose').Types.ObjectId[] = [];
+    const victims: Types.ObjectId[] = [];
     for (const g of dupGroups) {
       for (let i = 1; i < g.ids.length; i++) {
         const id = g.ids[i];
@@ -346,7 +345,7 @@ const runCleanup = async (
 };
 
 /** True iff every cleanup check failed — the only condition under which
- * the guild itself is marked failed by cleanup (R-03). */
+ * the guild itself is marked failed by cleanup. */
 const allCleanupChecksErrored = (counts: CleanupCounts): boolean =>
   CLEANUP_CHECK_KEYS.every((k) => counts.errors[k] !== undefined);
 
@@ -423,7 +422,7 @@ const isThreadManagerLike = (value: unknown): value is ThreadManagerLike<AnyThre
 };
 
 /**
- * Wrap a promise in a hard timeout (R-07). Resolves with the original
+ * Wrap a promise in a hard timeout. Resolves with the original
  * value on success, rejects with an `Error('<context> timed out after
  * <ms>ms')` if the deadline passes first. The underlying promise
  * keeps running — we do not have a way to abort discord.js's manager
@@ -676,7 +675,7 @@ const reconcileChannel = async (
     const delta = { upserted: 0, deletedBot: 0 };
     if (pending.upserts.length > 0) {
       // Unconditional upsert: every fetched message overwrites its DB
-      // row in full (R-23). bulkWrite returns `upsertedCount` (new
+      // row in full. bulkWrite returns `upsertedCount` (new
       // rows) and `modifiedCount` (existing rows changed). We report
       // the union — both count as "upserted from Discord truth".
       const ops = pending.upserts.map((doc) => ({
@@ -746,7 +745,7 @@ const reconcileChannel = async (
       const b = bucketFor(mk);
       stats.processed += 1;
       b.processed += 1;
-      // R-01: webhook deletion / cross-post source removal can leave
+      // Webhook deletion / cross-post source removal can leave
       // an authored-by-null row. Don't try to upsert it — count it as
       // skipped and let the operator see it in the per-channel /
       // per-month stats.
@@ -801,7 +800,7 @@ const reconcileChannel = async (
     const upsertScale = requestedUpserts === 0 ? 0 : delta.upserted / requestedUpserts;
     const botDeleteScale = requestedBotDeletes === 0 ? 0 : delta.deletedBot / requestedBotDeletes;
 
-    // R-12: to guarantee that per-month sums equal channel totals
+    // To guarantee that per-month sums equal channel totals
     // exactly, attribute every month except the last by rounding and
     // give the residual to the last month.
     let accUpserted = 0;
@@ -893,10 +892,10 @@ const reconcileChannel = async (
 
   finalizeMonth();
 
-  // Persist the Fetch cursor for incremental future runs. R-22: even
+  // Persist the Fetch cursor for incremental future runs. Even
   // for an empty channel we still write the row (with `''` as the
   // cursor) so msg-archive's per-hour incremental path has something
-  // to read against. R-02: wrap in try/catch so a single Mongo write
+  // to read against. Wrapped in try/catch so a single Mongo write
   // failure does not falsely flag the channel as aborted.
   let cursorPersistError: string | undefined;
   try {
@@ -980,7 +979,7 @@ const reconcileGuild = async (
   readonly cleanup: CleanupCounts;
   readonly channelOutcomes: readonly ChannelOutcome[];
 }> => {
-  // R-06: distinguish "bot not in this guild" from generic failures.
+  // Distinguish "bot not in this guild" from generic failures.
   let guild: Guild;
   try {
     guild = await client.guilds.fetch(guildId);
@@ -1030,7 +1029,7 @@ const reconcileGuild = async (
 
   // Step 1: cleanup. Runs BEFORE channel discovery so the channel
   // backfill operates on a fresh, valid baseline. Per-check try/catch
-  // is inside `runCleanup` (R-03); we only fail the guild if EVERY
+  // is inside `runCleanup`; we only fail the guild if EVERY
   // check errored.
   guildLogger.info({}, 'msg_backup: cleanup starting');
   const cleanup = await runCleanup(connection, runLog, guildLogger);
@@ -1042,8 +1041,8 @@ const reconcileGuild = async (
   }
   guildLogger.info({ cleanup, total: cleanupTotal(cleanup) }, 'msg_backup: cleanup complete');
 
-  // Step 2: discover channels (with R-07 timeout on the underlying
-  // channels.fetch and R-08 paginated thread discovery).
+  // Step 2: discover channels (with a timeout on the underlying
+  // channels.fetch, and paginated thread discovery).
   let discovery: DiscoveryBucketsForGuild;
   try {
     discovery = await collectChannels(client, guildId, guildLogger, runLog);
@@ -1234,6 +1233,7 @@ const buildLogger = (): Logger => {
   // human-facing output exclusively through the per-run text log
   // (`tools/msg_backup/logs/msg_backup_<...>.log`). pino retains the
   // pretty stdout stream that `createBootstrapLogger` provides.
+  // eslint-disable-next-line no-restricted-syntax -- writing LOG_DIR is how the bootstrap factory is told to skip the file sink; it is not a config read.
   process.env['LOG_DIR'] = '';
   return createBootstrapLogger({ bot: 'msg_backup', component: 'msg_backup' });
 };
@@ -1319,7 +1319,7 @@ const main = async (): Promise<void> => {
   try {
     appendLine(runLog, '[Discord] Logging in...');
     await client.login(config.discordToken);
-    // R-10: discord.js's `login()` resolves once the gateway handshake
+    // discord.js's `login()` resolves once the gateway handshake
     // begins, not when the client is fully ready to serve fetches.
     // Wait for the explicit ready event so the first guild.fetch is
     // not racing the initial guild sync.
@@ -1382,8 +1382,8 @@ const main = async (): Promise<void> => {
           }),
         );
         // Guild-level failure detection. Trigger conditions:
-        //   - synthetic `(n/a)` entry: R-06 (guild not accessible) or
-        //     R-07/R-08 (channel discovery failed / timed out)
+        //   - synthetic `(n/a)` entry: guild not accessible, or channel
+        //     discovery failed / timed out
         //   - `'guild-not-accessible'` status (subset of the above)
         //   - `'thread-enum-failed'`: silent thread-data-loss; must
         //     never exit 0 because the operator would otherwise miss

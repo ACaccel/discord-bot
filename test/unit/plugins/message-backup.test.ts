@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createLogger } from '../../../src/core/logger';
-import { TOKENS } from '../../../src/core/plugin';
+import { TOKENS } from '../../../src/bot/tokens';
 import type { PluginRuntimeContext } from '../../../src/core/plugin';
 import { createMessageBackupPlugin } from '../../../src/plugins/message-backup';
 import { performBackup } from '../../../src/plugins/message-backup/internal';
@@ -15,34 +15,6 @@ vi.mock('../../../src/plugins/message-backup/internal', () => ({
 }));
 
 describe('createMessageBackupPlugin', () => {
-  it('has the expected plugin shape', () => {
-    const p = createMessageBackupPlugin({ backupServers: ['1', '2'] });
-    expect(p.id).toBe('message-backup');
-    expect(p.scope).toBe('bot');
-    expect(p.onReady).toBeTypeOf('function');
-    expect(p.onShutdown).toBeTypeOf('function');
-  });
-
-  it('snapshots `backupServers` so mutating the caller array after construction does not affect the plugin', () => {
-    const servers = ['1', '2'];
-    const p = createMessageBackupPlugin({ backupServers: servers });
-    servers.push('3');
-    // The plugin captured a copy; the post-hoc push must not leak in.
-    // We can't inspect config directly, but the snapshot guarantee is
-    // worth pinning so future refactors don't regress it.
-    expect(p).toBeDefined();
-  });
-
-  it('accepts an explicit positive `backupIntervalMs`', () => {
-    const p = createMessageBackupPlugin({ backupServers: ['1'], backupIntervalMs: 5 * 60 * 1000 });
-    expect(p.id).toBe('message-backup');
-  });
-
-  it('defaults the interval when `backupIntervalMs` is omitted', () => {
-    const p = createMessageBackupPlugin({ backupServers: ['1'] });
-    expect(p).toBeDefined();
-  });
-
   it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, 2_147_483_648])(
     'rejects a non-positive, non-finite, or over-ceiling `backupIntervalMs` (%s)',
     (bad) => {
@@ -76,6 +48,47 @@ describe('createMessageBackupPlugin onReady loop resilience', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('backs up only the guilds present at construction, ignoring a later push into the caller array', async () => {
+    mockedPerformBackup.mockResolvedValue(undefined);
+    const servers = ['g1', 'g2'];
+    const plugin = createMessageBackupPlugin({ backupServers: servers, backupIntervalMs: 1000 });
+    // The caller keeps its array; the plugin must have taken a copy.
+    servers.push('g3');
+    const { onReady, onShutdown } = plugin;
+    if (onReady === undefined || onShutdown === undefined) {
+      throw new Error('message-backup plugin must expose onReady/onShutdown');
+    }
+    const ctx = buildCtx();
+
+    await onReady(ctx);
+
+    expect(mockedPerformBackup.mock.calls.map((call) => call[0])).toEqual(['g1', 'g2']);
+
+    await onShutdown(ctx);
+  });
+
+  it('runs the next pass one default hour later when `backupIntervalMs` is omitted', async () => {
+    mockedPerformBackup.mockResolvedValue(undefined);
+    const plugin = createMessageBackupPlugin({ backupServers: ['g1'] });
+    const { onReady, onShutdown } = plugin;
+    if (onReady === undefined || onShutdown === undefined) {
+      throw new Error('message-backup plugin must expose onReady/onShutdown');
+    }
+    const ctx = buildCtx();
+
+    await onReady(ctx);
+    expect(mockedPerformBackup).toHaveBeenCalledTimes(1);
+
+    // Just short of the hour: the loop must not have fired again.
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000 - 1);
+    expect(mockedPerformBackup).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(mockedPerformBackup).toHaveBeenCalledTimes(2);
+
+    await onShutdown(ctx);
   });
 
   it('keeps the repeat loop alive after a failing backup pass', async () => {

@@ -1,57 +1,19 @@
-import {
-    Client,
-    GatewayIntentBits,
-} from 'discord.js';
-import dotenv from 'dotenv';
-
 import { Nijika } from './nijika';
 import config from './config.json';
 
-import { loadEnv } from '@core/config';
-
-dotenv.config({ path: './src/bot/nijika/.env' });
+import { bootstrapPersonality, GUILD_OBSERVER_INTENTS } from '../bootstrap';
 
 // `requirePort` makes env validation fail fast when `PORT` is absent —
 // nijika cannot run without it because the earthquake webhook plugin
-// needs a listening port.
-const env = loadEnv({ requirePort: true });
-
-// discord client
-const client: Client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildModeration,
-        GatewayIntentBits.GuildEmojisAndStickers,
-        GatewayIntentBits.GuildIntegrations,
-        GatewayIntentBits.GuildWebhooks,
-        GatewayIntentBits.GuildInvites,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildPresences,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildMessageTyping,
-        GatewayIntentBits.DirectMessages,
-        GatewayIntentBits.DirectMessageReactions,
-        GatewayIntentBits.DirectMessageTyping,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildScheduledEvents,
-        GatewayIntentBits.AutoModerationConfiguration,
-        GatewayIntentBits.AutoModerationExecution,
-    ],
+// needs a listening port. The webhook server itself is owned by the
+// `earthquake` plugin's `start` hook (see `Nijika`'s composition in
+// `nijika.ts`).
+bootstrapPersonality({
+  name: 'nijika',
+  intents: GUILD_OBSERVER_INTENTS,
+  env: { requirePort: true },
+  // `requirePort` above guarantees `env.PORT` is defined; the assertion
+  // documents that invariant for the type checker.
+  build: (client, env) =>
+    new Nijika(client, env.TOKEN, env.MONGO_URI ?? '', env.CLIENT_ID, config, env.PORT as number),
 });
-
-// `requirePort` above guarantees `env.PORT` is defined; the assertion
-// documents that invariant for the type checker.
-const nijika = new Nijika(
-    client,
-    env.TOKEN,
-    env.MONGO_URI ?? '',
-    env.CLIENT_ID,
-    config,
-    env.PORT as number,
-);
-
-// The earthquake webhook server is owned by the `earthquake` plugin's
-// `start` hook (see `Nijika`'s composition in `nijika.ts`).
-void nijika.run();

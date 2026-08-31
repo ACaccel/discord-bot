@@ -9,5 +9,5 @@ import type { ModalSubmitInteraction } from 'discord.js';
 import type { BaseBot } from '@bot';
 
 export abstract class ModalHandler {
-    public abstract execute(interaction: ModalSubmitInteraction, bot: BaseBot): Promise<void>;
+  public abstract execute(interaction: ModalSubmitInteraction, bot: BaseBot): Promise<void>;
 }

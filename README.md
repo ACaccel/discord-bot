@@ -21,7 +21,7 @@ replies, slash-command codegen, and structured error handling.
 Highlights:
 
 - **Layered architecture** with ESLint-enforced dependency direction (`core → persistence/infra → handlers/plugins → bot`).
-- **Plugin system** with topological dependency resolution, zod-validated config, and a four-phase lifecycle (`init`, `start`, `onReady`, `onShutdown`).
+- **Plugin system** with a four-phase lifecycle (`init`, `start`, `onReady`, `onShutdown`), per-plugin failure isolation, and config parsed by each plugin's own factory.
 - **Typed IoC container** (no `reflect-metadata`, no DI framework) reachable from plugins only through a typed barrel.
 - **Repository pattern** over Mongoose; tests inject in-memory fakes.
 - **Strategy-based LLM provider layer** (OpenAI, Anthropic, Gemini, xAI).
@@ -35,10 +35,11 @@ single-page overview.
 
 | Bot           | Yarn script        | Surface                                                      |
 | ------------- | ------------------ | ------------------------------------------------------------ |
-| `nijika`      | `yarn nijika`      | Web-facing; exposes an Express `/discord/earthquake` webhook |
+| `nijika`      | `yarn nijika`      | Web-facing; exposes an Express`/discord/earthquake` webhook  |
 | `konata`      | `yarn konata`      | Full interactive feature set                                 |
 | `tomori`      | `yarn tomori`      | Full interactive feature set                                 |
 | `msg-archive` | `yarn msg-archive` | Worker-style; runs only the message-backup plugin            |
+| `gopher`      | `yarn gopher`      | Database-free; self-hosted-LLM auto-reply and a settings API |
 
 ## Features
 
@@ -113,20 +114,102 @@ authoritative schema lives in [`src/core/config/env.ts`](src/core/config/env.ts)
 Secrets must never be committed. The schema rejects obvious
 placeholders (`your_token`, `changeme`, etc.) at startup.
 
+There is no root `.env.example`: the env contract is per-personality,
+and the zod schema in `src/core/config/env.ts` plus the table above are
+the authoritative definition. A template file would be a third copy
+free to drift from both.
+
+**Transport security for `GOPHER_SETTINGS_API_KEY`.** Bearer auth
+authenticates the caller; it does not encrypt the request. Over plain
+HTTP the `Authorization: Bearer <key>` header — and the endpoint being
+written — travel in cleartext, so a firewall or source-IP allow-list
+limits _who_ can connect but does not stop on-path eavesdropping. The
+API binds to `127.0.0.1` by default. If you expose the port (router
+port-forward, or `settings_api.host: "0.0.0.0"`), front it with TLS — a
+reverse proxy such as Caddy or nginx terminating HTTPS and proxying to
+`127.0.0.1:<PORT>` — or reach it through an encrypted tunnel (SSH,
+Tailscale/WireGuard) and keep the bind on loopback. Rotate the key if it
+may have been sent in cleartext.
+
 ### `config.json`
 
-Per-personality static configuration. Every personality ships a
-checked-in `config.example.json` — copy it, fill in the real IDs, and
-keep your `config.json` out of git (it is `.gitignore`d). The four
-top-level keys are:
+Per-personality static configuration, loaded as a sibling of each
+composition root (`src/bot/<name>/config.json`). Every personality ships
+a checked-in `config.example.json` — copy it, fill in the real IDs, and
+keep your `config.json` out of git (it is `.gitignore`d). The shape is
+`Config` in [`src/bot/index.ts`](src/bot/index.ts) plus per-personality
+extensions. Snowflake ids exceed JavaScript's safe-integer range, so
+every id must be a JSON **string**.
 
-- `guilds` — every guild the bot serves; each entry maps named
-  `channels` and `roles` (e.g. `"debug"`, `"admin"`) to real Discord
-  IDs so handlers can look them up by name, and may carry a
-  `permission_rank` block (channel / user privacy ranks plus per-feature
-  channel-rank ceilings — see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
-- `commands` — the slash commands this personality should register.
-- Personality-specific extras (e.g. `level_roles`).
+Common fields:
+
+| Field                         | Type                | Required | Notes                                                                                                                                                                         |
+| ----------------------------- | ------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `admin`                       | `string[]`          | no       | User ids with bot-admin privileges. Gates `/ai_whitelist_*`; `/bug_report` DMs every id. Default `[]`.                                                                        |
+| `language`                    | `"zh-TW"` \| `"en"` | no       | Default display locale, also used for registered slash-command text. Default `"zh-TW"`; an unsupported value warns and falls back.                                            |
+| `commands`                    | `string[]`          | no       | The slash commands this personality registers with Discord. Removing an entry only stops re-registering it — run `yarn deploy -t <name>` to take the command down on Discord. |
+| `guilds.<id>.channels`        | `Record<name, id>`  | no       | Symbolic channel names (`"debug"`, `"event"`, `"x_feed"`, …) → Discord ids, so handlers look channels up by name.                                                             |
+| `guilds.<id>.roles`           | `Record<name, id>`  | no       | Symbolic role names → Discord ids.                                                                                                                                            |
+| `guilds.<id>.permission_rank` | object              | no       | Privacy / clearance ranks for this guild — see below. Validated at startup; a malformed block fails the boot naming the guild.                                                |
+
+`guilds` and both of its maps are optional. A bot may omit a map, a
+guild entry, or the whole block: unresolvable ids are dropped and the
+bot keeps every feature while silently skipping channel-bound side
+effects (the debug interaction log, the guild-event mirror). `tomori`
+runs this way. The exception is `msg-archive`, whose backup pass
+requires a `debug` channel and aborts without one.
+
+`permission_rank` carries three optional maps: `channels`
+(`channelId -> integer >= 0`, higher = more private; an unlisted channel
+is rank 0), `roles` (`roleId -> integer >= 0`, keyed by raw Discord role
+id — a member's clearance is the max over their ranked roles), and
+`features` (per-feature `maxChannelRank` ceiling). A feature is
+suppressed on a channel when the channel's effective rank — the max over
+the channel and its full ancestry — exceeds that feature's ceiling;
+`null` means unbounded. Defaults: `guild_events` `0`,
+`channel_logging` `0`, `social_preview` `null`.
+
+Feature blocks are per-personality and every one is optional. Each is
+zod-validated with `.strict()` at startup, so an unknown key fails the
+boot, and every scalar has a code default — the block may be partial or
+omitted entirely.
+
+| Block                     | Loaded by      | Fields (default)                                                                                                                                                                                                                                                                                 |
+| ------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `llm_auto_reply`          | gopher         | `enabled` (`false`), `probability` (`0.05`), `messageCount` (`5`), `windowSeconds` (`30`), `cooldownSeconds` (`30`), `endpoint` (placeholder), `timeoutMs` (`10000`)                                                                                                                             |
+| `settings_api`            | gopher         | `enabled` (`false`), `host` (`127.0.0.1`), `basePath` (`/settings`). The bearer key comes from `GOPHER_SETTINGS_API_KEY`, never this block; an enabled API with no key refuses to start. The listen port is `PORT`.                                                                              |
+| `identity_sync`           | gopher         | `enabled` (`false`), `syncWithSource` (`false`), `sourceUserId` (**required** when `enabled && syncWithSource`), `schedule` (`0 4 * * *`), `syncAvatar` / `syncNickname` (`true`), `fallbackNickname` (empty = leave untouched), `fallbackAvatarPath` (`assets/gopher.png`)                      |
+| `social_link_preview`     | nijika, tomori | `enabled` (`false`), `originalMessageStrategy` (`suppress`), `providers` (all), `timeoutMs` (`4000`), `validationBudgetMs` (`8000`), `maxUrlsPerMessage` (`1`), plus six `*ProxyHosts` lists — see below                                                                                         |
+| `x_media_feed`            | nijika         | `enabled` (`false`), `accounts` (`{ handle, channel? }[]`), `defaultChannel` (`x_feed`), `pollIntervalMs` (`300000`, floor `60000`), `fullSweepEveryPolls` (`12`), `apiBaseUrl` (`https://api.fxtwitter.com`), `timeoutMs` (`8000`), `maxPostsPerPoll` (`5`), `embedProxyHost` (`fxtwitter.com`) |
+| `level_roles`             | nijika         | `level_<n>` → role name for the level-role sync. Required by `/update_role`; a malformed block disables the command with `replies:update_role.no_config`.                                                                                                                                        |
+| `auto_reply`              | nijika, tomori | `luckyReplies` (`{ userId, probability, reply }[]`, default `[]`) and `globalLuckyProbability` (`0.005`). Each entry fires `reply` verbatim for `userId` at `probability`; the lines are operator data, not catalog copy.                                                                        |
+| `weather_forecast`        | nijika, tomori | `locationKey` (**required** when `/weather_forecast` is enabled) — the AccuWeather location id, e.g. `315078` for Taipei. The API key stays in `ACCUWEATHER_KEY`.                                                                                                                                |
+| `random_restaurant`       | nijika, tomori | `apiUrl` (**required** when `/random_restaurant` is enabled) — absolute `http(s)` URL of the recommendation endpoint.                                                                                                                                                                            |
+| `backup_log_enabled`      | msg-archive    | `false` — when `true`, each backup pass also writes a transcript under `logs/backup/`                                                                                                                                                                                                            |
+| `backup_interval_minutes` | msg-archive    | `60` — minutes between backup passes                                                                                                                                                                                                                                                             |
+
+Several fields carry a required-when rule worth calling out:
+
+- `weather_forecast.locationKey` and `random_restaurant.apiUrl` — both
+  are **required whenever their command appears in `commands`**. There
+  is no safe default for "which city" or "which recommendation
+  service", so the handler validates its block at startup: a missing or
+  malformed one is logged at error level and that single command is not
+  registered, leaving the rest of the bot's command set intact. Copy the
+  values from `config.example.json`.
+- `social_link_preview.*ProxyHosts` — the six per-source embed-proxy
+  lists (`twitterProxyHosts`, `instagramProxyHosts`, `threadsProxyHosts`,
+  `facebookProxyHosts`, `redditProxyHosts`, `bilibiliProxyHosts`) have
+  **no code defaults and are required whenever `enabled` is `true`**.
+  They name third-party services whose availability changes faster than
+  a release ships, so the operator owns them; enabling the feature
+  without one fails the boot with an error naming the missing key. Copy
+  the audited values from the personality's `config.example.json` rather
+  than inventing hosts. While `enabled` is `false` the lists are
+  accepted but unread.
+- `x_media_feed.accounts[].channel` / `defaultChannel` — a symbolic
+  channel name, so the guild's `channels` map must carry a matching
+  entry. A guild without it silently opts out.
 
 ## Adding a command, button, modal, or plugin
 
@@ -154,28 +237,18 @@ breakdown, key abstractions, request flow, and plugin lifecycle.
 
 ## Development
 
-```bash
-yarn typecheck         # strict TypeScript over the whole src/
-yarn lint              # ESLint
-yarn test              # vitest — unit, integration, contract, i18n
-yarn format:check      # prettier
-yarn handlers:gen:check # handler codegen drift check
-yarn knip              # dead code / unused exports
-```
+Every check that gates a change — type-check, lint, format, codegen
+drift, the six test projects, coverage, dead-code, and security — is
+listed with what it covers in
+[`CONTRIBUTING.md` §Quality gates](CONTRIBUTING.md#quality-gates).
 
 ## Contributing
 
 Bug reports, feature suggestions, and pull requests are welcome. Read
 [`CONTRIBUTING.md`](CONTRIBUTING.md) first; it covers the local setup,
-the quality gates that must pass before review, and the architectural
-rules a reviewer will hold you to. By participating you agree to the
-[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
-
-## Security
-
-To report a security vulnerability, please follow the process in
-[`SECURITY.md`](SECURITY.md). Do not open public issues for security
-problems.
+the quality gates that must pass before review, the architectural rules
+a reviewer will hold you to, and how to report a security vulnerability
+privately.
 
 ## License
 

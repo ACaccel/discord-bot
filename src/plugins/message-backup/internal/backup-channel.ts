@@ -94,9 +94,7 @@ export const backupChannel = async (
       stats.resumeFromMsgId = lastMessageID;
       let cursor = lastMessageID;
       for (;;) {
-        const fetched = await retryFetch(() =>
-          ch.messages.fetch({ limit: 100, after: cursor }),
-        );
+        const fetched = await retryFetch(() => ch.messages.fetch({ limit: 100, after: cursor }));
         if (fetched.size === 0) break;
         const batch = await saveBatch(fetched, ch, repos.message);
         stats.batches += 1;

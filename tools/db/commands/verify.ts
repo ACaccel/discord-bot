@@ -29,7 +29,7 @@ import { createProgressWriter } from '../framework/progress';
 
 const CONTENT_PREVIEW_LENGTH = 50;
 
-export const verifyOptionsSchema = z.object({
+const verifyOptionsSchema = z.object({
   sample_limit: z.number().int().min(0).default(50),
 });
 

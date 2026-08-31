@@ -26,7 +26,6 @@ import {
   type LifecycleHost,
   type RegisteredPlugin,
 } from '../../../../src/core/plugin/host/lifecycle';
-import { buildDependentsIndex } from '../../../../src/core/plugin/host/topology';
 import type {
   DisabledPlugin,
   Plugin,
@@ -47,20 +46,16 @@ interface TestService {
 const TestServiceToken = token<TestService>('R2TestService');
 const OtherToken = token<TestService>('R2OtherService');
 
-const plugin = (p: Partial<Plugin<unknown>> & { id: string }): Plugin<unknown> =>
-  ({ version: '1.0.0', scope: 'bot', ...p }) as Plugin<unknown>;
+const plugin = (p: Partial<Plugin> & { id: string }): Plugin =>
+  ({ version: '1.0.0', ...p }) as Plugin;
 
-const buildHost = (plugins: readonly Plugin<unknown>[]): LifecycleHost => {
+const buildHost = (plugins: readonly Plugin[]): LifecycleHost => {
   const registered = new Map<PluginId, RegisteredPlugin>();
-  for (const p of plugins) registered.set(p.id, { plugin: p, config: undefined });
-  const order = plugins.map((p) => p.id);
-  const dependents = buildDependentsIndex(registered);
+  for (const p of plugins) registered.set(p.id, { plugin: p });
   const container = createContainer();
   return {
     registered,
-    order,
     disabled: new Map<PluginId, DisabledPlugin>(),
-    dependents,
     resolve: container.resolve.bind(container),
     container,
     dispatcher: new EventDispatcher(silent),
@@ -77,7 +72,7 @@ describe('PluginLifecycleRunner.registerInstance stage guard', () => {
       plugin({
         id: 'p',
         init: async (ctx) => {
-          (ctx as PluginInitContext<unknown>).registerInstance(TestServiceToken, instance);
+          (ctx as PluginInitContext).registerInstance(TestServiceToken, instance);
         },
       }),
     ]);
@@ -94,13 +89,13 @@ describe('PluginLifecycleRunner.registerInstance stage guard', () => {
       plugin({
         id: 'a',
         init: async (ctx) => {
-          (ctx as PluginInitContext<unknown>).registerInstance(TestServiceToken, a);
+          (ctx as PluginInitContext).registerInstance(TestServiceToken, a);
         },
       }),
       plugin({
         id: 'b',
         init: async (ctx) => {
-          (ctx as PluginInitContext<unknown>).registerInstance(TestServiceToken, b);
+          (ctx as PluginInitContext).registerInstance(TestServiceToken, b);
         },
       }),
     ]);
@@ -114,12 +109,12 @@ describe('PluginLifecycleRunner.registerInstance stage guard', () => {
   });
 
   it('throws LIFECYCLE_PHASE_VIOLATION when a stale init ctx is reused in start', async () => {
-    let captured: PluginInitContext<unknown> | undefined;
+    let captured: PluginInitContext | undefined;
     const host = buildHost([
       plugin({
         id: 'p',
         init: async (ctx) => {
-          captured = ctx as PluginInitContext<unknown>;
+          captured = ctx as PluginInitContext;
         },
         start: async () => {
           captured!.registerInstance(TestServiceToken, { tag: 'late' });
@@ -148,12 +143,12 @@ describe('PluginLifecycleRunner.registerInstance stage guard', () => {
   });
 
   it('throws LIFECYCLE_PHASE_VIOLATION when the stale ctx fires in onReady', async () => {
-    let captured: PluginInitContext<unknown> | undefined;
+    let captured: PluginInitContext | undefined;
     const host = buildHost([
       plugin({
         id: 'p',
         init: async (ctx) => {
-          captured = ctx as PluginInitContext<unknown>;
+          captured = ctx as PluginInitContext;
         },
         onReady: async () => {
           captured!.registerInstance(OtherToken, { tag: 'late' });
@@ -175,13 +170,13 @@ describe('PluginLifecycleRunner.registerInstance stage guard', () => {
   });
 
   it('throws LIFECYCLE_PHASE_VIOLATION when the stale ctx fires in an event hook', async () => {
-    let captured: PluginInitContext<unknown> | undefined;
+    let captured: PluginInitContext | undefined;
     let observed: unknown;
     const host = buildHost([
       plugin({
         id: 'p',
         init: async (ctx) => {
-          captured = ctx as PluginInitContext<unknown>;
+          captured = ctx as PluginInitContext;
         },
         events: {
           messageCreate: async () => {
@@ -211,13 +206,13 @@ describe('PluginLifecycleRunner.registerInstance stage guard', () => {
   });
 
   it('throws LIFECYCLE_PHASE_VIOLATION when the stale ctx fires in onShutdown', async () => {
-    let captured: PluginInitContext<unknown> | undefined;
+    let captured: PluginInitContext | undefined;
     let observed: unknown;
     const host = buildHost([
       plugin({
         id: 'p',
         init: async (ctx) => {
-          captured = ctx as PluginInitContext<unknown>;
+          captured = ctx as PluginInitContext;
         },
         onShutdown: async () => {
           try {
@@ -237,20 +232,19 @@ describe('PluginLifecycleRunner.registerInstance stage guard', () => {
     );
   });
 
-  it('switches the phase off init even when a critical plugin throws', async () => {
-    let captured: PluginInitContext<unknown> | undefined;
+  it('switches the phase off init even when a plugin throws', async () => {
+    let captured: PluginInitContext | undefined;
     const host = buildHost([
       plugin({
-        id: 'critical',
-        critical: true,
+        id: 'thrower',
         init: async (ctx) => {
-          captured = ctx as PluginInitContext<unknown>;
+          captured = ctx as PluginInitContext;
           throw new Error('init blew up');
         },
       }),
     ]);
     const runner = new PluginLifecycleRunner(host);
-    await expect(runner.runInit()).rejects.toThrow();
+    await runner.runInit();
     // After the throw, the runner must have switched the phase off
     // 'init' so a deferred async callback cannot register late.
     expect(() => captured!.registerInstance(OtherToken, { tag: 'late' })).toThrow(
@@ -263,7 +257,7 @@ describe('PluginLifecycleRunner.registerInstance stage guard', () => {
   // actual assertion — TypeScript fails the build if either context
   // ever sprouts the property.
   it('only exposes registerInstance on PluginInitContext (type check)', () => {
-    const initCtx = {} as PluginInitContext<unknown>;
+    const initCtx = {} as PluginInitContext;
     void initCtx.registerInstance;
     const startCtx = {} as PluginStartContext;
     // @ts-expect-error registerInstance is not on PluginStartContext

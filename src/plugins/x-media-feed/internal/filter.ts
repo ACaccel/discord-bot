@@ -9,7 +9,7 @@
 import type { XPost } from '../../../infra/x-feed';
 
 /** Inputs to {@link selectPostsToForward}. */
-export interface SelectPostsInput {
+interface SelectPostsInput {
   /** Configured handle, used to reject entries authored by someone else. */
   readonly handle: string;
   /** Newest post id already forwarded; absent before the first pass. */
@@ -48,8 +48,10 @@ const SNOWFLAKE_TIMESTAMP_SHIFT = 22n;
  */
 export const snowflakeFloorAt = (atMs: number): string => {
   if (atMs <= SNOWFLAKE_EPOCH_MS) return '0';
-  return ((BigInt(Math.floor(atMs)) - BigInt(SNOWFLAKE_EPOCH_MS)) << SNOWFLAKE_TIMESTAMP_SHIFT)
-    .toString();
+  return (
+    (BigInt(Math.floor(atMs)) - BigInt(SNOWFLAKE_EPOCH_MS)) <<
+    SNOWFLAKE_TIMESTAMP_SHIFT
+  ).toString();
 };
 
 /**

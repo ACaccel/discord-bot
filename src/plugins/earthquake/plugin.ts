@@ -2,8 +2,8 @@
  * EarthquakePlugin — owns the `/discord/earthquake` HTTP webhook and
  * the per-guild earthquake-alert broadcast.
  *
- * This is a `scope: 'bot'` plugin assembled only by `nijika`. Its
- * `start` hook stands up the Express server; `onShutdown` closes it so
+ * Assembled only by `nijika`. Its `start` hook stands up the Express
+ * server; `onShutdown` closes it so
  * a fast restart does not leak the listening socket. The broadcast
  * logic lives in `internal/` so this file is lifecycle wiring only.
  *
@@ -13,7 +13,8 @@
 import express, { type Express } from 'express';
 import type { Server } from 'node:http';
 
-import { TOKENS } from '../../core/plugin';
+import { TOKENS } from '../../bot/tokens';
+import { closeServerBounded } from '../../core/http';
 import { logError, logSystem } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
 import { broadcastEarthquakeAlert } from './internal';
@@ -22,7 +23,7 @@ const PLUGIN_ID = 'earthquake';
 const PLUGIN_VERSION = '1.0.0';
 
 /** Configuration for {@link createEarthquakePlugin}. */
-export interface EarthquakePluginConfig {
+interface EarthquakePluginConfig {
   /** TCP port the earthquake webhook server listens on. */
   readonly port: number;
 }
@@ -38,10 +39,6 @@ export const createEarthquakePlugin = (rawConfig: EarthquakePluginConfig): Plugi
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    // Not critical: a failed webhook server must not abort the bot —
-    // the rest of nijika's features stay available.
-    critical: false,
 
     async start(ctx): Promise<void> {
       const client = ctx.resolve(TOKENS.DiscordClient);
@@ -74,10 +71,12 @@ export const createEarthquakePlugin = (rawConfig: EarthquakePluginConfig): Plugi
 
       await new Promise<void>((resolve, reject) => {
         const listening = app.listen(config.port, () => {
-          logSystem(
-            ctx.logger,
-            `earthquake webhook server is running on port ${config.port}`,
-          );
+          logSystem(ctx.logger, `earthquake webhook server is running on port ${config.port}`);
+          // Startup is settled. A socket error from here on is a runtime
+          // event, and `reject` would silently discard it against an
+          // already-settled promise — swap in a logging handler.
+          listening.removeListener('error', reject);
+          listening.on('error', (err: Error) => logError(ctx.logger, null, err));
           resolve();
         });
         listening.on('error', reject);
@@ -87,10 +86,14 @@ export const createEarthquakePlugin = (rawConfig: EarthquakePluginConfig): Plugi
 
     async onShutdown(ctx): Promise<void> {
       if (server === undefined) return;
-      await new Promise<void>((resolve) => {
-        server?.close(() => resolve());
-      });
+      const listening = server;
       server = undefined;
+      await closeServerBounded(listening, () => {
+        logSystem(
+          ctx.logger,
+          'earthquake webhook server did not close within the shutdown budget; continuing',
+        );
+      });
       logSystem(ctx.logger, 'earthquake webhook server closed');
     },
   };

@@ -244,8 +244,8 @@ describe('OgClient.fetch', () => {
 
   it('reads only the head of a large HTML body — never buffers it, never throws', async () => {
     // og:title sits in the first chunk; the rest dwarfs the byte cap and has
-    // no </head>, so the read must stop at the cap (the old maxContentLength
-    // path would have thrown on a body this large).
+    // no </head>, so the read must stop at the cap rather than buffering (or
+    // rejecting) a body this large.
     const head = Buffer.from('<html><head><meta property="og:title" content="Big">');
     const filler = Buffer.alloc(50_000, 0x78); // 'x'
     const response = streamResponse([head, filler, filler, filler], 'text/html');

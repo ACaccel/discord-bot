@@ -52,4 +52,30 @@ describe('installClientSafetyListeners', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]?.[0]).toMatchObject({ shardId: 0, code: 1006 });
   });
+
+  it('is idempotent for the same client', () => {
+    const client = buildClient();
+    const { logger, error } = buildLogger();
+    installClientSafetyListeners({ client: client as unknown as Client, logger });
+    installClientSafetyListeners({ client: client as unknown as Client, logger });
+
+    client.emit('error', new Error('socket hang up'));
+
+    // A repeated install used to double every connection-error line and
+    // walk the emitter towards Node's max-listeners warning.
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(client.listenerCount('error')).toBe(1);
+  });
+
+  it('still installs on a different client', () => {
+    const first = buildClient();
+    const second = buildClient();
+    const { logger, error } = buildLogger();
+    installClientSafetyListeners({ client: first as unknown as Client, logger });
+    installClientSafetyListeners({ client: second as unknown as Client, logger });
+
+    second.emit('error', new Error('socket hang up'));
+
+    expect(error).toHaveBeenCalledTimes(1);
+  });
 });

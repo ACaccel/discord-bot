@@ -1,29 +1,10 @@
-import { Client, GatewayIntentBits } from 'discord.js';
-import dotenv from 'dotenv';
 import { Konata } from './konata';
 import config from './config.json';
-import { loadEnv } from '@core/config';
 
-dotenv.config({ path: './src/bot/konata/.env' });
+import { bootstrapPersonality, MESSAGE_BOT_INTENTS } from '../bootstrap';
 
-const env = loadEnv();
-
-const client: Client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.MessageContent,
-    ],
+bootstrapPersonality({
+  name: 'konata',
+  intents: MESSAGE_BOT_INTENTS,
+  build: (client, env) => new Konata(client, env.TOKEN, env.MONGO_URI ?? '', env.CLIENT_ID, config),
 });
-
-const konata = new Konata(
-    client,
-    env.TOKEN,
-    env.MONGO_URI ?? '',
-    env.CLIENT_ID,
-    config,
-);
-
-konata.run();

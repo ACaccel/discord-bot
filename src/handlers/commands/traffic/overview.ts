@@ -8,17 +8,12 @@
 import { EmbedBuilder } from 'discord.js';
 
 import { TIME_CHART_FILE } from '../traffic-shared/chart';
-import type { BucketGranularity } from '../traffic-shared/types';
+import type { BucketCount, BucketGranularity, TFn, TrafficRange } from '../traffic-shared/types';
 import { bucketLabel } from '../traffic-shared/window';
 
-import type {
-  BucketCount,
-  TFn,
-  TopReaction,
-  TrafficAggregate,
-  TrafficRange,
-  TrafficTrend,
-} from './types';
+import type { TrafficAggregate } from './aggregation';
+import type { TopReaction } from './reactions';
+import type { TrafficTrend } from './trend';
 
 const EMBED_COLOR = 0x5865f2;
 

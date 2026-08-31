@@ -12,6 +12,17 @@ on:
       - main
       - dev
 
+# Least privilege by default: no job here writes to the repository.
+# A job that genuinely needs more must widen it at the job level.
+permissions:
+  contents: read
+
+# One in-flight run per ref. Pushing a follow-up commit cancels the
+# superseded run instead of paying for a result nobody will read.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -34,26 +45,15 @@ jobs:
       - uses: ./.github/actions/seed-bot-config
       - run: yarn typecheck
 
-  test-unit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/yarn-install
-      - run: yarn test:unit
-      - run: yarn test:i18n
-
-  test-tools:
-    # Unit tests for the ops scripts under `tools/<name>/`
-    # (msg_backup / db). They run the `tools` vitest project,
-    # which exercises pure internals only — no Discord/Mongo boot — so
-    # no `seed-bot-config` is needed.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/yarn-install
-      - run: yarn test:tools
-
   test-coverage:
+    # `yarn test:coverage` is `vitest run --coverage`, which runs every
+    # project — unit, integration, integration-nodb, contract, i18n and
+    # tools. It is therefore the single job that executes the whole
+    # suite; separate `test-unit` / `test-tools` jobs only re-ran a
+    # subset of it. The dedicated `test-int` / `test-contract` jobs
+    # below stay because they carry the empty-project guard, which this
+    # job cannot express.
+    #
     # Coverage floors (`src/core/**` ≥ 90%, overall ≥ baseline) live in
     # vitest.config.ts; this job is the gate that enforces them.
     runs-on: ubuntu-latest
@@ -116,11 +116,9 @@ jobs:
           exit 1
 
   knip:
-    # Detects unused exports / files / dependencies. The `knip.json`
-    # rules table errors on file / dependency drift but keeps the
-    # per-symbol checks (`exports`, `types`, `nsExports`, `nsTypes`,
-    # `enumMembers`, `classMembers`) at `warn`, so an unused export is
-    # surfaced without failing the build.
+    # Detects unused files, dependencies, exports and types. The
+    # `knip.json` rules table errors on all of them except
+    # `classMembers`, which stays at `warn`.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -138,10 +136,8 @@ jobs:
     # source (see `yarn nijika` etc. in package.json). The emitted
     # `dist/` retains TS path aliases (`require("@utils")`) and does
     # not bundle non-TS assets (config.json / locale JSON), so
-    # invoking `node dist/...` would fail. The artifact-presence
-    # check that used to live here was misleading and was removed
-    # — the only signal this job carries is whether tsc emits
-    # cleanly.
+    # invoking `node dist/...` would fail. The only signal this job
+    # carries is whether tsc emits cleanly.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -151,13 +147,23 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    # The only job that needs more than the workflow-level `contents:
+    # read`: gitleaks annotates the pull request with what it found.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # gitleaks needs full history
       - uses: ./.github/actions/yarn-install
       - name: audit-ci (HIGH+ with documented allowlist)
-        run: yarn security --output-format=json | tee audit-ci-report.json
+        # `pipefail` is what makes this a gate: without it the step's exit
+        # status is `tee`'s (always 0) and a HIGH+ advisory would pass.
+        shell: bash
+        run: |
+          set -euo pipefail
+          yarn security --output-format=json | tee audit-ci-report.json
       - name: Archive audit report + allowlist
         if: always()
         uses: actions/upload-artifact@v4
@@ -168,6 +174,10 @@ jobs:
             audit-ci.jsonc
           retention-days: 90
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        # Pinned to a commit SHA, not the moving `v2` tag: a secret
+        # scanner runs with repository contents in scope, so an
+        # upstream tag repoint must not change what executes here.
+        # Bump deliberately alongside the version comment.
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

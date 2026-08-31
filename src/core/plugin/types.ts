@@ -1,33 +1,31 @@
 /**
  * Plugin contract — types only.
  *
- * This file declares the interfaces and discriminants every plugin and
- * the {@link PluginHost} agree on. No runtime logic here — see
- * `host.ts`, `event-dispatcher.ts`, `interaction-router.ts`.
+ * This file declares the interfaces every plugin and the
+ * {@link PluginHost} agree on. No runtime logic here — see `host.ts`,
+ * `event-dispatcher.ts`, `interaction-router.ts`.
  *
  * Design pillars (the host enforces every one):
- *   - **id + version + dependencies** drive topological registration.
- *     Cycles or missing deps fail at register time (cheap, clearest
- *     diagnostic, lifecycle has not yet started).
- *   - **configSchema** validates via zod at register; plugins observe
- *     a 100%-typed `config` in their hooks.
- *   - **scope** declares whether one instance serves the whole bot or
- *     one per guild. Only `'bot'` is supported; `'guild'` is a
- *     type-level placeholder for future per-guild state.
- *   - **critical** marks a plugin whose failure must abort the bot.
- *     Non-critical plugin failures get logged + the plugin enters
- *     {@link DisabledPlugin} state; the rest of the bot keeps running.
+ *   - **id + version** identify the plugin. Ids are unique per host;
+ *     a duplicate fails at register time (cheap, clearest diagnostic,
+ *     lifecycle has not yet started).
  *   - **Lifecycle hooks** are all optional `async () => void` and run
- *     in topological order: `init` -> `start` -> `onReady` ->
- *     ... runtime ... -> `onShutdown` (reverse topological order).
+ *     in registration order: `init` -> `start` -> `onReady` ->
+ *     ... runtime ... -> `onShutdown` (reverse registration order).
  *   - **events** are a typed subscription map over `discord.js`'s
  *     `ClientEvents`. The {@link EventDispatcher} fans events out with
  *     per-subscription `Promise.allSettled` isolation.
- *   - **contributes** declare command / button / modal / select-menu /
- *     reaction handlers keyed by name. The host merges plugin
- *     contributions with the codegen core registry into an effective
- *     registry, throwing on duplicate names with both source ids
- *     surfaced. See `registries.ts`.
+ *   - **Failure isolation**: a hook that throws marks the plugin
+ *     {@link DisabledPlugin} and the rest of the bot keeps running.
+ *
+ * Configuration is *not* part of this contract. Each plugin factory
+ * parses its own raw config (`parse<X>Config`) at composition time and
+ * captures the result in the returned object's closure, so a malformed
+ * block fails the boot rather than the first event.
+ *
+ * Handler registration is *not* part of this contract either. The
+ * codegen registries under `src/handlers/<type>/registry.generated.ts`
+ * are the single registration mechanism.
  *
  * Service-locator guard: plugins do **not** receive the raw IoC
  * container. {@link PluginInitContext.resolve} is a typed-token
@@ -35,7 +33,6 @@
  * `core/ioc` from layered code, plugins cannot bypass DI.
  */
 import type { ClientEvents, Interaction } from 'discord.js';
-import type { z } from 'zod';
 
 import type { Logger } from '../logger';
 import type { Translator } from '../i18n';
@@ -43,7 +40,7 @@ import type { Clock } from '../time';
 import type { ServiceToken } from '../ioc';
 
 // ---------------------------------------------------------------------------
-// Identity / scoping
+// Identity
 // ---------------------------------------------------------------------------
 
 /** Globally unique plugin identifier. Snake-case or kebab-case by convention. */
@@ -51,23 +48,6 @@ export type PluginId = string;
 
 /** Semver string. Major bumps for breaking contract changes. */
 export type PluginVersion = string;
-
-/**
- * One plugin's dependency on another. `versionRange` is NOT enforced —
- * it is captured for diagnostics and future use. The host only
- * validates that `id` is registered.
- */
-export interface PluginDependency {
-  readonly id: PluginId;
-  readonly versionRange: string;
-}
-
-/**
- * `'bot'` plugins exist once per bot process; `'guild'` plugins are
- * instantiated per guild and receive a `GuildContext`. The host
- * currently throws on `'guild'` scoping.
- */
-export type PluginScope = 'bot' | 'guild';
 
 // ---------------------------------------------------------------------------
 // Lifecycle contexts
@@ -79,8 +59,8 @@ export type TypedResolver = <T>(token: ServiceToken<T>) => T;
 /**
  * Shared bindings every lifecycle context carries. The plugin gets a
  * pre-scoped child logger, the translator, a clock for any time math,
- * and a typed `resolve` for declared dependencies. No raw container,
- * no string-keyed lookups.
+ * and a typed `resolve` for its dependencies. No raw container, no
+ * string-keyed lookups.
  */
 export interface PluginRuntimeServices {
   readonly logger: Logger;
@@ -118,9 +98,7 @@ export interface PluginRuntimeServices {
 export type RegisterInstance = <T>(token: ServiceToken<T>, instance: T) => void;
 
 /** Context handed to `Plugin.init`. */
-export interface PluginInitContext<Config> extends PluginRuntimeServices {
-  /** Validated config — fully typed thanks to `configSchema`. */
-  readonly config: Config;
+export interface PluginInitContext extends PluginRuntimeServices {
   /**
    * Publish a pre-built instance under a typed token. See
    * {@link RegisterInstance} for the full contract. Calling this
@@ -158,81 +136,31 @@ export type PluginEventSubscriptions = {
 };
 
 // ---------------------------------------------------------------------------
-// Contributions (handler / job / locale)
-// ---------------------------------------------------------------------------
-
-/**
- * Constructor of a per-process-singleton interaction handler. The
- * shape is intentionally loose at the core layer; concrete `Command`
- * / `ButtonHandler` / `ModalHandler` / `SSMHandler` / `ReactionHandler`
- * subclasses satisfy this implicitly.
- */
-export type HandlerConstructor = new () => unknown;
-
-/**
- * Plugin-contributed handler map keyed by handler name. The map shape
- * (rather than an array shape) keeps duplicate detection trivial
- * without forcing the host to instantiate constructors just to read a
- * `config.name` field.
- */
-export type ContributedRegistry = Readonly<Record<string, HandlerConstructor>>;
-
-/** Cron / interval-scheduled background work declared by a plugin. */
-export interface JobDescriptor {
-  readonly name: string;
-  /** Cron expression OR fixed interval ms; the scheduler interprets it. */
-  readonly schedule: string | { readonly everyMs: number };
-  readonly run: (ctx: PluginRuntimeContext) => Promise<void>;
-}
-
-/** Plugin-owned i18n namespace merged into the translator catalog. */
-export interface LocaleNamespace {
-  readonly namespace: string;
-  readonly resources: Readonly<Record<string, Readonly<Record<string, string>>>>;
-}
-
-/**
- * Everything a plugin can add to the bot at register time. All fields
- * optional — the host accepts plugins that contribute nothing
- * (pure-listener plugins) just as readily.
- */
-export interface PluginContributions {
-  readonly commands?: ContributedRegistry;
-  readonly buttons?: ContributedRegistry;
-  readonly modals?: ContributedRegistry;
-  readonly selectMenus?: ContributedRegistry;
-  readonly reactions?: ContributedRegistry;
-  readonly jobs?: readonly JobDescriptor[];
-  readonly localeNamespaces?: readonly LocaleNamespace[];
-}
-
-// ---------------------------------------------------------------------------
 // Plugin contract
 // ---------------------------------------------------------------------------
 
-export interface Plugin<Config = void> {
+export interface Plugin {
   readonly id: PluginId;
   readonly version: PluginVersion;
-  readonly scope: PluginScope;
-  readonly dependencies?: readonly PluginDependency[];
-  readonly configSchema?: z.ZodType<Config>;
-  /**
-   * When true, a register-time or `init`/`start`-time failure terminates
-   * the bot instead of marking the plugin disabled. Default `false`.
-   */
-  readonly critical?: boolean;
 
   /**
-   * One-shot setup. Runs after dependency resolution succeeds and
-   * before Discord login. Throw to mark this plugin disabled (or to
-   * crash the bot if `critical === true`).
+   * One-shot setup. Runs before Discord login. Throw to mark this
+   * plugin disabled; the rest of the bot keeps running.
+   *
+   * `init` is where a plugin resolves its dependencies — once, into
+   * state the {@link events} closures read — rather than per event. The
+   * host attaches event subscriptions only for plugins whose `init`
+   * succeeded, so a subscription may treat that state as present. When
+   * it is not, **raise**: the dispatcher isolates and logs the throw per
+   * subscriber, whereas returning quietly leaves a plugin that looks
+   * alive and does nothing.
    */
-  init?(ctx: PluginInitContext<Config>): Promise<void>;
+  init?(ctx: PluginInitContext): Promise<void>;
 
   /**
    * Runs after Discord login succeeds but before the `ready` event
-   * fires. Use to attach low-frequency listeners or register slash
-   * commands. Same error semantics as `init`.
+   * fires. Use to attach low-frequency listeners or bind a port. Same
+   * error semantics as `init`.
    */
   start?(ctx: PluginStartContext): Promise<void>;
 
@@ -240,18 +168,22 @@ export interface Plugin<Config = void> {
   onReady?(ctx: PluginRuntimeContext): Promise<void>;
 
   /**
-   * Runs during graceful shutdown — in **reverse** topological order,
-   * so a plugin that depends on `Logger` stops before the plugin that
-   * owns `Logger` does. Failure here is logged but does not block
-   * other plugins' shutdown.
+   * Runs during graceful shutdown — in **reverse** registration order,
+   * so a plugin registered later stops before the ones it was layered
+   * on top of. Failure here is logged but does not block other
+   * plugins' shutdown.
+   *
+   * **May run without a successful `init` / `start`.** Disabled status
+   * does not skip teardown: a plugin disabled during `onReady` still
+   * holds whatever `start` opened, and skipping it leaked exactly
+   * those resources. The hook must therefore tolerate un-initialised
+   * state — guard the fields your `init` assigns rather than assuming
+   * they exist.
    */
   onShutdown?(ctx: PluginRuntimeContext): Promise<void>;
 
   /** Discord event subscriptions, fanned out by {@link EventDispatcher}. */
   readonly events?: PluginEventSubscriptions;
-
-  /** Static registrations merged into the bot's effective registries. */
-  readonly contributes?: PluginContributions;
 }
 
 // ---------------------------------------------------------------------------

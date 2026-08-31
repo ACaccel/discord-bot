@@ -32,11 +32,11 @@ expects to change). No external task-tracker file is required.
 1. Load the [`contribute-change`](../skills/contribute-change/SKILL.md)
    skill and follow its eight-step procedure.
 2. **Understand the area** — `Read` / `Grep` / `Glob` to map the
-   files, contracts, and layer involved. Read the relevant
-   `docs/wiki/components/C<N>-*.md` page.
-3. **Plan** — identify the smallest viable set of file edits and the
-   tests that must accompany them. Decide whether the change is
-   structural (triggers wiki sync).
+   files, contracts, and layer involved. Read the matching section of
+   `docs/architecture.md`, then the contract's own source.
+3. **Plan** — identify the smallest viable set of file edits, the tests
+   that must accompany them, and the documentation surfaces the change
+   touches.
 4. **Implement** — apply the rules of
    [`project-conventions`](../skills/project-conventions/SKILL.md) and
    [`coding-standards`](../skills/coding-standards/SKILL.md) while
@@ -50,9 +50,11 @@ expects to change). No external task-tracker file is required.
    `yarn typecheck`, `yarn lint`, `yarn test`, `yarn format:check`,
    `yarn handlers:gen:check`, `yarn knip`. Root-cause any failure; do
    not bypass.
-8. **Update wiki / changelog** when the change is structural — follow
-   [`update-wiki`](../skills/update-wiki/SKILL.md). Include the wiki
-   updates in the same commit as the code change.
+8. **Sync the documentation surfaces** — `docs/architecture.md`,
+   `README.md`, `CONTRIBUTING.md`, the matching `config.example.json`,
+   and one `CHANGELOG.md` line, for each surface the change touches
+   (`contribute-change` Step 7). They land in the same commit as the
+   code.
 9. **Produce the commit message** — conventional-commits prefix,
    explain the why, include
    `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>`. Do not

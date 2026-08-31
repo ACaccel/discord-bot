@@ -34,7 +34,7 @@ export interface SharedConfig {
 }
 
 /** The parsed config: the shared block plus the raw per-operation slices. */
-export interface UnifiedConfig {
+interface UnifiedConfig {
   readonly shared: SharedConfig;
   /** Raw, unvalidated option objects keyed by subcommand name. */
   readonly operations: Readonly<Record<string, unknown>>;

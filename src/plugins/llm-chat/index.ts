@@ -1,1 +1,1 @@
-export { createLlmChatPlugin, type LlmChatPluginConfig } from './plugin';
+export { createLlmChatPlugin } from './plugin';

@@ -8,11 +8,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildTrafficView } from '../../../../src/handlers/commands/traffic/view';
-import type {
-  TFn,
-  TrafficAggregate,
-  TrafficTrend,
-} from '../../../../src/handlers/commands/traffic/types';
+import type { TrafficAggregate } from '../../../../src/handlers/commands/traffic/aggregation';
+import type { TrafficTrend } from '../../../../src/handlers/commands/traffic/trend';
+import type { TFn } from '../../../../src/handlers/commands/traffic-shared/types';
 import { buildTextChannel } from '../../../fixtures/discord/channel-builder';
 import { buildGuild } from '../../../fixtures/discord/guild-builder';
 

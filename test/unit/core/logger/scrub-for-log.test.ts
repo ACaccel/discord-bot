@@ -96,3 +96,54 @@ describe('scrubForLog', () => {
     expect(out.name).toBe('visible');
   });
 });
+
+describe('scrubForLog URL credentials', () => {
+  it('redacts a credential carried in a query string', () => {
+    // AccuWeather accepts the key only as a query parameter, so
+    // field-name redaction alone cannot reach it.
+    const out = scrubForLog(
+      'https://dataservice.accuweather.com/forecasts/v1/hourly/1hour/315078?apikey=SUPERSECRET&language=zh-tw',
+    );
+    expect(out).not.toContain('SUPERSECRET');
+    expect(out).toContain('language=zh-tw');
+  });
+
+  it('redacts a credential inside an Error message and stack', () => {
+    const err = new Error('Request failed: https://api.example/v1/models?key=SUPERSECRET');
+    const out = scrubForLog(err) as { message: string; stack?: string };
+    expect(out.message).not.toContain('SUPERSECRET');
+    expect(out.stack ?? '').not.toContain('SUPERSECRET');
+  });
+
+  it('leaves ordinary prose untouched', () => {
+    expect(scrubForLog('the key=value convention is fine here')).toBe(
+      'the key=value convention is fine here',
+    );
+  });
+
+  it('redacts the userinfo of a Mongo connection string', () => {
+    // `buildGuildMongoUri` produces exactly this shape and mongoose
+    // embeds it verbatim in MongoServerSelectionError messages.
+    const out = scrubForLog(
+      'MongoServerSelectionError: mongodb://acaccel:hunter2@127.0.0.1:27017/12345?authSource=admin failed',
+    ) as string;
+    expect(out).not.toContain('hunter2');
+    expect(out).toContain('mongodb://');
+    expect(out).toContain('127.0.0.1:27017');
+  });
+
+  it('redacts a longer parameter name the shorter alternative would shadow', () => {
+    const out = scrubForLog(
+      'https://idp.test/token?client_secret=SECRET&refresh_token=RT&id_token=IT&grant_type=code',
+    ) as string;
+    expect(out).not.toContain('SECRET');
+    expect(out).not.toContain('RT');
+    expect(out).not.toContain('IT');
+    expect(out).toContain('grant_type=');
+  });
+
+  it('redacts a credential in a URL that carries no query string', () => {
+    const out = scrubForLog('redis://admin:s3cr3t@cache.internal:6379') as string;
+    expect(out).not.toContain('s3cr3t');
+  });
+});

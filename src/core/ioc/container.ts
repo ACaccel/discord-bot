@@ -13,17 +13,19 @@
  *     `ServiceToken<Dog>` is not assignable to `ServiceToken<Animal>`.
  *   - {@link Resolver}: read-only side, the only thing factories receive.
  *   - {@link ServiceContainer}: read + register, owned by composition roots.
- *   - {@link ScopedContainer}: returned by `createScope()`; resolves from
- *     itself for `scoped`, falls back to parent for everything else, and
- *     deliberately exposes no `register*` methods (that would silently
- *     shadow parent registrations).
+ *
+ * Singleton is the only lifetime. Every service the bot binds is
+ * process-scoped, and per-guild state is reached through explicit
+ * factory tokens (`ReposFactory`) rather than a container scope — one
+ * line in the composition root instead of a scope object threaded
+ * through the whole call graph.
  *
  * Service-locator guard:
  *   Only composition roots (`src/bot/**`) and tests are allowed to
  *   import this module. ESLint's `no-restricted-imports` enforces this so
- *   `application/`, `domain/`, `interface/`, `persistence/`, `infra/` may
- *   not call `container.resolve()` directly — they receive dependencies
- *   via constructor parameters.
+ *   `handlers/`, `plugins/`, `persistence/`, `infra/` may not call
+ *   `container.resolve()` directly — they receive dependencies via
+ *   constructor parameters or the plugin host's typed resolver.
  */
 
 /**
@@ -47,7 +49,7 @@ export interface ServiceToken<T> {
  *
  * @param description Human-readable label used in error messages and
  *   `Symbol(description)`. Pick something searchable (e.g. `'Logger'`,
- *   `'MessageRepoFactory'`).
+ *   `'ReposFactory'`).
  */
 export const token = <T>(description: string): ServiceToken<T> => ({
   symbol: Symbol(description),
@@ -70,65 +72,35 @@ export interface Resolver {
 export type ServiceFactory<T> = (resolver: Resolver) => T;
 
 /**
- * Register-and-resolve container. Owned by composition roots.
- *
- * Lifetimes:
- *   - **singleton**: factory runs at most once per container; result is
- *     cached on the container that registered it.
- *   - **transient**: factory runs every `resolve()`.
- *   - **scoped**: factory runs once per {@link ScopedContainer}; the root
- *     container itself never caches a scoped service (resolving a scoped
- *     token at root level throws to surface the misuse).
+ * Register-and-resolve container. Owned by composition roots. The
+ * factory runs at most once per token; the result is cached.
  */
 export interface ServiceContainer extends Resolver {
   registerSingleton<T>(t: ServiceToken<T>, factory: ServiceFactory<T>): void;
-  registerTransient<T>(t: ServiceToken<T>, factory: ServiceFactory<T>): void;
-  registerScoped<T>(t: ServiceToken<T>, factory: ServiceFactory<T>): void;
-  /**
-   * Create a child resolver that owns its own scoped-instance cache.
-   * Singleton and transient resolutions delegate to the parent so a
-   * single shared logger/clock/etc. survives across scopes.
-   */
-  createScope(): ScopedContainer;
 }
 
 /**
- * Resolver returned by {@link ServiceContainer.createScope}. No
- * `register*` methods — adding bindings inside a scope would create
- * silent fork-in-the-graph bugs, and scoped lifetime is the only
- * legitimate per-scope concept.
- */
-export type ScopedContainer = Resolver;
-
-/**
- * Thrown when {@link Resolver.resolve} is called for an unbound token,
- * or when a scoped token is resolved against the root container.
+ * Thrown when {@link Resolver.resolve} is called for an unbound token.
  *
  * Carries the token description so a missing binding shows up as
- * `ServiceResolutionError: no binding for "MessageRepoFactory"` rather
- * than the unhelpful `Symbol()` default.
+ * `ServiceResolutionError: no binding for "ReposFactory"` rather than
+ * the unhelpful `Symbol()` default.
  */
 export class ServiceResolutionError extends Error {
   public override readonly name = 'ServiceResolutionError';
   public readonly tokenDescription: string;
-  public readonly reason: 'unbound' | 'scoped-at-root';
 
-  constructor(tokenDescription: string, reason: 'unbound' | 'scoped-at-root') {
-    super(
-      reason === 'unbound'
-        ? `ServiceResolutionError: no binding for "${tokenDescription}"`
-        : `ServiceResolutionError: token "${tokenDescription}" is registered as scoped; resolve from a ScopedContainer (call createScope())`,
-    );
+  constructor(tokenDescription: string) {
+    super(`ServiceResolutionError: no binding for "${tokenDescription}"`);
     this.tokenDescription = tokenDescription;
-    this.reason = reason;
   }
 }
 
 /**
- * Thrown when {@link ServiceContainer.registerSingleton} / `registerTransient`
- * / `registerScoped` is called twice for the same token. Re-registering
- * is almost always a programmer error (two composition steps both
- * believe they own the binding); this fails loudly.
+ * Thrown when {@link ServiceContainer.registerSingleton} is called twice
+ * for the same token. Re-registering is almost always a programmer error
+ * (two composition steps both believe they own the binding); this fails
+ * loudly.
  */
 export class DuplicateRegistrationError extends Error {
   public override readonly name = 'DuplicateRegistrationError';
@@ -136,137 +108,51 @@ export class DuplicateRegistrationError extends Error {
 
   constructor(tokenDescription: string) {
     super(
-      `DuplicateRegistrationError: token "${tokenDescription}" is already registered. Re-registration is not allowed; use a separate container or rebind via a child scope.`,
+      `DuplicateRegistrationError: token "${tokenDescription}" is already registered. Re-registration is not allowed; use a separate container.`,
     );
     this.tokenDescription = tokenDescription;
   }
 }
 
-type Lifetime = 'singleton' | 'transient' | 'scoped';
-
-interface Binding<T> {
-  readonly lifetime: Lifetime;
-  readonly factory: ServiceFactory<T>;
-}
-
-/**
- * Default {@link ServiceContainer} implementation.
- *
- * Singleton cache lives on the root instance; scoped caches live on the
- * {@link DefaultScopedContainer} produced by `createScope`. Transients
- * are not cached.
- */
-export class DefaultServiceContainer implements ServiceContainer {
-  private readonly bindings = new Map<symbol, Binding<unknown>>();
-  private readonly singletonCache = new Map<symbol, unknown>();
+/** Default {@link ServiceContainer} implementation. */
+class DefaultServiceContainer implements ServiceContainer {
+  private readonly factories = new Map<symbol, ServiceFactory<unknown>>();
+  private readonly cache = new Map<symbol, unknown>();
 
   public registerSingleton<T>(t: ServiceToken<T>, factory: ServiceFactory<T>): void {
-    this.assertNotRegistered(t);
-    this.bindings.set(t.symbol, { lifetime: 'singleton', factory });
-  }
-
-  public registerTransient<T>(t: ServiceToken<T>, factory: ServiceFactory<T>): void {
-    this.assertNotRegistered(t);
-    this.bindings.set(t.symbol, { lifetime: 'transient', factory });
-  }
-
-  public registerScoped<T>(t: ServiceToken<T>, factory: ServiceFactory<T>): void {
-    this.assertNotRegistered(t);
-    this.bindings.set(t.symbol, { lifetime: 'scoped', factory });
+    if (this.factories.has(t.symbol)) {
+      throw new DuplicateRegistrationError(t.description);
+    }
+    this.factories.set(t.symbol, factory as ServiceFactory<unknown>);
   }
 
   public resolve<T>(t: ServiceToken<T>): T {
     const value = this.tryResolve(t);
     if (value === undefined) {
-      const binding = this.bindings.get(t.symbol);
-      if (binding?.lifetime === 'scoped') {
-        throw new ServiceResolutionError(t.description, 'scoped-at-root');
-      }
-      throw new ServiceResolutionError(t.description, 'unbound');
+      throw new ServiceResolutionError(t.description);
     }
     return value;
   }
 
   public tryResolve<T>(t: ServiceToken<T>): T | undefined {
-    const binding = this.bindings.get(t.symbol);
-    if (binding === undefined) return undefined;
-
-    switch (binding.lifetime) {
-      case 'singleton': {
-        if (!this.singletonCache.has(t.symbol)) {
-          this.singletonCache.set(t.symbol, binding.factory(this.resolverView()));
-        }
-        return this.singletonCache.get(t.symbol) as T;
-      }
-      case 'transient':
-        return binding.factory(this.resolverView()) as T;
-      case 'scoped':
-        // Scoped resolution is only valid via a ScopedContainer; surface
-        // misuse as undefined here so resolve() can throw a precise
-        // 'scoped-at-root' error.
-        return undefined;
+    const factory = this.factories.get(t.symbol);
+    if (factory === undefined) return undefined;
+    if (!this.cache.has(t.symbol)) {
+      this.cache.set(t.symbol, factory(this.resolverView()));
     }
+    return this.cache.get(t.symbol) as T;
   }
 
   /**
-   * Returns a Resolver view of this container — `register*` and
-   * `createScope` are absent at runtime, not just at compile time.
-   * Defense-in-depth against `@ts-ignore`d factories.
+   * Returns a Resolver view of this container — `registerSingleton` is
+   * absent at runtime, not just at compile time. Defense-in-depth
+   * against `@ts-ignore`d factories.
    */
   private resolverView(): Resolver {
     return {
       resolve: this.resolve.bind(this),
       tryResolve: this.tryResolve.bind(this),
     };
-  }
-
-  public createScope(): ScopedContainer {
-    // Closures capture private state so the scoped container can read
-    // bindings without the root container exposing a public accessor —
-    // closing the only structural escape hatch around the layer guard.
-    const getBinding = <T>(t: ServiceToken<T>): Binding<T> | undefined =>
-      this.bindings.get(t.symbol) as Binding<T> | undefined;
-    const delegateTryResolve = <T>(t: ServiceToken<T>): T | undefined => this.tryResolve(t);
-    return new DefaultScopedContainer(getBinding, delegateTryResolve);
-  }
-
-  private assertNotRegistered<T>(t: ServiceToken<T>): void {
-    if (this.bindings.has(t.symbol)) {
-      throw new DuplicateRegistrationError(t.description);
-    }
-  }
-}
-
-class DefaultScopedContainer implements ScopedContainer {
-  private readonly scopedCache = new Map<symbol, unknown>();
-
-  constructor(
-    private readonly getBinding: <T>(t: ServiceToken<T>) => Binding<T> | undefined,
-    private readonly delegateTryResolve: <T>(t: ServiceToken<T>) => T | undefined,
-  ) {}
-
-  public resolve<T>(t: ServiceToken<T>): T {
-    const value = this.tryResolve(t);
-    if (value === undefined) {
-      throw new ServiceResolutionError(t.description, 'unbound');
-    }
-    return value;
-  }
-
-  public tryResolve<T>(t: ServiceToken<T>): T | undefined {
-    const binding = this.getBinding(t);
-    if (binding === undefined) return undefined;
-
-    if (binding.lifetime === 'scoped') {
-      if (!this.scopedCache.has(t.symbol)) {
-        this.scopedCache.set(t.symbol, binding.factory(this));
-      }
-      return this.scopedCache.get(t.symbol) as T;
-    }
-
-    // Singleton + transient delegate to the parent so a shared
-    // logger/clock/etc. survives across scopes.
-    return this.delegateTryResolve(t);
   }
 }
 

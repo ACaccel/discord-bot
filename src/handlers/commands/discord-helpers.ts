@@ -1,4 +1,3 @@
-import axios from 'axios';
 import type { Message } from 'discord.js';
 import { AttachmentBuilder, ButtonStyle } from 'discord.js';
 import { ActionRowBuilder, ButtonBuilder } from '@discordjs/builders';
@@ -6,6 +5,8 @@ import { createCanvas, loadImage } from 'canvas';
 import schedule from 'node-schedule';
 import type { Job } from 'node-schedule';
 import type { Logger } from '@core/logger';
+
+import { boundedHttp } from '../../infra/http';
 
 /**
  * Shared Discord-side helpers for command handlers.
@@ -70,10 +71,7 @@ export const msgReact = async (
     } catch (error) {
       logger
         ?.child({ bot: clientId ?? 'unknown', guildId: msg.guildId ?? undefined })
-        .error(
-          { err: error, messageId: msg.id, reaction },
-          'msgReact: failed to add reaction',
-        );
+        .error({ err: error, messageId: msg.id, reaction }, 'msgReact: failed to add reaction');
     }
   }
 };
@@ -88,7 +86,7 @@ export const scheduleJob = (date: Date, callback: () => void): Job =>
   schedule.scheduleJob(date, callback);
 
 /** Layout knobs for {@link listInOneImage}. */
-export interface CanvasOptions {
+interface CanvasOptions {
   itemsPerRow: number;
   itemSize: number;
   padding: number;
@@ -147,7 +145,7 @@ export const listInOneImage = async (
     const y = row * (itemSize + textHeight + padding) + padding;
 
     try {
-      const response = await axios.get<ArrayBuffer>(url, { responseType: 'arraybuffer' });
+      const response = await boundedHttp.get<ArrayBuffer>(url, { responseType: 'arraybuffer' });
       const buffer = Buffer.from(response.data);
       const img = await loadImage(buffer);
       ctx.drawImage(img, x, y, itemSize, itemSize);

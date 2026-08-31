@@ -34,11 +34,26 @@ downward; ESLint `no-restricted-imports` rules enforce the direction.
 | `infra`       | `src/infra/`       | `core`                         | `MongoConnectionManager`, LLM provider strategies                    |
 | `handlers`    | `src/handlers/`    | `core`, `persistence`, `infra` | slash command / button / modal / select-menu / reaction entry points |
 | `plugins`     | `src/plugins/`     | `core`, `persistence`, `infra` | self-contained feature modules                                       |
-| `bot`         | `src/bot/`         | everything above               | `BaseBot` and per-personality subclasses                             |
+| `bot`         | `src/bot/`         | everything above               | `BaseBot`, per-personality subclasses, the token catalog             |
 
 Plugins reach `core` only through the `@core/plugin` barrel; importing
 `@core/ioc` directly from `src/plugins/**` is ESLint-forbidden so the
 IoC container's write face stays inside the composition root.
+
+Two modules under `src/bot/` are the exception to the arrow direction:
+[`tokens.ts`](../src/bot/tokens.ts) (the service-token catalog) and
+[`guild-registry.ts`](../src/bot/guild-registry.ts) (the per-guild
+lookup port). Both name concrete `infra` / `persistence` types, so
+`core` — which may depend on nothing outside itself — cannot host them;
+they belong to the composition root, and plugins import them directly.
+The personality composition roots (`src/bot/<name>/**`) stay off-limits
+to plugins, which ESLint enforces.
+
+`scripts/` sits outside the table and outside the dependency graph:
+nothing under `src/` may import from it. Logic needed at both build time
+(`src/deploy.ts`) and runtime (command registration) lives under
+`src/handlers/commands/` and is consumed from both sides — for example
+`buildCommandJsonBody`, whose input type is a handler-layer contract.
 
 ## 2. Key abstractions
 
@@ -53,7 +68,7 @@ configuration; `BaseBot.run()` orchestrates startup in a fixed order:
 3. Connect every configured guild's MongoDB via the shared connection manager.
 4. Resolve each guild's channels, roles, and repositories.
 5. Attach the Discord client event bridge.
-6. Run plugin `init` → `start` hooks in topological order.
+6. Run plugin `init` → `start` hooks in registration order.
 7. Login to Discord, await `ClientReady`, run `onReady` hooks.
 
 Three single-purpose collaborators back the orchestrator:
@@ -64,32 +79,95 @@ Three single-purpose collaborators back the orchestrator:
 
 Two process-level safety nets are installed in step 1 (before login), so they span the client's whole lifecycle and are owned by `BaseBot` rather than the late-attaching `ClientEventBridge`:
 
-- `installProcessHandlers` ([src/core/logger/process-handlers.ts](../src/core/logger/process-handlers.ts)) — `uncaughtException` triggers best-effort graceful shutdown, **except** a transient network blip (`ECONNRESET` / "socket hang up", classified by [`isTransientNetworkError`](../src/core/errors/transient-network-error.ts)), which is logged and tolerated so a momentary outbound-socket reset cannot kill the process; `unhandledRejection` is logged and counted, never fatal.
-- `installClientSafetyListeners` ([src/bot/client-safety-listeners.ts](../src/bot/client-safety-listeners.ts)) — attaches non-fatal `error` / `shardError` / `shardDisconnect` listeners to the Discord client. Without an `error` listener Node rethrows an emitted client error as an `uncaughtException`; this keeps a gateway socket reset observable while discord.js reconnects on its own.
+- `installProcessHandlers` ([src/core/logger/process-handlers.ts](../src/core/logger/process-handlers.ts)) — owns three signals into the same graceful-shutdown path:
+  - `SIGINT` / `SIGTERM` run `BaseBot.shutdown()` under a 5-second hard timeout and then exit 0. Installing a listener is what makes the graceful path reachable at all: with none, Node terminates immediately and leaves Mongo connections open, a half-written backup transcript, and a bound HTTP port. A **second** signal while a shutdown is in flight exits immediately — a second Ctrl+C means "stop waiting".
+  - `uncaughtException` triggers the same shutdown and exits 1, **except** a transient network blip (`ECONNRESET` / "socket hang up", classified by [`isTransientNetworkError`](../src/core/errors/transient-network-error.ts)), which is logged and tolerated so a momentary outbound-socket reset cannot kill the process. The tolerance whitelist is deliberately narrow and must stay that way: after a genuine uncaught fault the process state is indeterminate, so broadly declining to exit on `uncaughtException` would mask real defects rather than absorb a blip.
+  - `unhandledRejection` is logged and counted, never fatal.
+
+  A single re-entrancy guard covers all three, so concurrent triggers arm one timer and one teardown.
+
+- `installClientSafetyListeners` ([src/bot/client-safety-listeners.ts](../src/bot/client-safety-listeners.ts)) — attaches non-fatal `error` / `shardError` / `shardDisconnect` listeners to the Discord client. Without an `error` listener Node rethrows an emitted client error as an `uncaughtException`; this keeps a gateway socket reset observable while discord.js reconnects on its own. Idempotent per client, so a repeated install cannot multiply every logged line.
+
+Startup failure is terminal. Each personality entry point starts the bot through `bootstrapPersonality` ([src/bot/bootstrap.ts](../src/bot/bootstrap.ts)), which loads the personality's `.env`, validates it into a typed `Env`, builds the Discord client from the requested gateway intents, and hands the bot to `runOrExit` ([src/bot/run-or-exit.ts](../src/bot/run-or-exit.ts)). `runOrExit` exits 1 when `run()` rejects: a detached `run()` leaves a live process with no commands registered and no reason for a supervisor to restart it.
+
+Everything handlers and bridges read off a live bot goes through a typed accessor — `getRepos`, `guildRegistry`, `jobMap`, `permissionRankPolicy`, `connectionManager`, `voice`, `modelCatalog`, `requireLogger()`. Each resolves the container binding a plugin would reach through `ctx.resolve(TOKENS.X)`, so both sides of a feature observe one instance rather than two parallel copies.
 
 ### Plugin contract ([src/core/plugin/](../src/core/plugin/))
 
-A `Plugin<Config>` declares:
+A `Plugin` declares:
 
-- `id`, SemVer `version`, `scope` (`'bot'` or `'guild'`), optional `critical` flag.
-- Optional zod `configSchema` validated at registration time.
-- Optional `dependencies` (other plugin ids).
-- Lifecycle hooks: `init`, `start`, `onReady`, `onShutdown`. `init` is the only phase allowed to publish singletons via `ctx.registerInstance(token, instance)`. `onShutdown` runs in **reverse** topological order; failures are logged but never fatal.
+- `id` and a SemVer `version`. `id` must be unique per host; that is the only register-time check.
+- Lifecycle hooks: `init`, `start`, `onReady`, `onShutdown`. `init` is the only phase allowed to publish singletons via `ctx.registerInstance(token, instance)`. `onShutdown` runs in **reverse** registration order; failures are logged but never fatal. Shutdown ignores disabled status: a plugin disabled during `onReady` has already opened whatever `start` opened and still holds live event subscriptions, so both its `onShutdown` and its `unsubscribeAll` run. Teardown is best-effort by contract, which is what makes running it unconditionally safe.
 - Event subscriptions over discord.js `ClientEvents`.
-- A `contributes` block enumerating commands, buttons, modals, select-menus, reactions, jobs, and locale namespaces.
+
+Configuration is **not** part of the contract. Each plugin factory
+parses its own raw config with a `parse<X>Config` function at
+composition time and captures the result in the returned object's
+closure, so a malformed block fails the boot rather than the first
+event — and the parsed shape stays private to the plugin instead of
+travelling through the host as an `unknown`.
+
+Handler registration is not part of the contract either: the codegen
+registries under `src/handlers/<type>/registry.generated.ts` are the
+single registration mechanism. A plugin whose feature also has slash
+commands therefore has two entry paths into the same internals: its own
+lifecycle hooks, which take dependencies from `ctx.resolve`, and the
+handler layer, which arrives holding a `BaseBot`. The second path is
+adapted in one place per plugin — `internal/deps-from-bot.ts`, which
+builds the same dependency bundle out of `BaseBot`'s typed accessors.
+Keeping it in its own file also stops a test that imports the plugin
+from pulling `BaseBot` (and the whole handler layer behind it) into the
+compile.
 
 `PluginHost` ([src/core/plugin/host.ts](../src/core/plugin/host.ts))
-topologically sorts the graph, fans `Promise.allSettled` across event
-subscribers, and merges plugin contributions with the codegen core
-registries.
+walks every phase in registration order and fans `Promise.allSettled`
+across event subscribers. Failure isolation is total: a hook that
+throws moves its plugin into the disabled set and the phase carries on,
+so no plugin can abort startup.
 
 ### IoC container ([src/core/ioc/](../src/core/ioc/))
 
-A ~280-line manual `ServiceContainer` typed via `ServiceToken<T>`.
-There is no `reflect-metadata` and no DI framework. Standard tokens
-live at [src/core/ioc/tokens.ts](../src/core/ioc/tokens.ts). Plugins
-see `TOKENS` through the `@core/plugin` barrel; the container itself
-is not re-exported, so plugins cannot bypass DI.
+A small manual `ServiceContainer` typed via `ServiceToken<T>`. There is
+no `reflect-metadata` and no DI framework. The surface is
+`registerSingleton` / `resolve` / `tryResolve`: singleton is the only
+lifetime, because every service the bot binds is process-scoped and
+per-guild state is reached through an explicit factory token
+(`ReposFactory`) rather than a container scope.
+
+`core/ioc` owns the mechanism only. The catalog of what gets bound
+lives with the composition root at
+[src/bot/tokens.ts](../src/bot/tokens.ts) — naming `ConnectionManager`,
+`Repos`, `VoiceController` and friends inside `core` would invert the
+layer arrows. Plugins import `TOKENS` from there and reach the
+container itself through nothing but `ctx.resolve`, a typed-token
+accessor.
+
+### Structured logging ([src/core/logger/](../src/core/logger/))
+
+`createLogger` builds the pino instance and an optional pretty console;
+the file sink is a separate opt-in factory (`createFileSink`) wired in
+by `createBootstrapLogger`, the composition-root logger factory. The
+file router writes JSON Lines to
+`<rootDir>/<botId>[/<guildId>]/<localDate>.log`, rotating on the
+local-time day boundary. Tests build loggers through plain
+`createLogger` and therefore never touch the filesystem.
+
+Two contracts are load-bearing:
+
+- **Every record reaching the file sink must carry the `bot` binding.**
+  The composition root attaches `{ bot: clientId }` on the root logger;
+  a missing binding is a contract violation that surfaces as an error
+  on the `Writable` stream, deliberately rather than landing in a
+  fallback directory. `bot` is path-encoded only — the routing step
+  strips it from the record before serialising, while `guildId` stays in
+  so cross-guild aggregators can join on it. A one-shot CLI with no
+  `bot` binding that must not create a `logs/` tree — `src/deploy.ts` —
+  opts out with `createBootstrapLogger(base, { fileRouter: false })`,
+  the only console-only escape.
+- **Reaction events and `MESSAGE_CREATE` are intentionally not
+  audit-logged.** Per-guild throughput on the hot reply path would
+  drown every other event; the plugin reply behaviour itself is
+  unaffected.
 
 ### Repository pattern ([src/persistence/repositories/](../src/persistence/repositories/))
 
@@ -97,6 +175,23 @@ Each persistent entity has an `<X>Repo` interface and a `Mongo<X>Repo`
 implementation. `buildRepos(connection)` returns the `Repos` bundle
 bound to one guild's Mongo connection. Handlers and plugins depend on
 interfaces; tests inject in-memory fakes.
+
+Every repository method returns `Result<T, DatabaseError>`, and the
+boundary between a domain failure and a bug is explicit:
+
+- A successful lookup that finds nothing is `ok(undefined)`, not an
+  error. Mongoose failures are translated by `databaseErrorFrom` into
+  `err(databaseError)`, and `insertManyIgnoringDuplicates` treats a
+  duplicate-key `BulkWriteError` as `ok`.
+- **Programmer errors never enter `Result`.** A non-positive `limit` or
+  a malformed timestamp range throws a native `TypeError` — those are
+  bugs at the call site, not outcomes a caller should branch on.
+
+Schemas may not import infra-layer constants for their defaults; the
+dependency direction forbids it. Where a schema needs a seed value that
+infra also owns (the xAI-first model id in `user-api-setting`), the
+schema holds a static literal as a safety net and the authoritative
+value is resolved at runtime.
 
 ### i18n ([src/core/i18n/](../src/core/i18n/) + [src/i18n/locales/](../src/i18n/locales/))
 
@@ -108,18 +203,33 @@ layer's path. Each personality picks its default locale through its
 `config.json` `language` field (`'zh-TW'` | `'en'`), validated by
 `isLocale` and threaded into `createDefaultTranslator({ fallbackLocale })`;
 an unsupported value falls back to `DEFAULT_LOCALE`. CJK literals are
-forbidden inside `src/handlers/` and `src/plugins/`; a CI scanner
-enforces this.
+forbidden inside `src/handlers/`, `src/plugins/`, `src/bot/`, and
+`src/infra/`; a CI scanner enforces this. The scanner treats fullwidth
+CJK punctuation (`U+3000–U+303F`, `U+FF00–U+FFEF`) as CJK too, because a
+fullwidth `：` reads as Chinese copy even in an otherwise-Latin string.
+`src/infra/` is in scope because an adapter that formats text for a
+Discord reply must take the already-translated string from its caller —
+`formatUsageFooter` takes its "unknown model pricing" label as an
+argument rather than inlining one locale's wording.
+
+One surface is deliberately outside the catalog: the `guild-events`
+mirror channel. Its embeds (message edited / deleted, member updated)
+stay in English because the `event` channel is an **operator surface**,
+not a user-facing one — it is read by whoever administers the guild,
+alongside the structured log lines it mirrors, and those are English.
+Translating it would split one audit trail across two languages. Do not
+"fix" the missing keys.
 
 ### Error taxonomy + Result ([src/core/errors/](../src/core/errors/), [src/core/result/](../src/core/result/))
 
-`DomainError` is the root of a sealed taxonomy: `ValidationError`,
-`NotFoundError`, `ConflictError`, `PermissionError`,
-`ConfigurationError`, and the `ExternalServiceError` branch
-(`DiscordApiError`, `DatabaseError`, `LlmProviderError`,
-`LinkPreviewError`). Every error
-carries `code`, `messageKey` (i18n), `messageParams`, and the original
-`cause`. Use cases prefer `Result<T, DomainError>`; error-translator
+`DomainError` is the root of the taxonomy: `ConfigurationError` and the
+`ExternalServiceError` branch (`DatabaseError`, `LlmProviderError`,
+`LinkPreviewError`, `XFeedError`). Every error carries `code`,
+`messageKey` (i18n), `messageParams`, and the original `cause`.
+Dispatch is by `instanceof` — there is no discriminant string field,
+because a parallel tag can only drift out of sync with the class
+hierarchy. A new subclass is added when a real boundary needs one, not
+speculatively. Use cases prefer `Result<T, DomainError>`; error-translator
 modules at each infra boundary turn SDK failures into domain errors.
 Alongside the taxonomy, [`isTransientNetworkError`](../src/core/errors/transient-network-error.ts)
 classifies a raw, unwrapped `Error` as a transient connectivity blip
@@ -127,11 +237,23 @@ classifies a raw, unwrapped `Error` as a transient connectivity blip
 message) — used by the process-level safety net to tolerate a momentary
 network reset instead of crashing.
 
+`isRetryableError` ([src/core/retry/](../src/core/retry/)) answers a
+different question and is deliberately broader: transient 5xx / 429
+responses, `ConnectTimeoutError` / `AbortError` / `FetchError`, and
+undici `UND_ERR_*` codes all justify a bounded retry. **The two
+predicates must never be widened into each other.** A retry is cheap;
+tolerating an uncaught exception is not, so a code that belongs in one
+list does not automatically belong in the other. A caller may pass
+`shouldRetry` to _narrow_ `isRetryableError` — `x-feed` does, to stop
+retrying a 429 against a shared host whose rate-limit budget it does not
+own.
+
 ### Branded IDs ([src/core/ids.ts](../src/core/ids.ts))
 
-`GuildId`, `ChannelId`, `UserId`, `RoleId`, `MessageId` are branded
-strings so a `ChannelId` cannot be passed where a `GuildId` is
-expected.
+`GuildId` and `ChannelId` are branded strings so a `ChannelId` cannot be
+passed where a `GuildId` is expected. Only the two ids the data layer
+actually keys on carry a brand; one per Discord snowflake would buy
+nothing but noise at every call site.
 
 ### `PermissionRankPolicy` ([src/core/plugin/permission-rank-policy.ts](../src/core/plugin/permission-rank-policy.ts))
 
@@ -145,7 +267,13 @@ the channel and its full ancestry (parent channel → category, so a private
 category lifts every channel and thread nested under it) — exceeds the ceiling.
 For `guild-events` this gate is **disclosure-only**: an edit/delete above the
 ceiling is withheld from the Discord `event` channel, yet still written to the
-local structured log and its attachments archived, regardless of rank. The
+local structured log and its attachments archived, regardless of rank. That is
+a deliberate privacy trade-off, not an oversight: the rank system governs
+Discord-side disclosure, while the host is an unconditional sink, so
+private-channel message content lands in `logs/<bot>/<guildId>/<date>.log` and
+deleted attachments in `./data/deleted_attachments/<guildId>/`. Anyone with
+file-system access to the bot host can read them — treat host access as
+equivalent to full channel access. The
 `channelRank` /
 `userRank` / `visibilityCeiling` primitives let a visibility-gated feature —
 realized by the `/traffic` commands — show channel `T` only when
@@ -169,6 +297,12 @@ per-guild connection lifecycle, exponential-backoff retry, and the
 disabled-set that lets the bot keep serving other guilds when one
 guild's database is unreachable.
 
+`closeAll` is generation-guarded: it bumps a counter, drains the
+in-flight opens, and any open that completes afterwards discards its own
+connection instead of entering the cache. `closeAll` can only close what
+it can see, so a late arrival cached behind its back would be a socket
+no later teardown knows about.
+
 ### LLM Strategy ([src/infra/llm/](../src/infra/llm/))
 
 Four providers (`Anthropic`, `OpenAI`, `Gemini`, `xAI`) implement a
@@ -176,6 +310,13 @@ single `LLMProvider` interface and translate their SDK errors into
 `LlmProviderError`. `LLMService` selects a provider per request;
 `ModelCatalog` lists supported models and is published to the
 container by `LlmChatPlugin` under `TOKENS.ModelCatalog`.
+
+Two of the four speak the same wire protocol, so `OpenAIProvider` and
+`XAIProvider` are Template Method subclasses of
+[`OpenAICompatibleProvider`](../src/infra/llm/openai-compatible-provider.ts),
+each contributing only a spec: its name, its `baseURL`, and the
+web-search tool its Responses API expects. Anthropic and Gemini have
+their own SDK shapes and stand alone.
 
 `SelfHostedLlmClient` (`selfhosted-client.ts`) is a separate outbound
 adapter in the same layer for a lightweight self-hosted LLM endpoint. It
@@ -248,11 +389,33 @@ Generated registry         (src/handlers/<type>/registry.generated.ts)
 Handler index.ts           (src/handlers/<type>/<name>/index.ts)
 ```
 
+Buttons, modals, select menus and reactions are four instances of one
+shape, so each family's barrel is a spec (its generated registry, the
+noun its log lines use, and how its handler map is published on the bot)
+handed to the builders in
+[src/handlers/index.ts](../src/handlers/index.ts). Registration is
+best-effort — a throwing handler constructor disables that family and
+leaves the rest of the bot serving — and dispatch routes on the leading
+`<type>` segment of `customId`. Reactions carry no customId, so every
+registered reaction handler sees every reaction and decides for itself.
+
 Middleware lives in [src/bot/middlewares.ts](../src/bot/middlewares.ts).
 Handler-thrown `DomainError`s are caught at the router edge and
 rendered via `replyTranslated` ([src/handlers/reply-translated.ts](../src/handlers/reply-translated.ts) and
-[src/handlers/reply-for-error.ts](../src/handlers/reply-for-error.ts)) as
+[src/infra/discord/reply-for-error.ts](../src/infra/discord/reply-for-error.ts)) as
 i18n-aware ephemeral replies.
+
+`handlers` and `plugins` are **sibling** layers, so neither may import
+the other — and three plugins own Discord interaction bodies of their
+own (`giveaway`, `activity`, `temp-role`). The utilities both need
+therefore live one layer down, in `infra/`: option reading
+([src/infra/discord/options.ts](../src/infra/discord/options.ts)),
+error-to-reply mapping with the shared `traceId`
+([src/infra/discord/reply-for-error.ts](../src/infra/discord/reply-for-error.ts)),
+and the bounded outbound HTTP client
+([src/infra/http/](../src/infra/http/)). An ESLint
+`no-restricted-imports` rule fails the `plugins -> handlers` direction so
+the edge cannot silently return.
 
 The registry files are produced by
 [scripts/gen-registry.ts](../scripts/gen-registry.ts); a drift check
@@ -261,8 +424,8 @@ generated registry disagree.
 
 ## 4. Plugin lifecycle
 
-Plugins are processed in topological order over their declared
-dependency graph:
+Plugins are processed in registration order — the order each
+personality's constructor calls `this.use(...)`:
 
 1. `**init**` — runs before Discord login. The only phase where a
    plugin may publish a singleton via
@@ -272,18 +435,27 @@ dependency graph:
    subscriptions, registers low-frequency listeners, schedules jobs.
 3. `**onReady**` — runs once after `ClientReady`. Used for boot
    messages, startup checks.
-4. `**onShutdown**` — runs in **reverse** topological order during
+4. `**onShutdown**` — runs in **reverse** registration order during
    graceful shutdown (`SIGINT` / `SIGTERM`). Failures are logged but
-   never fatal.
+   never fatal, and disabled status does not skip it (see the Plugin
+   contract above).
 
-Critical plugins (`critical: true`) abort the bot on startup failure;
-non-critical plugins are marked disabled and the bot keeps running.
+A plugin whose hook throws is marked disabled and the bot keeps
+running. No plugin can abort startup: a feature module is optional by
+construction, so a failure in one is a degraded bot, not a dead one.
+
+A plugin that owns an HTTP listener (`earthquake`, `settings-api`)
+closes it through `closeServerBounded`
+([src/core/http/shutdown.ts](../src/core/http/shutdown.ts)), which
+destroys live sockets first and gives up after two seconds. Plain
+`server.close()` waits for every idle keep-alive connection, which would
+consume the whole shutdown budget the signal handler is working within.
 
 ## 5. Built-in plugins
 
 | Plugin                    | Path                               | Summary                                                                                                      |
 | ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `AutoReplyPlugin`         | `src/plugins/auto-reply/`          | `messageCreate` keyword + lucky replies and a dice roller                                                    |
+| `AutoReplyPlugin`         | `src/plugins/auto-reply/`          | `messageCreate` keyword replies, operator-configured per-user lucky replies, and a dice roller               |
 | `GuildEventsPlugin`       | `src/plugins/guild-events/`        | guild / member lifecycle events                                                                              |
 | `GiveawayPlugin`          | `src/plugins/giveaway/`            | scheduled giveaways (modal-driven create, select-menu delete) with reaction-driven winner selection          |
 | `TempRolePlugin`          | `src/plugins/temp-role/`           | temporary, permission-less self-claim notification roles with a hard 30-day expiry (nijika, tomori)          |
@@ -326,8 +498,8 @@ A CI parity check ensures the two locales stay key-aligned.
 
 ## 8. Design trade-offs
 
-Cross-cutting pattern choices; the full reasoning, including the rejected
-options, lives in [`docs/history/`](history/README.md).
+Cross-cutting pattern choices, and why each was preferred over the
+obvious alternative.
 
 - **Manual typed IoC, no `reflect-metadata` / DI framework** — a ~280-line
   `ServiceContainer` keeps the wiring explicit and the container's write face
@@ -344,15 +516,11 @@ options, lives in [`docs/history/`](history/README.md).
   selects at composition time instead.
 - **`PermissionRankPolicy` as a static, discord.js-free core service** built
   once in the `BaseBot` constructor, chosen over binding rank into
-  `GuildRegistry` to avoid event-before-registration races
-  (→ [0001](history/0001-permission-rank-privacy-model.md)).
+  `GuildRegistry` to avoid event-before-registration races.
 - **Full-ancestry effective rank**, folded monotonically over channel → parent
   → category so a private category gates everything beneath it and degrades
-  fail-safe when an ancestor is uncached
-  (→ [0002](history/0002-channel-aware-full-ancestry-rank.md)).
+  fail-safe when an ancestor is uncached.
 - **Index-served numeric timestamps** over a computed `$toLong` predicate, after
-  a one-time `db migrate-timestamp` backfill
-  (→ [0003](history/0003-migrate-timestamp-numeric-migration.md),
-  [0004](history/0004-index-served-timestamp-range-reads.md)).
+  a one-time `db migrate-timestamp` backfill.
 - **Fail-fast zod configuration** validated at startup; a malformed
   `permission_rank` block aborts the boot per-guild rather than fail-open.

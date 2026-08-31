@@ -19,20 +19,32 @@ import type { Client } from 'discord.js';
 
 import type { Logger } from '../core/logger';
 
-export interface InstallClientSafetyListenersInput {
+interface InstallClientSafetyListenersInput {
   readonly client: Client;
   readonly logger: Logger;
 }
 
 /**
+ * Clients that already carry these listeners.
+ *
+ * Node warns at ten listeners on one emitter and then stops warning, so
+ * a repeated install (a bot restarted in-process, a test that reuses a
+ * client) silently multiplied every connection-error line. A `WeakSet`
+ * keys off the client itself and lets a discarded client be collected.
+ */
+const guarded = new WeakSet<Client>();
+
+/**
  * Attach non-fatal listeners for the Discord client's connection-error
  * and shard-lifecycle events. Every handler only logs — none throws and
  * none tears the client down; discord.js owns reconnection.
+ *
+ * Idempotent per client: a second call for the same client is a no-op.
  */
-export const installClientSafetyListeners = (
-  input: InstallClientSafetyListenersInput,
-): void => {
+export const installClientSafetyListeners = (input: InstallClientSafetyListenersInput): void => {
   const { client, logger } = input;
+  if (guarded.has(client)) return;
+  guarded.add(client);
 
   client.on(Events.Error, (error) => {
     logger.error(

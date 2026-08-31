@@ -35,7 +35,7 @@ import type { LinkPreviewProvider, LinkPreviewProviderName } from './types';
 /** Default OG-cache TTL for the shared fetcher (avoids hammering flaky proxies). */
 const DEFAULT_OG_CACHE_TTL_MS = 10 * 60 * 1000;
 
-export interface LinkPreviewRegistryDeps {
+interface LinkPreviewRegistryDeps {
   /** OpenGraph fetcher shared by validation + Bahamut; defaults to a cached {@link OgClient}. */
   readonly ogClient?: OgClient;
   /** Twitter/X embed-proxy hosts, probed in list order. */

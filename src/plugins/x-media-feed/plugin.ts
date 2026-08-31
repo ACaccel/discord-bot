@@ -5,9 +5,7 @@
  * Lifecycle wiring only; the pass itself lives in `internal/poll.ts`.
  * `onReady` runs one pass immediately (so a restart surfaces anything
  * missed while the bot was down) and then drives a self-rescheduling
- * `setTimeout` loop, mirroring `message-backup`. The plugin contract's
- * `contributes.jobs` is deliberately not used: the host merges only
- * handler contributions, so a job declared there would never run.
+ * `setTimeout` loop, mirroring `message-backup`.
  *
  * Factory pattern (mirrors `createSocialLinkPreviewPlugin`): config is
  * parsed once at composition time — a malformed block fails the boot,
@@ -15,12 +13,12 @@
  * closure, so the returned object is pure data. `deps` exposes an
  * injectable `source` seam so tests run without the network.
  *
- * Not critical: a feed failure must never abort the bot. Every pass is
- * wrapped so a throw is logged and the loop always reschedules itself.
+ * Every pass is wrapped so a throw is logged and the loop always
+ * reschedules itself.
  */
 import { logError, logSystem } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
-import { TOKENS } from '../../core/plugin';
+import { TOKENS } from '../../bot/tokens';
 import { FxTwitterTimelineSource, type XTimelineSource } from '../../infra/x-feed';
 import { parseXMediaFeedConfig } from './config';
 import { reconcileCursors, runFeedPass } from './internal';
@@ -29,7 +27,7 @@ const PLUGIN_ID = 'x-media-feed';
 const PLUGIN_VERSION = '1.0.0';
 
 /** Optional collaborators wired by the composition root / tests. */
-export interface CreateXMediaFeedDeps {
+interface CreateXMediaFeedDeps {
   /** Timeline source; injectable so tests can supply fakes without the network. */
   readonly source?: XTimelineSource;
 }
@@ -56,8 +54,6 @@ export const createXMediaFeedPlugin = (
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    critical: false,
 
     async onReady(ctx): Promise<void> {
       if (!config.enabled) {
@@ -125,5 +121,3 @@ export const createXMediaFeedPlugin = (
     },
   };
 };
-
-export type { XMediaFeedPluginConfig, XMediaFeedAccount } from './config';

@@ -1,15 +1,8 @@
-import { type ChatInputCommandInteraction, MessageFlags } from 'discord.js';
+import type { ChatInputCommandInteraction } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { replyForError } from '../../reply-for-error';
-
-import { aggregateUserTraffic } from '../traffic-shared/aggregation-user';
-import { readTrafficStatsOptions } from '../traffic-shared/options';
-import type { TFn } from '../traffic-shared/types';
-import { buildUserTrafficView } from '../traffic-shared/user-view';
-import { buildAllowedChannelSet } from '../traffic-shared/visibility-filter';
-import { resolveWindow } from '../traffic-shared/window';
+import { runUserTrafficCommand } from '../traffic-shared/user-traffic-command';
 
 /**
  * `/traffic_me` — the invoker's personal message-activity stats over a
@@ -17,11 +10,9 @@ import { resolveWindow } from '../traffic-shared/window';
  * traffic, busiest period, rank among active users), a personal
  * time-trend line chart, and a personal channel-distribution bar chart.
  *
- * `visibility` mirrors `/traffic` (default `ephemeral`). Reuses the same
- * filter: a `public` reply is capped by both the invoker's clearance and
- * the command channel's rank (so a shared reply never exceeds the room's
- * level), while an `ephemeral` reply is capped by the invoker's clearance
- * alone. It thus sets both the ceiling and whether the reply is posted.
+ * The subject is the invoker, so the privacy filter and the counted user
+ * coincide. `visibility` mirrors `/traffic` (default `ephemeral`); see
+ * `traffic-shared/user-traffic-command` for the shared body.
  */
 export default class traffic_me extends Command {
   constructor() {
@@ -51,59 +42,12 @@ export default class traffic_me extends Command {
     interaction: ChatInputCommandInteraction,
     bot: BaseBot,
   ): Promise<void> {
-    const t: TFn = (key, params) => bot.translator?.t(key, params) ?? '';
-    // Read options before deferring: ephemerality is fixed at defer time.
-    const options = readTrafficStatsOptions(interaction);
-    await interaction.deferReply(
-      options.visibility === 'ephemeral' ? { flags: MessageFlags.Ephemeral } : {},
-    );
-    try {
-      const guild = interaction.guild;
-      if (!guild) {
-        await interaction.editReply({ content: t('errors:command.guild_not_found') });
-        return;
-      }
-      const repos = bot.getRepos(guild.id);
-      const policy = bot.permissionRankPolicy;
-      if (!repos || !policy) {
-        await interaction.editReply({ content: t('errors:db.not_configured') });
-        return;
-      }
-
-      const member = await guild.members.fetch(interaction.user.id);
-      const allowed = buildAllowedChannelSet({
-        guild,
-        member,
-        policy,
-        mode: options.visibility,
-        commandChannelId: interaction.channelId,
-      });
-
-      const window = resolveWindow(options.range, Date.now());
-      const aggregate = await aggregateUserTraffic(repos, window, allowed, interaction.user.id);
-      if (aggregate.userTotal === 0) {
-        await interaction.editReply({ content: t('replies:traffic_me.no_data') });
-        return;
-      }
-
-      const view = buildUserTrafficView(
-        aggregate,
-        options.topN,
-        options.range,
-        member.displayName,
-        guild,
-        t,
-        'traffic_me',
-      );
-      await interaction.editReply({ embeds: view.embeds, files: view.files });
-    } catch (error) {
-      await replyForError(
-        interaction,
-        bot,
-        error,
-        'replies:traffic_me.failed',
-        interaction.guild?.id,
-      );
-    }
+    await runUserTrafficCommand(interaction, bot, {
+      command: 'traffic_me',
+      resolveSubject: (_interaction, invoker) => ({
+        id: invoker.id,
+        displayName: invoker.displayName,
+      }),
+    });
   }
 }

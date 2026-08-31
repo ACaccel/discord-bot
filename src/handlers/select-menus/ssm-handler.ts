@@ -9,5 +9,5 @@ import type { StringSelectMenuInteraction } from 'discord.js';
 import type { BaseBot } from '@bot';
 
 export abstract class SSMHandler {
-    public abstract execute(interaction: StringSelectMenuInteraction, bot: BaseBot): Promise<void>;
+  public abstract execute(interaction: StringSelectMenuInteraction, bot: BaseBot): Promise<void>;
 }

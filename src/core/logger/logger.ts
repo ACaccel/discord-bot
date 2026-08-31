@@ -31,9 +31,7 @@ import pino, {
   type StreamEntry,
 } from 'pino';
 import { buildPinoRedactPaths } from '../config/redact';
-import { scrubForLog } from './scrub-for-log';
-
-export type { StreamEntry } from 'pino';
+import { scrubForLog, scrubUrlCredentials } from './scrub-for-log';
 
 /**
  * Application-facing logger surface. A subset of pino's API — keeping
@@ -62,7 +60,7 @@ export interface Logger {
 
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal' | 'silent';
 
-export interface CreateLoggerInput {
+interface CreateLoggerInput {
   /** pino level. Validated upstream by env schema. */
   readonly level: LogLevel;
   /** When true, route through pino-pretty for human-readable dev output. */
@@ -155,7 +153,10 @@ const wrap = (p: PinoLogger): Logger => {
     (objFn: LogFn, strFn: StringLogFn) =>
     (a: object | string, b?: string): void => {
       if (typeof a === 'string') {
-        strFn(a);
+        // A headline is a bare string, so the object walk never sees it.
+        // `guild-db-connector` passes a failed Mongo open's message here
+        // verbatim, and that message embeds the connection URI.
+        strFn(scrubUrlCredentials(a));
         return;
       }
       // scrubForLog deep-clones with sensitive top-level + nested keys

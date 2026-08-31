@@ -187,14 +187,6 @@
   "help": {
     "description": "顯示指令清單與說明"
   },
-  "inspect_member_ids": {
-    "description": "檢查多個 ID 是否在本 guild，並列出可查資訊",
-    "options": {
-      "ids": {
-        "description": "可貼多個 ID（逗號/空白/換行分隔）"
-      }
-    }
-  },
   "level_detail": {
     "description": "查看等級詳細資訊",
     "options": {

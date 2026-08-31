@@ -9,34 +9,42 @@ import { describe, expect, it, vi } from 'vitest';
 import { MessageFlags, type ButtonInteraction } from 'discord.js';
 
 import toggle_role from '../../../src/handlers/buttons/toggle_role';
-import type { BaseBot } from '../../../src/bot';
+import { buildFakeBot } from '../../fixtures/discord/bot-fake';
+import { buildGuild, buildGuildRoles } from '../../fixtures/discord/guild-builder';
+import { buildGuildMember, buildMemberRoles } from '../../fixtures/discord/member-builder';
 
-const translator = { t: (key: string) => key } as unknown as BaseBot['translator'];
-const bot = { translator } as unknown as BaseBot;
+const ROLE_ID = 'role-1';
 
-const makeMember = (hasRole: boolean) => ({
-  roles: {
-    cache: { has: () => hasRole },
-    add: vi.fn().mockResolvedValue(undefined),
-    remove: vi.fn().mockResolvedValue(undefined),
-  },
-});
+const { bot } = buildFakeBot();
 
-const makeInteraction = (
-  member: any,
-  role: { id: string; name: string } | undefined,
-): ButtonInteraction =>
-  ({
-    customId: 'toggle_role|role-1',
+/**
+ * Build the interaction plus the role spies the assertions read. `role`
+ * absent means the guild no longer resolves it — the role_not_found
+ * branch.
+ */
+const build = (opts: { readonly memberHasRole: boolean; readonly roleExists: boolean }) => {
+  const memberRoles = buildMemberRoles();
+  const member = buildGuildMember({
+    roleIds: opts.memberHasRole ? [ROLE_ID] : [],
+    roles: memberRoles,
+  });
+  const guild = buildGuild({
+    roles: buildGuildRoles({
+      roles: opts.roleExists ? [{ id: ROLE_ID, name: 'Notify' }] : [],
+    }),
+  });
+  const interaction = {
+    customId: `toggle_role|${ROLE_ID}`,
     member,
-    guild: { roles: { cache: { get: () => role } } },
+    guild,
     reply: vi.fn().mockResolvedValue(undefined),
-  }) as unknown as ButtonInteraction;
+  } as unknown as ButtonInteraction;
+  return { interaction, memberRoles };
+};
 
 describe('toggle_role button handler', () => {
   it('replies role_not_found when the role no longer exists', async () => {
-    const member = makeMember(false);
-    const interaction = makeInteraction(member, undefined);
+    const { interaction, memberRoles } = build({ memberHasRole: false, roleExists: false });
 
     await new toggle_role().execute(interaction, bot);
 
@@ -44,17 +52,16 @@ describe('toggle_role button handler', () => {
       content: 'replies:toggle_role.role_not_found',
       flags: MessageFlags.Ephemeral,
     });
-    expect(member.roles.add).not.toHaveBeenCalled();
-    expect(member.roles.remove).not.toHaveBeenCalled();
+    expect(memberRoles.add).not.toHaveBeenCalled();
+    expect(memberRoles.remove).not.toHaveBeenCalled();
   });
 
   it('removes the role and confirms when the member already has it', async () => {
-    const member = makeMember(true);
-    const interaction = makeInteraction(member, { id: 'role-1', name: 'Notify' });
+    const { interaction, memberRoles } = build({ memberHasRole: true, roleExists: true });
 
     await new toggle_role().execute(interaction, bot);
 
-    expect(member.roles.remove).toHaveBeenCalledWith('role-1');
+    expect(memberRoles.remove).toHaveBeenCalledWith(ROLE_ID);
     expect(interaction.reply).toHaveBeenCalledWith({
       content: 'replies:toggle_role.removed',
       flags: MessageFlags.Ephemeral,
@@ -62,12 +69,11 @@ describe('toggle_role button handler', () => {
   });
 
   it('adds the role and confirms when the member lacks it', async () => {
-    const member = makeMember(false);
-    const interaction = makeInteraction(member, { id: 'role-1', name: 'Notify' });
+    const { interaction, memberRoles } = build({ memberHasRole: false, roleExists: true });
 
     await new toggle_role().execute(interaction, bot);
 
-    expect(member.roles.add).toHaveBeenCalledWith('role-1');
+    expect(memberRoles.add).toHaveBeenCalledWith(ROLE_ID);
     expect(interaction.reply).toHaveBeenCalledWith({
       content: 'replies:toggle_role.added',
       flags: MessageFlags.Ephemeral,

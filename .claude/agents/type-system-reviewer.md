@@ -24,17 +24,20 @@ discipline — is doing the enforcing.
 - **`any` elimination**: no `any`, no `as any`, no
   `Record<string, X<any>>`. Replace with `unknown` plus narrowing. An
   intentional `any` must carry a comment justifying it.
-- **Branded / nominal types**: `GuildId` / `ChannelId` / `MessageId`
-  etc. live in `src/core/ids.ts`; `ServiceToken<T>` uses phantom
-  branding. Verify the phantom sits in a function position so `T` is
+- **Branded / nominal types**: `GuildId` and `ChannelId` live in
+  `src/core/ids.ts` — only ids the data layer keys on get a brand;
+  `ServiceToken<T>` uses phantom branding. Verify the phantom sits in a function position so `T` is
   invariant and unrelated tokens are not inter-assignable.
 - **Result / Either**: `Result<T, DomainError>` at use-case boundaries.
   A function returning `Result` must not also throw `DomainError`.
   Verify `isOk` / `isErr` narrowing is used, not raw `.value` access on
   an unchecked union.
-- **Discriminated unions + exhaustive switch**: `DomainError`
-  discriminates on `kind`; `switch` is exhaustive with a `never`
-  default arm; `noFallthroughCasesInSwitch` is satisfied.
+- **Discriminated unions + exhaustive switch**: outcome unions
+  discriminate on a literal `status` / `kind` field; `switch` is
+  exhaustive with a `never` default arm;
+  `noFallthroughCasesInSwitch` is satisfied. `DomainError` is the
+  exception — it is a class hierarchy narrowed by `instanceof`, and no
+  discriminant field is to be added to it.
 - **Generics**: variance is intentional; no needless type parameters;
   no `Function`; no over-broad constraints.
 - **Interface vs class**: cross-component dependencies are interfaces

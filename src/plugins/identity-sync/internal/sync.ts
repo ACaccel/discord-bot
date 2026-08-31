@@ -34,7 +34,7 @@ export interface IdentitySyncState {
   fallbackApplied: boolean;
 }
 
-export interface IdentitySyncDeps {
+interface IdentitySyncDeps {
   readonly client: Client;
   readonly config: IdentitySyncPluginConfig;
   readonly logger: Logger;

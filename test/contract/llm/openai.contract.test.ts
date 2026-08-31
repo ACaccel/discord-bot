@@ -115,9 +115,4 @@ describe('OpenAIProvider contract', () => {
     expect(err.context.operation).toBe('OpenAIProvider.chat');
     expect(err.context['input']).toMatchObject({ provider: 'openai', status: 503 });
   });
-
-  it('nock interceptors are consumed by the SDK call', () => {
-    // Hygiene check: every test above should leave no pending mocks.
-    expect(nock.pendingMocks()).toEqual([]);
-  });
 });

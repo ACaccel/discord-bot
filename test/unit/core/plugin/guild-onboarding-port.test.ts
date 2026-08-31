@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { createContainer } from '../../../../src/core/ioc';
-import { TOKENS } from '../../../../src/core/ioc/tokens';
+import { TOKENS } from '../../../../src/bot/tokens';
 import type { GuildOnboardingPort, GuildOnboardingResult } from '../../../../src/core/plugin';
 
 describe('GuildOnboardingPort contract', () => {

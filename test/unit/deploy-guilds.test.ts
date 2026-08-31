@@ -1,10 +1,10 @@
 /**
  * Unit tests for {@link fetchAllUserGuilds}.
  *
- * Regression: `Routes.userGuilds()` caps at 200 results per page, so the
- * deploy guild-command prune previously missed every guild beyond the
- * first page on bots in more than 200 guilds. These pin the `after`
- * cursor pagination and its termination conditions.
+ * `Routes.userGuilds()` caps at 200 results per page, so a bot in more
+ * than 200 guilds is only fully pruned if the fetch pages through them.
+ * These pin the `after` cursor pagination and its termination
+ * conditions.
  */
 import type { REST } from 'discord.js';
 import { describe, expect, it, vi } from 'vitest';

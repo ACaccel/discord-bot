@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { calculateCost, cheapestModel } from '../../../../src/infra/llm';
+import { calculateCost, cheapestModel, formatUsageFooter } from '../../../../src/infra/llm';
 
 describe('cheapestModel', () => {
   it('picks the lowest input-priced model among priced candidates', () => {
@@ -37,5 +37,26 @@ describe('cheapestModel', () => {
     ]) {
       expect(calculateCost(model, { inputTokens: 1_000_000, outputTokens: 0 })).not.toBeNull();
     }
+  });
+});
+
+describe('formatUsageFooter', () => {
+  const usage = { inputTokens: 1000, outputTokens: 200 };
+
+  it('renders the computed cost for a priced model', () => {
+    const footer = formatUsageFooter('gpt-5-nano', usage, 'UNKNOWN');
+    expect(footer).toContain('1000 in / 200 out');
+    expect(footer).not.toContain('UNKNOWN');
+  });
+
+  it('uses the caller-supplied label for an unpriced model', () => {
+    // `infra/` has no translator, so the copy must arrive already
+    // localised — the previous inline zh-TW literal shipped Chinese to
+    // every locale.
+    expect(formatUsageFooter('some-brand-new-model', usage, 'UNKNOWN')).toContain('UNKNOWN');
+  });
+
+  it('returns an empty footer when the provider reported no usage', () => {
+    expect(formatUsageFooter('gpt-5-nano', null, 'UNKNOWN')).toBe('');
   });
 });

@@ -58,7 +58,7 @@ export const buildSettingsModal = (
     .setStyle(TextInputStyle.Short)
     .setRequired(true)
     .setValue(current.temperature.toString())
-    .setPlaceholder('0.0 – 2.0');
+    .setPlaceholder(t('replies:ai_settings.temperature_placeholder'));
 
   const systemPromptInput = new TextInputBuilder()
     .setCustomId('system_prompt')
@@ -72,11 +72,17 @@ export const buildSettingsModal = (
     .setCustomId(`ai_settings|${provider}`)
     .setTitle(t('replies:ai_settings.modal_title', { provider }))
     .setLabelComponents(
-      new LabelBuilder().setLabel('Model').setStringSelectMenuComponent(modelSelect),
       new LabelBuilder()
-        .setLabel('Temperature (0.0 – 2.0)')
+        .setLabel(t('replies:ai_settings.label_model'))
+        .setStringSelectMenuComponent(modelSelect),
+      new LabelBuilder()
+        .setLabel(t('replies:ai_settings.label_temperature'))
         .setTextInputComponent(temperatureInput),
-      new LabelBuilder().setLabel('Web Search').setStringSelectMenuComponent(webSearchSelect),
-      new LabelBuilder().setLabel('System Prompt').setTextInputComponent(systemPromptInput),
+      new LabelBuilder()
+        .setLabel(t('replies:ai_settings.label_web_search'))
+        .setStringSelectMenuComponent(webSearchSelect),
+      new LabelBuilder()
+        .setLabel(t('replies:ai_settings.label_system_prompt'))
+        .setTextInputComponent(systemPromptInput),
     );
 };

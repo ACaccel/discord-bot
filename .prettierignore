@@ -4,5 +4,16 @@ coverage
 yarn.lock
 package-lock.json
 *.generated.ts
+
+# Operator-owned, gitignored: real credentials and live config.
 src/bot/**/config.json
 src/bot/**/.env
+
+# Gitignored working directories. Formatting them would fail the gate
+# on files that never reach the repository.
+.plan/
+/logs
+/data
+tools/**/config.json
+tools/msg_backup/tmp/
+.vitest-*.json

@@ -26,10 +26,14 @@ const makeBot = (repos: ReturnType<typeof makeRepos>) =>
   ({
     client: { guilds: { cache: new Map([[GUILD_ID, {}]]) } },
     getRepos: (guildId: string) => (guildId === GUILD_ID ? repos : undefined),
-    getGuildInfo: () => undefined,
-    getAllGuildInfo: () => new Map(),
-    jobs: new Map(),
-    logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+    guildRegistry: {
+      getRepos: (guildId: string) => (guildId === GUILD_ID ? repos : undefined),
+      getChannel: () => undefined,
+      getRole: () => undefined,
+      listGuildIds: () => [],
+    },
+    jobMap: new Map(),
+    requireLogger: () => ({ error: vi.fn(), info: vi.fn(), warn: vi.fn() }),
     translator,
   }) as unknown as BaseBot;
 
@@ -68,6 +72,36 @@ describe('handleGiveawayDeleteSelection', () => {
     expect(repos.giveaway.deleteByMessageId).not.toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith({
       content: 'replies:giveaway.missing_message_id',
+    });
+  });
+
+  it('answers a missing per-guild database with a catalog key, not a raw English reason', async () => {
+    const repos = makeRepos();
+    const bot = makeBot(repos);
+    // Registered guild, no repos bag: the `no_db` outcome.
+    (bot as unknown as { guildRegistry: { getRepos: () => undefined } }).guildRegistry.getRepos =
+      () => undefined;
+    const interaction = makeInteraction([MESSAGE_ID]);
+
+    await handleGiveawayDeleteSelection(interaction, bot);
+
+    // Previously the reply interpolated the literal 'Database not found'
+    // into the localised template, so a zh-TW user saw English.
+    expect(interaction.editReply).toHaveBeenCalledWith({ content: 'errors:db.not_found' });
+  });
+
+  it('answers an unknown guild with the shared guild-not-found key', async () => {
+    const repos = makeRepos();
+    const bot = makeBot(repos);
+    (bot as unknown as { client: { guilds: { cache: Map<string, unknown> } } }).client = {
+      guilds: { cache: new Map() },
+    };
+    const interaction = makeInteraction([MESSAGE_ID]);
+
+    await handleGiveawayDeleteSelection(interaction, bot);
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'errors:command.guild_not_found',
     });
   });
 });

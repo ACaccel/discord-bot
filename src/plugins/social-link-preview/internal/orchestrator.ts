@@ -20,7 +20,7 @@ import { renderPreview } from './render';
 import { applyOriginalMessageStrategy } from './suppress';
 
 /** Collaborators for {@link runSocialLinkPreview}; all injectable for tests. */
-export interface RunSocialLinkPreviewDeps {
+interface RunSocialLinkPreviewDeps {
   readonly registry: LinkPreviewProviderRegistry;
   readonly config: Pick<
     SocialLinkPreviewPluginConfig,

@@ -9,14 +9,6 @@ export {
   MissingTranslationError,
 } from './translator';
 export { I18NextTranslator, type CatalogResources } from './i18next-translator';
-export {
-  resolveLocale,
-  normalizeDiscordLocale,
-  type LocaleResolutionInputs,
-} from './locale-resolver';
-export {
-  loadCatalogResources,
-  createDefaultTranslator,
-  type LoadCatalogOptions,
-} from './catalog-loader';
+export { resolveLocale, normalizeDiscordLocale } from './locale-resolver';
+export { loadCatalogResources, createDefaultTranslator } from './catalog-loader';
 export { bindTranslator, type BoundTranslate } from './bind';

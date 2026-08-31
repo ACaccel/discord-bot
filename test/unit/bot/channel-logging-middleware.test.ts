@@ -1,8 +1,8 @@
 /**
  * Characterisation + behaviour test for the channel-logging middleware.
  *
- * Pins the load-bearing contract that the previously-untested suppression path
- * now upholds via {@link PermissionRankPolicy}: a command in a channel above
+ * Pins the load-bearing contract the suppression path upholds via
+ * {@link PermissionRankPolicy}: a command in a channel above
  * the `channel_logging` rank ceiling is kept OUT of the debug feed
  * (`sendChannelLog` not called), but the durable guild audit-log line
  * (`logGuildEvent`) ALWAYS fires — even for a suppressed channel and even
@@ -14,23 +14,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // `middlewares.ts` imports the interaction dispatchers (`@cmd` etc.), whose
 // barrels transitively load the generated handler registry. Stub them so the
 // test does not boot the entire command surface just to exercise logging.
-vi.mock('@cmd', () => ({
-  registerCommands: async (): Promise<void> => {},
-  getCommandJsonBody: (): unknown[] => [],
-  executeCommand: async (): Promise<void> => {},
-}));
-vi.mock('@button', () => ({
-  registerButtons: async (): Promise<void> => {},
-  executeButton: async (): Promise<void> => {},
-}));
-vi.mock('@modal', () => ({
-  registerModals: async (): Promise<void> => {},
-  executeModal: async (): Promise<void> => {},
-}));
-vi.mock('@select-menu', () => ({
-  registerSSMs: async (): Promise<void> => {},
-  executeSSM: async (): Promise<void> => {},
-}));
+import { barrelStubs } from '../../fixtures/handler-barrel-stubs';
+
+vi.mock('@cmd', () => barrelStubs.cmd);
+vi.mock('@button', () => barrelStubs.button);
+vi.mock('@modal', () => barrelStubs.modal);
+vi.mock('@select-menu', () => barrelStubs.selectMenu);
 
 // Mock the two log sinks the middleware drives; keep `ancestorChannelIdsOf`
 // real so the parent → category ancestry walk is exercised, not stubbed.

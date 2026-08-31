@@ -3,10 +3,9 @@ import { MessageFlags } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import type { ChannelId } from '../../../core/ids';
-import type { MessageDoc } from '../../../persistence/schemas/message.schema';
+import { asChannelId } from '../../../core/ids';
 
-import { replyForError } from '../../reply-for-error';
+import { replyForError } from '../../../infra/discord/reply-for-error';
 import { parseStartEnd } from './parse-range';
 import { sanitizeMentions } from './sanitize-mentions';
 import { chunkLines } from './chunk-output';
@@ -64,12 +63,12 @@ export default class db_list_message extends Command {
       }
       // A repo `err` is re-thrown into the surrounding catch.
       const messagesResult = await repos.message.findByChannelAndTimestampRange(
-        channel.id as ChannelId,
+        asChannelId(channel.id),
         range.startMs,
         range.endMs,
       );
       if (!messagesResult.ok) throw messagesResult.error;
-      const messages = messagesResult.value as unknown as MessageDoc[];
+      const messages = messagesResult.value;
       if (messages.length === 0) {
         const scopeText =
           hour === null || hour === undefined

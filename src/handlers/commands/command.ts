@@ -8,9 +8,9 @@
  * `registry.generated.ts`).
  */
 import type {
-    ChatInputCommandInteraction,
-    ContextMenuCommandInteraction,
-    ContextMenuCommandType,
+  ChatInputCommandInteraction,
+  ContextMenuCommandInteraction,
+  ContextMenuCommandType,
 } from 'discord.js';
 import type { BaseBot } from '@bot';
 
@@ -38,53 +38,53 @@ import type { Translator } from '../../core/i18n';
  * that omits `category` falls into `'other'`.
  */
 export type CommandCategory =
-    | 'auto_reply'
-    | 'fun'
-    | 'server_activity'
-    | 'utility'
-    | 'admin'
-    | 'ai'
-    | 'other';
+  | 'auto_reply'
+  | 'fun'
+  | 'server_activity'
+  | 'utility'
+  | 'admin'
+  | 'ai'
+  | 'other';
 
 export interface CommandConfig {
-    name: string; // command name for handler lookup and Discord registration
-    /** Resolved from `commands:<name>.description`; omitted by handlers. */
-    description?: string;
-    type?: ContextMenuCommandType; // for context menu commands, default is Chat Input
-    /** `/help` grouping key; defaults to `'other'` when a handler omits it. */
-    category?: CommandCategory;
-    options?: {
-        string?: CommandOption[];
-        number?: CommandOption[];
-        float?: CommandOption[];
-        user?: CommandOption[];
-        channel?: CommandOption[];
-        attachment?: CommandOption[];
-    };
+  name: string; // command name for handler lookup and Discord registration
+  /** Resolved from `commands:<name>.description`; omitted by handlers. */
+  description?: string;
+  type?: ContextMenuCommandType; // for context menu commands, default is Chat Input
+  /** `/help` grouping key; defaults to `'other'` when a handler omits it. */
+  category?: CommandCategory;
+  options?: {
+    string?: CommandOption[];
+    number?: CommandOption[];
+    float?: CommandOption[];
+    user?: CommandOption[];
+    channel?: CommandOption[];
+    attachment?: CommandOption[];
+  };
 }
 
 export interface CommandOption {
-    name: string;
-    /** Resolved from `commands:<cmd>.options.<name>.description`. */
-    description?: string;
-    required: boolean;
-    choices?: CommandChoice[];
-    /** Minimum numeric value (only applies to `number` and `float` options). */
-    min?: number;
-    /** Maximum numeric value (only applies to `number` and `float` options). */
-    max?: number;
+  name: string;
+  /** Resolved from `commands:<cmd>.options.<name>.description`. */
+  description?: string;
+  required: boolean;
+  choices?: CommandChoice[];
+  /** Minimum numeric value (only applies to `number` and `float` options). */
+  min?: number;
+  /** Maximum numeric value (only applies to `number` and `float` options). */
+  max?: number;
 }
 
-export interface CommandChoice {
-    /**
-     * Display label. Optional in the pre-localisation shape: a handler
-     * may omit it and let {@link localizeCommandConfig} fill it from
-     * `commands:<cmd>.options.<opt>.choices.<value>`. Handlers whose
-     * choice list is sourced from a colocated data file (e.g.
-     * `change_avatar`, `random_restaurant`) set it directly.
-     */
-    name?: string;
-    value: string;
+interface CommandChoice {
+  /**
+   * Display label. Optional in the pre-localisation shape: a handler
+   * may omit it and let {@link localizeCommandConfig} fill it from
+   * `commands:<cmd>.options.<opt>.choices.<value>`. Handlers whose
+   * choice list is sourced from a colocated data file (e.g.
+   * `change_avatar`, `random_restaurant`) set it directly.
+   */
+  name?: string;
+  value: string;
 }
 
 /**
@@ -94,26 +94,26 @@ export interface CommandChoice {
  * `description` fields are statically known to be present.
  */
 export interface LocalizedCommandConfig extends CommandConfig {
-    description: string;
-    options?: {
-        string?: LocalizedCommandOption[];
-        number?: LocalizedCommandOption[];
-        float?: LocalizedCommandOption[];
-        user?: LocalizedCommandOption[];
-        channel?: LocalizedCommandOption[];
-        attachment?: LocalizedCommandOption[];
-    };
+  description: string;
+  options?: {
+    string?: LocalizedCommandOption[];
+    number?: LocalizedCommandOption[];
+    float?: LocalizedCommandOption[];
+    user?: LocalizedCommandOption[];
+    channel?: LocalizedCommandOption[];
+    attachment?: LocalizedCommandOption[];
+  };
 }
 
 /** A {@link CommandOption} with its description and choices resolved. */
 export interface LocalizedCommandOption extends CommandOption {
-    description: string;
-    choices?: LocalizedCommandChoice[];
+  description: string;
+  choices?: LocalizedCommandChoice[];
 }
 
 /** A {@link CommandChoice} with its display label resolved. */
 export interface LocalizedCommandChoice extends CommandChoice {
-    name: string;
+  name: string;
 }
 
 /**
@@ -123,20 +123,36 @@ export interface LocalizedCommandChoice extends CommandChoice {
  * object the dispatcher invokes polymorphically through `execute`.
  */
 export abstract class Command {
-    public config: CommandConfig;
+  public config: CommandConfig;
 
-    public constructor() {
-        this.config = { name: '' };
-    }
+  public constructor() {
+    this.config = { name: '' };
+  }
 
-    public setConfig(config: CommandConfig): void {
-        this.config = config;
-    }
+  public setConfig(config: CommandConfig): void {
+    this.config = config;
+  }
 
-    public abstract execute(
-        interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction,
-        bot: BaseBot,
-    ): Promise<void>;
+  /**
+   * Optional startup validation of the operator's `config.json`.
+   *
+   * A handler that needs a per-bot configuration block (an upstream
+   * endpoint, a location id) implements this and throws when the
+   * block is missing or malformed. `registerCommands` calls it once
+   * per enabled command, logs the failure with its cause, and skips
+   * registering that command — so a misconfiguration surfaces in the
+   * boot log rather than as a puzzling reply the first time someone
+   * runs the command.
+   *
+   * @param botConfig - the personality's parsed `config.json`.
+   * @throws when the required configuration is absent or invalid.
+   */
+  public validateBotConfig?(botConfig: unknown): void;
+
+  public abstract execute(
+    interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction,
+    bot: BaseBot,
+  ): Promise<void>;
 }
 
 /**
@@ -153,49 +169,48 @@ export abstract class Command {
  * a shallow copy; the input is not mutated.
  */
 export const localizeCommandConfig = (
-    config: CommandConfig,
-    translator: Translator | undefined,
+  config: CommandConfig,
+  translator: Translator | undefined,
 ): LocalizedCommandConfig => {
-    const t = (key: string): string => translator?.t(key) ?? '';
-    const isContextMenu = config.type !== undefined;
-    const localizeOption = (opt: CommandOption): LocalizedCommandOption => {
-        const { choices, ...rest } = opt;
-        const localizedChoices = choices?.map(
-            (choice): LocalizedCommandChoice => ({
-                value: choice.value,
-                // A choice that already carries a `name` (data-file sourced)
-                // keeps it; otherwise the label is resolved by stable `value`.
-                name:
-                    choice.name ??
-                    t(`commands:${config.name}.options.${opt.name}.choices.${choice.value}`),
-            }),
-        );
-        return {
-            ...rest,
-            description: t(`commands:${config.name}.options.${opt.name}.description`),
-            ...(localizedChoices ? { choices: localizedChoices } : {}),
-        };
-    };
-
-    const localizedOptions: LocalizedCommandConfig['options'] | undefined = config.options
-        ? Object.fromEntries(
-              Object.entries(config.options).map(([optType, opts]) => [
-                  optType,
-                  (opts as CommandOption[]).map((opt) => localizeOption(opt)),
-              ]),
-          )
-        : undefined;
-
+  const t = (key: string): string => translator?.t(key) ?? '';
+  const isContextMenu = config.type !== undefined;
+  const localizeOption = (opt: CommandOption): LocalizedCommandOption => {
+    const { choices, ...rest } = opt;
+    const localizedChoices = choices?.map(
+      (choice): LocalizedCommandChoice => ({
+        value: choice.value,
+        // A choice that already carries a `name` (data-file sourced)
+        // keeps it; otherwise the label is resolved by stable `value`.
+        name:
+          choice.name ?? t(`commands:${config.name}.options.${opt.name}.choices.${choice.value}`),
+      }),
+    );
     return {
-        // A context-menu command's `config.name` is a stable ASCII id
-        // (the handler directory name); its user-facing Discord name is
-        // resolved from `commands:<id>.name`. Chat-input commands keep
-        // their name (Discord requires a lowercase-ASCII command name,
-        // which the id already is).
-        name: isContextMenu ? t(`commands:${config.name}.name`) : config.name,
-        ...(config.type !== undefined ? { type: config.type } : {}),
-        // Context-menu commands carry no description; chat-input commands do.
-        description: isContextMenu ? '' : t(`commands:${config.name}.description`),
-        ...(localizedOptions ? { options: localizedOptions } : {}),
+      ...rest,
+      description: t(`commands:${config.name}.options.${opt.name}.description`),
+      ...(localizedChoices ? { choices: localizedChoices } : {}),
     };
+  };
+
+  const localizedOptions: LocalizedCommandConfig['options'] | undefined = config.options
+    ? Object.fromEntries(
+        Object.entries(config.options).map(([optType, opts]) => [
+          optType,
+          (opts as CommandOption[]).map((opt) => localizeOption(opt)),
+        ]),
+      )
+    : undefined;
+
+  return {
+    // A context-menu command's `config.name` is a stable ASCII id
+    // (the handler directory name); its user-facing Discord name is
+    // resolved from `commands:<id>.name`. Chat-input commands keep
+    // their name (Discord requires a lowercase-ASCII command name,
+    // which the id already is).
+    name: isContextMenu ? t(`commands:${config.name}.name`) : config.name,
+    ...(config.type !== undefined ? { type: config.type } : {}),
+    // Context-menu commands carry no description; chat-input commands do.
+    description: isContextMenu ? '' : t(`commands:${config.name}.description`),
+    ...(localizedOptions ? { options: localizedOptions } : {}),
+  };
 };

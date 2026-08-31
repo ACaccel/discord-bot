@@ -85,7 +85,7 @@ describe('scheduleGiveaway channel resolution (thread / uncached channel)', () =
     expect(channelsFetch).toHaveBeenCalledWith(CHANNEL_ID);
     expect(channel.send).toHaveBeenCalledTimes(1);
     expect(repos.giveaway.deleteByMessageId).toHaveBeenCalledWith(MESSAGE_ID);
-    expect(result).toBeNull();
+    expect(result).toEqual({ status: 'completed' });
   });
 
   it('fails cleanly when neither cache nor fetch resolves the channel', async () => {
@@ -94,7 +94,7 @@ describe('scheduleGiveaway channel resolution (thread / uncached channel)', () =
 
     const result = await scheduleGiveaway(makeDeps(repos, channelsFetch), GUILD_ID, MESSAGE_ID);
 
-    expect(result).toBe('Giveaway channel not found');
+    expect(result).toEqual({ status: 'channel_not_found' });
     expect(repos.giveaway.deleteByMessageId).not.toHaveBeenCalled();
   });
 });

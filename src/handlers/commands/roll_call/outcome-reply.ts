@@ -4,7 +4,7 @@ import type { ResolveTargetsOutcome } from './resolve-targets';
 export type RollCallFailure = Exclude<ResolveTargetsOutcome, { status: 'ok' }>;
 
 /** A translator key plus optional interpolation params for a reply. */
-export interface OutcomeReply {
+interface OutcomeReply {
   readonly key: string;
   readonly params?: Record<string, string | number>;
 }

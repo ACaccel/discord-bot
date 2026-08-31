@@ -12,7 +12,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { err, ok } from '../../../src/core/result';
 import { createLogger } from '../../../src/core/logger';
 import { systemClock, createFakeClock } from '../../../src/core/time';
-import { createContainer, TOKENS } from '../../../src/core/ioc';
+import { createContainer } from '../../../src/core/ioc';
+import { TOKENS } from '../../../src/bot/tokens';
 import { databaseErrorFrom } from '../../../src/persistence/error-translator';
 import type { PluginRuntimeContext } from '../../../src/core/plugin';
 import { createTempRolePlugin } from '../../../src/plugins/temp-role';
@@ -24,6 +25,8 @@ import {
   MAX_GUILD_ROLES,
   type TempRoleDeps,
 } from '../../../src/plugins/temp-role/internal/temp-role';
+import { buildGuild, buildGuildRoles } from '../../fixtures/discord/guild-builder';
+import { buildSendableChannel } from '../../fixtures/discord/channel-builder';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // A fixed point well in the real future so node-schedule (which runs on
@@ -52,22 +55,17 @@ const makeRepos = (overrides: FakeReposOverrides = {}) => ({
   },
 });
 
-const makeMessage = () => ({ id: 'msg-1', delete: vi.fn().mockResolvedValue(undefined) });
+/**
+ * Guild / channel stand-ins for the create path. The spies come back
+ * alongside the typed value so assertions and `mockRejectedValue` reach
+ * them without casting the Discord type open again.
+ */
+const makeGuild = (roleCount: number) => {
+  const roles = buildGuildRoles({ roleCount });
+  return { guild: buildGuild({ id: 'g1', roles }), roles };
+};
 
-const makeChannel = (sendable: boolean, message = makeMessage()) => ({
-  id: 'chan-1',
-  isSendable: () => sendable,
-  send: vi.fn().mockResolvedValue(message),
-});
-
-const makeGuild = (roleCount: number) => ({
-  id: 'g1',
-  roles: {
-    cache: { size: roleCount },
-    create: vi.fn().mockResolvedValue({ id: 'role-1' }),
-    delete: vi.fn().mockResolvedValue(undefined),
-  },
-});
+const makeChannel = (sendable: boolean) => buildSendableChannel({ sendable });
 
 // Track every job map handed out so afterEach can cancel real
 // node-schedule timers and keep them from leaking past a test.
@@ -116,47 +114,47 @@ afterEach(() => {
 describe('createTempRole', () => {
   it('returns role_limit at the guild role ceiling and creates no role', async () => {
     const deps = makeDeps({ repos: makeRepos() });
-    const guild = makeGuild(MAX_GUILD_ROLES);
-    const channel = makeChannel(true);
+    const { guild, roles } = makeGuild(MAX_GUILD_ROLES);
+    const { channel } = makeChannel(true);
 
     const outcome = await createTempRole(deps, {
-      guild: guild as any,
-      channel: channel as any,
+      guild,
+      channel,
       creatorId: 'u1',
       roleName: 'Notify',
       days: 7,
     });
 
     expect(outcome.status).toBe('role_limit');
-    expect(guild.roles.create).not.toHaveBeenCalled();
+    expect(roles.create).not.toHaveBeenCalled();
   });
 
   it('returns no_db when the guild has no repository hookup', async () => {
     const deps = makeDeps({ repos: undefined });
-    const guild = makeGuild(10);
-    const channel = makeChannel(true);
+    const { guild, roles } = makeGuild(10);
+    const { channel } = makeChannel(true);
 
     const outcome = await createTempRole(deps, {
-      guild: guild as any,
-      channel: channel as any,
+      guild,
+      channel,
       creatorId: 'u1',
       roleName: 'Notify',
       days: 7,
     });
 
     expect(outcome.status).toBe('no_db');
-    expect(guild.roles.create).not.toHaveBeenCalled();
+    expect(roles.create).not.toHaveBeenCalled();
   });
 
   it('creates a permission-less mentionable role, persists it, and schedules expiry', async () => {
     const repos = makeRepos();
     const deps = makeDeps({ repos });
-    const guild = makeGuild(10);
-    const channel = makeChannel(true);
+    const { guild, roles } = makeGuild(10);
+    const { channel, send } = makeChannel(true);
 
     const outcome = await createTempRole(deps, {
-      guild: guild as any,
-      channel: channel as any,
+      guild,
+      channel,
       creatorId: 'u1',
       roleName: 'Notify',
       days: 7,
@@ -164,10 +162,10 @@ describe('createTempRole', () => {
 
     const expectedExpiry = BASE_NOW + 7 * MS_PER_DAY;
     expect(outcome).toEqual({ status: 'created', roleId: 'role-1', expiresAt: expectedExpiry });
-    expect(guild.roles.create).toHaveBeenCalledWith(
+    expect(roles.create).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Notify', mentionable: true, permissions: [] }),
     );
-    expect(channel.send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(1);
     expect(repos.tempRole.create).toHaveBeenCalledWith(
       expect.objectContaining({
         role_id: 'role-1',
@@ -184,40 +182,39 @@ describe('createTempRole', () => {
   it('deletes the orphan role when the announcement fails', async () => {
     const repos = makeRepos();
     const deps = makeDeps({ repos });
-    const guild = makeGuild(10);
-    const channel = makeChannel(false); // not sendable -> announce returns null
+    const { guild, roles } = makeGuild(10);
+    const { channel } = makeChannel(false); // not sendable -> announce returns null
 
     const outcome = await createTempRole(deps, {
-      guild: guild as any,
-      channel: channel as any,
+      guild,
+      channel,
       creatorId: 'u1',
       roleName: 'Notify',
       days: 7,
     });
 
     expect(outcome.status).toBe('announce_failed');
-    expect(guild.roles.delete).toHaveBeenCalledWith('role-1', expect.any(String));
+    expect(roles.delete).toHaveBeenCalledWith('role-1', expect.any(String));
     expect(repos.tempRole.create).not.toHaveBeenCalled();
   });
 
   it('rolls back the role + message and rethrows when persistence fails', async () => {
     const repos = makeRepos({ create: vi.fn().mockResolvedValue(dbErr()) });
     const deps = makeDeps({ repos });
-    const guild = makeGuild(10);
-    const message = makeMessage();
-    const channel = makeChannel(true, message);
+    const { guild, roles } = makeGuild(10);
+    const { channel, message } = makeChannel(true);
 
     await expect(
       createTempRole(deps, {
-        guild: guild as any,
-        channel: channel as any,
+        guild,
+        channel,
         creatorId: 'u1',
         roleName: 'Notify',
         days: 7,
       }),
     ).rejects.toBeDefined();
 
-    expect(guild.roles.delete).toHaveBeenCalledWith('role-1', expect.any(String));
+    expect(roles.delete).toHaveBeenCalledWith('role-1', expect.any(String));
     expect(message.delete).toHaveBeenCalledTimes(1);
     expect(deps.jobMap.has(tempRoleJobKey('role-1'))).toBe(false);
   });
@@ -225,16 +222,16 @@ describe('createTempRole', () => {
   it('maps a Discord max-roles rejection to role_limit', async () => {
     const repos = makeRepos();
     const deps = makeDeps({ repos });
-    const guild = makeGuild(10); // cache lags below the ceiling
-    const channel = makeChannel(true);
+    const { guild, roles } = makeGuild(10); // cache lags below the ceiling
+    const { channel } = makeChannel(true);
     // Discord rejects at the hard 250-role ceiling the cache missed.
     const maxRolesError = Object.create(DiscordAPIError.prototype) as DiscordAPIError;
     (maxRolesError as { code: number }).code = 30005;
-    guild.roles.create.mockRejectedValue(maxRolesError);
+    roles.create.mockRejectedValue(maxRolesError);
 
     const outcome = await createTempRole(deps, {
-      guild: guild as any,
-      channel: channel as any,
+      guild,
+      channel,
       creatorId: 'u1',
       roleName: 'Notify',
       days: 7,
@@ -422,13 +419,6 @@ describe('createTempRolePlugin', () => {
       resolve: container.resolve.bind(container) as PluginRuntimeContext['resolve'],
     };
   };
-
-  it('has the expected plugin shape', () => {
-    const p = createTempRolePlugin();
-    expect(p.id).toBe('temp-role');
-    expect(p.scope).toBe('bot');
-    expect(p.onReady).toBeTypeOf('function');
-  });
 
   it('onReady runs to completion with an empty registry', async () => {
     const p = createTempRolePlugin();

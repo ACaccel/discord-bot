@@ -17,8 +17,7 @@
   },
   "llm_chat": {
     "thinking": "🤔 Thinking...",
-    "api_error": "An error occurred while calling the AI API. Please try again later.",
-    "missing_api_key": "The API key for provider `{{provider}}` is not set (please set `{{envVar}}` in .env)."
+    "cost_unknown": "~$? (unknown model pricing)"
   },
   "menu_get_avatar": {
     "avatar_url_field": "Avatar URL",
@@ -31,14 +30,11 @@
   },
   "auto_reply": {
     "goodnight_reply": "Not good for your health! <:ave_mortis_bad_for_health:1333052644368846878>",
-    "fatcat_line": "Fat cat is so gay",
-    "mubaimu_line": "Haruto Jay",
     "long_hair_line": "Go to the spa"
   },
   "gay": {
     "is_gay": "{{name}} is gay",
-    "is_not_gay": "{{name}} is not gay",
-    "failed": "Hmm... the verdict failed this time. Give it another try later! (error code: {{traceId}})"
+    "is_not_gay": "{{name}} is not gay"
   },
   "add_reply": {
     "added": "Added input: {{input}} reply: {{reply}}!",
@@ -65,7 +61,11 @@
     "system_prompt_placeholder": "(Optional) Set a role or rules for the AI",
     "model_list_unavailable": "The available model list for `{{provider}}` cannot be retrieved right now. Possible causes: the API key is not set, a temporary network failure, or the service is still loading after startup. Please wait a moment and try again.",
     "modal_title": "AI settings — {{provider}}",
-    "system_prompt_preview": "`{{preview}}…` ({{length}} characters total, truncated)",
+    "label_model": "Model",
+    "label_temperature": "Temperature (0.0 – 2.0)",
+    "label_web_search": "Web Search",
+    "label_system_prompt": "System Prompt",
+    "temperature_placeholder": "0.0 – 2.0",
     "system_prompt_not_set": "(not set)",
     "updated_header": "✅ AI settings updated:",
     "modal_system_prompt_preview": "\n```\n{{preview}}\n…({{length}} characters total, truncated)\n```",
@@ -89,13 +89,13 @@
     "timeout_reason": "Lady Sakiko's timeout verdict!"
   },
   "bubble_wrap": {
-    "too_long": "The string is too long. Please shorten it to within 64 characters.",
-    "failed": "Hmm... generating the bubble wrap failed. Give it another try later! (error code: {{traceId}})"
+    "too_long": "The string is too long. Please shorten it to within 64 characters."
   },
   "bug_report": {
     "empty_content": "Please enter some content.",
     "failed": "Could not report the bug. (error code: {{traceId}})",
-    "reported": "Bug reported! Content: {{content}}"
+    "reported": "Bug reported! Content: {{content}}",
+    "admin_dm": "Bug report from {{reporter}}: {{content}}"
   },
   "change_avatar": {
     "no_role_config": "No role configuration found.",
@@ -155,34 +155,6 @@
       "ai": "🤖 AI Chat",
       "other": "📦 Other"
     }
-  },
-  "inspect_member_ids": {
-    "no_valid_id": "No valid ID found. Please enter Discord IDs of 17-20 digits.",
-    "embed_failed": "Could not build the inspection result.",
-    "failed": "Suspicious ID inspection failed. (error code: {{traceId}})",
-    "not_in_guild_line": "**In this server**: No",
-    "user_not_found_line": "**User info**: No data (may not exist, not cached, or inaccessible)",
-    "parse_failed_line": "**Status**: Could not parse user data",
-    "profile_link_line": "**Clickable profile**: [Open Profile](https://discord.com/users/{{id}})",
-    "in_guild_line": "**In this server**: {{value}}",
-    "account_type_line": "**Account type**: {{value}}",
-    "created_at_line": "**Account created at**: {{value}}",
-    "system_user_line": "**System User**: {{value}}",
-    "joined_at_line": "**Joined server at**: {{value}}",
-    "display_name_line": "**Display Name**: {{value}}",
-    "timed_out_line": "**Timed Out**: {{value}}",
-    "timeout_until_line": "**Timeout expires**: {{value}}",
-    "pending_line": "**Pending member verification**: {{value}}",
-    "highest_role_line": "**Highest role**: {{value}}",
-    "role_count_line": "**Role count**: {{value}}",
-    "top_roles_line": "**Top 10 roles**: {{value}}",
-    "boost_since_line": "**Boosting since**: {{value}}",
-    "kickable_line": "**Kickable**: {{value}}",
-    "bannable_line": "**Bannable**: {{value}}",
-    "yes": "Yes",
-    "no": "No",
-    "title": "Suspicious ID inspection {{current}}/{{total}}",
-    "exceeds_max": "Up to {{max}} entries can be checked at once; {{dropped}} were ignored."
   },
   "level_detail": {
     "too_long": "Too long... please choose a shorter range.",
@@ -268,14 +240,12 @@
   },
   "talk": {
     "missing_args": "Please enter a channel and content.",
-    "send_failed": "Could not send the message.",
     "tag_warning": "{{user}}, you naughty one — I caught you tagging everyone.",
     "failed": "Hmm... the message couldn't be sent. Give it another try later! (error code: {{traceId}})"
   },
   "talk_signed": {
     "missing_args": "Please enter some content.",
     "member_not_found": "Could not get the member information.",
-    "send_failed": "Could not send the message.",
     "tag_warning": "{{displayName}} ({{username}}), you naughty one — I caught you tagging everyone.",
     "failed": "Hmm... the message couldn't be sent. Give it another try later! (error code: {{traceId}})"
   },
@@ -378,9 +348,7 @@
     "create_announce_failed": "Could not create the giveaway.",
     "create_failed": "Could not run the giveaway.",
     "missing_message_id": "Please provide the giveaway message ID.",
-    "delete_failed_with_reason": "Could not delete the giveaway: {{reason}}",
     "delete_success": "Giveaway deleted.",
-    "delete_failed": "Could not delete the giveaway.",
     "no_active_giveaways": "There are no active giveaways.",
     "delete_select_placeholder": "Select a giveaway to delete",
     "delete_option_label": "{{prize}} — ends at {{endTime}}",
@@ -404,15 +372,10 @@
     "failed": "Hmm... the giveaway operation failed. Give it another try later! (error code: {{traceId}})"
   },
   "activity": {
-    "missing_required_fields": "Please enter the activity title and duration.",
     "invalid_duration": "Invalid duration.",
     "create_announce_failed": "Could not create the activity.",
-    "create_failed": "Could not create the activity.",
     "create_success": "Activity created!\n**Activity ID**: {{activityId}}\nIt will end at {{endTime}}.",
-    "missing_activity_id": "Please provide the activity ID.",
-    "delete_failed_with_reason": "Could not delete the activity: {{reason}}",
     "delete_success": "Activity deleted.",
-    "delete_failed": "Could not delete the activity.",
     "announce_title": "📢 Activity: {{title}}",
     "announce_field_id": "🆔 Activity ID",
     "announce_field_description": "📌 Description",

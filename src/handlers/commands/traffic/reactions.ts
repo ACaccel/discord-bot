@@ -6,10 +6,20 @@
  * character in `name`, so the same name on two different custom emojis
  * never collides.
  */
-import type { TopReaction } from './types';
+/**
+ * Most-used reaction emoji over the window. `id` is the custom-emoji
+ * snowflake (null for a unicode emoji, whose `name` is the character
+ * itself); `animated` drives the `<a:…>` vs `<:…>` render token.
+ */
+export interface TopReaction {
+  readonly name: string;
+  readonly id: string | null;
+  readonly animated: boolean;
+  readonly count: number;
+}
 
 /** The reaction fields the backup persists (see message.schema). */
-export interface RawReaction {
+interface RawReaction {
   readonly name?: string | null;
   readonly id?: string | null;
   readonly animated?: boolean | null;

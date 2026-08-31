@@ -12,8 +12,9 @@ not just the happy path.
 ## Error-handling contract
 
 - infra / persistence failures throw `DomainError` subclasses
-  (`DatabaseError`, `LlmProviderError`, `DiscordApiError`, ...) — never
-  raw `Error` / `TypeError` to express a domain failure. Each carries
+  (`DatabaseError`, `LlmProviderError`, `LinkPreviewError`,
+  `XFeedError`, `ConfigurationError`) — never raw `Error` / `TypeError`
+  to express a domain failure. Each carries
   `code`, `messageKey`, `messageParams`, `context.operation`, `cause`.
 - Programmer errors (contract violations, invariants) use native
   `TypeError` / `RangeError` and must NOT be swallowed into a `Result`
@@ -38,13 +39,12 @@ not just the happy path.
   `isDisabled()`.
 - **Partial-failure isolation**: one failing guild / plugin / subscriber
   must not abort the others. `EventDispatcher.emit` isolates per
-  subscriber; `PluginHost` cascades disable to dependents without
-  aborting the phase (non-critical) and escalates only `critical`
-  plugins.
-- **Lifecycle ordering**: `init -> start -> onReady` is topological;
-  `onShutdown` is reverse-topological and always non-fatal; events do
-  not flow before `startAll()` resolves; `unsubscribeAll` always runs
-  on shutdown.
+  subscriber; `PluginHost` disables a plugin whose hook threw and
+  carries on with the phase — no plugin can abort startup.
+- **Lifecycle ordering**: `init -> start -> onReady` runs in
+  registration order; `onShutdown` runs in reverse and is always
+  non-fatal; events do not flow before `startAll()` resolves;
+  `unsubscribeAll` always runs on shutdown.
 - **Race conditions**: in-flight de-duplication (e.g. the `pending`
   map in `MongoConnectionManager`), ready-latch ordering (the
   `ClientReady` once-listener must be armed before `login()`),

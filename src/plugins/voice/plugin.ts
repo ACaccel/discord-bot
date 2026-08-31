@@ -9,7 +9,7 @@
  * token from the IoC container. There is exactly one path — IoC token
  * resolution — from plugin to consumer, with no module-scope holder.
  */
-import { TOKENS } from '../../core/plugin';
+import { TOKENS } from '../../bot/tokens';
 import type { Plugin } from '../../core/plugin';
 import { VoiceController } from './internal';
 
@@ -20,8 +20,6 @@ export const createVoicePlugin = (): Plugin => {
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    critical: false,
 
     async init(ctx): Promise<void> {
       const client = ctx.resolve(TOKENS.DiscordClient);

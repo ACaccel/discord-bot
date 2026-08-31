@@ -15,14 +15,16 @@ import {
   type ChartRow,
   type TrafficChartData,
 } from '../traffic-shared/chart';
+import type { TFn, TrafficRange } from '../traffic-shared/types';
 import { bucketLabel } from '../traffic-shared/window';
 
+import type { TrafficAggregate } from './aggregation';
 import { buildOverviewEmbed } from './overview';
-import type { TFn, TrafficAggregate, TrafficRange, TrafficTrend } from './types';
+import type { TrafficTrend } from './trend';
 
 const EMBED_COLOR = 0x5865f2;
 
-export interface TrafficView {
+interface TrafficView {
   readonly embeds: EmbedBuilder[];
   readonly charts: TrafficChartData;
 }

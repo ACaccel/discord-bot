@@ -69,7 +69,13 @@ export const runLlmAutoReply = async (
   // requirement above still applies.
   const forced = mentionsBot(message, deps.clientId);
   const windowMs = deps.config.windowSeconds * 1000;
-  if (!forced && !isWithinWindow(chronological.map((m) => m.createdTimestamp), windowMs))
+  if (
+    !forced &&
+    !isWithinWindow(
+      chronological.map((m) => m.createdTimestamp),
+      windowMs,
+    )
+  )
     return false;
 
   const items: readonly TranscriptMessage[] = chronological.map((m) => ({

@@ -1,18 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AutoReplyPlugin, rollDice } from '../../../src/plugins/auto-reply';
-
-describe('AutoReplyPlugin shape', () => {
-  it('declares id, version, scope and a messageCreate subscription', () => {
-    expect(AutoReplyPlugin.id).toBe('auto-reply');
-    expect(AutoReplyPlugin.version).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(AutoReplyPlugin.scope).toBe('bot');
-    expect(AutoReplyPlugin.events?.messageCreate).toBeTypeOf('function');
-  });
-
-  it('is not marked critical (failures must not abort the bot)', () => {
-    expect(AutoReplyPlugin.critical === true).toBe(false);
-  });
-});
+import { rollDice } from '../../../src/plugins/auto-reply';
 
 describe('AutoReplyPlugin.rollDice', () => {
   it('returns null when the input is not a dice expression', () => {
@@ -26,11 +13,11 @@ describe('AutoReplyPlugin.rollDice', () => {
     expect(result).toMatch(/^🎲 3d6: \[\d+, \d+, \d+\]$/);
   });
 
-  it('rejects ranges outside the legacy bounds', () => {
+  it('rejects ranges outside the supported bounds', () => {
     expect(rollDice('0d6')).toMatch(/^out of range/);
     expect(rollDice('101d6')).toMatch(/^out of range/);
     expect(rollDice('1d0')).toMatch(/^out of range/);
-    // 2^30 + 1 sides — the legacy ceiling is enforced.
+    // 2^30 + 1 sides — the ceiling is enforced.
     expect(rollDice(`1d${(2 ** 30 + 1).toString()}`)).toMatch(/^out of range/);
   });
 

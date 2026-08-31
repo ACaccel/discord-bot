@@ -2,18 +2,22 @@ import { defineWorkspace } from 'vitest/config';
 import path from 'path';
 
 /**
- * Vitest workspace — defines five independent projects (unit,
- * integration, contract, i18n, tools). Each project's include glob is
- * the ground truth for what files it picks up; the corresponding yarn
- * script (`test:unit`, `test:int`, `test:contract`, `test:i18n`,
- * `test:tools`) selects via `--project <name>`.
+ * Vitest workspace — defines six independent projects (unit,
+ * integration, integration-nodb, contract, i18n, tools). Each project's
+ * include glob is the ground truth for what files it picks up; the
+ * corresponding yarn script (`test:unit`, `test:int`, `test:contract`,
+ * `test:i18n`, `test:tools`) selects via `--project <name>`.
  *
  * CI runs the integration and contract projects with `--reporter=json`
  * and fails the build if `numTotalTestSuites` is zero, catching a
  * broken project glob that would otherwise pass silently.
  *
- * `globalSetup` for the integration project owns the
- * mongodb-memory-server lifecycle.
+ * `globalSetup` for the `integration` project owns the
+ * mongodb-memory-server lifecycle. `integration-nodb` holds the
+ * integration suites that bind a real TCP port but touch no database:
+ * they get their own project so a memory-server failure cannot fail
+ * tests that never needed a database, and so they run in parallel
+ * instead of paying the Mongo suite's single-fork serialisation.
  */
 /**
  * Path aliases mirrored from `tsconfig.json` so handler-layer unit
@@ -50,6 +54,17 @@ const aliases = {
  */
 const TEST_TIMEOUT_MS = 20000;
 
+/**
+ * Integration suites that need no database. Listed once and used both
+ * as the `integration-nodb` include and the `integration` exclude, so
+ * the two projects cannot drift into overlapping or dropping a file.
+ */
+const NO_DB_INTEGRATION = [
+  'test/integration/core/http/**/*.test.ts',
+  'test/integration/plugins/earthquake-route.int.test.ts',
+  'test/integration/plugins/settings-api-route.int.test.ts',
+];
+
 export default defineWorkspace([
   {
     test: {
@@ -63,8 +78,19 @@ export default defineWorkspace([
   },
   {
     test: {
+      name: 'integration-nodb',
+      include: NO_DB_INTEGRATION,
+      environment: 'node',
+      env: testEnv,
+      testTimeout: TEST_TIMEOUT_MS,
+    },
+    resolve: { alias: aliases },
+  },
+  {
+    test: {
       name: 'integration',
       include: ['test/integration/**/*.test.ts'],
+      exclude: NO_DB_INTEGRATION,
       environment: 'node',
       env: testEnv,
       testTimeout: TEST_TIMEOUT_MS,

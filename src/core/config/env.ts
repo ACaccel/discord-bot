@@ -79,45 +79,58 @@ const llmKeySchema = z.preprocess(
   z.string().min(1).optional(),
 );
 
+/**
+ * The typed environment contract, as a zod shape.
+ *
+ * `Env` is derived from this rather than restated: a hand-written type
+ * beside a hand-written destructure is exactly how `ACCUWEATHER_KEY`
+ * came to exist in both the schema and the type while never reaching
+ * the returned object, silently disabling `/weather_forecast` on every
+ * deployment. Adding a key here now updates the type, the runtime
+ * projection, and the contract test at once.
+ */
+const envShape = {
+  TOKEN: nonPlaceholder('TOKEN'),
+  CLIENT_ID: nonPlaceholder('CLIENT_ID'),
+  MONGO_URI: mongoUriSchema.optional(),
+  /** HTTP port for the earthquake webhook (nijika) / settings API (gopher). */
+  PORT: z.coerce.number().int().positive().optional(),
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
+  /** Optional per-provider LLM API keys. Absent when the deployment does not use that provider. */
+  OPENAI_API_KEY: llmKeySchema,
+  ANTHROPIC_API_KEY: llmKeySchema,
+  GEMINI_API_KEY: llmKeySchema,
+  XAI_API_KEY: llmKeySchema,
+  /** AccuWeather API key. Optional — only required for the weather_forecast slash command. */
+  ACCUWEATHER_KEY: z.string().min(1).optional(),
+  /**
+   * Bearer key for gopher's settings REST API. Optional — only gopher
+   * sets it; the settings-api plugin refuses to start (when enabled)
+   * without it, so a secret never lives in config.json.
+   */
+  GOPHER_SETTINGS_API_KEY: z.string().min(1).optional(),
+} as const;
+
 const envSchema = z
-  .object({
-    TOKEN: nonPlaceholder('TOKEN'),
-    CLIENT_ID: nonPlaceholder('CLIENT_ID'),
-    MONGO_URI: mongoUriSchema.optional(),
-    PORT: z.coerce.number().int().positive().optional(),
-    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-    LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
-    OPENAI_API_KEY: llmKeySchema,
-    ANTHROPIC_API_KEY: llmKeySchema,
-    GEMINI_API_KEY: llmKeySchema,
-    XAI_API_KEY: llmKeySchema,
-    ACCUWEATHER_KEY: z.string().min(1).optional(),
-    // Bearer key for gopher's settings REST API. Optional — only gopher
-    // sets it; the settings-api plugin refuses to start (when enabled)
-    // without it, so a secret never lives in config.json.
-    GOPHER_SETTINGS_API_KEY: z.string().min(1).optional(),
-  })
+  .object(envShape)
   // Allow unknown env vars (Node, OS, shell tooling all add their own) but
   // only the typed keys above are returned to callers.
   .passthrough();
 
-export type Env = Readonly<{
-  TOKEN: string;
-  CLIENT_ID: string;
-  MONGO_URI?: string;
-  PORT?: number;
-  NODE_ENV: 'development' | 'test' | 'production';
-  LOG_LEVEL: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-  /** Optional per-provider LLM API keys. Empty when the deployment does not use that provider. */
-  OPENAI_API_KEY?: string;
-  ANTHROPIC_API_KEY?: string;
-  GEMINI_API_KEY?: string;
-  XAI_API_KEY?: string;
-  /** AccuWeather API key. Optional — only required for the weather_forecast slash command. */
-  ACCUWEATHER_KEY?: string;
-  /** Bearer key for gopher's settings REST API. Optional — only gopher uses it. */
-  GOPHER_SETTINGS_API_KEY?: string;
-}>;
+export type Env = Readonly<z.infer<z.ZodObject<typeof envShape>>>;
+
+/**
+ * Every typed key {@link loadEnv} carries through to its result.
+ *
+ * This is the projection `loadEnv` applies to strip the unknown keys
+ * `.passthrough()` admits. Exported so the env contract test can assert
+ * the closure at runtime, complementing the compile-time guarantee
+ * `Env` gets from the same shape.
+ */
+export const ENV_KEYS: readonly (keyof Env)[] = Object.freeze(
+  Object.keys(envShape) as (keyof Env)[],
+);
 
 /**
  * Structured aggregation of every zod validation failure for the parsed
@@ -136,7 +149,7 @@ export class EnvLoadError extends Error {
   }
 }
 
-export interface LoadEnvOptions {
+interface LoadEnvOptions {
   /**
    * Path to a `.env` file to load before parsing. Resolved relative to
    * `process.cwd()` if not absolute. Omit to read only `process.env`.
@@ -202,36 +215,19 @@ export const loadEnv = (options: LoadEnvOptions = {}): Env => {
     return handleFailure(parseResult.error.issues, exitOnFailure);
   }
 
-  // Destructure only the known keys — this filters out unknown keys that
-  // .passthrough() let into parseResult.data and keeps the returned object
-  // narrow. (Do not "simplify" by spreading parseResult.data; that would
-  // defeat the strip-unknown-keys guarantee asserted in env.test.ts.)
-  const {
-    TOKEN,
-    CLIENT_ID,
-    MONGO_URI,
-    PORT,
-    NODE_ENV,
-    LOG_LEVEL,
-    OPENAI_API_KEY,
-    ANTHROPIC_API_KEY,
-    GEMINI_API_KEY,
-    XAI_API_KEY,
-    GOPHER_SETTINGS_API_KEY,
-  } = parseResult.data;
-  const env: Env = Object.freeze({
-    TOKEN,
-    CLIENT_ID,
-    ...(MONGO_URI !== undefined && { MONGO_URI }),
-    ...(PORT !== undefined && { PORT }),
-    NODE_ENV,
-    LOG_LEVEL,
-    ...(OPENAI_API_KEY !== undefined && { OPENAI_API_KEY }),
-    ...(ANTHROPIC_API_KEY !== undefined && { ANTHROPIC_API_KEY }),
-    ...(GEMINI_API_KEY !== undefined && { GEMINI_API_KEY }),
-    ...(XAI_API_KEY !== undefined && { XAI_API_KEY }),
-    ...(GOPHER_SETTINGS_API_KEY !== undefined && { GOPHER_SETTINGS_API_KEY }),
-  });
+  // Project onto the schema's own keys — this filters out the unknown
+  // keys `.passthrough()` let into parseResult.data and keeps the
+  // returned object narrow. (Do not "simplify" by spreading
+  // parseResult.data; that would defeat the strip-unknown-keys guarantee
+  // asserted in env.test.ts.) Absent optionals are omitted rather than
+  // set to `undefined`, so `'KEY' in env` stays a meaningful test.
+  const parsed = parseResult.data as Record<string, unknown>;
+  const projected: Record<string, unknown> = {};
+  for (const key of ENV_KEYS) {
+    const value = parsed[key];
+    if (value !== undefined) projected[key] = value;
+  }
+  const env = Object.freeze(projected) as Env;
 
   if (env.NODE_ENV === 'production' && env.LOG_LEVEL === 'debug') {
     process.stderr.write(

@@ -9,6 +9,7 @@ import {
   MAX_TEMP_ROLE_DAYS,
 } from './temp-role';
 import { buildTempRoleDepsFromBot } from './deps-from-bot';
+import { getOptionalNumber, getRequiredString } from '../../../infra/discord/options';
 
 /**
  * `/temp_role` — create a permission-less, mentionable role that anyone
@@ -35,8 +36,8 @@ export const handleTempRoleCreate = async (
   const t = bindTranslator(bot.translator);
   const deps = buildTempRoleDepsFromBot(bot);
 
-  const name = interaction.options.get('name')?.value as string | null;
-  const daysRaw = interaction.options.get('days')?.value as number | null;
+  const name = getRequiredString(interaction, 'name');
+  const daysRaw = getOptionalNumber(interaction, 'days');
 
   if (!name || name.trim().length === 0) {
     await interaction.editReply({ content: t('replies:temp_role.missing_name') });

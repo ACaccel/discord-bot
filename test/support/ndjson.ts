@@ -8,7 +8,7 @@
  */
 import { vi, type MockInstance } from 'vitest';
 
-export interface NdjsonLine {
+interface NdjsonLine {
   readonly level: number;
   readonly levelLabel?: string;
   readonly event: string;
@@ -17,7 +17,7 @@ export interface NdjsonLine {
   readonly [key: string]: unknown;
 }
 
-export interface NdjsonCapture {
+interface NdjsonCapture {
   readonly lines: () => NdjsonLine[];
   readonly restore: () => void;
   readonly spy: MockInstance<typeof process.stderr.write>;

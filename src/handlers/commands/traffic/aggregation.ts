@@ -1,17 +1,49 @@
 /**
  * Chunked, privacy-filtered aggregation for `/traffic`. Messages are
- * fetched a day at a time and folded into one mutable accumulator
- * (mirroring `emoji_frequency`'s heap discipline) so a long window never
- * holds more than a day of documents at once. Window resolution lives in
+ * folded into one mutable accumulator (mirroring `emoji_frequency`'s
+ * heap discipline); the window layout and the day-sized fetch loop come
+ * from `../traffic-shared/aggregation-common`, window resolution from
  * `../traffic-shared/window`.
  */
 import type { MessageDoc } from '../../../persistence/schemas/message.schema';
 import type { Repos } from '../../../persistence/repositories';
 
-import { DAY_MS } from '../traffic-shared/window';
+import {
+  bucketExtremes,
+  bump,
+  bumpBucket,
+  createBuckets,
+  forEachDayChunk,
+  windowDaysOf,
+} from '../traffic-shared/aggregation-common';
+import type { BucketCount, BucketGranularity, TimeWindow } from '../traffic-shared/types';
 
-import { tallyReactions, topReactionOf, type ReactionTally } from './reactions';
-import type { BucketCount, TimeWindow, TrafficAggregate } from './types';
+import { tallyReactions, topReactionOf, type ReactionTally, type TopReaction } from './reactions';
+
+/**
+ * Privacy-filtered traffic statistics over a window. Every counter is
+ * derived only from messages in channels the invoker may see (see
+ * `../traffic-shared/visibility-filter`), so the whole aggregate is safe
+ * to render.
+ */
+export interface TrafficAggregate {
+  readonly totalMessages: number;
+  readonly perChannel: ReadonlyMap<string, number>;
+  readonly channelNames: ReadonlyMap<string, string>;
+  readonly perUser: ReadonlyMap<string, number>;
+  readonly userNames: ReadonlyMap<string, string>;
+  readonly buckets: readonly BucketCount[];
+  readonly bucket: BucketGranularity;
+  readonly totalReactions: number;
+  readonly topReaction: TopReaction | null;
+  readonly activeChannels: number;
+  readonly activeUsers: number;
+  readonly topUserCount: number;
+  readonly dailyAverage: number;
+  readonly busiest: BucketCount | null;
+  readonly quietest: BucketCount | null;
+  readonly windowDays: number;
+}
 
 interface Accumulator {
   totalMessages: number;
@@ -24,26 +56,16 @@ interface Accumulator {
   readonly buckets: BucketCount[];
 }
 
-const initAccumulator = (window: TimeWindow): Accumulator => {
-  const buckets: BucketCount[] = [];
-  for (let i = 0; i < window.bucketCount; i++) {
-    buckets.push({ startMs: window.startMs + i * window.bucketMs, count: 0 });
-  }
-  return {
-    totalMessages: 0,
-    totalReactions: 0,
-    perChannel: new Map(),
-    channelNames: new Map(),
-    perUser: new Map(),
-    userNames: new Map(),
-    reactionTallies: new Map(),
-    buckets,
-  };
-};
-
-const bump = (map: Map<string, number>, key: string): void => {
-  map.set(key, (map.get(key) ?? 0) + 1);
-};
+const initAccumulator = (window: TimeWindow): Accumulator => ({
+  totalMessages: 0,
+  totalReactions: 0,
+  perChannel: new Map(),
+  channelNames: new Map(),
+  perUser: new Map(),
+  userNames: new Map(),
+  reactionTallies: new Map(),
+  buckets: createBuckets(window),
+});
 
 /**
  * Fold a chunk of messages into the accumulator. The privacy filter is
@@ -63,11 +85,7 @@ const accumulateChunk = (
     acc.channelNames.set(m.channelId, m.channelName);
     bump(acc.perUser, m.userId);
     acc.userNames.set(m.userId, m.userName);
-    const idx = Math.floor((m.timestamp - window.startMs) / window.bucketMs);
-    if (idx >= 0 && idx < acc.buckets.length) {
-      const bucket = acc.buckets[idx];
-      if (bucket) bucket.count++;
-    }
+    bumpBucket(acc.buckets, window, m.timestamp);
     // Sum per-emoji so finalize can surface the window's top reaction.
     acc.totalReactions += tallyReactions(m.reactions ?? [], acc.reactionTallies);
   }
@@ -81,16 +99,9 @@ const maxCount = (counts: ReadonlyMap<string, number>): number => {
 };
 
 const finalize = (acc: Accumulator, window: TimeWindow): TrafficAggregate => {
-  // Single pass yields both the peak and the trough bucket; on a tie the
-  // earliest bucket wins (mirrors the busiest-bucket convention).
-  let busiest: BucketCount | null = null;
-  let quietest: BucketCount | null = null;
-  for (const bucket of acc.buckets) {
-    if (busiest === null || bucket.count > busiest.count) busiest = bucket;
-    if (quietest === null || bucket.count < quietest.count) quietest = bucket;
-  }
+  const { busiest, quietest } = bucketExtremes(acc.buckets);
   const hasActivity = acc.totalMessages > 0;
-  const windowDays = Math.max(1, (window.endMs - window.startMs) / DAY_MS);
+  const windowDays = windowDaysOf(window);
   return {
     totalMessages: acc.totalMessages,
     perChannel: acc.perChannel,
@@ -113,8 +124,7 @@ const finalize = (acc: Accumulator, window: TimeWindow): TrafficAggregate => {
 
 /**
  * Fetch the window's messages in day-sized chunks and fold them into a
- * privacy-filtered aggregate. A repo error is re-thrown to the handler
- * boundary (`replyForError`).
+ * privacy-filtered aggregate.
  */
 export const aggregateTraffic = async (
   repos: Pick<Repos, 'message'>,
@@ -122,11 +132,8 @@ export const aggregateTraffic = async (
   allowed: ReadonlySet<string>,
 ): Promise<TrafficAggregate> => {
   const acc = initAccumulator(window);
-  for (let chunkStart = window.startMs; chunkStart < window.endMs; chunkStart += DAY_MS) {
-    const chunkEnd = Math.min(chunkStart + DAY_MS, window.endMs);
-    const result = await repos.message.findByTimestampRange(chunkStart, chunkEnd);
-    if (!result.ok) throw result.error;
-    accumulateChunk(result.value, acc, allowed, window);
-  }
+  await forEachDayChunk(repos, window, (messages) =>
+    accumulateChunk(messages, acc, allowed, window),
+  );
   return finalize(acc, window);
 };

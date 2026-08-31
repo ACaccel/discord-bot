@@ -50,7 +50,7 @@ import { Writable } from 'node:stream';
 
 import type { StreamEntry } from 'pino';
 
-export interface FileRouterOptions {
+interface FileRouterOptions {
   /** Root directory under which `<botId>[/<guildId>]/<date>.log` lives. */
   readonly rootDir: string;
 }
@@ -89,9 +89,41 @@ const cacheKey = (botId: string, guildId: string | undefined): string => {
   return `${botId}|${guild}`;
 };
 
-const openStream = (filePath: string): WriteStream => {
+/**
+ * Report a file-sink failure on stderr.
+ *
+ * Deliberately not routed through the logger: the logger is the thing
+ * that just failed, so re-entering it would either loop or drop the
+ * report. stderr is the one sink that is still available.
+ */
+/**
+ * How long a failed sink target is left alone before the next record
+ * tries to reopen it.
+ */
+const SINK_RETRY_COOLDOWN_MS = 60_000;
+
+const reportSinkFailure = (filePath: string, err: unknown): void => {
+  const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+  process.stderr.write(
+    `file-router-transport: log sink ${filePath} failed (${reason}); ` +
+      'continuing without it. Records still reach the other configured streams.\n',
+  );
+};
+
+/**
+ * Open an append stream, routing its `'error'` event to `onError`.
+ *
+ * A disk-level failure (ENOSPC, EACCES, an unmounted volume) surfaces
+ * as an `'error'` event. With no listener Node rethrows it as an
+ * `uncaughtException`, which `installProcessHandlers` classifies as
+ * fatal — a full disk would take the whole bot down. Attaching a
+ * listener is what turns that into a degraded file sink.
+ */
+const openStream = (filePath: string, onError: (err: Error) => void): WriteStream => {
   mkdirSync(dirname(filePath), { recursive: true });
-  return createWriteStream(filePath, { flags: 'a', encoding: 'utf8' });
+  const stream = createWriteStream(filePath, { flags: 'a', encoding: 'utf8' });
+  stream.on('error', onError);
+  return stream;
 };
 
 const endStreamAsync = (stream: WriteStream): Promise<void> =>
@@ -124,6 +156,13 @@ export const createFileRouterStream = (options: FileRouterOptions): Writable => 
   }
   const rootDir = options.rootDir;
   const cache = new Map<string, CachedStream>();
+  /**
+   * Cache key -> earliest time the sink may retry it. A persistent
+   * failure (ENOSPC, a revoked mount) would otherwise re-open the file
+   * and re-report on *every* record, turning one disk problem into an
+   * unbounded stderr flood at log volume.
+   */
+  const retryAfter = new Map<string, number>();
   // Buffer for partial lines (defensive; pino writes complete lines).
   let pending = '';
 
@@ -155,6 +194,10 @@ export const createFileRouterStream = (options: FileRouterOptions): Writable => 
     }
     const guildId = typeof obj['guildId'] === 'string' ? (obj['guildId'] as string) : undefined;
     const cached = openOrRefresh(botId, guildId);
+    // The file sink is degraded (the target could not be opened); the
+    // failure is already on stderr and the other configured streams
+    // still carry this record.
+    if (cached === undefined) return;
     // `bot` is path-encoded (the parent directory names the bot), so
     // strip it from the JSON record before serialising. `guildId` stays
     // — cross-guild aggregators key on it without seeing the file path.
@@ -168,20 +211,49 @@ export const createFileRouterStream = (options: FileRouterOptions): Writable => 
     cached.stream.write(`${JSON.stringify(rest)}\n`);
   };
 
-  const openOrRefresh = (botId: string, guildId: string | undefined): CachedStream => {
+  /**
+   * Return the cached stream for `(bot, guild)`, opening or rotating it
+   * as needed. Returns `undefined` when the target cannot be opened —
+   * the sink degrades rather than propagating a disk failure into the
+   * caller's write path.
+   */
+  const openOrRefresh = (botId: string, guildId: string | undefined): CachedStream | undefined => {
     const key = cacheKey(botId, guildId);
     const date = localDateKey(new Date());
     const existing = cache.get(key);
     if (existing !== undefined && existing.date === date) {
       return existing;
     }
+    const backoffUntil = retryAfter.get(key);
+    if (backoffUntil !== undefined && Date.now() < backoffUntil) return undefined;
     if (existing !== undefined) {
       // Day rolled over — fire-and-forget close the prior stream.
       void endStreamAsync(existing.stream);
       cache.delete(key);
     }
     const filePath = targetFilePath(rootDir, botId, guildId, date);
-    const fresh: CachedStream = { date, stream: openStream(filePath) };
+    let fresh: CachedStream;
+    try {
+      fresh = {
+        date,
+        // The `'error'` listener fires asynchronously, so `fresh` is
+        // always assigned by the time this closure runs.
+        stream: openStream(filePath, (err) => {
+          reportSinkFailure(filePath, err);
+          retryAfter.set(key, Date.now() + SINK_RETRY_COOLDOWN_MS);
+          // Evict only if this is still the live entry: a day rollover
+          // may already have replaced it, and dropping the successor
+          // would lose a healthy stream.
+          if (cache.get(key) === fresh) cache.delete(key);
+        }),
+      };
+    } catch (err: unknown) {
+      // `mkdirSync` / `createWriteStream` throw synchronously on a
+      // permission or space failure.
+      reportSinkFailure(filePath, err);
+      retryAfter.set(key, Date.now() + SINK_RETRY_COOLDOWN_MS);
+      return undefined;
+    }
     cache.set(key, fresh);
     return fresh;
   };
@@ -274,13 +346,23 @@ export const createFixedPathFileStream = (filePath: string): Writable => {
   }
   mkdirSync(dirname(filePath), { recursive: true });
   const stream = createWriteStream(filePath, { flags: 'a', encoding: 'utf8' });
+  // Same degrade policy as the routed sink: report a disk failure on
+  // stderr instead of letting the unhandled `'error'` event escalate to
+  // a fatal `uncaughtException`.
+  stream.on('error', (err) => {
+    reportSinkFailure(filePath, err);
+  });
   return new Writable({
     decodeStrings: false,
     write(chunk: string | Buffer, _enc, cb): void {
-      const ok = stream.write(chunk, (err) => {
-        if (err) cb(err);
+      // One callback, invoked exactly once by Node when the chunk is
+      // flushed or the write fails, and it doubles as the backpressure
+      // signal. The failure itself is reported by the `'error'` listener
+      // above, so the callback completes the write unconditionally: a
+      // failed log write must not fail the logger that produced it.
+      stream.write(chunk, () => {
+        cb();
       });
-      if (ok) cb();
     },
     final(cb): void {
       stream.once('close', () => {
@@ -290,18 +372,3 @@ export const createFixedPathFileStream = (filePath: string): Writable => {
     },
   });
 };
-
-/**
- * Composition-root-facing factory for the fixed-path append sink.
- * Mirrors {@link createFileSink}'s signature so a caller can stack
- * both into one logger: one routed sink for the full log, one
- * fixed-path sink filtered to `error` for the operator's quick-look
- * channel.
- */
-export const createFixedPathFileSink = (options: {
-  readonly filePath: string;
-  readonly level: StreamEntry['level'];
-}): StreamEntry => ({
-  level: options.level,
-  stream: createFixedPathFileStream(options.filePath),
-});

@@ -1,65 +1,45 @@
 /**
  * Composition test for the Nijika personality.
  *
- * Pins the post-port contract: nijika keeps its full interactive plugin
- * set but NO LONGER registers `llm-auto-reply` (that feature moved to the
- * gopher personality). A regression that re-adds it — or drops one of the
- * remaining plugins — is caught here by spying on `BaseBot.prototype.use`.
+ * Pins nijika's plugin set: the full interactive suite, without
+ * `llm-auto-reply` (a gopher-only feature). Adding it here — or dropping
+ * one of the registered plugins — is caught by spying on
+ * `BaseBot.prototype.use`.
  */
 /* eslint-disable import/first */
 import { describe, expect, it, vi } from 'vitest';
-import type { Client } from 'discord.js';
 
-vi.mock('@cmd', () => ({
-  registerCommands: async (): Promise<void> => {},
-  getCommandJsonBody: (): unknown[] => [],
-  executeCommand: async (): Promise<void> => {},
-}));
-vi.mock('@button', () => ({
-  registerButtons: async (): Promise<void> => {},
-  executeButton: async (): Promise<void> => {},
-}));
-vi.mock('@modal', () => ({
-  registerModals: async (): Promise<void> => {},
-  executeModal: async (): Promise<void> => {},
-}));
-vi.mock('@select-menu', () => ({
-  registerSSMs: async (): Promise<void> => {},
-  executeSSM: async (): Promise<void> => {},
-}));
-vi.mock('@reaction', () => ({
-  registerReactions: async (): Promise<void> => {},
-  executeReactionAdded: async (): Promise<void> => {},
-  executeReactionRemoved: async (): Promise<void> => {},
-}));
+import { buildInertClient } from '../../fixtures/discord/client-builder';
+import { barrelStubs } from '../../fixtures/handler-barrel-stubs';
+
+vi.mock('@cmd', () => barrelStubs.cmd);
+vi.mock('@button', () => barrelStubs.button);
+vi.mock('@modal', () => barrelStubs.modal);
+vi.mock('@select-menu', () => barrelStubs.selectMenu);
+vi.mock('@reaction', () => barrelStubs.reaction);
 
 import { BaseBot } from '../../../src/bot/index';
 import { Nijika } from '../../../src/bot/nijika/nijika';
 import type { Plugin } from '../../../src/core/plugin';
 
-const fakeClient = (): Client =>
-  ({
-    user: null,
-    guilds: { cache: new Map() },
-    channels: { cache: new Map() },
-    application: null,
-    on: () => undefined,
-    once: () => undefined,
-    off: () => undefined,
-    destroy: () => undefined,
-  }) as unknown as Client;
-
 const collectRegisteredPluginIds = (): string[] => {
   const ids: string[] = [];
   const useSpy = vi.spyOn(BaseBot.prototype, 'use').mockImplementation(function (
     this: BaseBot,
-    plugin: Plugin<unknown>,
+    plugin: Plugin,
   ) {
     ids.push(plugin.id);
     return this;
   });
   try {
-    new Nijika(fakeClient(), 'token', '', 'bot-client', { commands: [], level_roles: {} }, 3000);
+    new Nijika(
+      buildInertClient(),
+      'token',
+      '',
+      'bot-client',
+      { commands: [], level_roles: {} },
+      3000,
+    );
   } finally {
     useSpy.mockRestore();
   }

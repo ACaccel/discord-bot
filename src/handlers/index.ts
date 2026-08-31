@@ -1,10 +1,13 @@
 /**
- * Generic handler registry / factory.
+ * Generic handler registry / factory, plus the barrel builders the four
+ * custom-id handler families share.
  *
  * Handlers are wired up through the codegen path: `scripts/gen-registry.ts`
  * writes each handler subdirectory's `registry.generated.ts`, and the
  * factory registers every entry from those statically-imported objects.
  */
+import type { BaseBot } from '@bot';
+import { logError, logSystem } from '@core/logger';
 
 type HandlerConstructor<T> = new () => T;
 
@@ -46,3 +49,77 @@ export class HandlerFactory<T> {
     return handlers;
   }
 }
+
+/**
+ * What a handler family tells the barrel builders about itself: where
+ * its generated registry lives, the noun its log lines use, and how its
+ * handler map is published on / read back from the bot.
+ */
+export interface HandlerBarrelSpec<T> {
+  readonly registry: HandlerRegistry<T>;
+  /** Noun the registration log lines name this handler family by. */
+  readonly label: string;
+  readonly assign: (bot: BaseBot, handlers: Map<string, T>) => void;
+  /**
+   * Read the map back. `BaseBot` seeds every family with an empty map,
+   * so this is never absent — a family whose registration failed is an
+   * empty map, and its components are ignored rather than answered.
+   */
+  readonly read: (bot: BaseBot) => Map<string, T>;
+}
+
+/**
+ * Build a family's `register<X>` entry point.
+ *
+ * The `HandlerFactory` is populated at module-evaluation time so a
+ * duplicate name in the generated registry fails at import rather than
+ * at the first interaction. Registration itself never throws: a broken
+ * handler constructor leaves the bot serving every other family.
+ */
+export const createHandlerRegistrar = <T>(
+  spec: HandlerBarrelSpec<T>,
+): ((bot: BaseBot) => Promise<void>) => {
+  const factory = new HandlerFactory<T>();
+  factory.registerFromRegistry(spec.registry);
+  return async (bot: BaseBot): Promise<void> => {
+    logSystem(bot.logger, `Registering ${spec.label} handlers...`);
+    try {
+      const handlers = factory.createAll();
+      spec.assign(bot, handlers);
+      logSystem(bot.logger, `Successfully register ${handlers.size} ${spec.label} handlers.`);
+    } catch (err) {
+      // Both lines on purpose: the `logSystem` line keeps the failure
+      // visible in the startup narrative next to the other families,
+      // while `logError` carries the stack and `cause` an operator needs
+      // (the same shape `registerCommands` uses for a bad command).
+      logSystem(bot.logger, `Failed to register ${spec.label} handlers: ${err}`);
+      logError(bot.logger, null, err);
+    }
+  };
+};
+
+/** Minimum surface the custom-id dispatcher needs from a handler. */
+interface CustomIdHandler<TInteraction> {
+  execute(interaction: TInteraction, bot: BaseBot): Promise<void>;
+}
+
+/**
+ * Build a family's `execute<X>` entry point: the customId's leading
+ * segment selects the handler.
+ *
+ * customId format: `<handler_type>|<handler_value>`. An unknown type is
+ * ignored — another bot in the same guild owns that component.
+ */
+export const createCustomIdDispatcher = <
+  TInteraction extends { readonly customId: string },
+  T extends CustomIdHandler<TInteraction>,
+>(
+  spec: HandlerBarrelSpec<T>,
+): ((interaction: TInteraction, bot: BaseBot) => Promise<void>) => {
+  return async (interaction: TInteraction, bot: BaseBot): Promise<void> => {
+    const handler = spec.read(bot).get(interaction.customId.split('|')[0] ?? '');
+    if (handler) {
+      await handler.execute(interaction, bot);
+    }
+  };
+};

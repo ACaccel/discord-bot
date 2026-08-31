@@ -20,12 +20,11 @@
  *     loop on `backupIntervalMs`). `onShutdown` clears the loop so a
  *     fast restart does not double-trigger.
  *
- * Why bot-scope rather than guild-scope: backup batches all
- * configured guilds in series to keep request-rate predictable. A
- * guild-scoped variant would race against itself on the Mongo
- * connection pool.
+ * One instance covers every guild: the backup batches all configured
+ * guilds in series to keep request-rate predictable. A per-guild
+ * variant would race against itself on the Mongo connection pool.
  */
-import { TOKENS } from '../../core/plugin';
+import { TOKENS } from '../../bot/tokens';
 import { logError } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
 import { performBackup } from './internal';
@@ -39,7 +38,7 @@ const DEFAULT_BACKUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 // such values at construction instead.
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
-export interface MessageBackupPluginConfig {
+interface MessageBackupPluginConfig {
   readonly backupServers: readonly string[];
   /**
    * Delay between repeat backup passes, in milliseconds. Omit to keep
@@ -56,9 +55,7 @@ export interface MessageBackupPluginConfig {
   readonly backupLogEnabled?: boolean;
 }
 
-export const createMessageBackupPlugin = (
-  rawConfig: MessageBackupPluginConfig,
-): Plugin => {
+export const createMessageBackupPlugin = (rawConfig: MessageBackupPluginConfig): Plugin => {
   // Transcript logging is opt-in (default off); the backup pass itself always runs.
   const backupLogEnabled = rawConfig.backupLogEnabled ?? false;
   const intervalMs = rawConfig.backupIntervalMs ?? DEFAULT_BACKUP_INTERVAL_MS;
@@ -82,8 +79,6 @@ export const createMessageBackupPlugin = (
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    critical: false,
 
     async onReady(ctx): Promise<void> {
       const registry = ctx.resolve(TOKENS.GuildRegistry);

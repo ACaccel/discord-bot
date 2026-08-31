@@ -5,7 +5,7 @@ import type { RankedEmoji } from './rank-emoji';
  */
 export type TFn = (key: string, params?: Record<string, string | number>) => string;
 
-export interface FormatLeaderboardOptions {
+interface FormatLeaderboardOptions {
   readonly months: number;
   readonly direction: string;
   readonly topN: number;

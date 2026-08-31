@@ -26,14 +26,11 @@ const ConfigSchema = z
      */
     host: z.string().min(1).default('127.0.0.1'),
     /** URL prefix all routes are mounted under (must start with `/`). */
-    basePath: z
-      .string()
-      .startsWith('/', 'basePath must start with "/"')
-      .default('/settings'),
+    basePath: z.string().startsWith('/', 'basePath must start with "/"').default('/settings'),
   })
   .strict();
 
-export type SettingsApiPluginConfig = z.infer<typeof ConfigSchema>;
+type SettingsApiPluginConfig = z.infer<typeof ConfigSchema>;
 
 /**
  * Parse a raw `settings_api` config block into a fully-defaulted,

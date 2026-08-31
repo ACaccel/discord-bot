@@ -19,7 +19,7 @@ import { PermissionFlagsBits, type Message } from 'discord.js';
 
 import { logError, type Logger } from '../../../core/logger';
 
-export type OriginalMessageStrategy = 'suppress' | 'delete' | 'leave';
+type OriginalMessageStrategy = 'suppress' | 'delete' | 'leave';
 
 /** Centralised operator-facing log message (no scattered literals). */
 const LOG_MISSING_PERMISSION =

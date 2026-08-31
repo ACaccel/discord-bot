@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createLogger } from '../../../../src/core/logger';
-import { TOKENS } from '../../../../src/core/plugin';
+import { TOKENS } from '../../../../src/bot/tokens';
 import type { PluginRuntimeContext } from '../../../../src/core/plugin';
 import { createXMediaFeedPlugin } from '../../../../src/plugins/x-media-feed';
 import { reconcileCursors, runFeedPass } from '../../../../src/plugins/x-media-feed/internal';
@@ -33,15 +33,6 @@ const enabledConfig = (overrides: Record<string, unknown> = {}): Record<string, 
 });
 
 describe('createXMediaFeedPlugin — shape and config', () => {
-  it('has the expected bot-scoped, non-critical plugin shape', () => {
-    const plugin = createXMediaFeedPlugin(undefined, { source: stubSource });
-    expect(plugin.id).toBe('x-media-feed');
-    expect(plugin.scope).toBe('bot');
-    expect(plugin.critical).toBe(false);
-    expect(plugin.onReady).toBeTypeOf('function');
-    expect(plugin.onShutdown).toBeTypeOf('function');
-  });
-
   it('accepts an absent config block and defaults to disabled', () => {
     expect(() => createXMediaFeedPlugin(undefined, { source: stubSource })).not.toThrow();
   });

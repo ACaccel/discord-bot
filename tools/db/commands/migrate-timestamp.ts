@@ -38,7 +38,7 @@ const MESSAGES_COLLECTION = 'messages';
 type GuildDb = NonNullable<Connection['db']>;
 
 /** The three phases of the migration, selected per run via config. */
-export type MigrateMode = 'audit' | 'convert' | 'index';
+type MigrateMode = 'audit' | 'convert' | 'index';
 
 export const MIGRATE_MODES: readonly MigrateMode[] = ['audit', 'convert', 'index'];
 
@@ -59,22 +59,22 @@ type MigrateOptions = z.infer<typeof migrateTimestampOptionsSchema>;
  * regex is anchored digits-only so an empty or sign-prefixed string is
  * treated as garbage, not a timestamp.
  */
-export const STRING_TYPED_FILTER: Readonly<Record<string, unknown>> = {
+const STRING_TYPED_FILTER: Readonly<Record<string, unknown>> = {
   timestamp: { $type: 'string' },
 };
 
 /** Convertible legacy rows: String-typed AND all-digit. */
-export const NUMERIC_STRING_FILTER: Readonly<Record<string, unknown>> = {
+const NUMERIC_STRING_FILTER: Readonly<Record<string, unknown>> = {
   timestamp: { $type: 'string', $regex: /^[0-9]+$/ },
 };
 
 /** Garbage rows: String-typed but not all-digit. Manual triage only. */
-export const NON_NUMERIC_STRING_FILTER: Readonly<Record<string, unknown>> = {
+const NON_NUMERIC_STRING_FILTER: Readonly<Record<string, unknown>> = {
   timestamp: { $type: 'string', $not: /^[0-9]+$/ },
 };
 
 /** Informational: `{ timestamp: null }` also matches a missing field. */
-export const NULL_OR_MISSING_FILTER: Readonly<Record<string, unknown>> = {
+const NULL_OR_MISSING_FILTER: Readonly<Record<string, unknown>> = {
   timestamp: null,
 };
 
@@ -111,7 +111,7 @@ export const backupCollectionName = (nowMs: number): string => {
   return `messages_backup_pre_ts_${stamp}`;
 };
 
-export interface IndexSpec {
+interface IndexSpec {
   readonly name: string;
   readonly spec: Readonly<Record<string, 1>>;
 }

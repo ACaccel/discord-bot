@@ -17,8 +17,7 @@
   },
   "llm_chat": {
     "thinking": "🤔 思考中…",
-    "api_error": "呼叫 AI API 時發生錯誤,請稍後再試。",
-    "missing_api_key": "Provider `{{provider}}` 的 API 金鑰未設定(請於 .env 設定 `{{envVar}}`)。"
+    "cost_unknown": "~$?(未知 model 計價)"
   },
   "menu_get_avatar": {
     "avatar_url_field": "頭像連結",
@@ -31,14 +30,11 @@
   },
   "auto_reply": {
     "goodnight_reply": "健康に良くない！<:ave_mortis_bad_for_health:1333052644368846878>",
-    "fatcat_line": "肥貓好gay",
-    "mubaimu_line": "晴人杰",
     "long_hair_line": "去spa"
   },
   "gay": {
     "is_gay": "{{name}} 是 gay",
-    "is_not_gay": "{{name}} 不是 gay",
-    "failed": "唔...這次判定失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
+    "is_not_gay": "{{name}} 不是 gay"
   },
   "add_reply": {
     "added": "已新增 輸入:{{input}} 回覆:{{reply}}!",
@@ -65,7 +61,11 @@
     "system_prompt_placeholder": "(選填)為 AI 設定角色或規則",
     "model_list_unavailable": "目前無法取得 `{{provider}}` 的可用模型清單。可能原因:API 金鑰未設定、網路暫時失敗,或服務剛啟動仍在載入。請稍候片刻後重試。",
     "modal_title": "AI 設定 — {{provider}}",
-    "system_prompt_preview": "`{{preview}}…`(共 {{length}} 字,已截斷)",
+    "label_model": "模型",
+    "label_temperature": "Temperature (0.0 – 2.0)",
+    "label_web_search": "網頁搜尋",
+    "label_system_prompt": "系統提示詞",
+    "temperature_placeholder": "0.0 – 2.0",
     "system_prompt_not_set": "(未設定)",
     "updated_header": "✅ AI 設定已更新:",
     "modal_system_prompt_preview": "\n```\n{{preview}}\n…(共 {{length}} 字,已截斷)\n```",
@@ -89,13 +89,13 @@
     "timeout_reason": "初華大人的禁言裁決!"
   },
   "bubble_wrap": {
-    "too_long": "字串太長了,請縮短到 64 字元以內",
-    "failed": "唔...泡泡紙生成失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
+    "too_long": "字串太長了,請縮短到 64 字元以內"
   },
   "bug_report": {
     "empty_content": "請輸入內容",
     "failed": "無法回報問題 (錯誤代碼:{{traceId}})",
-    "reported": "問題已回報! 內容: {{content}}"
+    "reported": "問題已回報! 內容: {{content}}",
+    "admin_dm": "問題回報來自 {{reporter}}:{{content}}"
   },
   "change_avatar": {
     "no_role_config": "沒有身份組設定",
@@ -155,34 +155,6 @@
       "ai": "🤖 AI 對話",
       "other": "📦 其他"
     }
-  },
-  "inspect_member_ids": {
-    "no_valid_id": "找不到有效 ID,請輸入 17~20 位數字的 Discord ID",
-    "embed_failed": "無法建立檢查結果",
-    "failed": "檢查可疑 ID 失敗 (錯誤代碼:{{traceId}})",
-    "not_in_guild_line": "**是否在本伺服器**: 否",
-    "user_not_found_line": "**使用者資訊**: 查無資料(可能不存在、未快取或無法存取)",
-    "parse_failed_line": "**狀態**: 無法解析使用者資料",
-    "profile_link_line": "**可點擊個人頁**: [Open Profile](https://discord.com/users/{{id}})",
-    "in_guild_line": "**是否在本伺服器**: {{value}}",
-    "account_type_line": "**帳號類型**: {{value}}",
-    "created_at_line": "**帳號建立時間**: {{value}}",
-    "system_user_line": "**System User**: {{value}}",
-    "joined_at_line": "**加入伺服器時間**: {{value}}",
-    "display_name_line": "**暱稱(Display Name)**: {{value}}",
-    "timed_out_line": "**已逾時(Timed Out)**: {{value}}",
-    "timeout_until_line": "**逾時到期**: {{value}}",
-    "pending_line": "**Pending 成員驗證**: {{value}}",
-    "highest_role_line": "**最高身分組**: {{value}}",
-    "role_count_line": "**身分組數量**: {{value}}",
-    "top_roles_line": "**前 10 個身分組**: {{value}}",
-    "boost_since_line": "**Boost 開始時間**: {{value}}",
-    "kickable_line": "**可被踢出**: {{value}}",
-    "bannable_line": "**可被封鎖**: {{value}}",
-    "yes": "是",
-    "no": "否",
-    "title": "可疑 ID 檢查 {{current}}/{{total}}",
-    "exceeds_max": "一次最多檢查 {{max}} 筆,已忽略 {{dropped}} 筆。"
   },
   "level_detail": {
     "too_long": "太長了...請選短一點的範圍",
@@ -268,14 +240,12 @@
   },
   "talk": {
     "missing_args": "請輸入頻道和內容",
-    "send_failed": "無法傳送訊息",
     "tag_warning": "{{user}}好壞喔被我抓到你在 tag 所有人",
     "failed": "唔...訊息送不出去耶,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
   },
   "talk_signed": {
     "missing_args": "請輸入內容",
     "member_not_found": "無法取得成員資訊",
-    "send_failed": "無法傳送訊息",
     "tag_warning": "{{displayName}}({{username}})好壞喔被我抓到你在 tag 所有人",
     "failed": "唔...訊息送不出去耶,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
   },
@@ -378,9 +348,7 @@
     "create_announce_failed": "無法建立抽獎",
     "create_failed": "無法抽獎",
     "missing_message_id": "請提供抽獎訊息ID",
-    "delete_failed_with_reason": "無法刪除抽獎: {{reason}}",
     "delete_success": "抽獎已刪除",
-    "delete_failed": "無法刪除抽獎",
     "no_active_giveaways": "目前沒有進行中的抽獎",
     "delete_select_placeholder": "選擇要刪除的抽獎",
     "delete_option_label": "{{prize}} — 結束於 {{endTime}}",
@@ -404,15 +372,10 @@
     "failed": "唔...抽獎操作失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
   },
   "activity": {
-    "missing_required_fields": "請輸入活動標題和持續時間",
     "invalid_duration": "無效的持續時間",
     "create_announce_failed": "無法建立活動",
-    "create_failed": "無法建立活動",
     "create_success": "活動已建立！\n**活動ID**: {{activityId}}\n將於 {{endTime}} 結束",
-    "missing_activity_id": "請提供活動ID",
-    "delete_failed_with_reason": "無法刪除活動: {{reason}}",
     "delete_success": "活動已刪除",
-    "delete_failed": "無法刪除活動",
     "announce_title": "📢 活動: {{title}}",
     "announce_field_id": "🆔 活動ID",
     "announce_field_description": "📌 說明",
