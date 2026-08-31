@@ -132,9 +132,11 @@ violations:
    commit as the code. The surfaces are
    [`docs/architecture.md`](docs/architecture.md),
    [`README.md`](README.md), this file, the matching
-   `src/bot/<name>/config.example.json`, and one line in
-   [`CHANGELOG.md`](CHANGELOG.md). A missing doc update is a defect,
-   like a missing test.
+   `src/bot/<name>/config.example.json`, and one entry in
+   [`CHANGELOG.md`](CHANGELOG.md) — an imperative sentence under
+   `[Unreleased]`, closing with a link to the commit that made it:
+   `- <Description> ([<7-char hash>](<commit URL>)).` A missing doc
+   update is a defect, like a missing test.
 
 ## Adding a slash command
 

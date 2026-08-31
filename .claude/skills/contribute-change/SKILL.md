@@ -102,16 +102,17 @@ each fact lives in exactly one place, everywhere else links to it.
 | `README.md`                          | A user-visible feature, an `.env` key, or a `config.json` field changed.      |
 | `CONTRIBUTING.md`                    | A recipe, convention, quality gate, or architectural rule changed.            |
 | `src/bot/<name>/config.example.json` | A config field was added, removed, renamed, or its default changed.           |
-| `CHANGELOG.md`                       | Any notable change — **one line** under `[Unreleased]`.                       |
+| `CHANGELOG.md`                       | Any notable change — **one entry** under `[Unreleased]`.                      |
 
-The changelog line format is
-`- <7-char commit hash> <type(scope)>: <one sentence>`, filed under
-Added / Changed / Fixed / Removed / Security. The hash only exists once
-the commit does, so the line is written against the commit that
-introduced the change — the next commit, or the release preparation,
-carries it. Mark a change that needs operator action as **breaking**
-and describe the action in README or CONTRIBUTING; the changelog stays
-one line.
+The changelog follows Keep a Changelog. An entry is one imperative
+sentence closing with a link to the commit that made it —
+`- <Description> ([<7-char hash>](https://github.com/ACaccel/BotFleet/commit/<hash>)).`
+— filed under Added / Changed / Fixed / Removed / Security. The hash
+only exists once the commit does, so the entry is written against the
+commit that introduced the change — the next commit, or the release
+preparation, carries it. Mark a change that needs operator action as
+**breaking** and describe the action in README or CONTRIBUTING; the
+changelog stays one line.
 
 Missing documentation is a defect, exactly like a missing test.
 

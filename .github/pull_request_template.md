@@ -28,7 +28,7 @@ unchecked rather than deleting the line.
 - [ ] Tests added or updated
 - [ ] Docs (`docs/architecture.md` / `README.md` / `CONTRIBUTING.md` / `CLAUDE.md`)
 - [ ] `config.example.json` (a config field was added, removed, or redefaulted)
-- [ ] `CHANGELOG.md` (one line under `[Unreleased]`)
+- [ ] `CHANGELOG.md` (one entry under `[Unreleased]`, closing with its commit link)
 
 ## Test plan
 
