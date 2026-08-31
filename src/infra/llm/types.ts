@@ -69,12 +69,6 @@ export const DEFAULT_MODELS: Readonly<Record<LLMProviderName, string>> = {
   gemini: 'gemini-2.5-flash-lite',
 };
 
-export const DEFAULT_SETTINGS: Omit<LLMSettings, 'provider' | 'model'> = {
-  temperature: 1.0,
-  systemPrompt: '',
-  webSearch: true,
-};
-
 /** Environment variable that holds each provider's API key. */
 export const PROVIDER_API_KEY_ENV: Readonly<Record<LLMProviderName, string>> = {
   xai: 'XAI_API_KEY',

@@ -17,7 +17,7 @@ unchecked rather than deleting the line.
 
 - [ ] `src/core/`
 - [ ] `src/persistence/` (schemas / repositories)
-- [ ] `src/infra/` (mongo / llm)
+- [ ] `src/infra/` (mongo / llm / link-preview / x-feed / discord)
 - [ ] `src/handlers/` (commands / buttons / modals / select-menus / reactions)
 - [ ] `src/plugins/`
 - [ ] `src/bot/<name>/` (composition root)
@@ -26,7 +26,9 @@ unchecked rather than deleting the line.
 - [ ] `.github/workflows/`
 - [ ] `tsconfig*` / `eslint.config.mjs` / `vitest.config.ts`
 - [ ] Tests added or updated
-- [ ] Docs (`docs/` / `README.md` / `CONTRIBUTING.md` / `CLAUDE.md`)
+- [ ] Docs (`docs/architecture.md` / `README.md` / `CONTRIBUTING.md` / `CLAUDE.md`)
+- [ ] `config.example.json` (a config field was added, removed, or redefaulted)
+- [ ] `CHANGELOG.md` (one entry under `[Unreleased]`, closing with its commit link)
 
 ## Test plan
 
@@ -36,13 +38,14 @@ unchecked rather than deleting the line.
 -->
 
 - [ ] `yarn typecheck`
-- [ ] `yarn lint && yarn format:check`
+- [ ] `yarn typecheck:emit`
+- [ ] `yarn lint`
+- [ ] `yarn format:check`
 - [ ] `yarn handlers:gen:check`
-- [ ] `yarn test:unit`
-- [ ] `yarn test:int`
-- [ ] `yarn test:contract`
-- [ ] `yarn test:i18n`
-- [ ] `yarn test:tools`
+- [ ] `yarn test` (unit / int / int-nodb / contract / i18n / tools)
+- [ ] `yarn test:coverage`
+- [ ] `yarn knip`
+- [ ] `yarn security`
 - [ ] Manual smoke against a dev guild (describe what you invoked)
 
 ## Reviewer-agent results

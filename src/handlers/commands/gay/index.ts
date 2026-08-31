@@ -2,6 +2,8 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
+import { getRequiredString } from '../../../infra/discord/options';
+
 const IS_GAY_PROBABILITY = 0.95;
 
 export default class gay extends Command {
@@ -25,10 +27,8 @@ export default class gay extends Command {
     interaction: ChatInputCommandInteraction,
     bot: BaseBot,
   ): Promise<void> {
-    const userId = interaction.options.get('user')?.value;
-    if (!interaction.guild?.members.cache.has(userId as string)) return;
-
-    const target = interaction.guild.members.cache.get(userId as string);
+    const userId = getRequiredString(interaction, 'user');
+    const target = interaction.guild?.members.cache.get(userId);
     const t = bot.translator;
     // Defensive guard for the pre-run() window: the translator field is
     // only set once `run()` resolves. The early-return keeps the strict

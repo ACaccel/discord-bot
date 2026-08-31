@@ -39,7 +39,7 @@ const truncateDisplayName = (name: string, maxLength: number): string => {
   return name.slice(0, maxLength) + '...';
 };
 
-export interface FormatMessageLinesOptions {
+interface FormatMessageLinesOptions {
   readonly resolveDisplayName: (userId: string, fallback: string) => Promise<string>;
   readonly truncateAt?: number;
 }

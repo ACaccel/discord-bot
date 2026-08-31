@@ -1,6 +1,6 @@
 /**
- * R6.1 unit tests — the interaction-router `traceId` is derived from
- * `crypto.randomUUID()` so the format and entropy match design §3.5.
+ * Unit tests for the interaction-router `traceId`, which is derived
+ * from `crypto.randomUUID()` so the format and entropy are well-defined.
  *
  * The bridge mints `randomUUID().slice(0, 8)`. We exercise the same
  * primitive directly: any drift between this test and the bridge would
@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 const HEX_8 = /^[0-9a-f]{8}$/;
 const newTraceId = (): string => randomUUID().slice(0, 8);
 
-describe('R6.1 traceId', () => {
+describe('traceId', () => {
   it('is exactly 8 lowercase hex characters', () => {
     for (let i = 0; i < 100; i += 1) {
       const id = newTraceId();

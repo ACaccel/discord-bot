@@ -1,11 +1,7 @@
-import type {
-    ButtonInteraction,
-} from 'discord.js';
-import type { BaseBot } from "@bot";
-import { logSystem } from '@core/logger';
+import type { ButtonInteraction } from 'discord.js';
+import type { BaseBot } from '@bot';
 
-import { HandlerFactory } from "handlers";
-import { replyTranslated } from "../reply-translated";
+import { createCustomIdDispatcher, createHandlerRegistrar, type HandlerBarrelSpec } from 'handlers';
 // `./button-handler` is imported BEFORE `./registry.generated` so the
 // abstract class is on `module.exports` by the time the generated
 // registry pulls in handler subclasses (which import the class back
@@ -15,41 +11,16 @@ import { BUTTON_REGISTRY } from './registry.generated';
 
 export { ButtonHandler };
 
-//==================================================//
-// Button Custom ID: <button_type>|<button_value>
-//==================================================//
+const BUTTON_BARREL: HandlerBarrelSpec<ButtonHandler> = {
+  registry: BUTTON_REGISTRY,
+  label: 'button',
+  assign: (bot: BaseBot, handlers) => {
+    bot.buttonHandlers = handlers;
+  },
+  read: (bot: BaseBot) => bot.buttonHandlers,
+};
 
-export const registerButtons = async (bot: BaseBot) => {
-    logSystem(bot.logger, "Registering button handlers...");
-
-    try {
-        // todo: whether to specify handlers for each bot
-        // import all button handlers
-        bot.buttonHandlers = createAllButtonHandlers();
-
-        logSystem(bot.logger, `Successfully register ${bot.buttonHandlers.size} button handlers.`)
-    } catch (err) {
-        logSystem(bot.logger, `Failed to register button handlers: ${err}`);
-    }
-}
-
-export const executeButton = async (interaction: ButtonInteraction, bot: BaseBot) => {
-    if (!bot.buttonHandlers) {
-        await replyTranslated(interaction, bot.translator, 'errors:command.handler_not_initialised');
-        return;
-    }
-
-    // customId format: <button_type>|<button_value>
-    const button_type = interaction.customId.split('|')[0] ?? '';
-    const handler = bot.buttonHandlers.get(button_type);
-    if (handler) {
-        await handler.execute(interaction, bot);
-    }
-}
-
-const buttonHandlerFactory = new HandlerFactory<ButtonHandler>();
-buttonHandlerFactory.registerFromRegistry(BUTTON_REGISTRY);
-
-export const getButtonHandlerClass = (name: string) => buttonHandlerFactory.getConstructor(name);
-export const createButtonHandler = (name: string) => buttonHandlerFactory.create(name);
-export const createAllButtonHandlers = () => buttonHandlerFactory.createAll();
+export const registerButtons = createHandlerRegistrar(BUTTON_BARREL);
+export const executeButton = createCustomIdDispatcher<ButtonInteraction, ButtonHandler>(
+  BUTTON_BARREL,
+);

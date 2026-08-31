@@ -5,15 +5,20 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 /**
- * Flat config (ESLint v9).
- *
- * Phase 0 scope: lints `src/core/**`, `scripts/**`, `test/**`.
- * Phase 2 expansion: also lints `src/persistence/**`, `src/infra/**`.
- * Legacy directories join as each later phase migrates them. Most rules
- * start as `warn` to avoid blocking the refactor; the critical ones
- * (no-restricted-syntax for raw process.env, import cycles, IoC
- * service-locator guard) are `error` from day one.
+ * Flat config (ESLint v9). Lints the whole `src/`, `scripts/`, `test/`
+ * and `tools/` trees (see the `lint` script). Stylistic rules are
+ * `warn`; correctness and architecture rules — raw `process.env`
+ * access, explicit `any`, import cycles, and the IoC service-locator
+ * guard — are `error`.
  */
+
+/**
+ * Shared message for a plugin-layer import that reaches into a
+ * personality composition root.
+ */
+const PERSONALITY_IMPORT_MESSAGE =
+  'Plugins must not import a personality composition root (src/bot/<name>/**). The contracts a plugin may consume are src/bot/tokens and src/bot/guild-registry.';
+
 export default tseslint.config(
   {
     ignores: [
@@ -22,6 +27,8 @@ export default tseslint.config(
       'coverage/**',
       '**/*.generated.ts',
       'src/bot/**/config.json',
+      // Gitignored scratch space for one-off backup investigations.
+      'tools/msg_backup/tmp/**',
     ],
   },
   js.configs.recommended,
@@ -45,7 +52,7 @@ export default tseslint.config(
       },
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': [
         'warn',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
@@ -53,12 +60,11 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'warn',
       'import/no-cycle': 'error',
       'import/no-self-import': 'error',
-      // R6.5: all `import` statements must form a single contiguous
-      // block at the top of the file. Prevents the pre-R1 pattern in
-      // `src/bot/index.ts` where module-level helpers were wedged
-      // between two import groups.
+      // All `import` statements must form a single contiguous block at
+      // the top of the file — no module-level code wedged between import
+      // groups.
       'import/first': 'error',
-      // R6.3: `console.*` is banned outside the test / scripts override
+      // `console.*` is banned outside the test / scripts override
       // below. `console.error` is permitted as a last-resort fallback
       // for the deploy CLI's top-level catch and any future site where
       // the structured logger itself is unavailable; every such call
@@ -67,10 +73,28 @@ export default tseslint.config(
       eqeqeq: ['error', 'always'],
     },
   },
+  // Every exported function in `src/` names its return type.
+  //
+  // `tsconfig.build.json` emits declarations, but tsc only complains
+  // when an inferred type is unnameable — a wrong-but-nameable inferred
+  // return still ships. This rule is what actually holds the public
+  // surface: a signature change becomes a compile error at the call
+  // site instead of silently widening. Tests and scripts are exempt;
+  // their exports are not a contract.
+  {
+    files: ['src/**/*.ts'],
+    rules: {
+      '@typescript-eslint/explicit-module-boundary-types': 'error',
+    },
+  },
   // Hard rule: only src/core/config may read process.env directly.
   // Everywhere else must import the typed Env from `core/config`.
+  // `tools/` is in scope too: an ops CLI reaching for a raw env var is
+  // the same defect, and the two legitimate writes (forcing `LOG_DIR`
+  // empty to keep a one-shot tool out of the bot's log tree) carry an
+  // explanatory inline disable.
   {
-    files: ['src/**/*.ts', 'test/**/*.ts'],
+    files: ['src/**/*.ts', 'test/**/*.ts', 'tools/**/*.ts'],
     ignores: ['src/core/config/**'],
     rules: {
       'no-restricted-syntax': [
@@ -88,13 +112,11 @@ export default tseslint.config(
       ],
     },
   },
-  // Service-locator guard (Phase 2): the IoC container is a composition
-  // tool, not an ambient lookup. Only composition roots (`src/bot/**`)
-  // and tests may import it. Application / domain / interface /
-  // persistence / infra layers receive dependencies via constructor
-  // parameters from their composition root. The legacy `src/events/**`
-  // and `src/features/**` trees were removed during gap-remediation, so
-  // their globs are no longer listed here.
+  // Service-locator guard: the IoC container is a composition tool, not
+  // an ambient lookup. Only composition roots (`src/bot/**`) and tests
+  // may import it. Application / domain / interface / persistence / infra
+  // layers receive dependencies via constructor parameters from their
+  // composition root.
   {
     files: [
       'src/application/**/*.ts',
@@ -119,13 +141,18 @@ export default tseslint.config(
       ],
     },
   },
-  // R3: plugin layer must reach the IoC surface only through the
-  // `core/plugin` barrel (which re-exports TOKENS / ServiceToken /
-  // Resolver). Direct imports from `core/ioc` are blocked so the
-  // container's write-side surface stays a composition-root privilege.
-  // Kept as a separate block (rather than merged with the layered
-  // service-locator guard above) so the error message can point
-  // plugin authors at the correct alternative path.
+  // Plugin layer: the IoC container's write side is a composition-root
+  // privilege, so `core/ioc` is unreachable from here. Plugins take
+  // `TOKENS` from `src/bot/tokens` and the per-guild lookup port from
+  // `src/bot/guild-registry` — both live with the composition root
+  // because they name concrete `infra` / `persistence` types, which
+  // `core/` may not depend on.
+  //
+  // A personality composition root (`src/bot/<name>/**`) is off-limits:
+  // it assembles plugins, so a plugin importing one would close the
+  // loop. Kept as a separate block (rather than merged with the layered
+  // service-locator guard above) so the error messages can point plugin
+  // authors at the correct alternative path.
   {
     files: ['src/plugins/**/*.ts'],
     rules: {
@@ -135,14 +162,47 @@ export default tseslint.config(
           patterns: [
             {
               group: ['**/core/ioc', '**/core/ioc/*', '@core/ioc', '@core/ioc/*'],
-              message: 'Plugins must import TOKENS / ServiceToken from core/plugin, not core/ioc.',
+              message:
+                'Plugins must import TOKENS from src/bot/tokens, not core/ioc; the container itself is composition-root-only.',
+            },
+            {
+              group: ['**/bot/*/*'],
+              message: PERSONALITY_IMPORT_MESSAGE,
+            },
+            {
+              // `handlers` and `plugins` are sibling layers (see
+              // docs/architecture.md §1); neither may depend on the
+              // other. Shared Discord-boundary utilities — option
+              // reading, error-to-reply mapping, the bounded HTTP
+              // client — live in `infra/`, which both may import.
+              //
+              // The `../` depths are spelled out so a plugin's own
+              // sibling `./handlers.ts` (the interaction bodies a
+              // plugin legitimately owns) is not caught.
+              group: [
+                '../handlers',
+                '../handlers/**',
+                '../../handlers',
+                '../../handlers/**',
+                '../../../handlers',
+                '../../../handlers/**',
+                '../../../../handlers',
+                '../../../../handlers/**',
+                '@cmd',
+                '@button',
+                '@modal',
+                '@select-menu',
+                '@reaction',
+              ],
+              message:
+                'Plugins must not import from the handler layer; use the shared utilities in src/infra/ instead.',
             },
           ],
         },
       ],
     },
   },
-  // R4: Handler index files must stay readable. Cap any file under
+  // Handler index files must stay readable. Cap any file under
   // src/handlers/**/*.ts at 150 visible lines (imports + JSDoc + blanks
   // included) to enforce the rule that pure helpers be split into
   // sibling kebab-case files. Discord I/O, permission checks, Translator
@@ -152,15 +212,12 @@ export default tseslint.config(
     ignores: [
       // Codegen artifact — one import per handler, naturally long.
       'src/handlers/**/registry.generated.ts',
-      // Handler-framework base class + localizer (single function file).
-      // Tracked as R4 PR follow-up: revisit only when functional changes land.
+      // Handler-framework base class + localizer (single function file);
+      // revisit only when functional changes land.
       'src/handlers/commands/command.ts',
       // Shared Discord helpers used by many handlers. Follow-up: keep
       // until a refactor extracts cohesive sub-modules.
       'src/handlers/commands/discord-helpers.ts',
-      // Cross-handler error -> reply mapping table. Follow-up: consider
-      // splitting the map into error-reply-map.ts.
-      'src/handlers/reply-for-error.ts',
     ],
     rules: {
       'max-lines': ['error', { max: 150, skipBlankLines: false, skipComments: false }],

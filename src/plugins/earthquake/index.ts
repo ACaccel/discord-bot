@@ -2,4 +2,4 @@
  * Earthquake plugin barrel. Surfaces the factory + config type; the
  * broadcast internals stay under `internal/`.
  */
-export { createEarthquakePlugin, type EarthquakePluginConfig } from './plugin';
+export { createEarthquakePlugin } from './plugin';

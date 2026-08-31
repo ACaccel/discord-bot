@@ -5,13 +5,11 @@
  * Invariant: the {@link Logger} passed in MUST already carry `bot` in
  * its base bindings. `createBootstrapLogger` (the only production
  * Logger factory) attaches `{ bot: <clientId> }` via pino's `base`, so
- * every child inherits it. These helpers therefore do not re-bind
- * `bot` themselves — the prior `child({ bot: clientId, ... })` shape
- * produced JSON records with two `bot` fields per line, and pino's
- * pretty printer / `jq` consumers had to ignore the duplicate. The
- * `clientId` parameter is gone (no compatibility shim) so callsites
- * shrink and there is no longer a way to drift the duplicate binding
- * back in.
+ * every child inherits it. These helpers therefore never re-bind `bot`
+ * themselves: a second binding would put two `bot` fields on every JSON
+ * record, which pino's pretty printer and `jq` consumers would have to
+ * disambiguate. No helper takes a `clientId` parameter, so there is no
+ * way to reintroduce the duplicate.
  *
  * Layer purity: this module deliberately depends only on the
  * {@link Logger} interface. Helpers that touch discord.js / axios / fs

@@ -5,7 +5,7 @@
  * `rebootGiveawayJobs` directly, so composition roots never deep-import
  * `./internal`.
  */
-import { TOKENS } from '../../core/plugin';
+import { TOKENS } from '../../bot/tokens';
 import type { Plugin } from '../../core/plugin';
 import { type GiveawayDeps, rebootGiveawayJobs } from './internal/giveaway';
 
@@ -15,8 +15,6 @@ const PLUGIN_VERSION = '1.0.0';
 export const createGiveawayPlugin = (): Plugin => ({
   id: PLUGIN_ID,
   version: PLUGIN_VERSION,
-  scope: 'bot',
-  critical: false,
 
   async onReady(ctx): Promise<void> {
     try {

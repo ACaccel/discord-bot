@@ -1,1 +1,1 @@
-export { createMessageBackupPlugin, type MessageBackupPluginConfig } from './plugin';
+export { createMessageBackupPlugin } from './plugin';

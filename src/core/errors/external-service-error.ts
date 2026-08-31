@@ -1,12 +1,13 @@
 /**
  * Failure originating outside the bot process — Discord API, MongoDB
  * cluster, an LLM provider, etc. Use one of the typed subclasses
- * ({@link DiscordApiError}, {@link DatabaseError}, {@link LlmProviderError})
- * so consumers can match on the boundary they care about.
+ * ({@link DatabaseError}, {@link LlmProviderError}, {@link LinkPreviewError},
+ * {@link XFeedError}) so consumers can match on the boundary they care
+ * about.
  *
  * Direct instantiation of `ExternalServiceError` is allowed but
- * discouraged: prefer one of the subclasses below so logs carry the
- * `kind` discriminant readers expect.
+ * discouraged: prefer one of the subclasses below so `instanceof`
+ * narrowing at the call site can name the boundary.
  */
 import { DomainError, type DomainErrorInit } from './domain-error';
 
@@ -20,25 +21,7 @@ export class ExternalServiceError<
   Code extends string = ExternalServiceErrorCode,
   P extends Readonly<Record<string, string | number>> | undefined = undefined,
 > extends DomainError<Code, P> {
-  public override readonly kind: string = 'ExternalServiceError';
   public constructor(init: DomainErrorInit<Code, P>) {
-    super(init);
-  }
-}
-
-/** Discord API surfaced an error response or a connection failure. */
-export type DiscordApiErrorCode =
-  | 'DISCORD_API_FAILURE'
-  | 'DISCORD_RATE_LIMITED'
-  | 'DISCORD_TIMEOUT'
-  | 'DISCORD_PERMISSION_MISSING'
-  | 'DISCORD_INTERACTION_EXPIRED';
-
-export class DiscordApiError<
-  P extends Readonly<Record<string, string | number>> | undefined = undefined,
-> extends ExternalServiceError<DiscordApiErrorCode, P> {
-  public override readonly kind = 'DiscordApiError';
-  public constructor(init: DomainErrorInit<DiscordApiErrorCode, P>) {
     super(init);
   }
 }
@@ -63,7 +46,6 @@ export type DatabaseErrorCode =
 export class DatabaseError<
   P extends Readonly<Record<string, string | number>> | undefined = undefined,
 > extends ExternalServiceError<DatabaseErrorCode, P> {
-  public override readonly kind = 'DatabaseError';
   public constructor(init: DomainErrorInit<DatabaseErrorCode, P>) {
     super(init);
   }
@@ -81,8 +63,64 @@ export type LlmProviderErrorCode =
 export class LlmProviderError<
   P extends Readonly<Record<string, string | number>> | undefined = undefined,
 > extends ExternalServiceError<LlmProviderErrorCode, P> {
-  public override readonly kind = 'LlmProviderError';
   public constructor(init: DomainErrorInit<LlmProviderErrorCode, P>) {
+    super(init);
+  }
+}
+
+/**
+ * Link-preview generation failed — an OpenGraph scrape (e.g. Bahamut)
+ * could not be fetched or returned an unusable payload. Surfaced only
+ * in logs: the social-link-preview plugin stays silent in the channel
+ * on failure, so the user-facing `messageKey` exists purely for catalog
+ * uniformity (`DomainError.messageKey` is required).
+ *
+ * Sub-code drives diagnostics, mirroring {@link LlmProviderError}:
+ * `TIMEOUT` / `UPSTREAM_5XX` / `RATE_LIMITED` are transient,
+ * `INVALID_RESPONSE` means the page lacked the expected OpenGraph tags,
+ * `FETCH_FAILED` / `UNKNOWN` cover transport and catch-all failures.
+ */
+export type LinkPreviewErrorCode =
+  | 'LINK_PREVIEW_FETCH_FAILED'
+  | 'LINK_PREVIEW_TIMEOUT'
+  | 'LINK_PREVIEW_UPSTREAM_5XX'
+  | 'LINK_PREVIEW_RATE_LIMITED'
+  | 'LINK_PREVIEW_INVALID_RESPONSE'
+  | 'LINK_PREVIEW_UNKNOWN';
+
+export class LinkPreviewError<
+  P extends Readonly<Record<string, string | number>> | undefined = undefined,
+> extends ExternalServiceError<LinkPreviewErrorCode, P> {
+  public constructor(init: DomainErrorInit<LinkPreviewErrorCode, P>) {
+    super(init);
+  }
+}
+
+/**
+ * An X (Twitter) timeline read failed. Like {@link LinkPreviewError}
+ * this is a log-only failure — the x-media-feed poller skips the
+ * affected account and retries on its next pass rather than reporting
+ * to a channel — so the `messageKey` exists for catalog uniformity.
+ *
+ * Sub-code drives diagnostics and the caller's response:
+ * `TIMEOUT` / `UPSTREAM_5XX` / `RATE_LIMITED` are transient and worth
+ * another pass; `NOT_FOUND` means the handle no longer exists (renamed,
+ * suspended, or a typo) and stays broken until an operator edits the
+ * config, so it is logged distinctly; `INVALID_RESPONSE` means the body
+ * did not match the expected schema; `FETCH_FAILED` covers transport.
+ */
+export type XFeedErrorCode =
+  | 'X_FEED_FETCH_FAILED'
+  | 'X_FEED_TIMEOUT'
+  | 'X_FEED_UPSTREAM_5XX'
+  | 'X_FEED_RATE_LIMITED'
+  | 'X_FEED_NOT_FOUND'
+  | 'X_FEED_INVALID_RESPONSE';
+
+export class XFeedError<
+  P extends Readonly<Record<string, string | number>> | undefined = undefined,
+> extends ExternalServiceError<XFeedErrorCode, P> {
+  public constructor(init: DomainErrorInit<XFeedErrorCode, P>) {
     super(init);
   }
 }

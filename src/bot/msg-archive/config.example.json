@@ -1,16 +1,15 @@
 {
-    "admin": ["YOUR_ADMIN_USER_ID"],
-    "language": "zh-TW",
-    "guilds": {
-        "YOUR_GUILD_ID": {
-            "channels": {
-                "debug": "YOUR_DEBUG_CHANNEL_ID"
-            },
-            "roles": {}
-        }
-    },
-    "backup_server": [
-        "YOUR_GUILD_ID"
-    ],
-    "backup_interval_minutes": 60
+  "admin": ["YOUR_ADMIN_USER_ID"],
+  "language": "zh-TW",
+  "guilds": {
+    "YOUR_GUILD_ID": {
+      "channels": {
+        "debug": "YOUR_DEBUG_CHANNEL_ID"
+      },
+      "roles": {}
+    }
+  },
+  "backup_log_enabled": false,
+  "backup_server": ["YOUR_GUILD_ID"],
+  "backup_interval_minutes": 60
 }

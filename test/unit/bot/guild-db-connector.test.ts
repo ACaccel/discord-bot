@@ -1,7 +1,6 @@
 /**
- * Unit tests for {@link GuildDbConnector} (R1 collaborator).
- *
- * Covers the §6.1 GuildDbConnector test plan from `docs/design/R1.md`:
+ * Unit tests for {@link GuildDbConnector}, the collaborator BaseBot
+ * composes for per-guild database connection. Covers:
  *   1. happy connectOne → repos populated
  *   2. ReposFactory throw → log w/ traceId + re-throw normalised Error
  *   3. ReposFactory throws non-Error → still normalised + re-thrown
@@ -14,7 +13,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { GuildDbConnector } from '../../../src/bot/guild-db-connector';
 import type { GuildInfo } from '../../../src/bot/index';
-import { createContainer, TOKENS, type ReposFactory } from '../../../src/core/ioc';
+import { createContainer } from '../../../src/core/ioc';
+import { TOKENS, type ReposFactory } from '../../../src/bot/tokens';
 import { createLogger } from '../../../src/core/logger';
 import { DatabaseError } from '../../../src/core/errors/external-service-error';
 import type { ConnectionManager } from '../../../src/infra/mongo/connection-manager';

@@ -4,7 +4,7 @@
  * and `deleteById` (no document removed -> ok(false)) — both observable
  * contract returns that would silently regress without an assertion.
  *
- * G-2: every repo method now returns `Result<T, DatabaseError>`. The
+ * Every repo method returns `Result<T, DatabaseError>`. The
  * happy-path cases unwrap with the test-only `unwrap`; the closed-
  * connection case asserts the `err(DatabaseError)` channel directly.
  */
@@ -101,7 +101,6 @@ describe('MongoReplyRepo (integration)', () => {
     });
   });
 
-  // G-2: a genuine DB failure resolves to `err(DatabaseError)`.
   it('findByInput resolves to err(DatabaseError) when the connection is closed', async () => {
     const baseUri = (() => {
       const uri = process.env.INTEGRATION_MONGO_URI;

@@ -13,10 +13,8 @@ self-check list.
 Authoritative public sources:
 [`docs/architecture.md`](../../../docs/architecture.md),
 [`CLAUDE.md`](../../../CLAUDE.md),
-[`CONTRIBUTING.md`](../../../CONTRIBUTING.md),
-[`docs/wiki/components/`](../../../docs/wiki/components/). When this
-file conflicts with the public design documents, the design documents
-win.
+[`CONTRIBUTING.md`](../../../CONTRIBUTING.md). When this file conflicts
+with the public design documents, the design documents win.
 
 ## 1. Layering and dependency direction (hard rule)
 
@@ -50,36 +48,48 @@ bot -> plugins -> handlers -> infra -> persistence -> core
 
 ## 2. Plugin contract
 
-Business features are always a `Plugin<Config>`
-(`src/core/plugin/types.ts`). There is no business-behavior carrier
-outside the plugin layer; `BaseBot` is not subclassed to carry
-behavior.
+Business features are always a `Plugin` (`src/core/plugin/types.ts`).
+There is no business-behavior carrier outside the plugin layer;
+`BaseBot` is not subclassed to carry behavior.
 
-- Required: `id`, SemVer `version`, `scope` (`'bot'` | `'guild'`).
-- Optional: `critical`, `dependencies`, `configSchema`, lifecycle hooks
-  (`init` / `start` / `onReady` / `onShutdown`), `events`, `contributes`.
+- Required: `id`, SemVer `version`.
+- Optional: lifecycle hooks (`init` / `start` / `onReady` /
+  `onShutdown`) and `events`.
+- Config is not part of the contract. The factory
+  `create<X>Plugin(rawConfig)` parses it with `parse<X>Config` at
+  composition time and closes over the result, so a malformed block
+  fails the boot rather than the first event.
+- Handlers are not declared on the plugin. The codegen registries under
+  `src/handlers/<type>/registry.generated.ts` are the single
+  registration mechanism.
+- Phases run in registration order; `onShutdown` runs in reverse. A
+  hook that throws disables that plugin and the phase continues — no
+  plugin can abort startup.
 - Dependencies are obtained via `ctx.resolve(TOKENS.X)`. Service
   Locator is forbidden inside runtime hooks — a plugin never holds the
   raw container.
-- Factory form `create<X>Plugin(config)` returns an independent
-  instance with isolated closure state.
 
 ## 3. IoC container
 
 - `ServiceToken<T>` is typed; tokens are centralised in `TOKENS` at
-  `src/core/ioc/tokens.ts` — register new dependencies there.
+  `src/bot/tokens.ts` — register new dependencies there. The catalog
+  lives with the composition root, not in `core`, because it names
+  concrete `infra` / `persistence` / `plugins` types.
+- `core/ioc` owns the mechanism only, and its surface is
+  `registerSingleton` / `resolve` / `tryResolve`. Singleton is the only
+  lifetime; per-guild state is reached through a factory token
+  (`ReposFactory`).
 - Do not introduce `reflect-metadata` or any third-party DI framework.
 - A factory receives only `Resolver` (no register); the composition
   root receives `ServiceContainer`.
-- Plugins reach `TOKENS` only through the `core/plugin` barrel:
-  `import { TOKENS, type ServiceToken } from '<path>/core/plugin'`.
-  Any direct import from `core/ioc` inside `src/plugins/**` is blocked
-  by ESLint. A plugin may call `ctx.resolve(token)` to read a
-  dependency and may call `ctx.registerInstance(token, instance)` in
-  the `init` hook to publish a constructed object. It must not obtain
-  the container's write-side API by any means, including casting
-  `ctx`. New tokens are registered centrally in
-  `src/core/ioc/tokens.ts` and re-exported via `core/plugin`.
+- Plugins import `TOKENS` from `src/bot/tokens` and nothing else from
+  the composition root except `src/bot/guild-registry`. Any direct
+  import from `core/ioc`, or from a personality root
+  (`src/bot/<name>/**`), inside `src/plugins/**` is blocked by ESLint.
+  A plugin may call `ctx.resolve(token)` to read a dependency and may
+  call `ctx.registerInstance(token, instance)` in the `init` hook to
+  publish a constructed object. It must not obtain the container's
+  write-side API by any means, including casting `ctx`.
 
 ## 4. Repository pattern
 
@@ -93,11 +103,12 @@ behavior.
 ## 5. Error tree and Result
 
 - infra / persistence failures throw `DomainError` subclasses
-  (`ValidationError`, `NotFoundError`, `ConflictError`,
-  `PermissionError`, `ExternalServiceError` ->
-  `DiscordApiError` / `DatabaseError` / `LlmProviderError`,
-  `ConfigurationError`). Never `throw new Error()` /
-  `throw new TypeError()` to express a domain failure.
+  (`ConfigurationError`, `ExternalServiceError` -> `DatabaseError` /
+  `LlmProviderError` / `LinkPreviewError` / `XFeedError`). Never
+  `throw new Error()` / `throw new TypeError()` to express a domain
+  failure. Add a subclass only when a real boundary needs one.
+- Dispatch on a `DomainError` with `instanceof`. There is no
+  discriminant string field, and none is to be added.
 - Every `DomainError` carries `code`, `messageKey`, `messageParams`,
   `context`, `cause`.
 - Programmer errors (contract violations, invariant breaches) use

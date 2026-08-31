@@ -9,25 +9,28 @@ import { fetchSchema, type FetchDoc } from './fetch.schema';
 import { giveawaySchema, type GiveawayDoc } from './giveaway.schema';
 import { messageSchema, type MessageDoc } from './message.schema';
 import { replySchema, type ReplyDoc } from './reply.schema';
-import { todoSchema, type TodoDoc } from './todo.schema';
+import { tempRoleSchema, type TempRoleDoc } from './temp-role.schema';
 import { userApiSettingSchema, type UserApiSettingDoc } from './user-api-setting.schema';
+import { xFeedCursorSchema, type XFeedCursorDoc } from './x-feed-cursor.schema';
 
 export { activitySchema, type ActivityDoc } from './activity.schema';
 export { fetchSchema, type FetchDoc } from './fetch.schema';
 export { giveawaySchema, type GiveawayDoc } from './giveaway.schema';
 export { messageSchema, type MessageDoc } from './message.schema';
 export { replySchema, type ReplyDoc } from './reply.schema';
-export { todoSchema, type TodoDoc } from './todo.schema';
+export { tempRoleSchema, type TempRoleDoc } from './temp-role.schema';
 export { userApiSettingSchema, type UserApiSettingDoc } from './user-api-setting.schema';
+export { xFeedCursorSchema, type XFeedCursorDoc } from './x-feed-cursor.schema';
 
 export const SCHEMAS = {
   Fetch: fetchSchema,
   Message: messageSchema,
   Reply: replySchema,
-  Todo: todoSchema,
   Giveaway: giveawaySchema,
   Activity: activitySchema,
+  TempRole: tempRoleSchema,
   UserApiSetting: userApiSettingSchema,
+  XFeedCursor: xFeedCursorSchema,
 } as const;
 
 export type SchemaName = keyof typeof SCHEMAS;
@@ -40,8 +43,9 @@ export interface DocByName {
   Fetch: FetchDoc;
   Message: MessageDoc;
   Reply: ReplyDoc;
-  Todo: TodoDoc;
   Giveaway: GiveawayDoc;
   Activity: ActivityDoc;
+  TempRole: TempRoleDoc;
   UserApiSetting: UserApiSettingDoc;
+  XFeedCursor: XFeedCursorDoc;
 }

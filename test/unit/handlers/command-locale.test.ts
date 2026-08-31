@@ -3,9 +3,9 @@
  * locale — the behaviour `src/deploy.ts` relies on so a bot deployed with
  * `config.language: "en"` registers English slash-command descriptions.
  *
- * Regression: deploy previously built its translator without a
- * `fallbackLocale`, so every bot registered `zh-TW` text regardless of
- * its configured language.
+ * The translator deploy builds carries the bot's `fallbackLocale`;
+ * without it every bot would register `zh-TW` text regardless of its
+ * configured language.
  *
  * Imports `command` / `command-builder` directly (not the `@cmd` barrel)
  * to stay out of the generated-registry import; reads the real catalog

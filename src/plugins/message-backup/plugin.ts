@@ -12,16 +12,19 @@
  *   - Reads the optional `backupIntervalMs` config — the delay between
  *     repeat passes. Defaults to one hour when omitted, preserving the
  *     historical hard-coded cadence.
+ *   - Reads the optional `backupLogEnabled` flag — defaults to `false`. The
+ *     backup always runs; this only controls whether each pass writes its
+ *     per-guild transcript to `logs/backup/`. The composition root maps the
+ *     operator-facing `backup_log_enabled` config field onto it.
  *   - Schedules itself on `onReady` (one-shot per guild then a repeat
  *     loop on `backupIntervalMs`). `onShutdown` clears the loop so a
  *     fast restart does not double-trigger.
  *
- * Why bot-scope rather than guild-scope: backup batches all
- * configured guilds in series to keep request-rate predictable. A
- * guild-scoped variant would race against itself on the Mongo
- * connection pool.
+ * One instance covers every guild: the backup batches all configured
+ * guilds in series to keep request-rate predictable. A per-guild
+ * variant would race against itself on the Mongo connection pool.
  */
-import { TOKENS } from '../../core/plugin';
+import { TOKENS } from '../../bot/tokens';
 import { logError } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
 import { performBackup } from './internal';
@@ -35,7 +38,7 @@ const DEFAULT_BACKUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 // such values at construction instead.
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
-export interface MessageBackupPluginConfig {
+interface MessageBackupPluginConfig {
   readonly backupServers: readonly string[];
   /**
    * Delay between repeat backup passes, in milliseconds. Omit to keep
@@ -43,11 +46,18 @@ export interface MessageBackupPluginConfig {
    * operator-facing `backup_interval_minutes` config field into this.
    */
   readonly backupIntervalMs?: number;
+  /**
+   * Whether each backup pass writes its per-guild transcript to `logs/backup/`.
+   * Defaults to `false` — the backup itself always runs; this only gates the
+   * transcript file. The composition root maps the operator-facing
+   * `backup_log_enabled` config field onto this.
+   */
+  readonly backupLogEnabled?: boolean;
 }
 
-export const createMessageBackupPlugin = (
-  rawConfig: MessageBackupPluginConfig,
-): Plugin => {
+export const createMessageBackupPlugin = (rawConfig: MessageBackupPluginConfig): Plugin => {
+  // Transcript logging is opt-in (default off); the backup pass itself always runs.
+  const backupLogEnabled = rawConfig.backupLogEnabled ?? false;
   const intervalMs = rawConfig.backupIntervalMs ?? DEFAULT_BACKUP_INTERVAL_MS;
   // Contract guard: a non-positive or non-finite interval would turn the
   // repeat loop into a tight spin (0ms) or never fire (NaN/Infinity); a
@@ -69,8 +79,6 @@ export const createMessageBackupPlugin = (
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    critical: false,
 
     async onReady(ctx): Promise<void> {
       const registry = ctx.resolve(TOKENS.GuildRegistry);
@@ -84,7 +92,12 @@ export const createMessageBackupPlugin = (
           }
           running.add(guildId);
           try {
-            await performBackup(guildId, registry, client, ctx.logger);
+            await performBackup(guildId, registry, client, ctx.logger, backupLogEnabled);
+          } catch (err: unknown) {
+            // Isolate a per-guild failure: one guild's error must not
+            // abort the remaining guilds in this pass, nor reject the
+            // scheduling loop above.
+            logError(ctx.logger, guildId, err);
           } finally {
             running.delete(guildId);
           }
@@ -94,9 +107,20 @@ export const createMessageBackupPlugin = (
       await runOnce();
       const scheduleNext = (): void => {
         if (stopped) return;
-        loopHandle = setTimeout(async () => {
-          await runOnce();
-          scheduleNext();
+        loopHandle = setTimeout(() => {
+          // Run the pass in a self-contained async IIFE: a throw must be
+          // caught here and the loop always rescheduled in `finally`.
+          // Without this, a rejected pass would die as an
+          // unhandledRejection and silently kill the repeat loop.
+          void (async (): Promise<void> => {
+            try {
+              await runOnce();
+            } catch (err: unknown) {
+              logError(ctx.logger, null, err);
+            } finally {
+              scheduleNext();
+            }
+          })();
         }, config.backupIntervalMs);
       };
       scheduleNext();

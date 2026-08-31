@@ -1,5 +1,5 @@
 /**
- * VoicePlugin DI smoke test (R2). Verifies that the plugin's `init`
+ * VoicePlugin DI smoke test. Verifies that the plugin's `init`
  * hook publishes its `VoiceController` under `TOKENS.VoiceController`
  * through the `registerInstance` facade so consumers (BaseBot's
  * `voice` getter, the record handler) can resolve it from the
@@ -12,7 +12,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Client } from 'discord.js';
 
-import { createContainer, TOKENS } from '../../../../src/core/ioc';
+import { createContainer } from '../../../../src/core/ioc';
+import { TOKENS } from '../../../../src/bot/tokens';
 import { createLogger } from '../../../../src/core/logger';
 import { EventDispatcher } from '../../../../src/core/plugin/event-dispatcher';
 import {
@@ -20,7 +21,6 @@ import {
   type LifecycleHost,
   type RegisteredPlugin,
 } from '../../../../src/core/plugin/host/lifecycle';
-import { buildDependentsIndex } from '../../../../src/core/plugin/host/topology';
 import type { DisabledPlugin, Plugin, PluginId } from '../../../../src/core/plugin/types';
 import { systemClock } from '../../../../src/core/time';
 import { createVoicePlugin, VoiceController } from '../../../../src/plugins/voice/plugin';
@@ -38,15 +38,11 @@ describe('VoicePlugin', () => {
     const fakeClient = {} as unknown as Client;
     container.registerSingleton(TOKENS.DiscordClient, () => fakeClient);
 
-    const plugin = createVoicePlugin() as Plugin<unknown>;
-    const registered = new Map<PluginId, RegisteredPlugin>([
-      [plugin.id, { plugin, config: undefined }],
-    ]);
+    const plugin = createVoicePlugin() as Plugin;
+    const registered = new Map<PluginId, RegisteredPlugin>([[plugin.id, { plugin }]]);
     const host: LifecycleHost = {
       registered,
-      order: [plugin.id],
       disabled: new Map<PluginId, DisabledPlugin>(),
-      dependents: buildDependentsIndex(registered),
       resolve: container.resolve.bind(container),
       container,
       dispatcher: new EventDispatcher(silent),

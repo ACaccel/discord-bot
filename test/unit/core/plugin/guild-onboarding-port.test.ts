@@ -1,11 +1,11 @@
 /**
- * Contract test for the guild-onboarding port (D1). Verifies the typed
+ * Contract test for the guild-onboarding port. Verifies the typed
  * seam can be implemented and resolved through a typed token without
  * the port pulling in persistence / infra types.
  */
 import { describe, expect, it } from 'vitest';
 import { createContainer } from '../../../../src/core/ioc';
-import { TOKENS } from '../../../../src/core/ioc/tokens';
+import { TOKENS } from '../../../../src/bot/tokens';
 import type { GuildOnboardingPort, GuildOnboardingResult } from '../../../../src/core/plugin';
 
 describe('GuildOnboardingPort contract', () => {

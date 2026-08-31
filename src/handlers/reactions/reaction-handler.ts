@@ -9,6 +9,10 @@ import type { MessageReaction, User } from 'discord.js';
 import type { BaseBot } from '@bot';
 
 export abstract class ReactionHandler {
-    public abstract executeAdded(reaction: MessageReaction, user: User, bot: BaseBot): Promise<void>;
-    public abstract executeRemoved(reaction: MessageReaction, user: User, bot: BaseBot): Promise<void>;
+  public abstract executeAdded(reaction: MessageReaction, user: User, bot: BaseBot): Promise<void>;
+  public abstract executeRemoved(
+    reaction: MessageReaction,
+    user: User,
+    bot: BaseBot,
+  ): Promise<void>;
 }

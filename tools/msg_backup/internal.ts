@@ -178,7 +178,7 @@ export const monthKey = (epochMs: number): string => {
 
 // ---------- Retry / transient classification ----------
 
-export const RETRY_DELAYS_MS: readonly number[] = [1000, 2000, 4000];
+const RETRY_DELAYS_MS: readonly number[] = [1000, 2000, 4000];
 
 const TRANSIENT_NODE_CODES: ReadonlySet<string> = new Set([
   'ECONNRESET',
@@ -287,7 +287,7 @@ export interface BackfillChannelLike {
 const channelDisplayName = (channel: BackfillChannelLike): string =>
   typeof channel.name === 'string' ? channel.name : channel.id;
 
-export interface BackfillDoc {
+interface BackfillDoc {
   /**
    * Plain object to feed into `$set`. Nested arrays are OMITTED when
    * any of their elements has a critical null field. Mongo's `$set`
@@ -424,7 +424,7 @@ export interface ChannelOutcomeLike {
   readonly stats: AnomalyChannelStats;
 }
 
-export type AnomalyStatus =
+type AnomalyStatus =
   | 'aborted'
   | 'no-permission'
   | 'channel-not-found'
@@ -434,7 +434,7 @@ export type AnomalyStatus =
   | 'retried-but-ok'
   | 'field-skip-ok';
 
-export interface AnomalyEntryOut {
+interface AnomalyEntryOut {
   readonly status: AnomalyStatus;
   readonly channelName: string;
   readonly channelId: string;
@@ -508,16 +508,16 @@ export const buildAnomalies = (
 // ---------- Thread enumeration ----------
 
 /** discord.js `ThreadManager` page size cap for archived fetches. */
-export const THREAD_PAGE_LIMIT = 50;
+const THREAD_PAGE_LIMIT = 50;
 
 /** The archived-thread visibility passes (gated differently by Discord). */
 export type ArchivedThreadType = 'public' | 'private';
 
 /** Which archived pass, if any, stopped early on a non-advancing cursor. */
-export type ArchivedPassLabel = 'archived-public' | 'archived-private';
+type ArchivedPassLabel = 'archived-public' | 'archived-private';
 
 /** Minimal thread shape needed to drive archived pagination. */
-export interface ThreadLike {
+interface ThreadLike {
   readonly id: string;
   readonly archiveTimestamp?: number | null;
   readonly createdTimestamp?: number | null;
@@ -539,7 +539,7 @@ export type ArchivedThreadFetcher<T> = (cursor: {
   readonly limit: number;
 }) => Promise<ArchivedThreadPage<T>>;
 
-export interface ArchivedPaginationResult<T> {
+interface ArchivedPaginationResult<T> {
   readonly threads: readonly T[];
   /**
    * True when Discord reported `hasMore` but the timestamp cursor could
@@ -562,7 +562,7 @@ export interface ArchivedPaginationResult<T> {
  * `hasMore` is still true we stop and flag `truncated` rather than loop
  * forever.
  */
-export const paginateArchivedThreads = async <T extends ThreadLike>(
+const paginateArchivedThreads = async <T extends ThreadLike>(
   fetchPage: ArchivedThreadFetcher<T>,
   onBatch: (info: {
     readonly batch: number;
@@ -605,7 +605,7 @@ export const paginateArchivedThreads = async <T extends ThreadLike>(
   }
 };
 
-export interface ChannelThreadEnumeration<T> {
+interface ChannelThreadEnumeration<T> {
   /** Active threads (public + private the bot can see). */
   readonly active: readonly T[];
   /** Archived threads, public and private passes combined. */

@@ -31,9 +31,9 @@ const ConfigSchema = z
     windowSeconds: z.number().positive().default(30),
     /**
      * Minimum seconds between two consecutive replies in the same channel.
-     * `0` disables the cooldown. A force-triggered (`fatcat_reply`) reply
-     * skips this check but still records its timestamp, so a following
-     * automatic reply observes the gap.
+     * `0` disables the cooldown. An @-mention reply skips this check but
+     * still records its timestamp, so a following automatic reply observes
+     * the gap.
      */
     cooldownSeconds: z.number().min(0).default(30),
     /** Self-hosted LLM chat endpoint URL. */

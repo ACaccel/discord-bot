@@ -5,18 +5,19 @@
  *
  * Flow per message: cheap guards -> per-channel reply cooldown + in-flight
  * guard (automatic replies only) -> probability gate (rolled BEFORE any
- * network/fetch, unless the message begins with the force-trigger keyword)
- * -> {@link runLlmAutoReply}, which fetches the recent burst, builds a
+ * network/fetch, unless the message @-mentions the bot) ->
+ * {@link runLlmAutoReply}, which fetches the recent burst, builds a
  * transcript, calls the LLM, and posts one reply. The channel is marked
  * in-flight before the first await (so a concurrent automatic message in
  * the same channel yields), and the cooldown is recorded only when a reply
- * actually goes out (automatic or force-triggered).
+ * actually goes out (automatic or @-mention).
  *
  * Factory pattern (mirrors `createEarthquakePlugin`): per-bot settings
  * are parsed once and the `SelfHostedLlmClient` is captured in the
- * closure, so the returned object is pure data. `deps` exposes a
- * `random` seam for deterministic tests and the host's `blockedChannels`
- * list so blocked channels never trigger.
+ * closure, so the returned object is pure data. `deps` carries the bot's
+ * `clientId` (for @-mention detection), a `random` seam for deterministic
+ * tests, and the host's `blockedChannels` list so blocked channels never
+ * trigger.
  */
 import { logError } from '../../core/logger';
 import type { Plugin } from '../../core/plugin';
@@ -25,30 +26,51 @@ import { parseLlmAutoReplyConfig } from './config';
 import { ReplyCooldown } from './internal/cooldown';
 import { InFlightChannels } from './internal/in-flight';
 import { runLlmAutoReply } from './internal/orchestrator';
-import { startsWithForceTrigger } from './internal/trigger';
+import { mentionsBot } from './internal/trigger';
 
 const PLUGIN_ID = 'llm-auto-reply';
 const PLUGIN_VERSION = '1.0.0';
 
-/** Optional collaborators wired by the composition root. */
-export interface CreateLlmAutoReplyDeps {
-  /** Channel ids (e.g. nijika's `blocked_channels`) that never trigger a reply. */
+/** Collaborators wired by the composition root. */
+interface CreateLlmAutoReplyDeps {
+  /**
+   * The bot's Discord application/client id. Used to detect an @-mention,
+   * which fires a reply deterministically (mirrors konata's llm-chat).
+   */
+  readonly clientId: string;
+  /**
+   * Channel ids that never trigger a reply. This is an intentionally
+   * list-based dep that predates the `permission_rank` model: gopher (the
+   * only consumer) passes none, so folding it into a `RankedFeature` would be
+   * speculative. Kept list-based on purpose; revisit if a gopher guild ever
+   * needs per-channel rank gating.
+   */
   readonly blockedChannels?: readonly string[];
   /** Random source in [0, 1); injectable for deterministic tests. */
   readonly random?: () => number;
   /** Reply client; injectable so tests can assert the send path without a real HTTP call. */
   readonly client?: Pick<SelfHostedLlmClient, 'reply'>;
+  /**
+   * Live endpoint source, read on every reply. When supplied it overrides
+   * `config.endpoint` so a composition root (e.g. gopher's settings API)
+   * can swap the self-hosted endpoint at runtime without rebuilding the
+   * plugin. Ignored when `client` is injected.
+   */
+  readonly endpointProvider?: () => string;
 }
 
 export const createLlmAutoReplyPlugin = (
   rawConfig: unknown,
-  deps: CreateLlmAutoReplyDeps = {},
+  deps: CreateLlmAutoReplyDeps,
 ): Plugin => {
   const config = parseLlmAutoReplyConfig(rawConfig);
+  const { clientId } = deps;
   const client =
     deps.client ??
     new SelfHostedLlmClient({
-      endpoint: config.endpoint,
+      // A live provider takes precedence so the endpoint can change at
+      // runtime; otherwise the parsed config's static endpoint is used.
+      endpoint: deps.endpointProvider ?? config.endpoint,
       timeoutMs: config.timeoutMs,
     });
   const random = deps.random ?? Math.random;
@@ -65,8 +87,6 @@ export const createLlmAutoReplyPlugin = (
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    critical: false,
 
     events: {
       messageCreate: async (ctx, message): Promise<void> => {
@@ -79,12 +99,12 @@ export const createLlmAutoReplyPlugin = (
         const channelId = message.channelId;
         // The triggering message's creation time is the cooldown reference.
         const now = message.createdTimestamp;
-        const forced = startsWithForceTrigger(message.content);
-        // A force-triggered message fires deterministically: it skips the
-        // cooldown, the in-flight guard, and (downstream) the windowSeconds
-        // burst check. An automatic reply must respect the per-channel
-        // cooldown, yield to an in-flight reply for the channel, and pass the
-        // probability roll. The messageCount requirement applies to both.
+        const forced = mentionsBot(message, clientId);
+        // An @-mention fires deterministically: it skips the cooldown, the
+        // in-flight guard, and (downstream) the windowSeconds burst check. An
+        // automatic reply must respect the per-channel cooldown, yield to an
+        // in-flight reply for the channel, and pass the probability roll. The
+        // messageCount requirement applies to both.
         if (!forced && !cooldown.isReady(channelId, now)) return;
         if (!forced && inFlight.isActive(channelId)) return;
         if (!forced && random() >= config.probability) return;
@@ -95,11 +115,14 @@ export const createLlmAutoReplyPlugin = (
         // reply still yields to it.
         inFlight.begin(channelId);
         try {
-          const sent = await runLlmAutoReply({ client, logger: ctx.logger, config }, message);
+          const sent = await runLlmAutoReply(
+            { client, logger: ctx.logger, config, clientId },
+            message,
+          );
           // Record only on an actual send, so a no-op attempt (too few
           // messages, out of window, empty transcript, LLM failure) does not
-          // suppress the next legitimate reply. A forced reply records too,
-          // so a following automatic reply observes the gap.
+          // suppress the next legitimate reply. An @-mention reply records
+          // too, so a following automatic reply observes the gap.
           if (sent) cooldown.record(channelId, now);
         } catch (err: unknown) {
           logError(ctx.logger, message.guildId, err);
@@ -110,5 +133,3 @@ export const createLlmAutoReplyPlugin = (
     },
   };
 };
-
-export type { LlmAutoReplyPluginConfig } from './config';

@@ -28,8 +28,7 @@ behavior — not whether a coverage number is high.
 
 - **Unit** — pure functions and single classes with fakes injected.
   Fast, no I/O. `core/**` facades (`host.ts`, `container.ts`,
-  `result.ts`), `*.repo.ts`, topology / merger pure functions belong
-  here.
+  `result.ts`), `*.repo.ts`, and pure helper modules belong here.
 - **Integration** — `mongodb-memory-server` for repositories; the
   `interaction -> handler -> use case -> repo` path via Discord
   fixtures. Real wiring, real Mongo, no network.
@@ -54,13 +53,13 @@ behavior — not whether a coverage number is high.
   counts. A mock that re-implements the unit under test proves nothing.
 - **Branch coverage / mutation resistance**: both `Ok` and `Err` paths,
   not-found and found, transient-retry and persistent-fail,
-  cascade-disable and critical-escalation. A test that passes against
-  an obviously wrong implementation is worthless.
+  plugin-disabled and plugin-healthy. A test that passes against an
+  obviously wrong implementation is worthless.
 - **Determinism**: injected `FakeClock`, seeded randomness, ASCII-sorted
-  codegen, Kahn insertion-order tie-break — no wall-clock or ordering
+  codegen, registration-order plugin phases — no wall-clock or ordering
   flake.
 - **Property-based testing**: consider when the input domain is large
-  and the property is small (parsers, ID normalization, topology sort
+  and the property is small (parsers, ID normalization, rank-fold
   invariants).
 - **Coverage thresholds**: do not lower a threshold to make a change
   pass.

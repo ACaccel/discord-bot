@@ -449,7 +449,7 @@ describe('msg_backup / buildAnomalies', () => {
 
 describe('msg_backup / maskMongoUri', () => {
   it('replaces the password segment with ****', () => {
-    expect(maskMongoUri('mongodb://user:secret@h:27017/')).toBe('mongodb://user:****@h:27017/');
+    expect(maskMongoUri('mongodb://user:secret@h:27017/')).toBe('mongodb://user:****@h:27017/'); // gitleaks:allow
   });
 
   it('leaves credential-less URIs untouched', () => {
@@ -457,9 +457,9 @@ describe('msg_backup / maskMongoUri', () => {
   });
 
   it('handles mongodb+srv URIs', () => {
-    expect(maskMongoUri('mongodb+srv://user:hunter2@cluster.example/')).toBe(
-      'mongodb+srv://user:****@cluster.example/',
-    );
+    const credentialed = 'mongodb+srv://user:hunter2@cluster.example/'; // gitleaks:allow
+    const masked = 'mongodb+srv://user:****@cluster.example/'; // gitleaks:allow
+    expect(maskMongoUri(credentialed)).toBe(masked);
   });
 });
 

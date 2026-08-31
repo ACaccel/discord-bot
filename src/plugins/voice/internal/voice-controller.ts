@@ -15,7 +15,7 @@ import type { Writable } from 'node:stream';
  * plugin keeps minimal Discord SDK builder dependencies (the
  * `joinVoiceChannel` adapter is the only one we cannot avoid).
  */
-export interface VoiceSaveResult {
+interface VoiceSaveResult {
   readonly buffer: Buffer;
 }
 

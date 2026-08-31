@@ -6,7 +6,7 @@ import { AttachmentBuilder } from 'discord.js';
  * is still extracted so the index.ts handler only worries about
  * "is this print=yes or print=no" routing logic.
  */
-export interface BuildArchiveAttachmentParams {
+interface BuildArchiveAttachmentParams {
   readonly channelId: string;
   readonly date: string;
   readonly hour: number | null | undefined;

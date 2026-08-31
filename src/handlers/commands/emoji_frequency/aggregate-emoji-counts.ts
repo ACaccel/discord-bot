@@ -9,7 +9,7 @@ export interface EmojiCounts {
   readonly reaction: Map<string, number>;
 }
 
-export interface MessageLike {
+interface MessageLike {
   readonly content?: string | null;
   readonly reactions?: ReadonlyArray<{
     readonly id?: string | null;

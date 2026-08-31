@@ -69,7 +69,7 @@ describe('handlers codegen', () => {
     });
 
     it('escapes embedded backslashes before single quotes', () => {
-      // Regression for CodeQL js/incomplete-sanitization (Phase 1 review).
+      // Regression for CodeQL js/incomplete-sanitization.
       // The emitted literal, when evaluated as TypeScript, must yield
       // back exactly the original key.
       const original = String.raw`a\b'c`;

@@ -1,123 +1,145 @@
-import type { 
-    ChatInputCommandInteraction,
-    GuildMember,
-    Message} from 'discord.js';
-import {
-    Events
-} from 'discord.js';
+import type { ChatInputCommandInteraction, GuildMember } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 import { msgReact, scheduleJob } from '../discord-helpers';
 
 import { logError } from '@core/logger';
-import { replyForError } from '../../reply-for-error';
+import { replyForError } from '../../../infra/discord/reply-for-error';
+import { getOptionalNumber, getRequiredString } from '../../../infra/discord/options';
+import { startMessageDeletionFallback } from './delete-messages-fallback';
 export default class ban_user extends Command {
-    constructor() {
-        super();
-        this.setConfig({
-            name: "ban_user",
-            category: 'admin',
-            options: {
-                user: [
-                    {
-                        name: "user",
-                        required: true
-                    }
-                ],
-                number: [
-                    {
-                        name: "duration",
-                        required: false
-                    }
-                ]
-            }
+  constructor() {
+    super();
+    this.setConfig({
+      name: 'ban_user',
+      category: 'admin',
+      options: {
+        user: [
+          {
+            name: 'user',
+            required: true,
+          },
+        ],
+        number: [
+          {
+            name: 'duration',
+            required: false,
+          },
+        ],
+      },
+    });
+  }
+
+  public override async execute(
+    interaction: ChatInputCommandInteraction,
+    bot: BaseBot,
+  ): Promise<void> {
+    await interaction.deferReply();
+    try {
+      const BAN_THRESHOLD = 5; // number of votes required to ban
+      const JUDGE_TIME = 1; // minutes to judge
+      const user = getRequiredString(interaction, 'user');
+      const member = interaction.guild?.members.cache.get(user);
+      const ban_user_role =
+        bot.getGuildInfo(interaction.guild?.id as string)?.roles?.ban_user?.id || 'role not set';
+      if (!member) {
+        await interaction.editReply({
+          content: bot.translator?.t('errors:command.user_not_found') ?? '',
         });
-    }
+        return;
+      }
 
-    public override async execute(interaction: ChatInputCommandInteraction, bot: BaseBot): Promise<void> {
-        await interaction.deferReply();
-        try {
-            const BAN_THRESHOLD = 5; // number of votes required to ban
-            const JUDGE_TIME = 1; // minutes to judge
-            const user = interaction.options.get("user")?.value as string;
-            const member = interaction.guild?.members.cache.get(user);
-            const ban_user_role = bot.getGuildInfo(interaction.guild?.id as string)?.roles?.ban_user?.id || "role not set";
-            if (!member) {
-                await interaction.editReply({ content: bot.translator?.t('errors:command.user_not_found') ?? '' });
-                return;
-            }
-            
-            let duration = interaction.options.get("duration")?.value as number;
-            if (!duration) duration = 1; // 1 minutes
-            if (duration > 5) duration = 5; // max 5 minutes
-            if (duration < 1) duration = 1; // min 1 minute
-    
-            // ban message
-            const initiator = interaction.member as GuildMember || interaction.user;
-            const ban_msg = bot.translator?.t('replies:ban_user.vote_call', {
-                initiator: initiator.displayName,
-                target: member.displayName,
-                duration,
-                judgeTime: JUDGE_TIME,
-                threshold: BAN_THRESHOLD,
-                role: ban_user_role,
-            }) ?? '';
-            await interaction.deleteReply();
-            const ch = interaction.channel;
-            if (!ch?.isSendable()) return;
-            const judge_msg = await ch.send({ content: ban_msg });
-            await msgReact(judge_msg, ["👍"], bot.logger, bot.clientId);
-    
-            // judgement time (todo: save to db like giveaway)
-            const current_time = Date.now();
-            const end_time = current_time + JUDGE_TIME * 60 * 1000;
-            const end_time_date = new Date(end_time);
-    
-            // delete message for unbanable users
-            const delete_on_msg_create = async () => {
-                const deleteListener = async (msg: Message) => {
-                    if (!msg.author.bot && msg.author?.id === member.id && msg.guild?.id === interaction.guild?.id) {
-                        try {
-                            await msg.delete();
-                        } catch (err) {
-                            logError(bot.logger, interaction.guild?.id, err);
-                        }
-                    }
-                };
-                bot.client.on(Events.MessageCreate, deleteListener);
-    
-                setTimeout(() => {
-                    bot.client.off("messageCreate", deleteListener);
-                }, duration * 60 * 1000);
-            }
-    
-            const ban_judgement = async () => {
-                const emoji = judge_msg.reactions.resolve("👍");
-                if (!emoji) {
-                    await judge_msg.reply(bot.translator?.t('replies:ban_user.cannot_get_votes') ?? '');
-                    return;
-                }
-                if (member.user.bot) {
-                    await judge_msg.reply(bot.translator?.t('replies:ban_user.cannot_ban_bot') ?? '');
-                    return;
-                }
+      let duration = getOptionalNumber(interaction, 'duration') ?? 0;
+      if (!duration) duration = 1; // 1 minutes
+      if (duration > 5) duration = 5; // max 5 minutes
+      if (duration < 1) duration = 1; // min 1 minute
 
-                const judge_count = emoji.count - 1;
-                if (judge_count >= BAN_THRESHOLD) {
-                    try {
-                        await member.timeout(duration * 60 * 1000, bot.translator?.t('replies:ban_user.timeout_reason') ?? '');
-                        await judge_msg.reply(bot.translator?.t('replies:ban_user.timed_out', { user: member.user.tag, duration }) ?? '');
-                    } catch (error) {
-                        await judge_msg.reply(bot.translator?.t('replies:ban_user.cannot_timeout') ?? '');
-                        await delete_on_msg_create();
-                    }
-                } else {
-                    await judge_msg.reply(bot.translator?.t('replies:ban_user.vote_failed', { count: judge_count, threshold: BAN_THRESHOLD }) ?? '');
-                }
-            }
-            scheduleJob(end_time_date, () => ban_judgement());
-        } catch (error) {
-            await replyForError(interaction, bot, error, 'replies:ban_user.failed', interaction.guild?.id);
+      // ban message
+      const initiator = (interaction.member as GuildMember) || interaction.user;
+      const ban_msg =
+        bot.translator?.t('replies:ban_user.vote_call', {
+          initiator: initiator.displayName,
+          target: member.displayName,
+          duration,
+          judgeTime: JUDGE_TIME,
+          threshold: BAN_THRESHOLD,
+          role: ban_user_role,
+        }) ?? '';
+      await interaction.deleteReply();
+      const ch = interaction.channel;
+      if (!ch?.isSendable()) return;
+      const judge_msg = await ch.send({ content: ban_msg });
+      await msgReact(judge_msg, ['👍'], bot.logger, bot.clientId);
+
+      // judgement time
+      const current_time = Date.now();
+      const end_time = current_time + JUDGE_TIME * 60 * 1000;
+      const end_time_date = new Date(end_time);
+
+      const ban_judgement = async () => {
+        const emoji = judge_msg.reactions.resolve('👍');
+        if (!emoji) {
+          await judge_msg.reply(bot.translator?.t('replies:ban_user.cannot_get_votes') ?? '');
+          return;
         }
+        if (member.user.bot) {
+          await judge_msg.reply(bot.translator?.t('replies:ban_user.cannot_ban_bot') ?? '');
+          return;
+        }
+
+        const judge_count = emoji.count - 1;
+        if (judge_count >= BAN_THRESHOLD) {
+          try {
+            await member.timeout(
+              duration * 60 * 1000,
+              bot.translator?.t('replies:ban_user.timeout_reason') ?? '',
+            );
+            await judge_msg.reply(
+              bot.translator?.t('replies:ban_user.timed_out', {
+                user: member.user.tag,
+                duration,
+              }) ?? '',
+            );
+          } catch (timeoutErr) {
+            // Usually a missing ModerateMembers permission or a
+            // target above the bot in the role hierarchy. The
+            // fallback below still runs, but the operator needs
+            // to see which one it was.
+            logError(bot.logger, interaction.guild?.id, timeoutErr);
+            await judge_msg.reply(bot.translator?.t('replies:ban_user.cannot_timeout') ?? '');
+            startMessageDeletionFallback({
+              client: bot.client,
+              logger: bot.logger,
+              targetMemberId: member.id,
+              guildId: interaction.guild?.id,
+              durationMs: duration * 60 * 1000,
+            });
+          }
+        } else {
+          await judge_msg.reply(
+            bot.translator?.t('replies:ban_user.vote_failed', {
+              count: judge_count,
+              threshold: BAN_THRESHOLD,
+            }) ?? '',
+          );
+        }
+      };
+      // node-schedule discards the value its callback returns, so the
+      // rejection has to be caught here or it escapes as a detached
+      // unhandledRejection with no link back to this vote.
+      scheduleJob(end_time_date, () => {
+        void ban_judgement().catch((err: unknown) =>
+          logError(bot.logger, interaction.guild?.id, err),
+        );
+      });
+    } catch (error) {
+      await replyForError(
+        interaction,
+        bot,
+        error,
+        'replies:ban_user.failed',
+        interaction.guild?.id,
+      );
     }
+  }
 }

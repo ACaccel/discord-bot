@@ -6,7 +6,7 @@
  * stays domain-shaped: a future swap to a different storage layer would
  * not change call sites.
  *
- * Inputs use branded ID types from `@core/ids` so a `UserId` cannot be
+ * Inputs use branded ID types from `@core/ids` so a `GuildId` cannot be
  * passed where a `ChannelId` is expected. Returned `MessageDoc` carries
  * the raw stored shape; the embedded id fields are not rebranded.
  *
@@ -29,7 +29,7 @@ import { err, ok, type Result } from '../../core/result';
 import type { DatabaseError } from '../../core/errors/external-service-error';
 import type { GuildConnection } from '../../infra/mongo/connection-manager';
 import { databaseErrorFrom } from '../error-translator';
-import type { MessageDoc } from '../schemas/message.schema';
+import type { MessageDoc, NewMessageDoc } from '../schemas/message.schema';
 
 export interface InsertResult {
   /** How many of the requested docs were actually written. */
@@ -67,7 +67,7 @@ export interface MessageRepo {
    * other Mongo error resolves to `err`.
    */
   insertManyIgnoringDuplicates(
-    docs: readonly MessageDoc[],
+    docs: readonly NewMessageDoc[],
   ): Promise<Result<InsertResult, DatabaseError>>;
 
   /**
@@ -165,7 +165,7 @@ export class MongoMessageRepo implements MessageRepo {
   }
 
   public async insertManyIgnoringDuplicates(
-    docs: readonly MessageDoc[],
+    docs: readonly NewMessageDoc[],
   ): Promise<Result<InsertResult, DatabaseError>> {
     if (docs.length === 0) {
       return ok({ inserted: 0, duplicates: 0 });
@@ -212,15 +212,12 @@ export class MongoMessageRepo implements MessageRepo {
       );
     }
     try {
-      // The stored `timestamp` field is a String; the `$toLong`
-      // projection makes the comparison numeric.
+      // `timestamp` is a numeric epoch (the one-time `db migrate-timestamp`
+      // backfill removed the legacy String rows that once required a
+      // `$toLong` projection), so this plain half-open range is sargable
+      // and served by the `{ timestamp: 1 }` index instead of a collection scan.
       const docs = await this.conn.models.Message.find({
-        $expr: {
-          $and: [
-            { $gte: [{ $toLong: '$timestamp' }, startMs] },
-            { $lt: [{ $toLong: '$timestamp' }, endMs] },
-          ],
-        },
+        timestamp: { $gte: startMs, $lt: endMs },
       })
         .lean<MessageDoc[]>()
         .exec();
@@ -268,14 +265,12 @@ export class MongoMessageRepo implements MessageRepo {
       );
     }
     try {
+      // Numeric `timestamp` (see findByTimestampRange) makes this a plain
+      // half-open range; the compound `{ channelId: 1, timestamp: 1 }` index
+      // serves both the equality + range and the sort with no blocking SORT.
       const docs = await this.conn.models.Message.find({
         channelId,
-        $expr: {
-          $and: [
-            { $gte: [{ $toLong: '$timestamp' }, startMs] },
-            { $lt: [{ $toLong: '$timestamp' }, endMs] },
-          ],
-        },
+        timestamp: { $gte: startMs, $lt: endMs },
       })
         .sort({ timestamp: 1 })
         .lean<MessageDoc[]>()

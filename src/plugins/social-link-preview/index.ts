@@ -1,0 +1,1 @@
+export { createSocialLinkPreviewPlugin } from './plugin';

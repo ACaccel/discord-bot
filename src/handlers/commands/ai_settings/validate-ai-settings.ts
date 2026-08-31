@@ -5,7 +5,7 @@ import type { UserApiDoc } from './provider-choices';
  * union so the handler can switch on `ok` and reach the
  * corresponding i18n reply key without further branching.
  */
-export type AiSettingsCheck =
+type AiSettingsCheck =
   | { ok: true; doc: UserApiDoc }
   | { ok: false; reason: 'no_doc' | 'no_models' };
 

@@ -15,21 +15,23 @@ import { MongoFetchRepo, type FetchRepo } from './fetch.repo';
 import { MongoGiveawayRepo, type GiveawayRepo } from './giveaway.repo';
 import { MongoMessageRepo, type MessageRepo } from './message.repo';
 import { MongoReplyRepo, type ReplyRepo } from './reply.repo';
-import { MongoTodoRepo, type TodoRepo } from './todo.repo';
+import { MongoTempRoleRepo, type TempRoleRepo } from './temp-role.repo';
 import { MongoUserApiSettingRepo, type UserApiSettingRepo } from './user-api-setting.repo';
+import { MongoXFeedCursorRepo, type XFeedCursorRepo } from './x-feed-cursor.repo';
 
 export { MongoActivityRepo, type ActivityRepo, type ActivityInput } from './activity.repo';
 export { MongoFetchRepo, type FetchRepo } from './fetch.repo';
 export { MongoGiveawayRepo, type GiveawayRepo, type GiveawayInput } from './giveaway.repo';
 export { MongoMessageRepo, type MessageRepo, type InsertResult } from './message.repo';
 export { MongoReplyRepo, type ReplyRepo } from './reply.repo';
-export { MongoTodoRepo, type TodoRepo } from './todo.repo';
+export { MongoTempRoleRepo, type TempRoleRepo, type TempRoleInput } from './temp-role.repo';
 export {
   MongoUserApiSettingRepo,
   type UserApiSettingRepo,
   type UserApiSettingDefaults,
   type UserApiSettingPatch,
 } from './user-api-setting.repo';
+export { MongoXFeedCursorRepo, type XFeedCursorRepo } from './x-feed-cursor.repo';
 
 /**
  * Per-guild repository bag. Composition roots build one of these per
@@ -42,8 +44,9 @@ export interface Repos {
   readonly giveaway: GiveawayRepo;
   readonly message: MessageRepo;
   readonly reply: ReplyRepo;
-  readonly todo: TodoRepo;
+  readonly tempRole: TempRoleRepo;
   readonly userApiSetting: UserApiSettingRepo;
+  readonly xFeedCursor: XFeedCursorRepo;
 }
 
 /**
@@ -58,6 +61,7 @@ export const buildRepos = (conn: GuildConnection): Repos => ({
   giveaway: new MongoGiveawayRepo(conn),
   message: new MongoMessageRepo(conn),
   reply: new MongoReplyRepo(conn),
-  todo: new MongoTodoRepo(conn),
+  tempRole: new MongoTempRoleRepo(conn),
   userApiSetting: new MongoUserApiSettingRepo(conn),
+  xFeedCursor: new MongoXFeedCursorRepo(conn),
 });

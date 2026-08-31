@@ -11,7 +11,7 @@
  *      means the translator was never bound, which would only happen
  *      if a caller invoked the dispatcher before `BaseBot.run()`).
  *   3. Always `await` the resulting promise so a `followUp` fallback
- *      can detect already-replied state (plan §5B.5 boundary contract).
+ *      can detect already-replied state (the handler-boundary contract).
  *
  * Returns `Promise<void>` rather than the discord.js
  * `InteractionResponse` because every existing call site discards the

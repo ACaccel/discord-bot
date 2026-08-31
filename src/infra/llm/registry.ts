@@ -29,6 +29,7 @@
  */
 import { LlmProviderError } from '../../core/errors';
 import { err, ok, type Result } from '../../core/result';
+import type { AnyLlmProviderError } from './errors';
 import {
   MissingApiKeyError,
   PROVIDER_API_KEY_ENV,
@@ -36,17 +37,10 @@ import {
   type LLMProviderName,
 } from './types';
 
-export type LlmProviderFactory = () => LLMProvider;
+type LlmProviderFactory = () => LLMProvider;
 
 /** Pre-resolved per-provider API keys. `undefined` = unset / unused. */
 export type LlmProviderApiKeys = Readonly<Partial<Record<LLMProviderName, string | undefined>>>;
-
-/**
- * Widened LlmProviderError used as the Err branch of {@link tryResolve}.
- * Erases the messageParams generic so consumers handle a single
- * concrete type regardless of which translation branch produced it.
- */
-type AnyLlmProviderError = LlmProviderError<Readonly<Record<string, string | number>>>;
 
 const missingApiKeyToLlmError = (provider: LLMProviderName, envVar: string): AnyLlmProviderError =>
   new LlmProviderError({

@@ -176,43 +176,16 @@
     }
   },
   "giveaway_create": {
-    "description": "建立抽獎",
-    "options": {
-      "duration": {
-        "description": "抽獎時限 (1s, 1m, 1h, 1d, 1w)"
-      },
-      "prize": {
-        "description": "獎品"
-      },
-      "description": {
-        "description": "抽獎描述 (optional)"
-      },
-      "winner_num": {
-        "description": "中獎人數"
-      }
-    }
+    "description": "建立抽獎"
   },
   "giveaway_delete": {
-    "description": "刪除抽獎",
-    "options": {
-      "message_id": {
-        "description": "抽獎訊息ID (Bot發布的公告)"
-      }
-    }
+    "description": "刪除抽獎"
   },
   "give_score": {
     "description": "給分"
   },
   "help": {
     "description": "顯示指令清單與說明"
-  },
-  "inspect_member_ids": {
-    "description": "檢查多個 ID 是否在本 guild，並列出可查資訊",
-    "options": {
-      "ids": {
-        "description": "可貼多個 ID（逗號/空白/換行分隔）"
-      }
-    }
   },
   "level_detail": {
     "description": "查看等級詳細資訊",
@@ -241,21 +214,6 @@
   },
   "menu_get_sticker": {
     "name": "取得表符/貼圖連結"
-  },
-  "pin_message": {
-    "description": "釘選訊息",
-    "options": {
-      "action": {
-        "description": "釘選或取消釘選",
-        "choices": {
-          "pin": "釘選",
-          "unpin": "取消釘選"
-        }
-      },
-      "message_link": {
-        "description": "要釘選的訊息連結"
-      }
-    }
   },
   "random_restaurant": {
     "description": "隨機餐廳抽取器 (台北/部分新北地區)",
@@ -308,7 +266,7 @@
     "description": "點名",
     "options": {
       "users": {
-        "description": "被點名者 (ex: @user1 @user2...)"
+        "description": "被點名者或身份組 (ex: @user1 @role1 @user2...)"
       },
       "activity_id": {
         "description": "活動ID (用於連動活動參與者點名)"
@@ -363,19 +321,86 @@
       }
     }
   },
-  "todo_list": {
-    "description": "待辦事項",
+  "temp_role": {
+    "description": "建立一個暫時性的通知身份組,任何人都能領取,到期後自動刪除",
     "options": {
-      "action": {
-        "description": "新增或刪除",
+      "name": {
+        "description": "身份組名稱"
+      },
+      "days": {
+        "description": "存活天數 (1-30,預設 30)"
+      }
+    }
+  },
+  "traffic": {
+    "description": "顯示伺服器訊息流量圖表與統計",
+    "options": {
+      "visibility": {
+        "description": "誰能看到回覆 (optional,預設:ephemeral)",
         "choices": {
-          "add": "新增 (+ content: 內容)",
-          "delete": "刪除 (+ content: 編號)",
-          "list": "查看"
+          "ephemeral": "僅你自己",
+          "public": "所有人"
         }
       },
-      "content": {
-        "description": "內容 (optional)"
+      "range": {
+        "description": "回顧的時間範圍 (optional,預設:7d)",
+        "choices": {
+          "24h": "最近 24 小時",
+          "7d": "最近 7 天",
+          "30d": "最近 30 天"
+        }
+      },
+      "top_n": {
+        "description": "排行要顯示幾個頻道／用戶 (optional,1-25,預設:10)"
+      }
+    }
+  },
+  "traffic_me": {
+    "description": "顯示你自己的訊息活動統計",
+    "options": {
+      "visibility": {
+        "description": "誰能看到回覆 (optional,預設:ephemeral)",
+        "choices": {
+          "ephemeral": "僅你自己",
+          "public": "所有人"
+        }
+      },
+      "range": {
+        "description": "回顧的時間範圍 (optional,預設:7d)",
+        "choices": {
+          "24h": "最近 24 小時",
+          "7d": "最近 7 天",
+          "30d": "最近 30 天"
+        }
+      },
+      "top_n": {
+        "description": "排行要顯示幾個頻道 (optional,1-25,預設:10)"
+      }
+    }
+  },
+  "traffic_user": {
+    "description": "顯示指定用戶的訊息活動統計",
+    "options": {
+      "user": {
+        "description": "要查詢的用戶"
+      },
+      "visibility": {
+        "description": "誰能看到回覆 (optional,預設:ephemeral)",
+        "choices": {
+          "ephemeral": "僅你自己",
+          "public": "所有人"
+        }
+      },
+      "range": {
+        "description": "回顧的時間範圍 (optional,預設:7d)",
+        "choices": {
+          "24h": "最近 24 小時",
+          "7d": "最近 7 天",
+          "30d": "最近 30 天"
+        }
+      },
+      "top_n": {
+        "description": "排行要顯示幾個頻道 (optional,1-25,預設:10)"
       }
     }
   },

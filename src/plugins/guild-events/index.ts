@@ -1,1 +1,1 @@
-export { createGuildEventsPlugin, type GuildEventsConfig } from './plugin';
+export { createGuildEventsPlugin } from './plugin';

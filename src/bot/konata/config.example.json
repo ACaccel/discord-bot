@@ -1,16 +1,13 @@
 {
-    "admin": ["YOUR_ADMIN_USER_ID"],
-    "language": "zh-TW",
-    "guilds": {
-        "YOUR_GUILD_ID": {
-            "channels": {
-                "debug": "YOUR_DEBUG_CHANNEL_ID"
-            },
-            "roles": {}
-        }
-    },
-    "commands": [
-        "help",
-        "COMMAND_NAME"
-    ]
+  "admin": ["YOUR_ADMIN_USER_ID"],
+  "language": "zh-TW",
+  "guilds": {
+    "YOUR_GUILD_ID": {
+      "channels": {
+        "debug": "YOUR_DEBUG_CHANNEL_ID"
+      },
+      "roles": {}
+    }
+  },
+  "commands": ["help", "COMMAND_NAME"]
 }

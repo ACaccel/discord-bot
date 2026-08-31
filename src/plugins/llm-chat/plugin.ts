@@ -18,9 +18,9 @@
  */
 import type { Message } from 'discord.js';
 
-import type { LlmProviderError } from '../../core/errors';
 import type { Translator } from '../../core/i18n';
-import { TOKENS } from '../../core/plugin';
+import { TOKENS } from '../../bot/tokens';
+import type { GuildRegistry } from '../../bot/guild-registry';
 import type { Plugin } from '../../core/plugin';
 import {
   DefaultModelResolver,
@@ -28,6 +28,7 @@ import {
   ModelCatalog,
   createDefaultRegistry,
   formatUsageFooter,
+  type AnyLlmProviderError,
   type LLMMessage,
   type LLMProviderName,
   type LLMResult,
@@ -46,8 +47,16 @@ const MAX_DISCORD_MESSAGE_LENGTH = 2000;
 const DEFAULT_MODEL_REFRESH_JOB_KEY = 'llm-chat:refresh-default-models';
 const DEFAULT_MODEL_REFRESH_CRON = '0 4 * * 1';
 
-export interface LlmChatPluginConfig {
+interface LlmChatPluginConfig {
   readonly clientId: string;
+}
+
+/** The message path's dependencies, built once by `init`. */
+interface LlmChatRuntime {
+  readonly service: LLMService;
+  readonly registry: GuildRegistry;
+  /** Bot-root logger: chat failures are per-guild operator events. */
+  readonly logger: Logger;
 }
 
 interface UserApiDoc {
@@ -70,8 +79,12 @@ const toSettings = (doc: UserApiDoc): LLMSettings => ({
 const stripMention = (content: string, clientId: string): string =>
   content.replace(new RegExp(`<@!?${clientId}>`, 'g'), '').trim();
 
-const appendUsageFooter = (result: LLMResult, model: string): string => {
-  const footer = formatUsageFooter(model, result.usage);
+const appendUsageFooter = (result: LLMResult, model: string, translator: Translator): string => {
+  const footer = formatUsageFooter(
+    model,
+    result.usage,
+    translator.t('replies:llm_chat.cost_unknown'),
+  );
   return footer.length > 0 ? `${result.content}\n${footer}` : result.content;
 };
 
@@ -101,13 +114,14 @@ const deliverChunked = async (
   if (remaining.length > 0) chunks.push(remaining);
 
   const sent: Message[] = [];
-  sent.push(
-    await placeholder.edit({ content: chunks[0]!, allowedMentions: NO_MENTIONS }),
-  );
+  sent.push(await placeholder.edit({ content: chunks[0]!, allowedMentions: NO_MENTIONS }));
   for (let i = 1; i < chunks.length; i += 1) {
     if (message.channel.isSendable()) {
       sent.push(
-        (await message.channel.send({ content: chunks[i]!, allowedMentions: NO_MENTIONS })) as Message,
+        (await message.channel.send({
+          content: chunks[i]!,
+          allowedMentions: NO_MENTIONS,
+        })) as Message,
       );
     }
   }
@@ -122,9 +136,6 @@ const deliverChunked = async (
  * the err object intact so pino's serialiser captures the cause
  * chain.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyLlmProviderError = LlmProviderError<any>;
-
 const handleChatError = async (
   llmErr: AnyLlmProviderError,
   logger: Logger | undefined,
@@ -148,13 +159,19 @@ const handleChatError = async (
 
 export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
   const sessions = new SessionManager();
-  // `llmService` is populated in `init()` from the resolved typed Env
-  // rather than at factory time, so the registry's API-key gate sees
-  // the values supplied through DI rather than direct `process.env`
-  // reads. The events handler below guards on `llmService` so a
-  // pre-init dispatch (impossible in production — host enforces
-  // ordering — but possible in tests) silently no-ops.
-  let llmService: LLMService | undefined;
+  // Everything the message path needs, built in `init()` from the
+  // resolved typed Env rather than at factory time, so the provider
+  // registry's API-key gate sees the values supplied through DI rather
+  // than direct `process.env` reads — and so a message event costs no
+  // container lookups.
+  let runtime: LlmChatRuntime | undefined;
+  /** See the `init` contract in `core/plugin/types.ts`: unreachable. */
+  const requireRuntime = (): LlmChatRuntime => {
+    if (runtime === undefined) {
+      throw new TypeError('llm-chat: event dispatched before init built the runtime');
+    }
+    return runtime;
+  };
   // Holds the cheapest-still-listed default model per provider. Created
   // in `init` alongside the catalog and refreshed weekly from `onReady`
   // so a model going legacy never strands the whitelist-entry default.
@@ -163,25 +180,29 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    critical: false,
 
     async init(ctx): Promise<void> {
       const env = ctx.resolve(TOKENS.Env);
-      llmService = new LLMService(createDefaultRegistry(env));
+      runtime = {
+        service: new LLMService(createDefaultRegistry(env)),
+        registry: ctx.resolve(TOKENS.GuildRegistry),
+        logger: ctx.resolve(TOKENS.Logger),
+      };
       // Build a per-bot ModelCatalog with the typed-Env-derived
-      // API-key map and publish it through the IoC container. R2
-      // replaced the prior `setActiveModelCatalog` module-global with
-      // `ctx.registerInstance` so the catalog reaches handlers via the
-      // bot's typed resolver (`bot.modelCatalog`); encapsulating the
+      // API-key map and publish it through the IoC container via
+      // `ctx.registerInstance` so the catalog reaches handlers through
+      // the bot's typed resolver (`bot.modelCatalog`); encapsulating the
       // cache + api-key map in a class keeps multiple bots in one
       // process from clobbering each other's API keys.
-      const modelCatalog = new ModelCatalog({
-        xai: env.XAI_API_KEY,
-        openai: env.OPENAI_API_KEY,
-        anthropic: env.ANTHROPIC_API_KEY,
-        gemini: env.GEMINI_API_KEY,
-      });
+      const modelCatalog = new ModelCatalog(
+        {
+          xai: env.XAI_API_KEY,
+          openai: env.OPENAI_API_KEY,
+          anthropic: env.ANTHROPIC_API_KEY,
+          gemini: env.GEMINI_API_KEY,
+        },
+        ctx.logger,
+      );
       ctx.registerInstance(TOKENS.ModelCatalog, modelCatalog);
       defaultModelResolver = new DefaultModelResolver(modelCatalog, ctx.logger);
       ctx.registerInstance(TOKENS.DefaultModelResolver, defaultModelResolver);
@@ -199,7 +220,7 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
       // Initial resolve runs in the background so a slow provider does
       // not delay readiness; the weekly cron keeps it current thereafter.
       void resolver.refresh().catch((err: unknown) => logError(ctx.logger, null, err));
-      new JobManager(ctx.resolve(TOKENS.JobMap)).scheduleRecurring(
+      new JobManager(ctx.resolve(TOKENS.JobMap), ctx.logger).scheduleRecurring(
         DEFAULT_MODEL_REFRESH_JOB_KEY,
         DEFAULT_MODEL_REFRESH_CRON,
         () => resolver.refresh().catch((err: unknown) => logError(ctx.logger, null, err)),
@@ -208,9 +229,8 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
 
     events: {
       messageCreate: async (ctx, message) => {
-        if (llmService === undefined) return;
+        const { service: llmService, registry, logger } = requireRuntime();
         if (message.author.bot || message.guildId === null) return;
-        const registry = ctx.resolve(TOKENS.GuildRegistry);
         const repos = registry.getRepos(message.guildId);
         if (repos === undefined) return;
 
@@ -221,8 +241,6 @@ export const createLlmChatPlugin = (config: LlmChatPluginConfig): Plugin => {
         if (!userDocResult.ok) throw userDocResult.error;
         const userDoc = userDocResult.value as UserApiDoc | undefined;
         if (userDoc === undefined || userDoc === null) return; // not whitelisted
-
-        const logger = ctx.resolve(TOKENS.Logger);
 
         // Case 1: @-mention -> new session. `ignoreRepliedUser` is
         // critical so a reply to the bot does not get classed as a
@@ -292,7 +310,7 @@ const handleNewSession = async (
   // back-to-back messages do not race the session table.
   sessions.startSession(message.author.id, message.guildId as string, message.channelId);
 
-  const finalText = appendUsageFooter(result, settings.model);
+  const finalText = appendUsageFooter(result, settings.model, translator);
   const botMsgs = await deliverChunked(message, placeholder, finalText);
   const assistantMsg: LLMMessage = { role: 'assistant', content: result.content };
   sessions.appendToHistory(
@@ -334,7 +352,7 @@ const handleContinueSession = async (
   }
   const result: LLMResult = chatResult.value;
 
-  const finalText = appendUsageFooter(result, settings.model);
+  const finalText = appendUsageFooter(result, settings.model, translator);
   const botMsgs = await deliverChunked(message, placeholder, finalText);
   const assistantMsg: LLMMessage = { role: 'assistant', content: result.content };
   sessions.appendToHistory(

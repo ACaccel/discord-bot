@@ -3,9 +3,12 @@ import { buildGuildMongoUri } from '../../../../src/infra/mongo';
 
 describe('buildGuildMongoUri', () => {
   it('appends the guild id and authSource query for a valid snowflake', () => {
-    expect(buildGuildMongoUri('mongodb://user:pass@host/', '123456789012345678')).toBe(
-      'mongodb://user:pass@host/123456789012345678?authSource=admin',
-    );
+    // The credential-bearing form is the shape the builder has to carry
+    // through untouched, so it has to appear literally. Both lines are
+    // exempted from the `mongodb-connection-uri` gitleaks rule.
+    const base = 'mongodb://user:pass@host/'; // gitleaks:allow
+    const expected = 'mongodb://user:pass@host/123456789012345678?authSource=admin'; // gitleaks:allow
+    expect(buildGuildMongoUri(base, '123456789012345678')).toBe(expected);
   });
 
   it('rejects an empty guild id', () => {

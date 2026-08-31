@@ -5,7 +5,11 @@
   "nijika": {
     "help_message": "### Currently supported features:\n1. auto reply: the bot replies based on message pairs in the database\n2. roll dice: example input -> `2d5`, randomly picks two numbers between 1 and 5\n"
   },
+  "gopher": {
+    "help_message": "### Gopher\nOccasionally replies automatically based on the recent conversation."
+  },
   "tomori": {
+    "presence_text": "It must be Misumi Uika's conspiracy!",
     "help_message": "Hi, I'm Tomori! Here are the commands you can use, grouped by purpose:"
   },
   "konata": {
@@ -13,8 +17,7 @@
   },
   "llm_chat": {
     "thinking": "🤔 Thinking...",
-    "api_error": "An error occurred while calling the AI API. Please try again later.",
-    "missing_api_key": "The API key for provider `{{provider}}` is not set (please set `{{envVar}}` in .env)."
+    "cost_unknown": "~$? (unknown model pricing)"
   },
   "menu_get_avatar": {
     "avatar_url_field": "Avatar URL",
@@ -27,23 +30,11 @@
   },
   "auto_reply": {
     "goodnight_reply": "Not good for your health! <:ave_mortis_bad_for_health:1333052644368846878>",
-    "fatcat_line": "Fat cat is so gay",
-    "mubaimu_line": "Haruto Jay",
     "long_hair_line": "Go to the spa"
   },
   "gay": {
     "is_gay": "{{name}} is gay",
-    "is_not_gay": "{{name}} is not gay",
-    "failed": "Hmm... the verdict failed this time. Give it another try later! (error code: {{traceId}})"
-  },
-  "pin_message": {
-    "not_in_thread": "This command can only be used in a thread.",
-    "not_thread_owner": "You are not the thread owner.",
-    "unpinned": "Message unpinned.",
-    "pinned": "Message pinned.",
-    "invalid_action": "Invalid action.",
-    "operation_failed": "Could not pin the message.",
-    "failed": "Hmm... the pin operation failed. Give it another try later! (error code: {{traceId}})"
+    "is_not_gay": "{{name}} is not gay"
   },
   "add_reply": {
     "added": "Added input: {{input}} reply: {{reply}}!",
@@ -70,7 +61,11 @@
     "system_prompt_placeholder": "(Optional) Set a role or rules for the AI",
     "model_list_unavailable": "The available model list for `{{provider}}` cannot be retrieved right now. Possible causes: the API key is not set, a temporary network failure, or the service is still loading after startup. Please wait a moment and try again.",
     "modal_title": "AI settings — {{provider}}",
-    "system_prompt_preview": "`{{preview}}…` ({{length}} characters total, truncated)",
+    "label_model": "Model",
+    "label_temperature": "Temperature (0.0 – 2.0)",
+    "label_web_search": "Web Search",
+    "label_system_prompt": "System Prompt",
+    "temperature_placeholder": "0.0 – 2.0",
     "system_prompt_not_set": "(not set)",
     "updated_header": "✅ AI settings updated:",
     "modal_system_prompt_preview": "\n```\n{{preview}}\n…({{length}} characters total, truncated)\n```",
@@ -94,13 +89,13 @@
     "timeout_reason": "Lady Sakiko's timeout verdict!"
   },
   "bubble_wrap": {
-    "too_long": "The string is too long. Please shorten it to within 64 characters.",
-    "failed": "Hmm... generating the bubble wrap failed. Give it another try later! (error code: {{traceId}})"
+    "too_long": "The string is too long. Please shorten it to within 64 characters."
   },
   "bug_report": {
     "empty_content": "Please enter some content.",
     "failed": "Could not report the bug. (error code: {{traceId}})",
-    "reported": "Bug reported! Content: {{content}}"
+    "reported": "Bug reported! Content: {{content}}",
+    "admin_dm": "Bug report from {{reporter}}: {{content}}"
   },
   "change_avatar": {
     "no_role_config": "No role configuration found.",
@@ -161,34 +156,6 @@
       "other": "📦 Other"
     }
   },
-  "inspect_member_ids": {
-    "no_valid_id": "No valid ID found. Please enter Discord IDs of 17-20 digits.",
-    "embed_failed": "Could not build the inspection result.",
-    "failed": "Suspicious ID inspection failed. (error code: {{traceId}})",
-    "not_in_guild_line": "**In this server**: No",
-    "user_not_found_line": "**User info**: No data (may not exist, not cached, or inaccessible)",
-    "parse_failed_line": "**Status**: Could not parse user data",
-    "profile_link_line": "**Clickable profile**: [Open Profile](https://discord.com/users/{{id}})",
-    "in_guild_line": "**In this server**: {{value}}",
-    "account_type_line": "**Account type**: {{value}}",
-    "created_at_line": "**Account created at**: {{value}}",
-    "system_user_line": "**System User**: {{value}}",
-    "joined_at_line": "**Joined server at**: {{value}}",
-    "display_name_line": "**Display Name**: {{value}}",
-    "timed_out_line": "**Timed Out**: {{value}}",
-    "timeout_until_line": "**Timeout expires**: {{value}}",
-    "pending_line": "**Pending member verification**: {{value}}",
-    "highest_role_line": "**Highest role**: {{value}}",
-    "role_count_line": "**Role count**: {{value}}",
-    "top_roles_line": "**Top 10 roles**: {{value}}",
-    "boost_since_line": "**Boosting since**: {{value}}",
-    "kickable_line": "**Kickable**: {{value}}",
-    "bannable_line": "**Bannable**: {{value}}",
-    "yes": "Yes",
-    "no": "No",
-    "title": "Suspicious ID inspection {{current}}/{{total}}",
-    "exceeds_max": "Up to {{max}} entries can be checked at once; {{dropped}} were ignored."
-  },
   "level_detail": {
     "too_long": "Too long... please choose a shorter range.",
     "failed": "Could not get the level details. (error code: {{traceId}})",
@@ -242,13 +209,16 @@
   "roll_call": {
     "missing_target": "Please provide the users to call (users) or an activity ID (activity_id).",
     "no_participants": "That activity currently has no participants.",
-    "format_error": "Format error! regex: match(/^<@\\d+>(\\s*<@\\d+>)*$/)",
+    "format_error": "Format error! Mention users or roles with @ (e.g. @user1 @role1).",
     "no_valid_id": "Please provide at least one valid user ID.",
     "sent": "Roll call sent!",
     "failed": "Could not run the roll call. (error code: {{traceId}})",
     "activity_not_found": "No activity found with ID {{id}}.",
     "activity_already_consumed": "Activity {{id}} has already been consumed by another roll-call command.",
     "user_not_found": "No user found with ID {{id}}. Please verify the ID is correct.",
+    "role_no_members": "Role <@&{{id}}> has no callable members (bots don't count).",
+    "everyone_not_allowed": "Lady Sakiko won't let you roll-call @everyone! Pick specific members or roles instead.",
+    "too_many_targets": "Too many people for one roll call! The limit is {{max}}, but this call has {{count}}. Trim some roles or users.",
     "announcement_header": "Lady Sakiko's roll-call list: <@{{userId}}> has started a roll call!\n",
     "activity_id_line": "(Activity ID: {{id}})\n",
     "trigger_prefix": "Lady Sakiko's roll-call list"
@@ -270,26 +240,75 @@
   },
   "talk": {
     "missing_args": "Please enter a channel and content.",
-    "send_failed": "Could not send the message.",
     "tag_warning": "{{user}}, you naughty one — I caught you tagging everyone.",
     "failed": "Hmm... the message couldn't be sent. Give it another try later! (error code: {{traceId}})"
   },
   "talk_signed": {
     "missing_args": "Please enter some content.",
     "member_not_found": "Could not get the member information.",
-    "send_failed": "Could not send the message.",
     "tag_warning": "{{displayName}} ({{username}}), you naughty one — I caught you tagging everyone.",
     "failed": "Hmm... the message couldn't be sent. Give it another try later! (error code: {{traceId}})"
   },
-  "todo_list": {
-    "missing_content": "Please enter the to-do item content.",
-    "expect_number": "Please enter a number.",
-    "failed": "Could not change the to-do item. (error code: {{traceId}})",
-    "added": "Added to-do item: {{content}}",
-    "already_exists": "This to-do item: {{content}} already exists!",
-    "not_found": "To-do item not found: {{content}}",
-    "deleted": "Deleted to-do item: {{content}}",
-    "header": "To-do list:\n"
+  "traffic": {
+    "failed": "Could not build the traffic report. (error code: {{traceId}})",
+    "no_data": "No message traffic found for the selected window.",
+    "title": "Server Traffic - {{range}}",
+    "range_24h": "last 24 hours",
+    "range_7d": "last 7 days",
+    "range_30d": "last 30 days",
+    "chart_time_title": "Messages over time",
+    "chart_y_axis": "Messages",
+    "channels_title": "Top channels",
+    "users_title": "Top users",
+    "field_total": "Total messages",
+    "field_daily_average": "Daily average",
+    "field_trend": "Change vs previous",
+    "field_active_channels": "Active channels",
+    "field_active_users": "Active users",
+    "field_top_share": "Top contributor share",
+    "field_busiest": "Busiest period",
+    "field_quietest": "Quietest period",
+    "field_reactions": "Total reactions",
+    "field_top_reaction": "Top reaction",
+    "busiest_none": "N/A",
+    "busiest_value": "{{label}} ({{count}})",
+    "top_reaction_none": "No reactions",
+    "top_reaction_value": "{{emoji}} ({{count}})",
+    "trend_none": "No baseline"
+  },
+  "traffic_me": {
+    "failed": "Could not build your traffic report. (error code: {{traceId}})",
+    "no_data": "You have no message activity in the selected window.",
+    "title": "{{user}}'s activity - {{range}}",
+    "channels_title": "Your top channels",
+    "chart_time_title": "{{user}}'s messages over time",
+    "field_total": "Total messages",
+    "field_daily_average": "Daily average",
+    "field_share": "Share of traffic",
+    "field_busiest": "Busiest period",
+    "field_rank": "Rank",
+    "field_active_channels": "Channels active in",
+    "busiest_none": "N/A",
+    "busiest_value": "{{label}} ({{count}})",
+    "rank_value": "#{{rank}} of {{total}}",
+    "rank_none": "N/A"
+  },
+  "traffic_user": {
+    "failed": "Could not build the traffic report. (error code: {{traceId}})",
+    "no_data": "No message activity found for that user in the selected window.",
+    "title": "{{user}}'s activity - {{range}}",
+    "channels_title": "{{user}}'s top channels",
+    "chart_time_title": "{{user}}'s messages over time",
+    "field_total": "Total messages",
+    "field_daily_average": "Daily average",
+    "field_share": "Share of traffic",
+    "field_busiest": "Busiest period",
+    "field_rank": "Rank",
+    "field_active_channels": "Channels active in",
+    "busiest_none": "N/A",
+    "busiest_value": "{{label}} ({{count}})",
+    "rank_value": "#{{rank}} of {{total}}",
+    "rank_none": "N/A"
   },
   "update_role": {
     "no_config": "No level role configuration found in the config file.",
@@ -313,18 +332,35 @@
   "earthquake": {
     "alert": "# <@&{{role}}> Taipei strong earthquake alert!!! (intensity 4 or above)\n> Why must there be an earthquake!?"
   },
+  "social_link_preview": {
+    "embed_footer": "Preview via {{provider}}"
+  },
+  "x_media_feed": {
+    "post": "**@{{author}}** posted new media on X\n{{url}}"
+  },
   "common": {
     "empty_value": "None"
   },
   "giveaway": {
     "missing_required_fields": "Please enter the duration, number of winners, and prize.",
     "invalid_duration": "Invalid duration.",
+    "invalid_winner_num": "Number of winners must be a positive integer.",
     "create_announce_failed": "Could not create the giveaway.",
     "create_failed": "Could not run the giveaway.",
     "missing_message_id": "Please provide the giveaway message ID.",
-    "delete_failed_with_reason": "Could not delete the giveaway: {{reason}}",
     "delete_success": "Giveaway deleted.",
-    "delete_failed": "Could not delete the giveaway.",
+    "no_active_giveaways": "There are no active giveaways.",
+    "delete_select_placeholder": "Select a giveaway to delete",
+    "delete_option_label": "{{prize}} — ends at {{endTime}}",
+    "modal_title": "Create a giveaway",
+    "modal_duration_label": "Duration",
+    "modal_duration_placeholder": "e.g. 1d / 2h / 30m",
+    "modal_prize_label": "Prize",
+    "modal_prize_placeholder": "e.g. Discord Nitro x1",
+    "modal_winner_label": "Number of winners",
+    "modal_winner_placeholder": "e.g. 3",
+    "modal_description_label": "Description (optional)",
+    "modal_description_placeholder": "Extra notes (optional)",
     "announce_title": "🎉 Giveaway: {{prize}}",
     "announce_field_owner": "🎁 Prize provider",
     "announce_field_winners": "👤 Number of winners",
@@ -336,15 +372,10 @@
     "failed": "Hmm... the giveaway operation failed. Give it another try later! (error code: {{traceId}})"
   },
   "activity": {
-    "missing_required_fields": "Please enter the activity title and duration.",
     "invalid_duration": "Invalid duration.",
     "create_announce_failed": "Could not create the activity.",
-    "create_failed": "Could not create the activity.",
     "create_success": "Activity created!\n**Activity ID**: {{activityId}}\nIt will end at {{endTime}}.",
-    "missing_activity_id": "Please provide the activity ID.",
-    "delete_failed_with_reason": "Could not delete the activity: {{reason}}",
     "delete_success": "Activity deleted.",
-    "delete_failed": "Could not delete the activity.",
     "announce_title": "📢 Activity: {{title}}",
     "announce_field_id": "🆔 Activity ID",
     "announce_field_description": "📌 Description",
@@ -353,5 +384,20 @@
     "result_with_participants": "📢 **Activity ended!** 📢\n\n**Activity: {{title}}**\n\n✅ **Participants:**\n{{participants}}\n\n{{count}} people joined the activity!",
     "result_no_participants": "📢 **Activity ended!** 📢\n\n**Activity: {{title}}**\n\n😢 **No one joined the activity**",
     "failed": "Hmm... the activity operation failed. Give it another try later! (error code: {{traceId}})"
+  },
+  "temp_role": {
+    "created": "🔔 Temporary notification role {{role}} created! It will be deleted automatically at {{expiry}}. Use the button below to claim or remove the role.",
+    "button_label": "Claim / remove role",
+    "expired": "⌛ The temporary notification role \"{{role}}\" has expired and was deleted.",
+    "at_role_limit": "This server has reached its role limit ({{max}}); a new temporary role cannot be created.",
+    "invalid_duration": "The lifetime must be an integer between 1 and {{max}} days.",
+    "missing_name": "Please provide a role name.",
+    "announce_failed": "Could not post the claim message in this channel; the temporary role was not created.",
+    "failed": "Could not create the temporary role (error code: {{traceId}})"
+  },
+  "toggle_role": {
+    "role_not_found": "Role not found; it may have been deleted.",
+    "added": "Added the role {{role}} to you.",
+    "removed": "Removed the role {{role}} from you."
   }
 }

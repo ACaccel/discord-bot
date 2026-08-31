@@ -1,5 +1,5 @@
 /**
- * Unit coverage for the handler-boundary error helper (gap D9).
+ * Unit coverage for the handler-boundary error helper.
  *
  * The helper routes a caught error down two independent channels:
  *   - operator channel: a structured log line, always written;
@@ -9,9 +9,9 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { ConflictError } from '../../../src/core/errors';
+import { DatabaseError } from '../../../src/core/errors';
 import type { Translator } from '../../../src/core/i18n';
-import { replyForError, resolveErrorReply } from '../../../src/handlers/reply-for-error';
+import { replyForError, resolveErrorReply } from '../../../src/infra/discord/reply-for-error';
 
 /**
  * A translator stub that returns a `T(<key>)` marker (plus a JSON of
@@ -80,16 +80,16 @@ const stubInteraction = (state: { deferred: boolean; replied: boolean }) => {
   };
 };
 
-describe('resolveErrorReply (gap D9 channel selection)', () => {
+describe('resolveErrorReply — channel selection', () => {
   it('uses the DomainError messageKey + messageParams for a DomainError', () => {
-    const error = new ConflictError({
-      code: 'ALREADY_EXISTS',
-      messageKey: 'errors:conflict.reply_exists',
+    const error = new DatabaseError({
+      code: 'DATABASE_DUPLICATE_KEY',
+      messageKey: 'errors:db.duplicate_key',
       context: { operation: 'ReplyRepo.create' },
       messageParams: { keyword: 'hi' },
     });
     const text = resolveErrorReply(stubTranslator(), error, 'replies:add_reply.failed', 'abc123');
-    expect(text).toBe('T(errors:conflict.reply_exists)|{"keyword":"hi"}');
+    expect(text).toBe('T(errors:db.duplicate_key)|{"keyword":"hi"}');
   });
 
   it('falls back to the per-feature failed key + traceId for a non-DomainError', () => {
@@ -114,9 +114,9 @@ describe('resolveErrorReply (gap D9 channel selection)', () => {
   it('degrades to the per-feature fallback when a DomainError messageKey has no catalog entry', () => {
     // i18next echoes the key on a miss; the helper must not surface a
     // raw `errors:*` key and instead use the toned fallback copy.
-    const error = new ConflictError({
-      code: 'ALREADY_EXISTS',
-      messageKey: 'errors:conflict.nonexistent_key',
+    const error = new DatabaseError({
+      code: 'DATABASE_DUPLICATE_KEY',
+      messageKey: 'errors:db.nonexistent_key',
       context: { operation: 'ReplyRepo.create' },
     });
     const text = resolveErrorReply(missTranslator(), error, 'replies:add_reply.failed', 'tr4ce1');
@@ -127,13 +127,13 @@ describe('resolveErrorReply (gap D9 channel selection)', () => {
   });
 });
 
-describe('replyForError (gap D9 dual-channel boundary)', () => {
+describe('replyForError — dual-channel boundary', () => {
   it('logs the operator channel and replies with the messageKey for a DomainError', async () => {
     const { logger, errorCalls } = stubLogger();
     const { interaction, editReplies } = stubInteraction({ deferred: true, replied: false });
-    const error = new ConflictError({
-      code: 'ALREADY_EXISTS',
-      messageKey: 'errors:conflict.reply_exists',
+    const error = new DatabaseError({
+      code: 'DATABASE_DUPLICATE_KEY',
+      messageKey: 'errors:db.duplicate_key',
       context: { operation: 'ReplyRepo.create' },
     });
 
@@ -149,7 +149,7 @@ describe('replyForError (gap D9 dual-channel boundary)', () => {
     expect(errorCalls).toHaveLength(1);
     expect(errorCalls[0]).toMatchObject({ err: error });
     // User channel: taxonomy-driven messageKey (deferred -> editReply).
-    expect(editReplies).toEqual([{ content: 'T(errors:conflict.reply_exists)' }]);
+    expect(editReplies).toEqual([{ content: 'T(errors:db.duplicate_key)' }]);
   });
 
   it('logs the operator channel and replies with the per-feature fallback for a raw error', async () => {

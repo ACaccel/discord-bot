@@ -12,5 +12,5 @@ import type { ButtonInteraction } from 'discord.js';
 import type { BaseBot } from '@bot';
 
 export abstract class ButtonHandler {
-    public abstract execute(interaction: ButtonInteraction, bot: BaseBot): Promise<void>;
+  public abstract execute(interaction: ButtonInteraction, bot: BaseBot): Promise<void>;
 }

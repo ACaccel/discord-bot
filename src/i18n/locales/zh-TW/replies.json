@@ -5,7 +5,11 @@
   "nijika": {
     "help_message": "### 目前支援的功能：\n1. auto reply: bot會根據資料庫的message pair回覆訊息\n2. roll dice: 輸入範例-> `2d5`, 在1~5隨機選擇兩個數字\n"
   },
+  "gopher": {
+    "help_message": "### 老鼠人\n會偶爾根據最近的對話自動回覆訊息。"
+  },
   "tomori": {
+    "presence_text": "一定是三角初華的陰謀!",
     "help_message": "嗨,我是 Tomori!以下是你可以使用的指令,依用途分類整理:"
   },
   "konata": {
@@ -13,8 +17,7 @@
   },
   "llm_chat": {
     "thinking": "🤔 思考中…",
-    "api_error": "呼叫 AI API 時發生錯誤,請稍後再試。",
-    "missing_api_key": "Provider `{{provider}}` 的 API 金鑰未設定(請於 .env 設定 `{{envVar}}`)。"
+    "cost_unknown": "~$?(未知 model 計價)"
   },
   "menu_get_avatar": {
     "avatar_url_field": "頭像連結",
@@ -27,23 +30,11 @@
   },
   "auto_reply": {
     "goodnight_reply": "健康に良くない！<:ave_mortis_bad_for_health:1333052644368846878>",
-    "fatcat_line": "肥貓好gay",
-    "mubaimu_line": "晴人杰",
     "long_hair_line": "去spa"
   },
   "gay": {
     "is_gay": "{{name}} 是 gay",
-    "is_not_gay": "{{name}} 不是 gay",
-    "failed": "唔...這次判定失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
-  },
-  "pin_message": {
-    "not_in_thread": "這個指令只能在討論串使用喔",
-    "not_thread_owner": "你不是串主喔",
-    "unpinned": "已取消釘選訊息",
-    "pinned": "已釘選訊息",
-    "invalid_action": "無效的指令",
-    "operation_failed": "無法釘選訊息",
-    "failed": "唔...釘選操作失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
+    "is_not_gay": "{{name}} 不是 gay"
   },
   "add_reply": {
     "added": "已新增 輸入:{{input}} 回覆:{{reply}}!",
@@ -70,7 +61,11 @@
     "system_prompt_placeholder": "(選填)為 AI 設定角色或規則",
     "model_list_unavailable": "目前無法取得 `{{provider}}` 的可用模型清單。可能原因:API 金鑰未設定、網路暫時失敗,或服務剛啟動仍在載入。請稍候片刻後重試。",
     "modal_title": "AI 設定 — {{provider}}",
-    "system_prompt_preview": "`{{preview}}…`(共 {{length}} 字,已截斷)",
+    "label_model": "模型",
+    "label_temperature": "Temperature (0.0 – 2.0)",
+    "label_web_search": "網頁搜尋",
+    "label_system_prompt": "系統提示詞",
+    "temperature_placeholder": "0.0 – 2.0",
     "system_prompt_not_set": "(未設定)",
     "updated_header": "✅ AI 設定已更新:",
     "modal_system_prompt_preview": "\n```\n{{preview}}\n…(共 {{length}} 字,已截斷)\n```",
@@ -94,13 +89,13 @@
     "timeout_reason": "初華大人的禁言裁決!"
   },
   "bubble_wrap": {
-    "too_long": "字串太長了,請縮短到 64 字元以內",
-    "failed": "唔...泡泡紙生成失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
+    "too_long": "字串太長了,請縮短到 64 字元以內"
   },
   "bug_report": {
     "empty_content": "請輸入內容",
     "failed": "無法回報問題 (錯誤代碼:{{traceId}})",
-    "reported": "問題已回報! 內容: {{content}}"
+    "reported": "問題已回報! 內容: {{content}}",
+    "admin_dm": "問題回報來自 {{reporter}}:{{content}}"
   },
   "change_avatar": {
     "no_role_config": "沒有身份組設定",
@@ -161,34 +156,6 @@
       "other": "📦 其他"
     }
   },
-  "inspect_member_ids": {
-    "no_valid_id": "找不到有效 ID,請輸入 17~20 位數字的 Discord ID",
-    "embed_failed": "無法建立檢查結果",
-    "failed": "檢查可疑 ID 失敗 (錯誤代碼:{{traceId}})",
-    "not_in_guild_line": "**是否在本伺服器**: 否",
-    "user_not_found_line": "**使用者資訊**: 查無資料(可能不存在、未快取或無法存取)",
-    "parse_failed_line": "**狀態**: 無法解析使用者資料",
-    "profile_link_line": "**可點擊個人頁**: [Open Profile](https://discord.com/users/{{id}})",
-    "in_guild_line": "**是否在本伺服器**: {{value}}",
-    "account_type_line": "**帳號類型**: {{value}}",
-    "created_at_line": "**帳號建立時間**: {{value}}",
-    "system_user_line": "**System User**: {{value}}",
-    "joined_at_line": "**加入伺服器時間**: {{value}}",
-    "display_name_line": "**暱稱(Display Name)**: {{value}}",
-    "timed_out_line": "**已逾時(Timed Out)**: {{value}}",
-    "timeout_until_line": "**逾時到期**: {{value}}",
-    "pending_line": "**Pending 成員驗證**: {{value}}",
-    "highest_role_line": "**最高身分組**: {{value}}",
-    "role_count_line": "**身分組數量**: {{value}}",
-    "top_roles_line": "**前 10 個身分組**: {{value}}",
-    "boost_since_line": "**Boost 開始時間**: {{value}}",
-    "kickable_line": "**可被踢出**: {{value}}",
-    "bannable_line": "**可被封鎖**: {{value}}",
-    "yes": "是",
-    "no": "否",
-    "title": "可疑 ID 檢查 {{current}}/{{total}}",
-    "exceeds_max": "一次最多檢查 {{max}} 筆,已忽略 {{dropped}} 筆。"
-  },
   "level_detail": {
     "too_long": "太長了...請選短一點的範圍",
     "failed": "無法取得等級詳情 (錯誤代碼:{{traceId}})",
@@ -242,13 +209,16 @@
   "roll_call": {
     "missing_target": "請提供被點名者 (users) 或活動ID (activity_id)",
     "no_participants": "該活動目前沒有參與者",
-    "format_error": "格式錯誤!regex: match(/^<@\\d+>(\\s*<@\\d+>)*$/)",
+    "format_error": "格式錯誤!請用 @ 提及使用者或身份組 (例如 @user1 @role1)",
     "no_valid_id": "請至少提供一個有效的使用者ID",
     "sent": "點名已發送!",
     "failed": "無法進行點名 (錯誤代碼:{{traceId}})",
     "activity_not_found": "找不到活動ID為 {{id}} 的活動",
     "activity_already_consumed": "活動 {{id}} 已經被另一次點名指令消化過了。",
     "user_not_found": "找不到ID為 {{id}} 的使用者, 請確認ID是否正確",
+    "role_no_members": "身份組 <@&{{id}}> 沒有可點名的成員 (機器人不算喔)。",
+    "everyone_not_allowed": "初華大人不准點 @everyone 啦!請改點特定的人或身份組。",
+    "too_many_targets": "點名人數太多啦!最多只能點 {{max}} 人,但這次有 {{count}} 人,請減少身份組或人數~",
     "announcement_header": "初華大人的點名簿:<@{{userId}}> 發起了點名!\n",
     "activity_id_line": "(活動ID: {{id}})\n",
     "trigger_prefix": "初華大人的點名簿"
@@ -270,26 +240,75 @@
   },
   "talk": {
     "missing_args": "請輸入頻道和內容",
-    "send_failed": "無法傳送訊息",
     "tag_warning": "{{user}}好壞喔被我抓到你在 tag 所有人",
     "failed": "唔...訊息送不出去耶,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
   },
   "talk_signed": {
     "missing_args": "請輸入內容",
     "member_not_found": "無法取得成員資訊",
-    "send_failed": "無法傳送訊息",
     "tag_warning": "{{displayName}}({{username}})好壞喔被我抓到你在 tag 所有人",
     "failed": "唔...訊息送不出去耶,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
   },
-  "todo_list": {
-    "missing_content": "請輸入待辦事項內容",
-    "expect_number": "請輸入數字",
-    "failed": "無法變更待辦事項 (錯誤代碼:{{traceId}})",
-    "added": "已新增待辦事項:{{content}}",
-    "already_exists": "此待辦事項:{{content}} 已經存在!",
-    "not_found": "找不到待辦事項:{{content}}",
-    "deleted": "已刪除待辦事項:{{content}}",
-    "header": "待辦事項:\n"
+  "traffic": {
+    "failed": "無法產生流量報告 (錯誤代碼:{{traceId}})",
+    "no_data": "所選時間範圍內找不到任何訊息流量",
+    "title": "伺服器流量 - {{range}}",
+    "range_24h": "最近 24 小時",
+    "range_7d": "最近 7 天",
+    "range_30d": "最近 30 天",
+    "chart_time_title": "訊息時間趨勢",
+    "chart_y_axis": "訊息數",
+    "channels_title": "頻道排行",
+    "users_title": "用戶排行",
+    "field_total": "總訊息數",
+    "field_daily_average": "日均訊息數",
+    "field_trend": "與前期相比",
+    "field_active_channels": "活躍頻道數",
+    "field_active_users": "活躍用戶數",
+    "field_top_share": "最活躍用戶佔比",
+    "field_busiest": "最忙碌時段",
+    "field_quietest": "最安靜時段",
+    "field_reactions": "反應總數",
+    "field_top_reaction": "最熱門反應",
+    "busiest_none": "無",
+    "busiest_value": "{{label}} ({{count}})",
+    "top_reaction_none": "尚無反應",
+    "top_reaction_value": "{{emoji}} ({{count}})",
+    "trend_none": "無對比基準"
+  },
+  "traffic_me": {
+    "failed": "無法產生你的流量報告 (錯誤代碼:{{traceId}})",
+    "no_data": "你在所選時間範圍內沒有任何訊息活動",
+    "title": "{{user}} 的活動 - {{range}}",
+    "channels_title": "你最常發言的頻道",
+    "chart_time_title": "{{user}} 的訊息時間趨勢",
+    "field_total": "總訊息數",
+    "field_daily_average": "日均訊息數",
+    "field_share": "佔可見流量比例",
+    "field_busiest": "最忙碌時段",
+    "field_rank": "名次",
+    "field_active_channels": "活躍頻道數",
+    "busiest_none": "無",
+    "busiest_value": "{{label}} ({{count}})",
+    "rank_value": "第 {{rank}} 名 / 共 {{total}} 人",
+    "rank_none": "無"
+  },
+  "traffic_user": {
+    "failed": "無法產生流量報告 (錯誤代碼:{{traceId}})",
+    "no_data": "找不到該用戶在所選時間範圍內的訊息活動",
+    "title": "{{user}} 的活動 - {{range}}",
+    "channels_title": "{{user}} 最常發言的頻道",
+    "chart_time_title": "{{user}} 的訊息時間趨勢",
+    "field_total": "總訊息數",
+    "field_daily_average": "日均訊息數",
+    "field_share": "佔可見流量比例",
+    "field_busiest": "最忙碌時段",
+    "field_rank": "名次",
+    "field_active_channels": "活躍頻道數",
+    "busiest_none": "無",
+    "busiest_value": "{{label}} ({{count}})",
+    "rank_value": "第 {{rank}} 名 / 共 {{total}} 人",
+    "rank_none": "無"
   },
   "update_role": {
     "no_config": "設定檔中未找到等級身分組配置",
@@ -313,18 +332,35 @@
   "earthquake": {
     "alert": "# <@&{{role}}> 台北強震警報!!! (4級以上)\n> 為什麼要地震!?"
   },
+  "social_link_preview": {
+    "embed_footer": "預覽來源:{{provider}}"
+  },
+  "x_media_feed": {
+    "post": "**@{{author}}** 在 X 發布了新的圖片 / 影片\n{{url}}"
+  },
   "common": {
     "empty_value": "無"
   },
   "giveaway": {
     "missing_required_fields": "請輸入持續時間、得獎人數和獎品",
     "invalid_duration": "無效的持續時間",
+    "invalid_winner_num": "中獎人數必須是正整數",
     "create_announce_failed": "無法建立抽獎",
     "create_failed": "無法抽獎",
     "missing_message_id": "請提供抽獎訊息ID",
-    "delete_failed_with_reason": "無法刪除抽獎: {{reason}}",
     "delete_success": "抽獎已刪除",
-    "delete_failed": "無法刪除抽獎",
+    "no_active_giveaways": "目前沒有進行中的抽獎",
+    "delete_select_placeholder": "選擇要刪除的抽獎",
+    "delete_option_label": "{{prize}} — 結束於 {{endTime}}",
+    "modal_title": "建立抽獎",
+    "modal_duration_label": "持續時間",
+    "modal_duration_placeholder": "例: 1d / 2h / 30m",
+    "modal_prize_label": "獎品",
+    "modal_prize_placeholder": "例: Discord Nitro x1",
+    "modal_winner_label": "得獎人數",
+    "modal_winner_placeholder": "例: 3",
+    "modal_description_label": "抽獎描述 (選填)",
+    "modal_description_placeholder": "補充說明 (可留空)",
     "announce_title": "🎉 抽獎: {{prize}}",
     "announce_field_owner": "🎁 獎品提供者",
     "announce_field_winners": "👤 中獎人數",
@@ -336,15 +372,10 @@
     "failed": "唔...抽獎操作失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
   },
   "activity": {
-    "missing_required_fields": "請輸入活動標題和持續時間",
     "invalid_duration": "無效的持續時間",
     "create_announce_failed": "無法建立活動",
-    "create_failed": "無法建立活動",
     "create_success": "活動已建立！\n**活動ID**: {{activityId}}\n將於 {{endTime}} 結束",
-    "missing_activity_id": "請提供活動ID",
-    "delete_failed_with_reason": "無法刪除活動: {{reason}}",
     "delete_success": "活動已刪除",
-    "delete_failed": "無法刪除活動",
     "announce_title": "📢 活動: {{title}}",
     "announce_field_id": "🆔 活動ID",
     "announce_field_description": "📌 說明",
@@ -353,5 +384,20 @@
     "result_with_participants": "📢 **活動結束!** 📢\n\n**活動: {{title}}**\n\n✅ **參與者:**\n{{participants}}\n\n共 {{count}} 人參與活動！",
     "result_no_participants": "📢 **活動結束!** 📢\n\n**活動: {{title}}**\n\n😢 **沒有人參加活動**",
     "failed": "唔...活動操作失敗了,稍後再試一次看看吧!(錯誤代碼:{{traceId}})"
+  },
+  "temp_role": {
+    "created": "🔔 暫時通知身份組 {{role}} 已建立!將於 {{expiry}} 自動刪除。點下方按鈕領取或取消身份組。",
+    "button_label": "領取 / 取消身份組",
+    "expired": "⌛ 暫時通知身份組「{{role}}」已到期並被刪除。",
+    "at_role_limit": "本伺服器的身份組數量已達上限 ({{max}}),無法建立新的暫時身份組。",
+    "invalid_duration": "存活天數必須是 1 到 {{max}} 之間的整數。",
+    "missing_name": "請提供身份組名稱。",
+    "announce_failed": "無法在此頻道發送領取訊息,暫時身份組未建立。",
+    "failed": "無法建立暫時身份組 (錯誤代碼:{{traceId}})"
+  },
+  "toggle_role": {
+    "role_not_found": "找不到該身份組,可能已被刪除。",
+    "added": "已為你加上身份組 {{role}}。",
+    "removed": "已為你移除身份組 {{role}}。"
   }
 }

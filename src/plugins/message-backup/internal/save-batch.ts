@@ -8,7 +8,7 @@
  * `insertManyIgnoringDuplicates` already absorbs a double-write.
  */
 import type { MessageRepo } from '../../../persistence/repositories';
-import type { MessageDoc } from '../../../persistence/schemas/message.schema';
+import type { NewMessageDoc } from '../../../persistence/schemas/message.schema';
 
 export interface BatchResult {
   inserted: number;
@@ -29,11 +29,18 @@ export const saveBatch = async (
     id: string;
     author?: { bot?: boolean; id: string; username: string };
     content?: string;
-    attachments: Map<string, { id: string; name: string; url: string; contentType?: string | null }>;
+    attachments: Map<
+      string,
+      { id: string; name: string; url: string; contentType?: string | null }
+    >;
     reactions: {
       cache: Map<
         string,
-        { emoji: { id?: string; name?: string; animated?: boolean }; count: number; users: { cache: Map<string, unknown> } }
+        {
+          emoji: { id?: string; name?: string; animated?: boolean };
+          count: number;
+          users: { cache: Map<string, unknown> };
+        }
       >;
     };
     stickers: Map<string, { id: string; name: string }>;
@@ -59,13 +66,13 @@ export const saveBatch = async (
   let skippedDuplicates = 0;
   let oldestMsg: { id: string; content: string } | undefined;
   let newestMsg: { id: string; content: string } | undefined;
-  const toInsert: unknown[] = [];
+  const toInsert: NewMessageDoc[] = [];
 
   for (const msg of messages) {
     // Defensive guard against `msg.author === null` — webhook deleted
     // / cross-post source removed / very old system messages can
     // legitimately have a null author. Skip them rather than crashing
-    // the whole channel's backup. Mirrors the R-01 fix in msg_backup.
+    // the whole channel's backup. Mirrors the `msg_backup` tool.
     if (msg.author === undefined || msg.author === null) {
       continue;
     }
@@ -85,11 +92,11 @@ export const saveBatch = async (
       newestMsg = { id: msg.id, content };
     }
     // Build the doc with the same null-omission contract msg_backup
-    // uses (R-05): if any nested array element has a critical null
+    // uses: if any nested array element has a critical null
     // field, OMIT the whole array so mongoose's schema validation does
     // not silently reject the entire insert. Omitting on insert defaults
     // to an empty array — better than dropping the whole row.
-    const baseDoc: Record<string, unknown> = {
+    const baseDoc: NewMessageDoc = {
       channelId: ch.id,
       channelName: ch.name ?? '',
       content,
@@ -99,7 +106,7 @@ export const saveBatch = async (
       timestamp: msg.createdTimestamp,
     };
 
-    let attachmentArr: Array<Record<string, unknown>> | null = [];
+    let attachmentArr: NonNullable<NewMessageDoc['attachments']> | null = [];
     for (const a of msg.attachments.values()) {
       if (a === null || a === undefined || a.name === null || a.name === undefined) {
         attachmentArr = null;
@@ -112,9 +119,9 @@ export const saveBatch = async (
         contentType: a.contentType,
       });
     }
-    if (attachmentArr !== null) baseDoc['attachments'] = attachmentArr;
+    if (attachmentArr !== null) baseDoc.attachments = attachmentArr;
 
-    let reactionArr: Array<Record<string, unknown>> | null = [];
+    let reactionArr: NonNullable<NewMessageDoc['reactions']> | null = [];
     for (const r of msg.reactions.cache.values()) {
       if (r === null || r === undefined || r.emoji === null || r.emoji === undefined) {
         reactionArr = null;
@@ -132,9 +139,9 @@ export const saveBatch = async (
         userIds: [...r.users.cache.keys()],
       });
     }
-    if (reactionArr !== null) baseDoc['reactions'] = reactionArr;
+    if (reactionArr !== null) baseDoc.reactions = reactionArr;
 
-    let stickerArr: Array<Record<string, unknown>> | null = [];
+    let stickerArr: NonNullable<NewMessageDoc['stickers']> | null = [];
     for (const s of msg.stickers.values()) {
       if (s === null || s === undefined || s.name === null || s.name === undefined) {
         stickerArr = null;
@@ -142,22 +149,28 @@ export const saveBatch = async (
       }
       stickerArr.push({ id: s.id, name: s.name });
     }
-    if (stickerArr !== null) baseDoc['stickers'] = stickerArr;
+    if (stickerArr !== null) baseDoc.stickers = stickerArr;
 
     toInsert.push(baseDoc);
   }
 
   if (toInsert.length === 0) {
-    return { inserted: 0, skippedBots, skippedDuplicates, oldestId, newestId, oldestMsg, newestMsg };
+    return {
+      inserted: 0,
+      skippedBots,
+      skippedDuplicates,
+      oldestId,
+      newestId,
+      oldestMsg,
+      newestMsg,
+    };
   }
 
   // `insertManyIgnoringDuplicates` already absorbs a duplicate-key
   // BulkWriteError into a partial-success count (see message.repo.ts);
   // only a genuine Mongo failure resolves to `err`, which is re-thrown
   // for `backupChannel`'s catch.
-  const insertResult = await messageRepo.insertManyIgnoringDuplicates(
-    toInsert as unknown as readonly MessageDoc[],
-  );
+  const insertResult = await messageRepo.insertManyIgnoringDuplicates(toInsert);
   if (!insertResult.ok) throw insertResult.error;
   const { inserted } = insertResult.value;
   return { inserted, skippedBots, skippedDuplicates, oldestId, newestId, oldestMsg, newestMsg };

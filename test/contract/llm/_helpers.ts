@@ -11,19 +11,26 @@
  * upstream. nock pins the HTTP boundary so an SDK upgrade that
  * silently changes its surface still fails the suite.
  */
-import { afterAll, afterEach, beforeAll } from 'vitest';
+import { afterAll, afterEach, beforeAll, expect } from 'vitest';
 import nock from 'nock';
 
-import type { LlmProviderError, LlmProviderErrorCode } from '../../../src/core/errors';
+import { LlmProviderError, type LlmProviderErrorCode } from '../../../src/core/errors';
 import type { LLMSettings } from '../../../src/infra/llm';
 
 /**
  * Sets up nock for the duration of a `describe` block:
  *   - blocks all real HTTP egress so a missing fixture surfaces as
  *     "no match for request" instead of silently calling the live API;
+ *   - asserts each test consumed the stub it registered, so an
+ *     assertion that never reached the wire fails instead of passing
+ *     vacuously;
  *   - removes accumulated interceptors between tests so one test's
  *     leftover stub does not match another's request;
  *   - restores the network at suite end.
+ *
+ * Order matters: the consumption check runs before `cleanAll()`. Once
+ * the interceptors are cleared nothing can be pending, so the same
+ * assertion made after the clear can never fail.
  */
 export const setupNock = (): void => {
   beforeAll(() => {
@@ -31,6 +38,7 @@ export const setupNock = (): void => {
     nock.disableNetConnect();
   });
   afterEach(() => {
+    expect(nock.pendingMocks()).toEqual([]);
     nock.cleanAll();
   });
   afterAll(() => {
@@ -61,10 +69,10 @@ export const expectLlmError = async (
   try {
     await promise;
   } catch (err: unknown) {
-    const e = err as LlmProviderError;
-    if (e.kind !== 'LlmProviderError') {
-      throw new Error(`Expected LlmProviderError, got ${e.kind ?? typeof err}: ${String(err)}`);
+    if (!(err instanceof LlmProviderError)) {
+      throw new Error(`Expected LlmProviderError, got ${String(err)}`);
     }
+    const e = err;
     if (e.code !== expectedCode) {
       throw new Error(`Expected code ${expectedCode}, got ${e.code}`);
     }

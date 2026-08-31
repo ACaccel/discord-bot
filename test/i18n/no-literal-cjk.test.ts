@@ -1,35 +1,27 @@
 /**
  * CJK-literal scanner — enforces that every user-facing string in the
  * handler / plugin / bot layers flows through the translator
- * (`Translator.t`) rather than living as an inline literal.
- *
- * Phase 6 lands this in **warn mode**: the test reports every
- * violation but does not fail. The output is consumed by PR 6-2's
- * migration sweep and the rule is promoted to **error mode** in PR
- * 6-3 once the catalog is complete (see `STRICT_MODE_PHASE`).
+ * (`Translator.t`) rather than living as an inline literal. The scanner
+ * is strict: any CJK literal in a scoped directory fails the suite.
  *
  * Whitelist mechanism: prefix the offending line with
  * `// i18n-ignore: <reason>` to silence the scanner. The reason is
  * required so future readers see WHY a literal stayed inline
- * (e.g. command-builder default that Discord ignores anyway, raw
- * SQL fragment that happens to contain CJK).
+ * (e.g. a command-builder default that Discord ignores anyway, or a
+ * raw fragment that happens to contain CJK).
  *
  * Scope rationale:
  *   - `src/handlers/**` (commands / buttons / modals / SSMs / reactions)
  *     and `src/plugins/**` reach Discord users directly.
- *   - `src/events/**` no longer exists: the transitional event layer was
- *     fully removed in gap-remediation D3 (its last user-visible behaviour,
- *     `detectGuildCreate`, moved into the guild-onboarding plugin), so the
- *     scanner no longer scopes it.
- *   - `src/bot/**` (composition roots + bot subclasses) is scanned
- *     in strict mode after audit 3.4. Composition roots used to seed
- *     help_msg / presence as inline CJK; they now must route through
- *     the translator (e.g. Nijika's `helpMessageKey`, Konata's
+ *   - `src/infra/**` reaches users indirectly: an adapter that formats
+ *     a string for a Discord reply (the LLM usage footer) must take the
+ *     already-translated text from its caller rather than inline it.
+ *   - `src/bot/**` (composition roots + bot subclasses) is scanned too:
+ *     personalities route their help / presence text through translator
+ *     keys (e.g. Nijika's `helpMessageKey`, Konata's
  *     `replies:konata.presence_text`). `src/bot/index.ts` BaseBot only
  *     emits ops-log lines that are deliberately English; if a future
  *     change reintroduces CJK there, the scanner catches it.
- *   - `src/utils/` and `src/features/` were transitional trees removed
- *     during gap-remediation (gaps D4 / earlier audits); no longer scoped.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -37,7 +29,6 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const STRICT_MODE_PHASE = 6; // PR 6-3b: scanner now strict at PHASE >= 6.
 
 /**
  * Directories the scanner walks. Each entry is a path relative to
@@ -45,29 +36,39 @@ const STRICT_MODE_PHASE = 6; // PR 6-3b: scanner now strict at PHASE >= 6.
  * catalog sweep WILL fail in strict mode — coordinate with the
  * migration PR.
  */
-const SCOPED_DIRECTORIES: readonly string[] = ['src/handlers', 'src/plugins', 'src/bot'];
+const SCOPED_DIRECTORIES: readonly string[] = [
+  'src/handlers',
+  'src/plugins',
+  'src/bot',
+  'src/infra',
+];
 
 /**
  * Per-file allowlist. Use sparingly — every entry should carry a
  * comment explaining why the file genuinely cannot reach a translator
- * (e.g. data fixtures, command-builder defaults Discord overrides
- * with `name_localizations`, etc.). PR 6-2's migration sweep will
- * empty this set; PR 6-3 keeps the field for future exceptional cases.
+ * (e.g. data fixtures, or command-builder defaults Discord overrides
+ * with `name_localizations`). Empty by default; reserved for
+ * exceptional cases.
  */
 const FILE_ALLOWLIST: ReadonlySet<string> = new Set<string>([]);
 
 /**
- * Directory-level skip list. Entries here are subdirectories whose
- * legacy contents are tracked for i18n migration but excluded from
- * the strict scanner until they are rewritten. Empty in PR-F1
- * onwards — the `src/plugins/<plugin-id>/internal/` carve-out from
- * PR-E E-4 was removed once the 46 CJK literals in
- * `activity/internal/` + `giveaway/internal/` were routed through
- * the translator.
+ * Directory-level skip list. Entries here are subdirectories excluded
+ * from the strict scanner. Empty by default; reserved for the rare
+ * case where a subtree genuinely cannot route through the translator.
  */
 const SKIP_PATH_PATTERNS: readonly RegExp[] = [];
 
-const CJK_REGEX = /[぀-ゟ゠-ヿ一-鿿가-힯]/;
+// Ideographs, kana and hangul, plus the blocks a Taiwan-facing bot can
+// realistically reach for: Bopomofo (U+3100–312F), Hangul Jamo
+// (U+3130–318F), CJK Ext-A (U+3400–4DBF), compatibility ideographs
+// (U+F900–FAFF), and the two punctuation blocks that carry CJK-only
+// forms — U+3000–U+303F (、。「」) and U+FF00–U+FFEF (fullwidth ：！（）).
+// Fullwidth punctuation reads as CJK copy to a user even when the
+// surrounding words are Latin, so `Bug Report from X：${content}`
+// belongs in the catalog too.
+const CJK_REGEX =
+  /[぀-ゟ゠-ヿ一-鿿가-힯\u3000-\u303f\u3100-\u318f\u3400-\u4dbf\uf900-\ufaff\uff00-\uffef]/;
 // Require a non-empty reason after the colon so reviewers see WHY a
 // literal stayed inline. The reason-less form `// i18n-ignore` is
 // rejected on purpose — it defeats the audit trail this whitelist
@@ -97,8 +98,8 @@ const walk = (dir: string): readonly string[] => {
 /**
  * Skip lines that are pure comments. The scanner targets user-facing
  * string literals; CJK inside JSDoc / line comments is documentation
- * (e.g. an inline example of the legacy reply text) and is not part
- * of the translation contract. Tracking is line-based with a small
+ * (e.g. an inline example of a reply's text) and is not part of the
+ * translation contract. Tracking is line-based with a small
  * block-comment cursor so unbalanced `/* … *\/` does not leak.
  */
 const isCommentLine = (line: string, inBlockComment: boolean): boolean => {
@@ -153,76 +154,14 @@ const collectAllViolations = (): readonly Violation[] => {
   return out;
 };
 
-const phase = (): number => {
-  try {
-    const raw = fs.readFileSync(path.join(ROOT, '.github', 'PHASE'), 'utf8').trim();
-    const n = Number.parseInt(raw, 10);
-    return Number.isNaN(n) ? 0 : n;
-  } catch {
-    return 0;
-  }
-};
-
-/**
- * Monotonic-decrease ratchet: the warn-mode count is allowed to drop
- * but never to grow. PR 6-2 migrates handlers in waves; each wave
- * updates `.baseline` downward, and the ratchet here catches the
- * regression case "PR introduces new literals while migrating old
- * ones". When PR 6-3 flips `STRICT_MODE_PHASE` to 6, the strict
- * assertion below subsumes the ratchet and the baseline can drop to 0.
- */
-const readBaseline = (): number => {
-  try {
-    const raw = fs.readFileSync(path.join(__dirname, '.baseline'), 'utf8').trim();
-    const n = Number.parseInt(raw, 10);
-    return Number.isNaN(n) ? Number.POSITIVE_INFINITY : n;
-  } catch {
-    return Number.POSITIVE_INFINITY;
-  }
-};
-
 describe('CJK-literal scanner', () => {
-  const violations = collectAllViolations();
-
-  it('reports the current violation count and a preview for the migration sweep', () => {
-    if (violations.length > 0) {
-      console.log(
-        `[i18n-scanner] ${violations.length} CJK literal(s) flagged across ${SCOPED_DIRECTORIES.length} scoped directories.`,
-      );
-      // Print a compact preview so CI logs are useful without flooding.
-      for (const v of violations.slice(0, 20)) {
-        console.log(`  ${v.file}:${v.line}  ${v.text.slice(0, 120)}`);
-      }
-      if (violations.length > 20) {
-        console.log(`  ... and ${violations.length - 20} more.`);
-      }
-    }
-    expect(true).toBe(true);
-  });
-
-  it('never regresses: violation count must not exceed the committed baseline', () => {
-    const baseline = readBaseline();
+  it('reports zero CJK literals across the scoped directories', () => {
+    const violations = collectAllViolations();
     expect(
-      violations.length,
-      `i18n violation count (${violations.length}) exceeds baseline (${baseline}). ` +
-        'A new CJK literal was introduced. Either migrate it to a translator key in ' +
-        'src/i18n/locales/zh-TW/ or annotate it with "// i18n-ignore: <reason>". ' +
-        'After a migration wave drops the count, lower test/i18n/.baseline to match.',
-    ).toBeLessThanOrEqual(baseline);
-  });
-
-  it(`is strict (zero violations) once PHASE >= ${STRICT_MODE_PHASE}; warn-only before`, () => {
-    if (phase() >= STRICT_MODE_PHASE) {
-      expect(
-        violations,
-        `Expected zero CJK literals in ${SCOPED_DIRECTORIES.join(', ')} once PHASE >= ${STRICT_MODE_PHASE}. ` +
-          `Migrate each to a translator key in src/i18n/locales/zh-TW/ or annotate with "// i18n-ignore: <reason>".`,
-      ).toEqual([]);
-    } else {
-      // Below the strict threshold: the report-only assertion above
-      // is the only signal. Pin the threshold here so the check
-      // cannot be silently disabled by deleting one line.
-      expect(STRICT_MODE_PHASE).toBeGreaterThanOrEqual(6);
-    }
+      violations,
+      `Expected zero CJK literals in ${SCOPED_DIRECTORIES.join(', ')}. ` +
+        'Migrate each to a translator key in src/i18n/locales/zh-TW/ or ' +
+        'annotate the line with "// i18n-ignore: <reason>".',
+    ).toEqual([]);
   });
 });

@@ -2,29 +2,41 @@
 
 Minimal structural builders for the Discord types that handler / plugin
 tests touch. Builders return plain objects shaped to the structural
-minimum the SUT reads — no third-party mock libraries. Added in PR-G5
-(audit C-12).
+minimum the SUT reads — no third-party mock libraries.
 
 ## Files
 
-- `guild-builder.ts` — `buildGuild({ id, name, channels, members })`
-- `member-builder.ts` — `buildGuildMember({ id, displayName, voiceChannelId, roleIds })`
-- `message-builder.ts` — `buildMessage({ id, content, authorId, guildId, sink })`
+- `guild-builder.ts` — `buildGuild({ id, name, channels, members, roles })`
+  and `buildGuildRoles({ roleCount, roles, createdRoleId })`, whose
+  `create` / `delete` mocks drive the role-creation failure branches.
+- `member-builder.ts` — `buildGuildMember({ id, displayName, voiceChannelId, roleIds, roles })`
+  and `buildMemberRoles()` for the `roles.add` / `roles.remove` spies.
+- `channel-builder.ts` — `buildTextChannel({ id, name, viewableBy })` for
+  the `/traffic` visibility filter, and `buildSendableChannel({ sendable })`
+  for any path that posts a message and later deletes it.
 - `interaction-builder.ts` — `buildChatInputInteraction({ commandName, userId, guildId, options, sink })`
-- `client-fake.ts` — `buildFakeClient({ userId, guilds })` returning a
-  `{ client, fireEvent }` handle so listener-driven flows can be pumped
+- `client-builder.ts` — `buildInertClient()`, the pre-login `Client` a
+  composition-root test constructs a personality around.
+- `bot-fake.ts` — `buildFakeBot(fields)` plus
+  `echoTranslatorWithParams()`. Not a Discord type: a `BaseBot`
+  stand-in for handler tests.
+
+The sibling `test/fixtures/handler-barrel-stubs.ts` holds the five
+handler-barrel module stubs every test that boots a real `BaseBot`
+needs; it is not a Discord type either, so it sits one level up.
 
 ## Conventions
 
 - One file per Discord type.
 - Tests import builders, not bare object literals, when the shape is
   used in 3 or more places.
-- Each builder accepts an optional `sink` object so call-recording
-  stays explicit (no global `vi.fn()` magic).
+- A builder that needs call recording returns the `vi.fn()` mocks
+  alongside the built value (`{ guild, roles }`, `{ channel, send }`)
+  rather than burying them behind the cast — the test can then both
+  assert on and reprogram them.
 - Builders cast to the public discord.js type at the end (`as unknown
 as X`) — keep test files free of these casts so the shape change
   surface stays one file per type.
 
-See `test/integration/interaction-router/router-dispatch.int.test.ts`
-for the first integration test that exercises the full router chain
-through these fixtures.
+See `test/unit/core/plugin/router-dispatch.test.ts` for a test that
+exercises the full router chain through these fixtures.

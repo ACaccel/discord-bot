@@ -7,7 +7,7 @@
  */
 import type { Channel, Client } from 'discord.js';
 
-import type { GuildRegistry } from '../../../core/guild-registry';
+import type { GuildRegistry } from '../../../bot/guild-registry';
 import type { Translator } from '../../../core/i18n';
 import { logError, type Logger } from '../../../core/logger';
 

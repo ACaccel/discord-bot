@@ -1,1 +1,1 @@
-export { createLlmAutoReplyPlugin, type LlmAutoReplyPluginConfig } from './plugin';
+export { createLlmAutoReplyPlugin } from './plugin';

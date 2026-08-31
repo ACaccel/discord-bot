@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Job } from 'node-schedule';
 
 import { JobManager } from '../../../../src/core/scheduling';
+import type { Logger } from '../../../../src/core/logger';
 
 // `JobManager` is a keyed wrapper around `node-schedule`. The scheduler
 // itself is mocked so the tests stay deterministic and never register a
@@ -32,7 +33,9 @@ describe('JobManager', () => {
     const result = manager.schedule('giveaway:1', date, callback);
 
     expect(result).toBe(job);
-    expect(scheduleJobMock).toHaveBeenCalledWith(date, callback);
+    // The callback is wrapped (see the failure-routing cases below), so
+    // the identity of the function handed to node-schedule differs.
+    expect(scheduleJobMock).toHaveBeenCalledWith(date, expect.any(Function));
     expect(jobs.get('giveaway:1')).toBe(job);
   });
 
@@ -46,7 +49,7 @@ describe('JobManager', () => {
     const result = manager.scheduleRecurring('llm-chat:refresh', '0 4 * * 1', callback);
 
     expect(result).toBe(job);
-    expect(scheduleJobMock).toHaveBeenCalledWith('0 4 * * 1', callback);
+    expect(scheduleJobMock).toHaveBeenCalledWith('0 4 * * 1', expect.any(Function));
     expect(jobs.get('llm-chat:refresh')).toBe(job);
   });
 
@@ -105,5 +108,43 @@ describe('JobManager', () => {
     expect(manager.has('k')).toBe(true);
     expect(manager.get('absent')).toBeUndefined();
     expect(manager.has('absent')).toBe(false);
+  });
+
+  it('routes a rejected async callback to the logger instead of dropping it', async () => {
+    // node-schedule discards its callback's return value, so a rejected
+    // job used to surface only as a detached unhandledRejection.
+    let fire: () => void = () => {};
+    scheduleJobMock.mockImplementation((_when: unknown, cb: () => void) => {
+      fire = cb;
+      return fakeJob();
+    });
+    const error = vi.fn();
+    const manager = new JobManager(new Map<string, Job>(), { error } as unknown as Logger);
+
+    manager.schedule('giveaway:1', new Date('2030-01-01T00:00:00Z'), async () => {
+      throw new Error('draw exploded');
+    });
+    fire();
+    await new Promise<void>((r) => setImmediate(r));
+
+    expect(error).toHaveBeenCalledTimes(1);
+    expect((error.mock.calls[0] as [{ job: string }])[0].job).toBe('giveaway:1');
+  });
+
+  it('routes a synchronous throw to the logger', () => {
+    let fire: () => void = () => {};
+    scheduleJobMock.mockImplementation((_when: unknown, cb: () => void) => {
+      fire = cb;
+      return fakeJob();
+    });
+    const error = vi.fn();
+    const manager = new JobManager(new Map<string, Job>(), { error } as unknown as Logger);
+
+    manager.scheduleRecurring('refresh', '0 4 * * *', () => {
+      throw new Error('sync boom');
+    });
+
+    expect(() => fire()).not.toThrow();
+    expect(error).toHaveBeenCalledTimes(1);
   });
 });

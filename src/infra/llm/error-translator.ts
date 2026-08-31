@@ -167,7 +167,6 @@ const messageKeyFor = (code: LlmProviderErrorCode): string => {
     case 'LLM_TIMEOUT':
       return 'errors:llm.timeout';
     case 'LLM_UNKNOWN':
-    default:
       return 'errors:llm.unknown';
   }
 };
@@ -190,6 +189,3 @@ export const emptyResponseError = (
     messageParams: { provider, status: 'empty_response' },
     context: { operation, input: { provider } },
   });
-
-/** Test-only re-export so contract tests can introspect the classifier. */
-export const __test = { normalise, codeFor, isContextLengthError };

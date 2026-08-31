@@ -1,14 +1,14 @@
 /**
  * Orchestrates a single LLM auto-reply attempt once the plugin's cheap
  * guards have passed and either the probability gate fired or the message
- * carried the force-trigger keyword.
+ * @-mentioned the bot.
  *
  * Sequence: fetch the latest N messages -> require exactly N (enough
  * recent context) -> require they form a tight burst within the window
- * (skipped for a force-triggered message) -> build the transcript
- * (bot/blank lines dropped, force-trigger keyword stripped) -> call the
- * self-hosted LLM -> post one reply. Any short-circuit returns silently;
- * an LLM failure is logged but never surfaced to the channel.
+ * (skipped for an @-mention) -> build the transcript (bot/blank lines
+ * dropped, the bot's mention stripped) -> call the self-hosted LLM ->
+ * post one reply. Any short-circuit returns silently; an LLM failure is
+ * logged but never surfaced to the channel.
  *
  * Returns `true` iff a reply was actually posted, so the caller records the
  * per-channel cooldown only when a message really went out (every
@@ -21,7 +21,7 @@ import type { SelfHostedLlmClient } from '../../../infra/llm';
 import type { LlmAutoReplyPluginConfig } from '../config';
 import { buildTranscript, isWithinWindow, type TranscriptMessage } from './transcript';
 import { clampReply } from './reply';
-import { startsWithForceTrigger, stripForceTrigger } from './trigger';
+import { mentionsBot, stripBotMention } from './trigger';
 
 /**
  * Collaborators for {@link runLlmAutoReply}. `client` is narrowed to the
@@ -31,6 +31,8 @@ export interface RunLlmAutoReplyDeps {
   readonly client: Pick<SelfHostedLlmClient, 'reply'>;
   readonly logger: Logger;
   readonly config: Pick<LlmAutoReplyPluginConfig, 'messageCount' | 'windowSeconds'>;
+  /** Bot client id — drives @-mention detection and mention-stripping. */
+  readonly clientId: string;
 }
 
 /** Mentions are stripped so an LLM-authored reply cannot ping @everyone/@role. */
@@ -61,27 +63,32 @@ export const runLlmAutoReply = async (
 
   // discord.js returns newest -> oldest; reverse to chronological order.
   const chronological = [...fetched.values()].reverse();
-  // A force-triggered message skips the burst-window requirement: the user
-  // explicitly asked for a reply, so the recent N messages are used as
-  // context regardless of how spread out in time they are. The messageCount
+  // An @-mention skips the burst-window requirement: the user explicitly
+  // asked for a reply, so the recent N messages are used as context
+  // regardless of how spread out in time they are. The messageCount
   // requirement above still applies.
-  const forced = startsWithForceTrigger(message.content);
+  const forced = mentionsBot(message, deps.clientId);
   const windowMs = deps.config.windowSeconds * 1000;
-  if (!forced && !isWithinWindow(chronological.map((m) => m.createdTimestamp), windowMs))
+  if (
+    !forced &&
+    !isWithinWindow(
+      chronological.map((m) => m.createdTimestamp),
+      windowMs,
+    )
+  )
     return false;
 
   const items: readonly TranscriptMessage[] = chronological.map((m) => ({
     // Global display name only (User.displayName = globalName ?? username);
     // deliberately NOT m.member.displayName, which would be the guild nickname.
     displayName: m.author.displayName,
-    // Strip a leading force-trigger keyword so the control token never
-    // reaches the prompt; ordinary messages pass through unchanged.
-    content: stripForceTrigger(m.content),
+    // Strip the bot's @-mention so the control marker never reaches the
+    // prompt; mentions of other users pass through unchanged.
+    content: stripBotMention(m.content, deps.clientId),
     createdTimestamp: m.createdTimestamp,
     isBot: m.author.bot,
   }));
-  const channelName = 'name' in channel && typeof channel.name === 'string' ? channel.name : '';
-  const transcript = buildTranscript(items, channelName);
+  const transcript = buildTranscript(items);
   if (transcript.length === 0) return false; // only bot/blank messages remained
 
   const result = await deps.client.reply(transcript);

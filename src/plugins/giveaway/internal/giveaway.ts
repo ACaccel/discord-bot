@@ -14,7 +14,7 @@ import type { Client, GuildMember, Channel } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
 import type { Job } from 'node-schedule';
 
-import type { GuildRegistry } from '../../../core/guild-registry';
+import type { GuildRegistry } from '../../../bot/guild-registry';
 import { bindTranslator } from '../../../core/i18n';
 import type { Translator } from '../../../core/i18n';
 import { logError, type Logger } from '../../../core/logger';
@@ -54,10 +54,32 @@ export interface GiveawayDeps {
   readonly translator: Translator | undefined;
 }
 
-export const giveawayJobKey = (message_id: string) => `giveaway:${message_id}`;
+export const giveawayJobKey = (message_id: string): string => `giveaway:${message_id}`;
 
-export const isGiveawayJobKey = (key: string, messageId: string) =>
-  key.startsWith('giveaway:') && key.split(':')[1] === messageId;
+/**
+ * Outcome of {@link scheduleGiveaway} — the deferred draw that runs when
+ * a giveaway's deadline arrives. Every non-`completed` variant names a
+ * precondition that failed, so callers log a stable status instead of an
+ * English sentence.
+ */
+type ScheduleGiveawayOutcome =
+  | { readonly status: 'completed' }
+  | { readonly status: 'guild_not_found' }
+  | { readonly status: 'no_db' }
+  | { readonly status: 'giveaway_not_found' }
+  | { readonly status: 'channel_not_found' }
+  | { readonly status: 'message_not_found' };
+
+/**
+ * Outcome of {@link deleteGiveaway}; the handler maps each variant to an
+ * i18n key. A raw English reason string was previously interpolated
+ * straight into the localised reply, so a zh-TW user saw
+ * "無法刪除抽獎: Database not found".
+ */
+type DeleteGiveawayOutcome =
+  | { readonly status: 'deleted' }
+  | { readonly status: 'guild_not_found' }
+  | { readonly status: 'no_db' };
 
 export const giveawayAnnouncement = async (
   channel: Channel,
@@ -67,7 +89,7 @@ export const giveawayAnnouncement = async (
   end_time_date: Date,
   description: string,
   deps: GiveawayDeps,
-) => {
+): Promise<string | null> => {
   if (!channel.isSendable()) return null;
 
   const t = bindTranslator(deps.translator);
@@ -97,7 +119,11 @@ export const giveawayAnnouncement = async (
   }
 };
 
-export const findGiveaway = async (deps: GiveawayDeps, guild_id: string, message_id: string) => {
+export const findGiveaway = async (
+  deps: GiveawayDeps,
+  guild_id: string,
+  message_id: string,
+): Promise<boolean> => {
   const guild = deps.client.guilds.cache.get(guild_id);
   if (!guild) return false;
   const repos = deps.registry.getRepos(guild_id);
@@ -113,17 +139,17 @@ export const scheduleGiveaway = async (
   deps: GiveawayDeps,
   guild_id: string,
   message_id: string,
-) => {
+): Promise<ScheduleGiveawayOutcome> => {
   const guild = deps.client.guilds.cache.get(guild_id);
-  if (!guild) return 'Guild not found';
+  if (!guild) return { status: 'guild_not_found' };
   const repos = deps.registry.getRepos(guild_id);
-  if (!repos) return 'Database not found';
+  if (!repos) return { status: 'no_db' };
 
   // An `err` is re-thrown for the caller's surrounding catch.
   const giveawayResult = await repos.giveaway.findByMessageId(message_id);
   if (!giveawayResult.ok) throw giveawayResult.error;
   const giveaway = giveawayResult.value;
-  if (!giveaway) return 'Giveaway not found';
+  if (!giveaway) return { status: 'giveaway_not_found' };
   // The giveaway is announced in whatever channel `/giveaway_create`
   // was invoked from — which may be a thread or a channel that is not
   // in `guild.channels.cache` after a restart (threads in particular
@@ -133,10 +159,10 @@ export const scheduleGiveaway = async (
   const giveawayChannel =
     guild.channels.cache.get(giveaway.channel_id) ??
     (await deps.client.channels.fetch(giveaway.channel_id).catch(() => null));
-  if (!giveawayChannel?.isSendable()) return 'Giveaway channel not found';
+  if (!giveawayChannel?.isSendable()) return { status: 'channel_not_found' };
 
   const message = await giveawayChannel.messages.fetch(message_id).catch(() => null);
-  if (!message) return 'Giveaway message not found';
+  if (!message) return { status: 'message_not_found' };
 
   const reaction = message.reactions.cache.get('🎉');
   const users = await reaction?.users.fetch().catch(() => null);
@@ -173,20 +199,43 @@ export const scheduleGiveaway = async (
   const deleteResult = await repos.giveaway.deleteByMessageId(message_id);
   if (!deleteResult.ok) throw deleteResult.error;
   new JobManager(deps.jobMap).cancel(giveawayJobKey(message_id));
-  return null;
+  return { status: 'completed' };
 };
 
-export const deleteGiveaway = async (deps: GiveawayDeps, guild_id: string, message_id: string) => {
+export const deleteGiveaway = async (
+  deps: GiveawayDeps,
+  guild_id: string,
+  message_id: string,
+): Promise<DeleteGiveawayOutcome> => {
   const guild = deps.client.guilds.cache.get(guild_id);
-  if (!guild) return 'Guild not found';
+  if (!guild) return { status: 'guild_not_found' };
   const repos = deps.registry.getRepos(guild_id);
-  if (!repos) return 'Database not found';
+  if (!repos) return { status: 'no_db' };
 
   new JobManager(deps.jobMap).cancel(giveawayJobKey(message_id));
   // An `err` is re-thrown for the caller's surrounding catch.
   const deleteResult = await repos.giveaway.deleteByMessageId(message_id);
   if (!deleteResult.ok) throw deleteResult.error;
-  return null;
+  return { status: 'deleted' };
+};
+
+/**
+ * Run a deferred draw, recording a non-success outcome on the operator
+ * channel. The job callback has no user to answer, so a silent return
+ * would make a missing channel or message indistinguishable from a
+ * completed draw.
+ */
+export const runGiveawayDraw = async (
+  deps: GiveawayDeps,
+  guildId: string,
+  messageId: string,
+): Promise<void> => {
+  const outcome = await scheduleGiveaway(deps, guildId, messageId);
+  if (outcome.status === 'completed') return;
+  deps.logger.warn(
+    { guildId, messageId, outcome: outcome.status },
+    'giveaway draw did not complete',
+  );
 };
 
 /**
@@ -211,7 +260,7 @@ const rebootRetry = async <T>(op: () => Promise<T>): Promise<T> => {
 };
 
 export const rebootGiveawayJobs = async (deps: GiveawayDeps): Promise<void> => {
-  const jobManager = new JobManager(deps.jobMap);
+  const jobManager = new JobManager(deps.jobMap, deps.logger);
   await Promise.all(
     deps.registry.listGuildIds().map(async (guildId) => {
       try {
@@ -231,7 +280,7 @@ export const rebootGiveawayJobs = async (deps: GiveawayDeps): Promise<void> => {
             if (end_time > new Date()) {
               jobManager.schedule(giveawayJobKey(g.message_id), end_time, async () => {
                 if (await findGiveaway(deps, guildId, g.message_id)) {
-                  await scheduleGiveaway(deps, guildId, g.message_id);
+                  await runGiveawayDraw(deps, guildId, g.message_id);
                 }
               });
             } else {

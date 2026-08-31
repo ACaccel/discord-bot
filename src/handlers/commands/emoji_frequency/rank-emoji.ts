@@ -12,7 +12,7 @@ export interface RankedEmoji {
   readonly reaction: number;
 }
 
-export interface RankOptions {
+interface RankOptions {
   readonly type: 'animated' | 'static';
   readonly frequency: 'asc' | 'desc';
   readonly topN: number;

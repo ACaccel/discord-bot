@@ -1,7 +1,7 @@
 /**
- * ModelCatalog DI integration smoke test (R2).
+ * ModelCatalog DI integration smoke test.
  *
- * After R2 the catalog is no longer a module-scope holder — it is
+ * The catalog is not a module-scope holder — it is
  * built by `LlmChatPlugin.init` and published through
  * `ctx.registerInstance(TOKENS.ModelCatalog, ...)`. This test wires
  * the plugin against a real `PluginLifecycleRunner` + container,
@@ -11,19 +11,19 @@
  *     matching the `bot.modelCatalog` getter's contract.
  *
  * The catalog's HTTP-fetch behaviour is covered elsewhere; here we
- * only care about the DI hop because that is the surface R2 changed.
+ * only care about the DI hop.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createContainer, TOKENS } from '../../../../src/core/ioc';
-import { createLogger } from '../../../../src/core/logger';
+import { createContainer } from '../../../../src/core/ioc';
+import { TOKENS } from '../../../../src/bot/tokens';
+import { createLogger, type Logger } from '../../../../src/core/logger';
 import { EventDispatcher } from '../../../../src/core/plugin/event-dispatcher';
 import {
   PluginLifecycleRunner,
   type LifecycleHost,
   type RegisteredPlugin,
 } from '../../../../src/core/plugin/host/lifecycle';
-import { buildDependentsIndex } from '../../../../src/core/plugin/host/topology';
 import type { DisabledPlugin, Plugin, PluginId } from '../../../../src/core/plugin/types';
 import { systemClock } from '../../../../src/core/time';
 import { ModelCatalog } from '../../../../src/infra/llm/models-catalog';
@@ -46,23 +46,28 @@ const stubEnv: PartialEnv = {
   GEMINI_API_KEY: 'sk-test-gemini',
 };
 
-describe('ModelCatalog DI wiring (R2)', () => {
+describe('ModelCatalog DI wiring', () => {
   it('LlmChatPlugin.init registers a ModelCatalog the container can resolve', async () => {
     const container = createContainer();
-    // The plugin only reads the four provider API keys off the typed
-    // Env. Cast a minimal stub through unknown so we do not have to
+    // The plugin reads the four provider API keys off the typed Env.
+    // Cast a minimal stub through unknown so we do not have to
     // synthesise the full schema.
     container.registerSingleton(TOKENS.Env, () => stubEnv as unknown as never);
+    // `init` also resolves the message-path dependencies once, so both
+    // have to be bound for the phase to complete.
+    container.registerSingleton(TOKENS.Logger, () => silent);
+    container.registerSingleton(TOKENS.GuildRegistry, () => ({
+      getRepos: () => undefined,
+      getChannel: () => undefined,
+      getRole: () => undefined,
+      listGuildIds: () => [],
+    }));
 
-    const plugin = createLlmChatPlugin({ clientId: 'bot-1' }) as Plugin<unknown>;
-    const registered = new Map<PluginId, RegisteredPlugin>([
-      [plugin.id, { plugin, config: undefined }],
-    ]);
+    const plugin = createLlmChatPlugin({ clientId: 'bot-1' }) as Plugin;
+    const registered = new Map<PluginId, RegisteredPlugin>([[plugin.id, { plugin }]]);
     const host: LifecycleHost = {
       registered,
-      order: [plugin.id],
       disabled: new Map<PluginId, DisabledPlugin>(),
-      dependents: buildDependentsIndex(registered),
       resolve: container.resolve.bind(container),
       container,
       dispatcher: new EventDispatcher(silent),
@@ -115,5 +120,75 @@ describe('ModelCatalog.listLive (uncapped vs cached cap)', () => {
     // The synchronous cache view feeds the Discord select menu and must
     // stay within the 25-option hard limit.
     expect(catalog.list('gemini')).toHaveLength(25);
+  });
+
+  it('sends the Gemini key as a header, never in the query string', async () => {
+    const fetchSpy = vi.fn(
+      async () => ({ ok: true, json: async () => ({ models: [] }) }) as unknown as Response,
+    );
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await new ModelCatalog({ gemini: 'super-secret-key' }).listLive('gemini');
+
+    const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
+    // A URL reaches request logs and error messages verbatim, where the
+    // log redactor cannot reach inside it.
+    expect(url).not.toContain('super-secret-key');
+    expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('super-secret-key');
+  });
+});
+
+describe('ModelCatalog background fetch resilience', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('logs a warning naming the provider when a background fetch fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('getaddrinfo ENOTFOUND');
+      }),
+    );
+    const warn = vi.fn();
+    const logger = { warn } as unknown as Logger;
+
+    const catalog = new ModelCatalog({ gemini: 'test-key' }, logger);
+    expect(catalog.list('gemini')).toEqual([]);
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+
+    expect((warn.mock.calls[0] as [{ provider: string }])[0].provider).toBe('gemini');
+  });
+
+  it('releases the in-flight marker when a fetch never settles, so a later call retries', async () => {
+    // A provider that hangs forever used to wedge the catalog: the
+    // in-flight flag was never cleared and every later `list` call
+    // returned an empty array without re-fetching.
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1;
+        return new Promise<Response>(() => {
+          /* never settles */
+        });
+      }),
+    );
+    vi.useFakeTimers();
+    const catalog = new ModelCatalog({ gemini: 'test-key' });
+
+    expect(catalog.list('gemini')).toEqual([]);
+    expect(calls).toBe(1);
+    // A second call while the first is genuinely in flight must not
+    // start a duplicate fetch.
+    expect(catalog.list('gemini')).toEqual([]);
+    expect(calls).toBe(1);
+
+    // Once the bounded fetch times out, the marker clears and the next
+    // call is free to retry.
+    await vi.advanceTimersByTimeAsync(11_000);
+    expect(catalog.list('gemini')).toEqual([]);
+    expect(calls).toBe(2);
   });
 });

@@ -1,12 +1,10 @@
 import {
   ApplicationCommandType,
   ChannelType,
+  type RESTPostAPIApplicationCommandsJSONBody,
 } from 'discord.js';
 import { ContextMenuCommandBuilder, SlashCommandBuilder } from '@discordjs/builders';
-import type {
-  LocalizedCommandConfig,
-  LocalizedCommandOption,
-} from './command';
+import type { LocalizedCommandConfig, LocalizedCommandOption } from './command';
 
 /**
  * Translates a {@link LocalizedCommandConfig} into the Discord REST JSON
@@ -16,16 +14,15 @@ import type {
  * registration (`getCommandJsonBody`). It lives next to `command.ts`
  * because it operates purely on the localised command-metadata contract.
  */
-export const buildCommandJsonBody = (config: LocalizedCommandConfig) => {
+export const buildCommandJsonBody = (
+  config: LocalizedCommandConfig,
+): RESTPostAPIApplicationCommandsJSONBody => {
   // Context menu commands carry no description / options.
   if (
     config.type === ApplicationCommandType.User ||
     config.type === ApplicationCommandType.Message
   ) {
-    return new ContextMenuCommandBuilder()
-      .setName(config.name)
-      .setType(config.type)
-      .toJSON();
+    return new ContextMenuCommandBuilder().setName(config.name).setType(config.type).toJSON();
   }
 
   const slashCommand = new SlashCommandBuilder()

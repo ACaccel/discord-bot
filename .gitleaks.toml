@@ -4,6 +4,18 @@
 [extend]
 useDefault = true
 
+# A MongoDB connection string carries the cluster credentials inline and
+# is the one secret shape this repo actually handles at every layer
+# (`MONGO_URI`, the per-guild URI builder, every ops tool's config). The
+# default ruleset has no rule for it, so a pasted live URI would commit
+# clean. Placeholder URIs in the example files are covered by the
+# path allowlist below.
+[[rules]]
+id = "mongodb-connection-uri"
+description = "MongoDB connection string with inline credentials"
+regex = '''mongodb(\+srv)?://[^\s:/@]+:[^\s:/@]+@'''
+tags = ["mongodb", "credentials"]
+
 [allowlist]
 description = "Example/template files that may carry placeholder secrets"
 paths = [

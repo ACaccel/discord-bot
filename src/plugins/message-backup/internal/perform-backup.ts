@@ -9,9 +9,9 @@
  */
 import { type Client, DiscordAPIError } from 'discord.js';
 
-import type { GuildRegistry } from '../../../core/guild-registry';
+import type { GuildRegistry } from '../../../bot/guild-registry';
 import { logError, type Logger } from '../../../core/logger';
-import { BackupLog } from './backup-log';
+import { BackupLog, NullBackupLog, type BackupTranscript } from './backup-log';
 import { buildBackupLogPath } from './log-path';
 import { backupChannel, type ChannelBackupStats } from './backup-channel';
 import { collectChannels } from './collect-channels';
@@ -21,6 +21,7 @@ export const performBackup = async (
   registry: GuildRegistry,
   client: Client,
   pluginLogger: Logger,
+  writeTranscript: boolean,
 ): Promise<void> => {
   const guild = client.guilds.cache.get(guildId);
   if (guild === undefined) {
@@ -39,8 +40,11 @@ export const performBackup = async (
     return;
   }
 
-  const logPath = buildBackupLogPath(guildId, new Date());
-  const log = new BackupLog(logPath);
+  // Transcript logging is opt-in: when disabled, a Null Object swallows every
+  // `writeln` so the backup runs identically but writes no `logs/backup/` file.
+  const log: BackupTranscript = writeTranscript
+    ? new BackupLog(buildBackupLogPath(guildId, new Date()))
+    : new NullBackupLog();
 
   try {
     const startTime = Date.now();

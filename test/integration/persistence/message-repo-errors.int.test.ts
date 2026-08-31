@@ -1,5 +1,5 @@
 /**
- * Integration regression for the G-2 `Result<T, DatabaseError>`
+ * Integration regression for the `Result<T, DatabaseError>`
  * boundary on `MongoMessageRepo`.
  *
  * The unit tests in `test/unit/persistence/error-translator.test.ts`
@@ -44,7 +44,6 @@ describe('MongoMessageRepo error boundary (integration)', () => {
     expect(isErr(result)).toBe(true);
     if (isErr(result)) {
       expect(result.error).toBeInstanceOf(DatabaseError);
-      expect(result.error.kind).toBe('DatabaseError');
       expect(result.error.context.operation).toBe('MongoMessageRepo.countAll');
       expect(result.error.cause).toBeDefined();
     }

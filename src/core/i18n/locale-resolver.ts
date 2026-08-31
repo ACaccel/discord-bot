@@ -2,7 +2,7 @@ import { DEFAULT_LOCALE, type Locale } from './translator';
 
 const SUPPORTED: ReadonlySet<Locale> = new Set<Locale>(['zh-TW', 'en']);
 
-export interface LocaleResolutionInputs {
+interface LocaleResolutionInputs {
   /** User-level preference (from UserApiSetting or similar). */
   userLocale?: string | null;
   /** Guild-level default. */

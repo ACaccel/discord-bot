@@ -13,38 +13,46 @@ import { createLlmChatPlugin } from '@plugins';
  * Discord presence.
  *
  * Listener policy: Konata is a pure LLM-chat bot. It opts out of the
- * reaction and guildCreate raw listeners through the R1
+ * reaction and guildCreate raw listeners through the
  * `eventBridgeSuppression` hook so the bridge does not install them.
  */
 export class Konata extends BaseBot<Config> {
-    public constructor(client: Client, token: string, mongoURI: string, clientId: string, config: Config) {
-        super(client, token, mongoURI, clientId, config);
-        this.use(createLlmChatPlugin({ clientId: this.clientId }));
-        this.registerPresence();
-    }
+  public constructor(
+    client: Client,
+    token: string,
+    mongoURI: string,
+    clientId: string,
+    config: Config,
+  ) {
+    super(client, token, mongoURI, clientId, config);
+    this.use(createLlmChatPlugin({ clientId: this.clientId }));
+    this.registerPresence();
+  }
 
-    protected override eventBridgeSuppression(): ClientEventBridgeSuppression {
-        return { reaction: true, guildCreate: true };
-    }
+  protected override eventBridgeSuppression(): ClientEventBridgeSuppression {
+    return { reaction: true, guildCreate: true };
+  }
 
-    /**
-     * Without an explicit presence, Discord clients tend to render an idle bot
-     * as offline even though its gateway session is still alive. Register a
-     * ready-time presence so konata reliably appears online with a custom
-     * status line.
-     */
-    private registerPresence(): void {
-        this.client.once(Events.ClientReady, () => {
-            const text = this.translator?.t('replies:konata.presence_text') ?? '';
-            if (text.length === 0) return;
-            this.client.user?.setPresence({
-                status: 'online',
-                activities: [{
-                    name: text,
-                    type: ActivityType.Custom,
-                    state: text,
-                }],
-            });
-        });
-    }
+  /**
+   * Without an explicit presence, Discord clients tend to render an idle bot
+   * as offline even though its gateway session is still alive. Register a
+   * ready-time presence so konata reliably appears online with a custom
+   * status line.
+   */
+  private registerPresence(): void {
+    this.client.once(Events.ClientReady, () => {
+      const text = this.translator?.t('replies:konata.presence_text') ?? '';
+      if (text.length === 0) return;
+      this.client.user?.setPresence({
+        status: 'online',
+        activities: [
+          {
+            name: text,
+            type: ActivityType.Custom,
+            state: text,
+          },
+        ],
+      });
+    });
+  }
 }

@@ -22,18 +22,9 @@
  */
 import { LlmProviderError } from '../../core/errors';
 import { err, ok, type Result } from '../../core/result';
+import type { AnyLlmProviderError } from './errors';
 import type { LlmProviderRegistry } from './registry';
 import type { LLMMessage, LLMResult, LLMSettings } from './types';
-import { PROVIDER_API_KEY_ENV } from './types';
-
-/**
- * Widened LlmProviderError that erases the params-shape generic so the
- * `chat()` return type stays a single concrete type regardless of
- * which translation branch produced it. Handlers read `messageKey` and
- * `messageParams` as an untyped i18n bag — the per-translator narrowing
- * doesn't survive past the boundary anyway.
- */
-type AnyLlmProviderError = LlmProviderError<Readonly<Record<string, string | number>>>;
 
 const unknownToLlmError = (e: unknown, provider: string): AnyLlmProviderError => {
   const message = e instanceof Error ? e.message : String(e);
@@ -89,7 +80,3 @@ export class LLMService {
     }
   }
 }
-
-// Re-export so plugin/llm-chat keeps importing `PROVIDER_API_KEY_ENV`
-// (and friends) from a single entry without splitting the surface.
-export { PROVIDER_API_KEY_ENV };

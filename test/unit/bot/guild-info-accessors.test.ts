@@ -2,53 +2,29 @@
  * Unit tests for BaseBot's `guildInfo` read accessors and the narrow
  * write seams (`registerGuildSlotInternal`, `updateBotName`, `attachRepos`).
  *
- * Proposal §4.1 item 7: `guildInfo` migrated from a public mutable
- * `Record` to a private `Map` exposed through `getGuildInfo`,
- * `getAllGuildInfo`, and `getRepos`. These tests assert the read /
+ * `guildInfo` is held as a private `Map` exposed through
+ * `getGuildInfo`, `getAllGuildInfo`, and `getRepos`, rather than a
+ * public mutable `Record`. These tests assert the read /
  * write contract from the consumer side without reaching into BaseBot
  * internals.
  */
 /* eslint-disable import/first */
 import { describe, expect, it, vi } from 'vitest';
-import type { Client, Guild } from 'discord.js';
+import type { Channel, Guild } from 'discord.js';
+import type { Job } from 'node-schedule';
 
-vi.mock('@cmd', () => ({
-  registerCommands: async (): Promise<void> => {},
-  getCommandJsonBody: (): unknown[] => [],
-  executeCommand: async (): Promise<void> => {},
-}));
-vi.mock('@button', () => ({
-  registerButtons: async (): Promise<void> => {},
-  executeButton: async (): Promise<void> => {},
-}));
-vi.mock('@modal', () => ({
-  registerModals: async (): Promise<void> => {},
-  executeModal: async (): Promise<void> => {},
-}));
-vi.mock('@select-menu', () => ({
-  registerSSMs: async (): Promise<void> => {},
-  executeSSM: async (): Promise<void> => {},
-}));
-vi.mock('@reaction', () => ({
-  registerReactions: async (): Promise<void> => {},
-  executeReactionAdded: async (): Promise<void> => {},
-  executeReactionRemoved: async (): Promise<void> => {},
-}));
+import { buildInertClient } from '../../fixtures/discord/client-builder';
+import { barrelStubs } from '../../fixtures/handler-barrel-stubs';
+
+vi.mock('@cmd', () => barrelStubs.cmd);
+vi.mock('@button', () => barrelStubs.button);
+vi.mock('@modal', () => barrelStubs.modal);
+vi.mock('@select-menu', () => barrelStubs.selectMenu);
+vi.mock('@reaction', () => barrelStubs.reaction);
 
 import { BaseBot, type Config, type GuildInfo } from '../../../src/bot/index';
 import type { Repos } from '../../../src/persistence/repositories';
-
-const fakeClient = (): Client =>
-  ({
-    user: null,
-    guilds: { cache: new Map() },
-    channels: { cache: new Map() },
-    application: null,
-    on: () => undefined,
-    once: () => undefined,
-    off: () => undefined,
-    destroy: () => undefined,
-  }) as unknown as Client;
+import { TOKENS } from '../../../src/bot/tokens';
 
 const fakeGuild = (id: string): Guild => ({ id, name: `Guild ${id}` }) as unknown as Guild;
 
@@ -68,7 +44,7 @@ class TestBot extends BaseBot<Config> {
 }
 
 const buildBot = (): TestBot =>
-  new TestBot(fakeClient(), 'token', '', 'bot-client', {} satisfies Config);
+  new TestBot(buildInertClient(), 'token', '', 'bot-client', {} satisfies Config);
 
 describe('BaseBot guildInfo accessors', () => {
   it('getGuildInfo returns undefined for an unregistered guild', () => {
@@ -138,5 +114,55 @@ describe('BaseBot guildInfo accessors', () => {
     const bot = buildBot();
     bot.updateBotName('missing', 'irrelevant');
     expect(bot.getGuildInfo('missing')).toBeUndefined();
+  });
+});
+
+/**
+ * The accessors the plugin-side `deps-from-bot` bridges read. Each must
+ * hand back the very object the container binds under the matching
+ * token, because that identity is what keeps a plugin's own
+ * `ctx.resolve` path and its handler path pointed at one instance.
+ */
+describe('BaseBot container-backed accessors', () => {
+  it('guildRegistry is the object bound under TOKENS.GuildRegistry', () => {
+    const bot = buildBot();
+    expect(bot.guildRegistry).toBe(bot.container.resolve(TOKENS.GuildRegistry));
+  });
+
+  it('guildRegistry reads through to the live guild slots', () => {
+    const bot = buildBot();
+    const channel = { id: 'c-1' } as unknown as Channel;
+    bot.registerGuildSlotInternal('g-1', {
+      bot_name: 'A',
+      guild: fakeGuild('g-1'),
+      channels: { event: channel },
+    });
+
+    // Registered after the registry was built, so a stale snapshot fails here.
+    expect(bot.guildRegistry.listGuildIds()).toEqual(['g-1']);
+    expect(bot.guildRegistry.getChannel('g-1', 'event')).toBe(channel);
+    expect(bot.guildRegistry.getRole('g-1', 'staff')).toBeUndefined();
+  });
+
+  it('jobMap is the same map plugins resolve under TOKENS.JobMap', () => {
+    const bot = buildBot();
+    expect(bot.jobMap).toBe(bot.container.resolve(TOKENS.JobMap));
+
+    bot.jobMap.set('job-1', {} as unknown as Job);
+    expect(bot.container.resolve(TOKENS.JobMap).get('job-1')).toBeDefined();
+  });
+
+  it('requireLogger throws before run() binds the logger', () => {
+    const bot = buildBot();
+    expect(bot.logger).toBeUndefined();
+    expect(() => bot.requireLogger()).toThrow(TypeError);
+  });
+
+  it('requireLogger returns the bound logger once it exists', () => {
+    const bot = buildBot();
+    const logger = bot.container.resolve(TOKENS.Logger);
+    (bot as unknown as { logger: unknown }).logger = logger;
+
+    expect(bot.requireLogger()).toBe(logger);
   });
 });

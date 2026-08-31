@@ -10,14 +10,15 @@
  * signal instead of a stale guess.
  *
  * The cache and API keys are instance state on the `ModelCatalog`
- * class. R2 removed the prior module-scope holder + `setActive` /
- * `getActive` / `listProviderModels` shims: the catalog is now
- * published by `LlmChatPlugin.init` through
- * `ctx.registerInstance(TOKENS.ModelCatalog, ...)` and consumers
- * (the `/ai_settings` handler) reach it via `bot.modelCatalog`.
+ * class (not a module-scope holder), so the catalog carries no
+ * ambient global state. It is published by `LlmChatPlugin.init`
+ * through `ctx.registerInstance(TOKENS.ModelCatalog, ...)` and
+ * consumers (the `/ai_settings` handler) reach it via
+ * `bot.modelCatalog`.
  */
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
+import type { Logger } from '../../core/logger';
 import { type LLMProviderName } from './types';
 import type { LlmProviderApiKeys } from './registry';
 
@@ -27,16 +28,50 @@ const CACHE_TTL_MS = 15 * 60 * 1000;
 /** Discord StringSelectMenu hard limit. */
 const SELECT_MENU_MAX_OPTIONS = 25;
 
+/**
+ * Wall-clock budget for one provider's list-models round trip. Every
+ * fetch path is bounded by it: an SDK pagination loop that stalls
+ * mid-stream would otherwise leave the provider permanently marked
+ * in-flight, and `/ai_settings` would show an empty model list for the
+ * lifetime of the process.
+ */
+const FETCH_TIMEOUT_MS = 10_000;
+
 interface CacheEntry {
   list: string[];
   expiresAt: number;
 }
 
+/** Reject `op` once `ms` elapses, always clearing the timer. */
+const withTimeout = async <T>(op: Promise<T>, ms: number, label: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      op,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+        timer.unref?.();
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+};
+
 export class ModelCatalog {
   private readonly cache = new Map<LLMProviderName, CacheEntry>();
   private readonly inFlight = new Set<LLMProviderName>();
 
-  public constructor(private readonly apiKeys: LlmProviderApiKeys) {}
+  /**
+   * @param apiKeys Per-provider API keys, derived from the typed Env.
+   * @param logger  Optional sink for background-fetch failures. Without
+   *   it a provider that never lists models is silent, and the operator
+   *   sees only an empty `/ai_settings` menu with no explanation.
+   */
+  public constructor(
+    private readonly apiKeys: LlmProviderApiKeys,
+    private readonly logger?: Logger,
+  ) {}
 
   /**
    * Returns the live model list for a provider, **synchronously**.
@@ -100,9 +135,15 @@ export class ModelCatalog {
           this.cache.set(provider, { list, expiresAt: Date.now() + CACHE_TTL_MS });
         }
       })
-      .catch(() => {
-        // Swallow: the next call will retry. Callers see an empty list
-        // and surface a "no available models" message until success.
+      .catch((err: unknown) => {
+        // Not fatal — the next call retries and callers see an empty
+        // list — but a provider that consistently fails to list models
+        // is an operator problem (bad key, blocked egress), so it is
+        // recorded rather than swallowed.
+        this.logger?.warn(
+          { err: err instanceof Error ? err : new Error(String(err)), provider },
+          'ModelCatalog: background model-list fetch failed',
+        );
       })
       .finally(() => {
         this.inFlight.delete(provider);
@@ -115,16 +156,24 @@ export class ModelCatalog {
       throw new Error(`API key for ${provider} not set`);
     }
 
-    switch (provider) {
-      case 'openai':
-        return fetchOpenAICompatibleModels(apiKey, undefined, /^(gpt-|o\d|chatgpt-)/i);
-      case 'xai':
-        return fetchOpenAICompatibleModels(apiKey, 'https://api.x.ai/v1', /grok/i);
-      case 'anthropic':
-        return fetchAnthropicModels(apiKey);
-      case 'gemini':
-        return fetchGeminiModels(apiKey);
-    }
+    return withTimeout(
+      fetchProviderModels(provider, apiKey),
+      FETCH_TIMEOUT_MS,
+      `${provider} listModels`,
+    );
+  }
+}
+
+function fetchProviderModels(provider: LLMProviderName, apiKey: string): Promise<string[]> {
+  switch (provider) {
+    case 'openai':
+      return fetchOpenAICompatibleModels(apiKey, undefined, /^(gpt-|o\d|chatgpt-)/i);
+    case 'xai':
+      return fetchOpenAICompatibleModels(apiKey, 'https://api.x.ai/v1', /grok/i);
+    case 'anthropic':
+      return fetchAnthropicModels(apiKey);
+    case 'gemini':
+      return fetchGeminiModels(apiKey);
   }
 }
 
@@ -133,7 +182,7 @@ async function fetchOpenAICompatibleModels(
   baseURL: string | undefined,
   chatIdPattern: RegExp,
 ): Promise<string[]> {
-  const client = new OpenAI({ apiKey, baseURL });
+  const client = new OpenAI({ apiKey, baseURL, timeout: FETCH_TIMEOUT_MS });
   const ids: string[] = [];
   for await (const model of client.models.list()) {
     if (chatIdPattern.test(model.id)) ids.push(model.id);
@@ -142,7 +191,7 @@ async function fetchOpenAICompatibleModels(
 }
 
 async function fetchAnthropicModels(apiKey: string): Promise<string[]> {
-  const client = new Anthropic({ apiKey });
+  const client = new Anthropic({ apiKey, timeout: FETCH_TIMEOUT_MS });
   const ids: string[] = [];
   for await (const model of client.models.list()) {
     ids.push(model.id);
@@ -153,8 +202,14 @@ async function fetchAnthropicModels(apiKey: string): Promise<string[]> {
 async function fetchGeminiModels(apiKey: string): Promise<string[]> {
   // The @google/generative-ai SDK does not expose listModels; use the REST
   // endpoint directly and keep only models supporting generateContent.
-  const url = `https://generativelanguage.googleapis.com/v1/models?key=${encodeURIComponent(apiKey)}&pageSize=200`;
-  const res = await fetch(url);
+  // The key travels in `x-goog-api-key`, never the query string: a URL
+  // reaches request logs, proxy access logs, and error messages verbatim,
+  // where the log redactor cannot reach inside it.
+  const url = 'https://generativelanguage.googleapis.com/v1/models?pageSize=200';
+  const res = await fetch(url, {
+    headers: { 'x-goog-api-key': apiKey },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
   if (!res.ok) {
     throw new Error(`Gemini listModels HTTP ${res.status}`);
   }

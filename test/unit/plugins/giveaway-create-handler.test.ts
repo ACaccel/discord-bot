@@ -1,7 +1,11 @@
 /**
- * Handler-level tests for `handleGiveawayCreate` after the redesign:
+ * Handler-level tests for `handleGiveawayCreate` after the modal
+ * redesign:
+ *   - parameters arrive through modal text inputs (not slash options),
  *   - the giveaway is published in the channel the command was invoked
- *     from (no dedicated `giveaway` channel config), and
+ *     from (no dedicated `giveaway` channel config),
+ *   - `winner_num` is parsed/validated server-side (modals have no
+ *     numeric input type), and
  *   - the interaction's own reply is removed on success (the
  *     announcement embed is the only visible output).
  *
@@ -10,7 +14,7 @@
  * channel and repos.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MessageFlags, type ChatInputCommandInteraction } from 'discord.js';
+import { MessageFlags, type ModalSubmitInteraction } from 'discord.js';
 
 import { ok } from '../../../src/core/result';
 import { handleGiveawayCreate } from '../../../src/plugins/giveaway/internal/handlers';
@@ -43,14 +47,30 @@ const makeBot = (
   ({
     client: { guilds: { cache: new Map([[GUILD_ID, {}]]) } },
     getRepos: (guildId: string) => (guildId === GUILD_ID ? repos : undefined),
-    getGuildInfo: () => undefined,
-    getAllGuildInfo: () => new Map(),
-    jobs: jobMap,
-    logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+    guildRegistry: {
+      getRepos: (guildId: string) => (guildId === GUILD_ID ? repos : undefined),
+      getChannel: () => undefined,
+      getRole: () => undefined,
+      listGuildIds: () => [],
+    },
+    jobMap,
+    requireLogger: () => ({ error: vi.fn(), info: vi.fn(), warn: vi.fn() }),
     translator,
   }) as unknown as BaseBot;
 
-const makeInteraction = (channel: ReturnType<typeof makeChannel>) =>
+type Fields = { duration: string; winner_num: string; prize: string; description: string };
+
+const DEFAULT_FIELDS: Fields = {
+  duration: '1d',
+  winner_num: '1',
+  prize: 'A Prize',
+  description: 'desc',
+};
+
+const makeInteraction = (
+  channel: ReturnType<typeof makeChannel>,
+  fields: Fields = DEFAULT_FIELDS,
+) =>
   ({
     deferReply: vi.fn().mockResolvedValue(undefined),
     editReply: vi.fn().mockResolvedValue(undefined),
@@ -58,23 +78,10 @@ const makeInteraction = (channel: ReturnType<typeof makeChannel>) =>
     guild: { id: GUILD_ID },
     channel,
     user: { id: 'user-1' },
-    options: {
-      get: (name: string) => {
-        switch (name) {
-          case 'duration':
-            return { value: '1d' };
-          case 'winner_num':
-            return { value: 1 };
-          case 'prize':
-            return { value: 'A Prize' };
-          case 'description':
-            return { value: 'desc' };
-          default:
-            return undefined;
-        }
-      },
+    fields: {
+      getTextInputValue: (name: keyof Fields) => fields[name] ?? '',
     },
-  }) as unknown as ChatInputCommandInteraction;
+  }) as unknown as ModalSubmitInteraction;
 
 // node-schedule jobs created on the happy path are cancelled so no
 // timer leaks past the test.
@@ -85,8 +92,8 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('handleGiveawayCreate (redesign: publish in the invoking channel)', () => {
-  it('publishes in interaction.channel and stores that channel id, with no giveaway-channel config', async () => {
+describe('handleGiveawayCreate (modal redesign)', () => {
+  it('reads modal fields, publishes in interaction.channel, and stores that channel id', async () => {
     const repos = makeRepos();
     const channel = makeChannel(true);
     const bot = makeBot(repos, scheduledJobs);
@@ -105,6 +112,35 @@ describe('handleGiveawayCreate (redesign: publish in the invoking channel)', () 
     // The interaction's own reply is removed; no success message remains.
     expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
     expect(interaction.editReply).not.toHaveBeenCalled();
+  });
+
+  it('rejects ephemerally when winner_num is not a positive integer', async () => {
+    const repos = makeRepos();
+    const channel = makeChannel(true);
+    const bot = makeBot(repos, scheduledJobs);
+    const interaction = makeInteraction(channel, { ...DEFAULT_FIELDS, winner_num: 'abc' });
+
+    await handleGiveawayCreate(interaction, bot);
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'replies:giveaway.invalid_winner_num',
+    });
+    expect(repos.giveaway.create).not.toHaveBeenCalled();
+    expect(interaction.deleteReply).not.toHaveBeenCalled();
+  });
+
+  it('rejects ephemerally when required fields are blank', async () => {
+    const repos = makeRepos();
+    const channel = makeChannel(true);
+    const bot = makeBot(repos, scheduledJobs);
+    const interaction = makeInteraction(channel, { ...DEFAULT_FIELDS, prize: '   ' });
+
+    await handleGiveawayCreate(interaction, bot);
+
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: 'replies:giveaway.missing_required_fields',
+    });
+    expect(repos.giveaway.create).not.toHaveBeenCalled();
   });
 
   it('rejects ephemerally when the invoking channel is not sendable', async () => {

@@ -77,6 +77,21 @@ describe('loadEnv', () => {
       expect(env.GEMINI_API_KEY).toBeUndefined();
       expect(env.XAI_API_KEY).toBe('real-xai-key');
     });
+
+    it('passes GOPHER_SETTINGS_API_KEY through to the returned object', () => {
+      // Regression guard: a key present in the schema + type but omitted
+      // from the destructure/freeze block would be silently stripped.
+      const env = loadEnv({
+        exitOnFailure: false,
+        source: { ...validBase, GOPHER_SETTINGS_API_KEY: 'gopher-secret' },
+      });
+      expect(env.GOPHER_SETTINGS_API_KEY).toBe('gopher-secret');
+    });
+
+    it('omits GOPHER_SETTINGS_API_KEY when it is absent', () => {
+      const env = loadEnv({ exitOnFailure: false, source: { ...validBase } });
+      expect(env.GOPHER_SETTINGS_API_KEY).toBeUndefined();
+    });
   });
 
   describe('failure paths', () => {

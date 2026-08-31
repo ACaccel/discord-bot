@@ -1,1 +1,1 @@
-export { systemClock, createFakeClock, type Clock, type FakeClock } from './clock';
+export { systemClock, createFakeClock, type Clock } from './clock';

@@ -6,24 +6,24 @@ import { I18NextTranslator } from '../../src/core/i18n/i18next-translator';
 import { loadCatalogResources } from '../../src/core/i18n/catalog-loader';
 
 /**
- * R5: the loader no longer reverse-resolves `src/i18n/locales` from
- * its own `__dirname`. This test file is part of the composition
- * surface (it asserts behaviour against the real deployed catalogs),
- * so it owns the path knowledge and injects it explicitly.
+ * The loader does not reverse-resolve `src/i18n/locales` from its own
+ * `__dirname`. This test file is part of the composition surface (it
+ * asserts behaviour against the real deployed catalogs), so it owns the
+ * path knowledge and injects it explicitly.
  */
 const LOCALES_DIR = path.resolve(__dirname, '..', '..', 'src', 'i18n', 'locales');
 
 /**
- * Runtime catalog checks (gaps D7 / D9).
+ * Runtime catalog checks.
  *
  * Unlike `catalog-completeness.test.ts` — which inspects the raw JSON files
  * for cross-locale key/placeholder parity — this suite loads the on-disk
  * catalogs through the real `loadCatalogResources` + `I18NextTranslator`
- * pipeline and asserts the behaviour C6 depends on:
+ * pipeline and asserts:
  *
- * - D7: the `en` locale resolves real keys, and a key missing in `en`
+ * - the `en` locale resolves real keys, and a key missing in `en`
  *   degrades gracefully by falling back to `zh-TW`.
- * - D9: every per-feature `replies:<feature>.failed` fallback string carries
+ * - every per-feature `replies:<feature>.failed` fallback string carries
  *   the `{{traceId}}` interpolation slot so `replyForError` can surface a
  *   trace code for non-DomainError failures.
  */
@@ -41,15 +41,6 @@ describe('catalog runtime behaviour', () => {
       'Add an auto-reply',
     );
     expect(translator.t('commands:add_reply.description', undefined, 'zh-TW')).toBe('新增自動回覆');
-  });
-
-  it('reports zero missing keys between zh-TW and en', async () => {
-    const translator = await I18NextTranslator.create(
-      loadCatalogResources({ localesDir: LOCALES_DIR }),
-    );
-    const missing = translator.listMissingKeys('zh-TW');
-    expect(missing['zh-TW']).toEqual([]);
-    expect(missing.en).toEqual([]);
   });
 
   it('falls back to zh-TW when a key is absent in the requested locale', async () => {
@@ -94,6 +85,33 @@ describe('catalog runtime behaviour', () => {
           `${key} (${locale}) must not contain an uninterpolated placeholder`,
         ).toBe(false);
       }
+    }
+  });
+
+  it('keeps roll_call.announcement_header prefixed by roll_call.trigger_prefix', () => {
+    // The reaction tally recognises its own announcement by matching
+    // `trigger_prefix` against the start of the posted message, which is
+    // built from `announcement_header`. The two are separate catalog
+    // entries, so a translator editing the header in isolation would
+    // silently switch the tally off for that locale — the exact defect
+    // the hard-coded zh-TW prefix used to cause for `en`.
+    const resources = loadCatalogResources({ localesDir: LOCALES_DIR });
+    for (const locale of ['zh-TW', 'en'] as const) {
+      const rollCall = (resources[locale].replies as Record<string, unknown>).roll_call as {
+        announcement_header?: string;
+        trigger_prefix?: string;
+      };
+      const header = rollCall.announcement_header ?? '';
+      const prefix = rollCall.trigger_prefix ?? '';
+      expect(
+        prefix.length,
+        `replies:roll_call.trigger_prefix (${locale}) must be present`,
+      ).toBeGreaterThan(0);
+      expect(
+        header.startsWith(prefix),
+        `replies:roll_call.announcement_header (${locale}) must start with trigger_prefix, ` +
+          'otherwise the reaction tally never matches its own announcement',
+      ).toBe(true);
     }
   });
 

@@ -67,9 +67,9 @@ describe('logSystem', () => {
     const fake = makeFake();
     logSystem(fake as unknown as Logger, 'hello');
     expect(fake.child).not.toHaveBeenCalled();
-    // The headline must be passed positionally — the old shape
-    // `{ msg }` collided with pino's `messageKey` default and silently
-    // dropped the headline. See helpers.ts comment.
+    // The headline must be passed positionally: as `{ msg }` it would
+    // collide with pino's `messageKey` default and be dropped silently.
+    // See helpers.ts comment.
     expect(fake.info).toHaveBeenCalledWith('hello');
   });
 });

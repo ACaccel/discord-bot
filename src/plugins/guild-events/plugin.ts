@@ -3,10 +3,11 @@
  * to a guild's configured `event` channel.
  *
  * Behaviours:
- *   - `messageUpdate`: if the bot's guild has an `event` channel and
- *     the content actually changed, send an embed describing the diff.
- *   - `messageDelete`: same shape; attaches images / non-image file
- *     URLs separately.
+ *   - `messageUpdate`: when the content actually changed, record the edit
+ *     locally and — unless rank-suppressed — mirror an embed describing the
+ *     diff to the `event` channel.
+ *   - `messageDelete`: same shape; the embed attaches images / non-image
+ *     file URLs separately, and every attachment is archived to disk.
  *   - `guildMemberUpdate`: when role membership changes, send a role-
  *     delta embed (added / removed).
  *   - `guildCreate`: when the bot joins a new guild, onboard it
@@ -15,14 +16,19 @@
  *     IoC container, so no plugin code reaches into `BaseBot`
  *     internals.
  *
- * Why a factory (`createGuildEventsPlugin(config)`) rather than a
- * plain `Plugin` const: the per-bot `blockedChannels` list lives in
- * the bot's `config.json` and must be captured into closures the
- * event handlers can read. The plugin's `events.messageUpdate(ctx,
- * ...)` signature does not carry the typed config (only `init` does),
- * so the cleanest production-grade option is a factory whose closures
- * encapsulate config. This keeps the plugin object pure-data
- * once produced and avoids module-scoped mutable state.
+ * Dependencies are resolved once in `init` into a typed bundle the event
+ * subscriptions close over, rather than per event.
+ *
+ * Rank gates DISCLOSURE only. For `messageUpdate` / `messageDelete` the
+ * handlers ask the {@link PermissionRankPolicy} whether the `guild_events`
+ * feature is suppressed for the message's
+ * channel. Suppression withholds the Discord `event`-channel embed, but the
+ * local record — the `logGuildEvent` audit line and `archiveDeletedAttachments`
+ * forensic download — runs UNCONDITIONALLY for every non-bot guild message.
+ * Private (rank-1+) channels are therefore fully recorded server-side yet
+ * never mirrored to Discord. A no-arg factory (consistent with the sibling
+ * `createGiveawayPlugin()` / `createActivityPlugin()`) keeps the returned
+ * object pure data.
  */
 import {
   EmbedBuilder,
@@ -31,51 +37,23 @@ import {
   type PartialMessage,
   type TextChannel,
 } from 'discord.js';
-import { z } from 'zod';
 
-import { TOKENS } from '../../core/plugin';
-import type { GuildRegistry } from '../../core/guild-registry';
+import { TOKENS } from '../../bot/tokens';
+import type { GuildRegistry } from '../../bot/guild-registry';
 import type { Plugin } from '../../core/plugin';
-import type { GuildOnboardingPort } from '../../core/plugin';
+import type { GuildOnboardingPort, PermissionRankPolicy } from '../../core/plugin';
 import { logError, logGuildEvent, logSystem, type Logger } from '../../core/logger';
-import { archiveDeletedAttachment } from '../../infra/discord';
+import { archiveDeletedAttachments, ancestorChannelIdsOf } from '../../infra/discord';
 
 const PLUGIN_ID = 'guild-events';
 const PLUGIN_VERSION = '1.0.0';
 const EVENT_CHANNEL = 'event';
 const MAX_MESSAGE_PREVIEW = 1000;
 
-const ConfigSchema = z
-  .object({
-    /**
-     * Channel ids whose `messageUpdate` / `messageDelete` events the
-     * plugin must suppress. The list also matches a message's parent
-     * channel (thread parent) so threads under a blocked forum are
-     * silenced too. Empty = mirror everything.
-     */
-    blockedChannels: z.array(z.string()).default([]),
-  })
-  .strict();
-
-export type GuildEventsConfig = z.infer<typeof ConfigSchema>;
-
 const truncate = (text: string): string =>
   text.length > MAX_MESSAGE_PREVIEW ? `${text.slice(0, MAX_MESSAGE_PREVIEW)}...` : text;
 
-const isBlocked = (
-  channelId: string,
-  parentId: string | null | undefined,
-  blocked: readonly string[],
-): boolean => {
-  if (blocked.length === 0) return false;
-  if (blocked.includes(channelId)) return true;
-  return parentId !== null && parentId !== undefined && blocked.includes(parentId);
-};
-
-const resolveEventChannel = (
-  registry: GuildRegistry,
-  guildId: string,
-): TextChannel | undefined => {
+const resolveEventChannel = (registry: GuildRegistry, guildId: string): TextChannel | undefined => {
   const channel = registry.getChannel(guildId, EVENT_CHANNEL);
   if (channel === undefined) return undefined;
   // Use `isSendable()` — discord.js's narrowing predicate models
@@ -113,53 +91,57 @@ const safeSendEmbed = async (
   }
 };
 
-/**
- * Build a plugin instance with `blockedChannels` baked into closures.
- *
- * The factory validates `rawConfig` here (rather than letting the host
- * do it via `configSchema`) because the returned Plugin object has its
- * config inlined into closures — the host's register-time path never
- * needs to re-validate. Producing a `Plugin<void>` keeps the typing
- * crisp and sidesteps the `ZodObject` / `ZodType` invariance pitfall
- * that arises when a schema with `.default()` widens the input shape.
- */
-export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
-  const config = ConfigSchema.parse(rawConfig);
+/** Everything the event handlers read, resolved once in `init`. */
+interface GuildEventsDeps {
+  readonly registry: GuildRegistry;
+  readonly policy: PermissionRankPolicy;
+  readonly onboardingPort: GuildOnboardingPort;
+  /** The bot-root logger, not the plugin child: audit lines are per-guild. */
+  readonly logger: Logger;
+}
+
+/** Build the guild-events plugin. Takes no config; suppression is decided
+ * per event by the {@link PermissionRankPolicy} resolved in `init`. */
+export const createGuildEventsPlugin = (): Plugin => {
+  let resolved: GuildEventsDeps | undefined;
+  /** See the `init` contract in `core/plugin/types.ts`: unreachable. */
+  const deps = (): GuildEventsDeps => {
+    if (resolved === undefined) {
+      throw new TypeError('guild-events: event dispatched before init resolved dependencies');
+    }
+    return resolved;
+  };
+
   return {
     id: PLUGIN_ID,
     version: PLUGIN_VERSION,
-    scope: 'bot',
-    critical: false,
+
+    async init(ctx): Promise<void> {
+      resolved = {
+        registry: ctx.resolve(TOKENS.GuildRegistry),
+        policy: ctx.resolve(TOKENS.PermissionRankPolicy),
+        onboardingPort: ctx.resolve(TOKENS.GuildOnboardingPort),
+        logger: ctx.resolve(TOKENS.Logger),
+      };
+    },
 
     events: {
-      messageUpdate: async (ctx, oldMessage, newMessage) => {
-        await handleMessageUpdate(
-          ctx.resolve(TOKENS.GuildRegistry),
-          ctx.resolve(TOKENS.Logger),
-          config.blockedChannels,
-          oldMessage,
-          newMessage,
-        );
+      messageUpdate: async (_ctx, oldMessage, newMessage) => {
+        const { registry, policy, logger } = deps();
+        await handleMessageUpdate(registry, policy, logger, oldMessage, newMessage);
       },
-      messageDelete: async (ctx, message) => {
-        await handleMessageDelete(
-          ctx.resolve(TOKENS.GuildRegistry),
-          ctx.resolve(TOKENS.Logger),
-          config.blockedChannels,
-          message,
-        );
+      messageDelete: async (_ctx, message) => {
+        const { registry, policy, logger } = deps();
+        await handleMessageDelete(registry, policy, logger, message);
       },
-      guildCreate: async (ctx, guild) => {
-        await handleGuildCreate(
-          ctx.resolve(TOKENS.GuildOnboardingPort),
-          ctx.resolve(TOKENS.Logger),
-          guild,
-        );
+      guildCreate: async (_ctx, guild) => {
+        const { onboardingPort, logger } = deps();
+        await handleGuildCreate(onboardingPort, logger, guild);
       },
-      guildMemberUpdate: async (ctx, oldMember, newMember) => {
+      guildMemberUpdate: async (_ctx, oldMember, newMember) => {
+        const { registry, logger } = deps();
         const guildId = newMember.guild.id;
-        const logger = ctx.resolve(TOKENS.Logger);
-        const eventChannel = resolveEventChannel(ctx.resolve(TOKENS.GuildRegistry), guildId);
+        const eventChannel = resolveEventChannel(registry, guildId);
         const oldRoles = oldMember.roles.cache;
         const newRoles = newMember.roles.cache;
         const addedRoles = newRoles.filter((role) => !oldRoles.has(role.id));
@@ -213,128 +195,185 @@ export const createGuildEventsPlugin = (rawConfig: unknown): Plugin => {
   };
 };
 
+/**
+ * Hydrate a partial message, tolerating a fetch rejection. A deleted
+ * message's `fetch()` rejects with `Unknown Message`; swallowing it (after an
+ * error line) lets the unconditional local-record path still run on whatever
+ * the cache held, rather than aborting the whole handler. On `messageUpdate`
+ * the content guards already ran before this call, so there the tolerance
+ * covers attachment hydration rather than content. The narrowing of `guildId`
+ * to a string is the caller's responsibility (the guards run first).
+ */
+const fetchPartialMessage = async (
+  message: Message | PartialMessage,
+  logger: Logger | undefined,
+  guildId: string,
+): Promise<void> => {
+  if (!message.partial) return;
+  try {
+    await message.fetch();
+  } catch (err: unknown) {
+    logError(logger, guildId, err);
+  }
+};
+
 const handleMessageUpdate = async (
   registry: GuildRegistry,
+  policy: PermissionRankPolicy,
   logger: Logger | undefined,
-  blockedChannels: readonly string[],
   oldMessage: Message | PartialMessage,
   newMessage: Message | PartialMessage,
 ): Promise<void> => {
-  const parentId = (oldMessage.channel as TextChannel).parentId;
-  if (isBlocked(oldMessage.channel.id, parentId, blockedChannels)) return;
-
-  // Guards: skip when either content side is missing, identical, or
-  // the author / guild is unresolvable. These also filter the
-  // partial-message edge that pre-cache messages emit.
+  // Relevance guards: skip when either content side is missing, identical, or
+  // the author / guild is unresolvable. These also filter the partial-message
+  // edge that pre-cache messages emit. They are relevance filters ("is there a
+  // textual change worth recording at all"), not disclosure filters, so they
+  // stay BEFORE the rank check; the guild guard also puts a guild id in hand.
   if (oldMessage.content === null || oldMessage.content === undefined) return;
   if (newMessage.content === null || newMessage.content === undefined) return;
   if (oldMessage.content === newMessage.content) return;
   if (newMessage.guild === null || newMessage.guildId === null) return;
   if (newMessage.author === null || oldMessage.author === null) return;
   if (newMessage.author.bot) return;
-  if (oldMessage.partial) await oldMessage.fetch();
-  if (newMessage.partial) await newMessage.fetch();
 
-  const eventChannel = resolveEventChannel(registry, newMessage.guildId);
-  if (eventChannel !== undefined) {
-    const embed = new EmbedBuilder()
-      .setColor(0x00ff00)
-      .setTitle('Message Updated')
-      .setAuthor({
-        name: newMessage.author.displayName,
-        iconURL: newMessage.author.displayAvatarURL(),
-      })
-      .addFields(
-        { name: 'author', value: `<@${newMessage.author.id}>`, inline: true },
-        { name: 'channel', value: `<#${newMessage.channel.id}>`, inline: true },
-        { name: 'old message', value: truncate(oldMessage.content), inline: false },
-        { name: 'new message', value: truncate(newMessage.content), inline: false },
-      )
-      .setTimestamp();
-    await safeSendEmbed(eventChannel, embed, logger, newMessage.guildId, 'message_update');
+  // Hydrate partials before recording so the local audit captures full content
+  // even for channels the embed mirror will skip.
+  await fetchPartialMessage(oldMessage, logger, newMessage.guildId);
+  await fetchPartialMessage(newMessage, logger, newMessage.guildId);
+
+  // Rank gates DISCLOSURE only: a channel above the `guild_events` ceiling is
+  // withheld from the Discord `event` channel but still recorded locally below.
+  const suppressed = policy.isSuppressed(
+    newMessage.guildId,
+    'guild_events',
+    oldMessage.channel.id,
+    ancestorChannelIdsOf(oldMessage.channel, oldMessage.guild?.channels.cache),
+  );
+
+  if (!suppressed) {
+    const eventChannel = resolveEventChannel(registry, newMessage.guildId);
+    if (eventChannel !== undefined) {
+      const embed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle('Message Updated')
+        .setAuthor({
+          name: newMessage.author.displayName,
+          iconURL: newMessage.author.displayAvatarURL(),
+        })
+        .addFields(
+          { name: 'author', value: `<@${newMessage.author.id}>`, inline: true },
+          { name: 'channel', value: `<#${newMessage.channel.id}>`, inline: true },
+          { name: 'old message', value: truncate(oldMessage.content), inline: false },
+          { name: 'new message', value: truncate(newMessage.content), inline: false },
+        )
+        .setTimestamp();
+      await safeSendEmbed(eventChannel, embed, logger, newMessage.guildId, 'message_update');
+    }
   }
 
-  // Audit-log side effect — emitted independently of the embed so a
-  // missing `event` channel does not suppress the audit trail.
+  // Local audit record — unconditional, regardless of rank or event-channel
+  // presence. Stable ids (`userId` / `channelId` / `messageId`) make the line
+  // independently usable, since display / channel names change and collide.
   // `?.name` tolerates a channel missing from the cache.
   const channelName = newMessage.guild.channels.cache.get(newMessage.channel.id)?.name;
-  logGuildEvent(
-    logger,
-    newMessage.guildId,
-    'message_update',
-    {
-      user: newMessage.author.username,
-      channel: channelName ?? '<unknown>',
-      oldMessage: oldMessage.content,
-      newMessage: newMessage.content,
-    },
-    newMessage.guild.name,
-  );
+  const details: Record<string, unknown> = {
+    user: newMessage.author.username,
+    userId: newMessage.author.id,
+    channel: channelName ?? '<unknown>',
+    channelId: newMessage.channel.id,
+    messageId: newMessage.id,
+    oldMessage: oldMessage.content,
+    newMessage: newMessage.content,
+  };
+  // Edits cannot add attachments via Discord and the message still exists, so
+  // record only their metadata here — the binary archival is a delete concern.
+  const updatedAttachmentUrls = newMessage.attachments.map((a) => a.url);
+  if (updatedAttachmentUrls.length > 0) {
+    details['attachments'] = updatedAttachmentUrls;
+  }
+  logGuildEvent(logger, newMessage.guildId, 'message_update', details, newMessage.guild.name);
 };
 
 const handleMessageDelete = async (
   registry: GuildRegistry,
+  policy: PermissionRankPolicy,
   logger: Logger | undefined,
-  blockedChannels: readonly string[],
   message: Message | PartialMessage,
 ): Promise<void> => {
-  const parentId = (message.channel as TextChannel).parentId;
-  if (isBlocked(message.channel.id, parentId, blockedChannels)) return;
   if (message.guild === null || message.guildId === null) return;
   if (message.author === null) return;
   if (message.author.bot) return;
-  if (message.partial) await message.fetch();
 
-  const eventChannel = resolveEventChannel(registry, message.guildId);
+  // Hydrate before reading content / attachments. A deleted message's
+  // `fetch()` rejects with `Unknown Message`; the helper tolerates that so the
+  // unconditional local record below still runs on the cached partial.
+  await fetchPartialMessage(message, logger, message.guildId);
+
+  // Rank gates DISCLOSURE only — see handleMessageUpdate. The local record
+  // (attachment archival + audit line) runs regardless of this flag.
+  const suppressed = policy.isSuppressed(
+    message.guildId,
+    'guild_events',
+    message.channel.id,
+    ancestorChannelIdsOf(message.channel, message.guild?.channels.cache),
+  );
+
   const content =
     message.content === null || message.content === undefined || message.content.length === 0
       ? 'No content'
       : truncate(message.content);
 
-  if (eventChannel !== undefined) {
-    const embed = new EmbedBuilder()
-      .setColor(0xff0000)
-      .setTitle('Message Deleted')
-      .setAuthor({
-        name: message.author.displayName,
-        iconURL: message.author.displayAvatarURL(),
-      })
-      .addFields(
-        { name: 'author', value: `<@${message.author.id}>`, inline: true },
-        { name: 'channel', value: `<#${message.channel.id}>`, inline: true },
-        { name: 'message', value: content, inline: false },
-      )
-      .setTimestamp();
-    if (message.attachments.size > 0) {
-      message.attachments.forEach((attachment) => {
-        if (attachment.contentType === null) return;
-        if (attachment.contentType.includes('image')) {
-          embed.setImage(attachment.url);
-        } else {
-          embed.addFields({ name: 'attachment', value: attachment.url, inline: false });
-        }
-      });
+  if (!suppressed) {
+    const eventChannel = resolveEventChannel(registry, message.guildId);
+    if (eventChannel !== undefined) {
+      const embed = new EmbedBuilder()
+        .setColor(0xff0000)
+        .setTitle('Message Deleted')
+        .setAuthor({
+          name: message.author.displayName,
+          iconURL: message.author.displayAvatarURL(),
+        })
+        .addFields(
+          { name: 'author', value: `<@${message.author.id}>`, inline: true },
+          { name: 'channel', value: `<#${message.channel.id}>`, inline: true },
+          { name: 'message', value: content, inline: false },
+        )
+        .setTimestamp();
+      if (message.attachments.size > 0) {
+        message.attachments.forEach((attachment) => {
+          if (attachment.contentType === null) return;
+          if (attachment.contentType.includes('image')) {
+            embed.setImage(attachment.url);
+          } else {
+            embed.addFields({ name: 'attachment', value: attachment.url, inline: false });
+          }
+        });
+      }
+      await safeSendEmbed(eventChannel, embed, logger, message.guildId, 'message_delete');
     }
-    await safeSendEmbed(eventChannel, embed, logger, message.guildId, 'message_delete');
   }
 
-  // Forensic attachment download — runs for every attachment,
-  // including images that the embed separately previews.
-  // Fire-and-forget; the helper has its own internal try/catch so a
-  // failed save does not break the audit log below.
+  // Forensic attachment download — unconditional, regardless of rank, runs for
+  // every attachment including images the embed separately previews. URLs are
+  // signed CDN links that expire, so the binary download is what makes the
+  // local record durable. Fire-and-forget; the helper bounds its own
+  // concurrency (a bulk delete can carry a hundred attachments) and has its
+  // own try/catch per file.
   if (message.attachments.size > 0) {
-    message.attachments.forEach((attachment) => {
-      void archiveDeletedAttachment(logger, message.guildId as string, attachment);
-    });
+    void archiveDeletedAttachments(logger, message.guildId as string, message.attachments.values());
   }
 
-  // Audit-log side effect — emitted regardless of event-channel
-  // presence so deletions are traceable when the mirror is offline.
+  // Local audit record — unconditional, regardless of rank or event-channel
+  // presence, so deletions are traceable even for private channels and when
+  // the mirror is offline. Stable ids correlate the line independently.
   const channelName = message.guild.channels.cache.get(message.channel.id)?.name;
   const attachmentUrls = message.attachments.map((a) => a.url);
   const details: Record<string, unknown> = {
     user: message.author.username,
+    userId: message.author.id,
     channel: channelName ?? '<unknown>',
+    channelId: message.channel.id,
+    messageId: message.id,
     message: message.content ?? '',
   };
   if (attachmentUrls.length > 0) {

@@ -2,9 +2,9 @@
  * Per-channel reply cooldown for the LLM auto-reply plugin.
  *
  * Enforces a minimum gap between two consecutive replies in the same
- * channel so the bot cannot post back-to-back replies. A force-triggered
- * reply skips the {@link isReady} check but still calls {@link record},
- * so a following automatic reply still observes the gap.
+ * channel so the bot cannot post back-to-back replies. An @-mention reply
+ * skips the {@link isReady} check but still calls {@link record}, so a
+ * following automatic reply still observes the gap.
  *
  * Timestamps are supplied by the caller (the triggering message's
  * creation time) rather than read from a clock here, keeping the tracker

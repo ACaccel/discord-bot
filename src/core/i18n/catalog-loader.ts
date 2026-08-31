@@ -10,9 +10,9 @@
  * paths would require a custom resolver. Sync `readFileSync` at bot
  * startup is one-off.
  *
- * R5: `localesDir` is REQUIRED. The composition root owns the
+ * `localesDir` is REQUIRED: the composition root owns the
  * deployment-layout knowledge ("locales live at `<src>/i18n/locales`")
- * and injects the path explicitly; `core` does not reverse-resolve
+ * and injects the path explicitly, so this loader never resolves
  * downstream layout via `__dirname` tricks.
  *
  * Resilience: missing namespace files for a locale degrade to an empty
@@ -28,7 +28,7 @@ import { DEFAULT_LOCALE, type Locale, type Translator } from './translator';
 const NAMESPACES = ['commands', 'errors', 'replies'] as const;
 type Namespace = (typeof NAMESPACES)[number];
 
-export interface LoadCatalogOptions {
+interface LoadCatalogOptions {
   /**
    * Filesystem path to the locales root. Required: the composition
    * root must inject it so `core` stays ignorant of the deployment

@@ -12,12 +12,7 @@
     "config_missing": "The command list has not been configured. Please contact an administrator.",
     "handler_not_initialised": "The command dispatcher is not ready yet. Please try again shortly."
   },
-  "validation": {
-    "field_required": "The \"{{field}}\" field cannot be empty. Please enter it again.",
-    "field_invalid": "The \"{{field}}\" field has an invalid format. Please enter it again."
-  },
   "permission": {
-    "denied": "You do not have permission to use this command (required role: {{requiredRole}}).",
     "admin_only": "This command is restricted to administrators.",
     "admin_only_short": "Only administrators can run this command."
   },
@@ -30,7 +25,6 @@
     "timeout": "The database took too long to respond and the request timed out. Give it a moment and retry.",
     "network": "I can't reach the database right now, the network might be acting up. Try again in a little while.",
     "validation": "The data format isn't quite right, so it couldn't be saved. Check the input and try again.",
-    "connection_failed": "The database connection failed. Please try again later.",
     "operation_failed": "The database operation failed. Please try again later.",
     "not_found": "Database not found.",
     "not_configured": "Please configure the database first.",
@@ -44,8 +38,21 @@
     "timeout": "The AI service `{{provider}}` timed out. Please try again later.",
     "unknown": "An unexpected error occurred in the AI service. Please try again later."
   },
-  "configuration": {
-    "missing_env": "The environment variable `{{envVar}}` is not set. Please contact an administrator."
+  "link_preview": {
+    "fetch_failed": "Could not fetch the link preview from `{{provider}}` (status {{status}}).",
+    "timeout": "The link preview from `{{provider}}` timed out (status {{status}}).",
+    "upstream_failure": "The link preview source `{{provider}}` is temporarily unavailable (status {{status}}). Please try again later.",
+    "rate_limited": "The link preview source `{{provider}}` is rate limited (status {{status}}). Please try again later.",
+    "invalid_response": "The link preview source `{{provider}}` returned an unexpected response (status {{status}}).",
+    "unknown": "An unexpected error occurred while building the link preview from `{{provider}}` (status {{status}})."
+  },
+  "x_feed": {
+    "fetch_failed": "Could not read `@{{handle}}`'s posts from X (status {{status}}).",
+    "timeout": "Reading `@{{handle}}`'s posts from X timed out (status {{status}}).",
+    "upstream_failure": "The X feed source is temporarily unavailable while reading `@{{handle}}` (status {{status}}). Please try again later.",
+    "rate_limited": "The X feed source is rate limited while reading `@{{handle}}` (status {{status}}). Please try again later.",
+    "not_found": "The X account `@{{handle}}` was not found (status {{status}}). It may have been renamed, suspended, or misspelled in the configuration.",
+    "invalid_response": "The X feed source returned an unexpected response for `@{{handle}}` (status {{status}})."
   },
   "plugin": {
     "lifecycle_phase_violation": "Plugin `{{plugin}}` called registerInstance(`{{token}}`) during phase `{{phase}}`; only `init` is allowed."

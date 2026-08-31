@@ -39,8 +39,10 @@ export const ops = {
     registerEmpty: (): string => `ops:command.register_empty | No commands to register.`,
     registerSuccess: (count: number): string =>
       `ops:command.register_success | Successfully registered ${count} application (/) commands.`,
-    registerFailed: (detail: string): string =>
-      `ops:command.register_failed | Failed to register commands: ${detail}`,
+    registerFailed: (commandName: string): string =>
+      `ops:command.register_failed | Failed to register command ${commandName}`,
+    guildSyncFailed: (guildId: string): string =>
+      `ops:command.guild_sync_failed | Failed to sync commands for guild ${guildId}`,
     handlerMissingConfig: (commandName: string): string =>
       `ops:command.handler_missing_config | Command ${commandName} has no config.`,
   },

@@ -12,12 +12,7 @@
     "config_missing": "指令清單尚未設定,請聯絡管理員。",
     "handler_not_initialised": "指令派發器尚未就緒,請稍後再試。"
   },
-  "validation": {
-    "field_required": "參數「{{field}}」不可為空,請重新輸入。",
-    "field_invalid": "參數「{{field}}」格式不正確,請重新輸入。"
-  },
   "permission": {
-    "denied": "你沒有使用此指令的權限(需要角色:{{requiredRole}})。",
     "admin_only": "此指令僅限管理員使用。",
     "admin_only_short": "只有管理員可以執行此指令。"
   },
@@ -30,7 +25,6 @@
     "timeout": "資料庫回應有點慢,連線逾時了,稍等一下再重試看看。",
     "network": "連不上資料庫,可能是網路出狀況,等一下再試試看吧。",
     "validation": "資料格式不太對,沒辦法存進資料庫,檢查一下輸入內容再試一次。",
-    "connection_failed": "資料庫連線異常,請稍後再試。",
     "operation_failed": "資料庫操作失敗,請稍後再試。",
     "not_found": "找不到資料庫",
     "not_configured": "請先設定資料庫",
@@ -44,8 +38,21 @@
     "timeout": "AI 服務 `{{provider}}` 回應逾時,請稍後再試。",
     "unknown": "AI 服務發生未預期的錯誤,請稍後再試。"
   },
-  "configuration": {
-    "missing_env": "環境變數 `{{envVar}}` 未設定,請聯絡管理員。"
+  "link_preview": {
+    "fetch_failed": "無法從 `{{provider}}` 取得連結預覽(狀態 {{status}})。",
+    "timeout": "`{{provider}}` 的連結預覽逾時(狀態 {{status}})。",
+    "upstream_failure": "連結預覽來源 `{{provider}}` 暫時無法存取(狀態 {{status}}),請稍後再試。",
+    "rate_limited": "連結預覽來源 `{{provider}}` 觸發限流(狀態 {{status}}),請稍後再試。",
+    "invalid_response": "連結預覽來源 `{{provider}}` 回傳了非預期的內容(狀態 {{status}})。",
+    "unknown": "建立 `{{provider}}` 連結預覽時發生未預期的錯誤(狀態 {{status}})。"
+  },
+  "x_feed": {
+    "fetch_failed": "無法讀取 `@{{handle}}` 在 X 的貼文(狀態 {{status}})。",
+    "timeout": "讀取 `@{{handle}}` 在 X 的貼文逾時(狀態 {{status}})。",
+    "upstream_failure": "讀取 `@{{handle}}` 時 X 貼文來源暫時無法存取(狀態 {{status}}),請稍後再試。",
+    "rate_limited": "讀取 `@{{handle}}` 時 X 貼文來源觸發限流(狀態 {{status}}),請稍後再試。",
+    "not_found": "找不到 X 帳號 `@{{handle}}`(狀態 {{status}}),可能已改名、被停權,或設定中拼錯。",
+    "invalid_response": "X 貼文來源對 `@{{handle}}` 回傳了非預期的內容(狀態 {{status}})。"
   },
   "plugin": {
     "lifecycle_phase_violation": "Plugin `{{plugin}}` 在階段 `{{phase}}` 呼叫了 registerInstance(`{{token}}`),只有 `init` 階段允許此操作。"

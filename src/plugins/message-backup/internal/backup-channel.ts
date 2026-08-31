@@ -12,7 +12,7 @@ import type { TextBasedChannel } from 'discord.js';
 
 import { logError, type Logger } from '../../../core/logger';
 import type { Repos } from '../../../persistence/repositories';
-import { retryFetch } from './retry';
+import { retryFetch } from '../../../core/retry';
 import { saveBatch, type BatchResult } from './save-batch';
 
 export interface ChannelBackupStats {
@@ -94,9 +94,7 @@ export const backupChannel = async (
       stats.resumeFromMsgId = lastMessageID;
       let cursor = lastMessageID;
       for (;;) {
-        const fetched = await retryFetch(() =>
-          ch.messages.fetch({ limit: 100, after: cursor }),
-        );
+        const fetched = await retryFetch(() => ch.messages.fetch({ limit: 100, after: cursor }));
         if (fetched.size === 0) break;
         const batch = await saveBatch(fetched, ch, repos.message);
         stats.batches += 1;

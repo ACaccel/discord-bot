@@ -20,12 +20,12 @@ export {
   type LLMSettings,
   type LLMUsage,
   DEFAULT_MODELS,
-  DEFAULT_SETTINGS,
   PROVIDER_API_KEY_ENV,
   MissingApiKeyError,
 } from './types';
 
-export { LlmProviderRegistry, type LlmProviderFactory } from './registry';
+export type { AnyLlmProviderError } from './errors';
+export { LlmProviderRegistry } from './registry';
 export { LLMService } from './llm-service';
 export { createDefaultRegistry } from './default-registry';
 export { translateProviderError } from './error-translator';
@@ -40,8 +40,4 @@ export { DefaultModelResolver } from './default-model-resolver';
 export type { LlmProviderApiKeys } from './registry';
 export { calculateCost, cheapestModel, formatUsageFooter } from './pricing';
 
-export {
-  SelfHostedLlmClient,
-  type SelfHostedLlmClientOptions,
-  type SelfHostedLlmError,
-} from './selfhosted-client';
+export { SelfHostedLlmClient } from './selfhosted-client';

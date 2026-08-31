@@ -1,6 +1,6 @@
 {
   "name": "botfleet",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Multi-personality Discord bot framework on TypeScript, discord.js and MongoDB, with a layered plugin architecture and bilingual i18n.",
   "keywords": [
     "botfleet",
@@ -25,15 +25,16 @@
     "nijika": "ts-node src/bot/nijika/index.ts",
     "msg-archive": "ts-node src/bot/msg-archive/index.ts",
     "konata": "ts-node src/bot/konata/index.ts",
+    "gopher": "ts-node src/bot/gopher/index.ts",
     "typecheck": "tsc -p tsconfig.strict.json",
-    "lint": "eslint src scripts test eslint.config.mjs vitest.config.ts",
-    "lint:fix": "eslint src scripts test --fix",
-    "format": "prettier --write src/core src/persistence src/infra scripts test tools eslint.config.mjs vitest.config.ts vitest.workspace.ts tsconfig.strict.json tsconfig.build.json knip.json *.md docs",
-    "format:check": "prettier --check src/core src/persistence src/infra scripts test tools eslint.config.mjs vitest.config.ts vitest.workspace.ts tsconfig.strict.json tsconfig.build.json knip.json *.md docs",
+    "lint": "eslint src scripts test tools eslint.config.mjs vitest.config.ts vitest.workspace.ts",
+    "lint:fix": "eslint src scripts test tools --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
-    "test:int": "vitest run --project integration",
-    "test:contract": "vitest run --project contract --passWithNoTests",
+    "test:int": "vitest run --project integration --project integration-nodb",
+    "test:contract": "vitest run --project contract",
     "test:i18n": "vitest run --project i18n",
     "test:tools": "vitest run --project tools",
     "test:watch": "vitest",
@@ -46,8 +47,8 @@
     "security": "audit-ci --config audit-ci.jsonc",
     "msg_backup": "ts-node tools/msg_backup/msg_backup.ts",
     "msg_backup:test": "vitest run --project tools tools/msg_backup",
-    "verify_db": "ts-node tools/verify_db/verify_db.ts",
-    "verify_db:test": "vitest run --project tools tools/verify_db"
+    "db": "ts-node tools/db/db.ts",
+    "db:test": "vitest run --project tools tools/db"
   },
   "repository": {
     "type": "git",
@@ -67,18 +68,18 @@
     "@kirdock/discordjs-voice-recorder": "^1.1.1",
     "@types/express": "^5.0.0",
     "@types/node-schedule": "^2.1.7",
-    "axios": "^1.15.2",
+    "axios": "^1.19.0",
     "canvas": "^3.2.0",
     "discord.js": "^14.21.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "i18next": "^23.15.1",
+    "libsodium-wrappers": "^0.7.15",
     "mee6-levels-api": "^1.3.1",
     "mongoose": "^8.22.1",
     "node-schedule": "^2.1.1",
     "openai": "^6.36.0",
     "pino": "^10.3.1",
-    "sodium": "^3.0.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.6.2",
@@ -87,7 +88,7 @@
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@types/node": "^22.9.0",
-    "@vitest/coverage-v8": "^2.1.3",
+    "@vitest/coverage-v8": "^3.2.6",
     "audit-ci": "^7.1.0",
     "eslint": "^9.13.0",
     "eslint-config-prettier": "^9.1.0",
@@ -100,6 +101,9 @@
     "pino-pretty": "^13.1.3",
     "prettier": "^3.3.3",
     "typescript-eslint": "^8.10.0",
-    "vitest": "^2.1.3"
+    "vitest": "^3.2.6"
+  },
+  "resolutions": {
+    "undici": "^6.27.0"
   }
 }

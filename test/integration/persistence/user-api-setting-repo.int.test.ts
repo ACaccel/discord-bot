@@ -84,7 +84,6 @@ describe('MongoUserApiSettingRepo (integration)', () => {
     });
   });
 
-  // G-2: a genuine DB failure resolves to `err(DatabaseError)`.
   it('findByUserId resolves to err(DatabaseError) when the connection is closed', async () => {
     const baseUri = (() => {
       const uri = process.env.INTEGRATION_MONGO_URI;

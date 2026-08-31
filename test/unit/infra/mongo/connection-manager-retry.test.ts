@@ -1,5 +1,5 @@
 /**
- * Unit coverage for the gap-D5 resilience contract of
+ * Unit coverage for the resilience contract of
  * `ConnectionManager`: transient-failure retry with bounded backoff,
  * persistent-failure / retry-exhaustion disabling, and the
  * `isDisabled` query surface.
@@ -45,7 +45,7 @@ const persistentError = (): DatabaseError =>
 const guildConnection = (): GuildConnection =>
   ({ guildId, connection: fakeConnection }) as unknown as GuildConnection;
 
-describe('ConnectionManager — D5 retry / disable', () => {
+describe('ConnectionManager — retry / disable', () => {
   it('retries a transient failure and succeeds within the attempt budget', async () => {
     const sleep = vi.fn(async () => {});
     let calls = 0;
@@ -185,6 +185,147 @@ describe('ConnectionManager — D5 retry / disable', () => {
 
     await expect(mgr.getConnection(guildId)).rejects.toBeInstanceOf(DatabaseError);
     expect(sleep.mock.calls).toEqual([[100], [200], [400], [500]]);
+  });
+
+  it('discards an open that finishes after closeAll instead of caching it', async () => {
+    let releaseOpen: () => void = () => {};
+    const opening = new Promise<void>((resolve) => {
+      releaseOpen = resolve;
+    });
+    const openOverride = vi.fn(async (): Promise<GuildConnection> => {
+      await opening;
+      return guildConnection();
+    });
+    const mgr = new StaticConnectionManager(fakeConnection, {
+      retryPolicy: { maxAttempts: 1, initialDelayMs: 1, maxDelayMs: 1 },
+      sleep: async () => {},
+      openOverride,
+    });
+
+    const pending = mgr.getConnection(guildId).catch((e: unknown) => e);
+    // Tear down while the open is still in flight.
+    const closing = mgr.closeAll();
+    releaseOpen();
+    await closing;
+
+    // `closeAll` closes exactly the connections it can see; a late
+    // arrival cached behind its back would never be closed again.
+    await expect(pending).resolves.toBeInstanceOf(Error);
+    expect(((await pending) as Error).message).toMatch(/closed while it was opening/);
+    // ...and the teardown leaves no disabled marker behind.
+    expect(mgr.isDisabled(guildId)).toBeUndefined();
+  });
+
+  it('waits for an in-flight open before closeAll resolves', async () => {
+    const timeline: string[] = [];
+    let releaseOpen: () => void = () => {};
+    const opening = new Promise<void>((resolve) => {
+      releaseOpen = resolve;
+    });
+    const openOverride = vi.fn(async (): Promise<GuildConnection> => {
+      await opening;
+      timeline.push('open-settled');
+      return guildConnection();
+    });
+    const mgr = new StaticConnectionManager(fakeConnection, {
+      retryPolicy: { maxAttempts: 1, initialDelayMs: 1, maxDelayMs: 1 },
+      sleep: async () => {},
+      openOverride,
+    });
+
+    void mgr.getConnection(guildId).catch(() => undefined);
+    const closing = mgr.closeAll().then(() => {
+      timeline.push('closeAll-resolved');
+    });
+
+    // Hold the open open for a few turns; without the drain `closeAll`
+    // resolves here and the ordering below inverts.
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    expect(timeline).toEqual([]);
+
+    releaseOpen();
+    await closing;
+
+    expect(timeline).toEqual(['open-settled', 'closeAll-resolved']);
+  });
+
+  it('refuses new connections while closeAll is running', async () => {
+    let releaseOpen: () => void = () => {};
+    const opening = new Promise<void>((resolve) => {
+      releaseOpen = resolve;
+    });
+    const openOverride = vi.fn(async (): Promise<GuildConnection> => {
+      await opening;
+      return guildConnection();
+    });
+    const mgr = new StaticConnectionManager(fakeConnection, {
+      retryPolicy: { maxAttempts: 1, initialDelayMs: 1, maxDelayMs: 1 },
+      sleep: async () => {},
+      openOverride,
+    });
+
+    void mgr.getConnection(guildId).catch(() => undefined);
+    const closing = mgr.closeAll();
+    // The generation counter only covers opens that started *before*
+    // the teardown; `closeAll` yields twice, so new work has to be
+    // refused outright for the window.
+    await expect(mgr.getConnection(guildId)).rejects.toThrow(/closed while it was opening/);
+
+    releaseOpen();
+    await closing;
+
+    // ...and the manager is usable again once the teardown finishes.
+    await expect(mgr.getConnection(guildId)).resolves.toBeDefined();
+  });
+
+  it('gives up on an in-flight open that never settles', async () => {
+    const openOverride = vi.fn(
+      () =>
+        new Promise<GuildConnection>(() => {
+          /* never settles */
+        }),
+    );
+    const mgr = new StaticConnectionManager(fakeConnection, {
+      retryPolicy: { maxAttempts: 1, initialDelayMs: 1, maxDelayMs: 1 },
+      sleep: async () => {},
+      openOverride,
+    });
+
+    void mgr.getConnection(guildId).catch(() => undefined);
+    vi.useFakeTimers();
+    const closing = mgr.closeAll();
+    await vi.advanceTimersByTimeAsync(2_000);
+    // An open retrying against a dead cluster must not consume the
+    // process-level shutdown budget.
+    await expect(closing).resolves.toBeUndefined();
+    vi.useRealTimers();
+  });
+
+  it('does not mark the guild disabled when an open loses a shutdown race', async () => {
+    let releaseOpen: () => void = () => {};
+    const opening = new Promise<void>((resolve) => {
+      releaseOpen = resolve;
+    });
+    const openOverride = vi.fn(async (): Promise<GuildConnection> => {
+      await opening;
+      return guildConnection();
+    });
+    const mgr = new StaticConnectionManager(fakeConnection, {
+      retryPolicy: { maxAttempts: 1, initialDelayMs: 1, maxDelayMs: 1 },
+      sleep: async () => {},
+      openOverride,
+    });
+
+    const pending = mgr.getConnection(guildId).catch((e: unknown) => e);
+    const closing = mgr.closeAll();
+    releaseOpen();
+    await closing;
+
+    // An ordinary Ctrl+C is not a cluster failure; classifying it as one
+    // wrote an alarming "[mongo] guild … disabled" line on every clean
+    // shutdown that raced an open.
+    await expect(pending).resolves.not.toBeInstanceOf(DatabaseError);
+    expect(mgr.isDisabled(guildId)).toBeUndefined();
   });
 
   it('wraps a non-DatabaseError thrown by open into a typed DatabaseError', async () => {

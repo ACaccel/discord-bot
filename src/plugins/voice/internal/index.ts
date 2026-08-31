@@ -1,1 +1,1 @@
-export { VoiceController, type VoiceSaveResult } from './voice-controller';
+export { VoiceController } from './voice-controller';

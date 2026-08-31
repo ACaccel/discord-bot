@@ -1,7 +1,7 @@
 /**
  * Reference integration test for the persistence layer.
  *
- * Demonstrates the contract every Phase 2 PR-B repo test will follow:
+ * Demonstrates the contract every repo integration test follows:
  *   1. Open a fresh mongoose connection against the shared memory server.
  *   2. Wrap it in a `StaticConnectionManager` so the production
  *      `MongoMessageRepo` runs against the same `GuildConnection`
@@ -11,7 +11,7 @@
  *   4. The `withFreshConnection` helper drops the database afterwards
  *      so each `it()` is fully isolated.
  *
- * G-2: every repo method returns `Result<T, DatabaseError>`. Happy-path
+ * Every repo method returns `Result<T, DatabaseError>`. Happy-path
  * cases unwrap with the test-only `unwrap`. Programmer errors (a non-
  * positive `limit`) still throw `TypeError` — they are not a domain
  * failure and never enter the `Result` channel.
@@ -41,6 +41,24 @@ const buildMessageDoc = (overrides: Partial<MessageDoc> & { messageId: string })
     stickers: [],
     ...overrides,
   }) as MessageDoc;
+
+/** Recursively collect every `stage` label from an explain plan tree. */
+const collectStages = (node: unknown, acc: string[] = []): string[] => {
+  if (node !== null && typeof node === 'object') {
+    const obj = node as Record<string, unknown>;
+    if (typeof obj['stage'] === 'string') acc.push(obj['stage']);
+    const single = obj['inputStage'];
+    if (single !== undefined) collectStages(single, acc);
+    const many = obj['inputStages'];
+    if (Array.isArray(many)) for (const s of many) collectStages(s, acc);
+  }
+  return acc;
+};
+
+const winningPlanOf = (explain: unknown): unknown => {
+  const planner = (explain as Record<string, unknown>)['queryPlanner'];
+  return planner !== undefined ? (planner as Record<string, unknown>)['winningPlan'] : undefined;
+};
 
 describe('MongoMessageRepo (integration)', () => {
   it('countAll returns 0 on an empty collection', async () => {
@@ -192,6 +210,102 @@ describe('MongoMessageRepo (integration)', () => {
       );
       const existing = unwrap(await repo.findExistingMessageIds(['m1', 'm3']));
       expect([...existing].sort()).toEqual(['m1']);
+    });
+  });
+
+  it('findByTimestampRange returns numeric-timestamp docs within the half-open window', async () => {
+    await withFreshConnection(async (connection) => {
+      const manager = new StaticConnectionManager(connection);
+      const guildConn = await manager.getConnection(guildId);
+      const repo = new MongoMessageRepo(guildConn);
+
+      unwrap(
+        await repo.insertManyIgnoringDuplicates([
+          buildMessageDoc({ messageId: 'a', timestamp: 100 }),
+          buildMessageDoc({ messageId: 'b', timestamp: 200 }),
+          buildMessageDoc({ messageId: 'c', timestamp: 300 }),
+        ]),
+      );
+
+      // Half-open [100, 300): includes 100 and 200, excludes 300.
+      const got = unwrap(await repo.findByTimestampRange(100, 300));
+      expect(got.map((d) => d.messageId).sort()).toEqual(['a', 'b']);
+    });
+  });
+
+  it('findByTimestampRange excludes a legacy String-typed timestamp until it is converted', async () => {
+    await withFreshConnection(async (connection) => {
+      const manager = new StaticConnectionManager(connection);
+      const guildConn = await manager.getConnection(guildId);
+      const repo = new MongoMessageRepo(guildConn);
+      const raw = connection.db?.collection('messages');
+      if (raw === undefined) throw new Error('no resolved db handle');
+
+      // Insert a legacy String-typed timestamp via the raw driver, bypassing
+      // mongoose's Number cast — the exact shape the pre-refactor schema left
+      // behind and that `db migrate-timestamp` backfills.
+      await raw.insertOne({
+        channelId: String(channelId),
+        channelName: 'general',
+        messageId: 'legacy',
+        userId: 'u',
+        userName: 't',
+        timestamp: '1700000000000',
+        attachments: [],
+        reactions: [],
+        stickers: [],
+      });
+
+      const startMs = 1_699_000_000_000;
+      const endMs = 1_701_000_000_000;
+
+      // The sargable predicate cannot match a String-typed value (string vs
+      // number BSON bracket) — this is the silent-exclusion hazard the
+      // migration gate exists to prevent.
+      const before = unwrap(await repo.findByTimestampRange(startMs, endMs));
+      expect(before.map((d) => d.messageId)).not.toContain('legacy');
+
+      // Apply the same conversion `db migrate-timestamp` runs
+      // (buildConvertFilter + buildConvertPipeline, asserted shape-for-shape
+      // in tools/db/commands/migrate-timestamp.test.ts).
+      await raw.updateMany({ timestamp: { $type: 'string', $regex: /^[0-9]+$/ } }, [
+        {
+          $set: {
+            timestamp: { $convert: { input: '$timestamp', to: 'long', onError: '$timestamp' } },
+          },
+        },
+      ]);
+
+      const after = unwrap(await repo.findByTimestampRange(startMs, endMs));
+      expect(after.map((d) => d.messageId)).toContain('legacy');
+    });
+  });
+
+  it('findByChannelAndTimestampRange is served by the compound index with no blocking SORT', async () => {
+    await withFreshConnection(async (connection) => {
+      const manager = new StaticConnectionManager(connection);
+      // getConnection runs model.init(), which builds the schema-declared
+      // { channelId: 1, timestamp: 1 } index this query relies on.
+      const guildConn = await manager.getConnection(guildId);
+      const repo = new MongoMessageRepo(guildConn);
+      unwrap(
+        await repo.insertManyIgnoringDuplicates([
+          buildMessageDoc({ messageId: 'a', timestamp: 100 }),
+          buildMessageDoc({ messageId: 'b', timestamp: 200 }),
+        ]),
+      );
+
+      // Hint the compound index so the assertion is deterministic regardless
+      // of the planner's cost choice on a tiny test collection: with the
+      // index in use, an index-provided sort must produce no SORT stage.
+      const explain: unknown = await guildConn.models.Message.collection
+        .find({ channelId: String(channelId), timestamp: { $gte: 0, $lt: 1_000 } })
+        .sort({ timestamp: 1 })
+        .hint({ channelId: 1, timestamp: 1 })
+        .explain('queryPlanner');
+      const stages = collectStages(winningPlanOf(explain));
+      expect(stages).toContain('IXSCAN');
+      expect(stages).not.toContain('SORT');
     });
   });
 });

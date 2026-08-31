@@ -1,23 +1,15 @@
 /**
- * Unit coverage for `requireGuildRepos` (gap D5, C6 slice).
+ * Unit coverage for `requireGuildRepos`.
  *
- * The disabled-guild guard now reads the `ConnectionManager.isDisabled`
- * state straight off `BaseBot.connectionManager` instead of the legacy
- * `BaseBot.disabledGuilds` projection. The `traceId` surfaced to the
- * user must be the one the manager stamped.
+ * The disabled-guild guard reads `ConnectionManager.isDisabled` straight
+ * off `BaseBot.connectionManager`, and the `traceId` surfaced to the user
+ * must be the one the manager stamped.
  */
 import { describe, expect, it } from 'vitest';
 
 import type { BaseBot } from '../../../src/bot/index';
 import { requireGuildRepos } from '../../../src/handlers/require-guild-repos';
-
-/** Translator stub that echoes the key + a JSON of params. */
-const echoTranslator = () =>
-  ({
-    t: (key: string, params?: Record<string, unknown>) =>
-      params === undefined ? key : `${key}|${JSON.stringify(params)}`,
-    tStrict: (key: string) => key,
-  }) as never;
+import { buildFakeBot, echoTranslatorWithParams } from '../../fixtures/discord/bot-fake';
 
 /** Minimal interaction fake recording reply payloads. */
 const stubInteraction = (guildId: string | undefined) => {
@@ -52,18 +44,17 @@ const stubBot = (input: StubBotInput = {}): BaseBot => {
       error: new Error('boot failure'),
     });
   }
-  return {
+  return buildFakeBot({
     clientId: 'bot-1',
-    logger: undefined,
-    translator: echoTranslator(),
+    translator: echoTranslatorWithParams('|'),
     connectionManager: {
       isDisabled: (guildId: string) => disabledMap.get(guildId),
     },
     getRepos: (guildId: string) => (guildId === 'g-1' ? input.repos : undefined),
-  } as unknown as BaseBot;
+  }).bot;
 };
 
-describe('requireGuildRepos (gap D5 — reads ConnectionManager.isDisabled)', () => {
+describe('requireGuildRepos — reads ConnectionManager.isDisabled', () => {
   it('replies guild_only and returns null outside a guild', async () => {
     const { interaction, replies } = stubInteraction(undefined);
     const result = await requireGuildRepos(stubBot(), interaction);
@@ -97,13 +88,12 @@ describe('requireGuildRepos (gap D5 — reads ConnectionManager.isDisabled)', ()
   it('treats an absent ConnectionManager as "not disabled"', async () => {
     const { interaction, replies } = stubInteraction('g-1');
     const repos = { reply: {} };
-    const bot = {
+    const { bot } = buildFakeBot({
       clientId: 'bot-1',
-      logger: undefined,
-      translator: echoTranslator(),
+      translator: echoTranslatorWithParams('|'),
       connectionManager: undefined,
       getRepos: (guildId: string) => (guildId === 'g-1' ? repos : undefined),
-    } as unknown as BaseBot;
+    });
     const result = await requireGuildRepos(bot, interaction);
     expect(result).toBe(repos);
     expect(replies).toHaveLength(0);

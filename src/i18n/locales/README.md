@@ -19,11 +19,13 @@ CJK in keys. Use ICU-style `{{placeholder}}` (i18next syntax, NOT
 single-brace) for interpolation. Pluralisation uses i18next plural keys
 (`<key>_one`, `<key>_other`).
 
-## Phase 6 enforcement
+## Enforcement
 
-ESLint `no-literal-string` is currently `warn` for `src/i18n/**` and
-`src/application/**`; Phase 6 promotes it to `error`. Every user-facing
-string must reach Discord via `ctx.t(key, params)`.
+The CJK-literal scanner (`test/i18n/no-literal-cjk.test.ts`) fails the
+build on any CJK string literal in `src/handlers/`, `src/plugins/`, or
+`src/bot/` — every user-facing string must reach Discord through the
+translator (`translator.t(key, params)`). Annotate a genuinely
+unavoidable literal with `// i18n-ignore: <reason>`.
 
 ## Adding a new language
 

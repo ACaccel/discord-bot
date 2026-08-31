@@ -42,20 +42,36 @@ const ResponseSchema = z
  * mirror the SDK providers' shape so the shared `errors:llm.*` catalog
  * templates render even though an auto-reply failure is only logged.
  */
-export type SelfHostedLlmError = ExternalServiceError<
+type SelfHostedLlmError = ExternalServiceError<
   ExternalServiceErrorCode,
   { provider: string; status: string }
 >;
 
-export interface SelfHostedLlmClientOptions {
-  /** Fully-qualified chat endpoint URL (e.g. `https://host/chat`). */
-  readonly endpoint: string;
+interface SelfHostedLlmClientOptions {
+  /**
+   * Fully-qualified chat endpoint URL (e.g. `https://host/chat`), or a
+   * provider read on every {@link SelfHostedLlmClient.reply} call. The
+   * function form lets a composition root swap the endpoint at runtime
+   * (e.g. gopher's settings API) without rebuilding the client; a plain
+   * string is resolved once and never changes.
+   */
+  readonly endpoint: string | (() => string);
   /** Per-request timeout in milliseconds. */
   readonly timeoutMs: number;
 }
 
 export class SelfHostedLlmClient {
   public constructor(private readonly options: SelfHostedLlmClientOptions) {}
+
+  /**
+   * Resolve the current endpoint. A string is returned verbatim; a
+   * provider is invoked so runtime updates take effect on the next call.
+   */
+  private resolveEndpoint(): string {
+    return typeof this.options.endpoint === 'function'
+      ? this.options.endpoint()
+      : this.options.endpoint;
+  }
 
   /**
    * POST `transcript` as a single user message and return the model's
@@ -65,9 +81,10 @@ export class SelfHostedLlmClient {
    * failure.
    */
   public async reply(transcript: string): Promise<Result<string, SelfHostedLlmError>> {
+    const endpoint = this.resolveEndpoint();
     try {
       const res = await axios.post(
-        this.options.endpoint,
+        endpoint,
         { messages: [{ role: 'user', content: transcript }] },
         {
           timeout: this.options.timeoutMs,
@@ -137,7 +154,7 @@ export class SelfHostedLlmClient {
       code,
       messageKey,
       messageParams: { provider: 'selfhosted', status },
-      context: { operation: OPERATION, input: { endpoint: this.options.endpoint, status } },
+      context: { operation: OPERATION, input: { endpoint: this.resolveEndpoint(), status } },
       cause,
     });
   }

@@ -53,9 +53,9 @@ describe('databaseErrorFrom', () => {
   });
 
   it('produces an i18next-style errors:db.* messageKey for every sub-code', () => {
-    // Regression for the gap-remediation fix: the key must use the
-    // `namespace:key.path` colon convention so the D9 handler boundary can
-    // resolve it; the `.`-separated form silently missed the catalog.
+    // The key must use the `namespace:key.path` colon convention so the
+    // handler boundary can resolve it; the `.`-separated form silently
+    // missed the catalog.
     const cases: ReadonlyArray<readonly [unknown, string]> = [
       [
         (() => {

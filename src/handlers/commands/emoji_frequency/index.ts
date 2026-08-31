@@ -2,11 +2,16 @@ import type { ChatInputCommandInteraction } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
-import { replyForError } from '../../reply-for-error';
+import { replyForError } from '../../../infra/discord/reply-for-error';
 import { clampOptions } from './clamp-options';
 import { accumulateEmojiCounts, initEmojiCounts, type EmojiCounts } from './aggregate-emoji-counts';
 import { rankEmoji } from './rank-emoji';
 import { formatLeaderboard, type TFn } from './format-leaderboard';
+import { getOptionalChoice, getOptionalNumber } from '../../../infra/discord/options';
+
+/** Choice sets registered with Discord; the reads below are validated against them. */
+const EMOJI_TYPES = ['animated', 'static'] as const;
+const SORT_DIRECTIONS = ['asc', 'desc'] as const;
 
 export default class emoji_frequency extends Command {
   constructor() {
@@ -53,15 +58,11 @@ export default class emoji_frequency extends Command {
         return;
       }
 
-      const type = ((interaction.options.get('type')?.value as string) ?? 'static') as
-        | 'animated'
-        | 'static';
-      const frequency = ((interaction.options.get('frequency')?.value as string) ?? 'asc') as
-        | 'asc'
-        | 'desc';
+      const type = getOptionalChoice(interaction, 'type', EMOJI_TYPES, 'static');
+      const frequency = getOptionalChoice(interaction, 'frequency', SORT_DIRECTIONS, 'asc');
       const { topN, lastNMonths } = clampOptions({
-        topN: (interaction.options.get('top_n')?.value as number) ?? 5,
-        lastNMonths: (interaction.options.get('last_n_months')?.value as number) ?? 1,
+        topN: getOptionalNumber(interaction, 'top_n') ?? 5,
+        lastNMonths: getOptionalNumber(interaction, 'last_n_months') ?? 1,
       });
 
       const guildEmojiTexts: string[] = [];

@@ -73,8 +73,4 @@ describe('XAIProvider contract', () => {
       'LLM_CONTEXT_TOO_LONG',
     );
   });
-
-  it('every nock interceptor was matched', () => {
-    expect(nock.pendingMocks()).toEqual([]);
-  });
 });

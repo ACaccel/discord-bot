@@ -14,7 +14,7 @@ import type { Client, GuildMember, Channel } from 'discord.js';
 import { EmbedBuilder } from 'discord.js';
 import type { Job } from 'node-schedule';
 
-import type { GuildRegistry } from '../../../core/guild-registry';
+import type { GuildRegistry } from '../../../bot/guild-registry';
 import { bindTranslator } from '../../../core/i18n';
 import type { Translator } from '../../../core/i18n';
 import { logError, type Logger } from '../../../core/logger';
@@ -60,10 +60,32 @@ export interface ActivityDeps {
   readonly translator: Translator | undefined;
 }
 
-export const activityJobKey = (activity_id: string) => `activity:${activity_id}`;
+export const activityJobKey = (activity_id: string): string => `activity:${activity_id}`;
 
-export const isActivityJobKey = (key: string, activityId: string) =>
-  key.startsWith('activity:') && key.split(':')[1] === activityId;
+/**
+ * Outcome of {@link scheduleActivity} — the deferred participant roll-up
+ * that runs when an activity expires. Every non-`completed` variant
+ * names a precondition that failed, so callers log a stable status
+ * instead of an English sentence.
+ */
+type ScheduleActivityOutcome =
+  | { readonly status: 'completed' }
+  | { readonly status: 'guild_not_found' }
+  | { readonly status: 'no_db' }
+  | { readonly status: 'activity_not_found' }
+  | { readonly status: 'channel_not_found' }
+  | { readonly status: 'message_not_found' };
+
+/**
+ * Outcome of {@link deleteActivity}; the handler maps each variant to an
+ * i18n key. A raw English reason string was previously interpolated
+ * straight into the localised reply, so a zh-TW user saw
+ * "無法刪除活動: Database not found".
+ */
+type DeleteActivityOutcome =
+  | { readonly status: 'deleted' }
+  | { readonly status: 'guild_not_found' }
+  | { readonly status: 'no_db' };
 
 export const activityAnnouncement = async (
   activity_id: string,
@@ -72,7 +94,7 @@ export const activityAnnouncement = async (
   description: string,
   end_time_date: Date,
   deps: ActivityDeps,
-) => {
+): Promise<string | null> => {
   if (!channel.isSendable()) return null;
 
   const t = bindTranslator(deps.translator);
@@ -101,7 +123,11 @@ export const activityAnnouncement = async (
   }
 };
 
-export const findActivity = async (deps: ActivityDeps, guild_id: string, activity_id: string) => {
+export const findActivity = async (
+  deps: ActivityDeps,
+  guild_id: string,
+  activity_id: string,
+): Promise<boolean> => {
   const guild = deps.client.guilds.cache.get(guild_id);
   if (!guild) return false;
   const repos = deps.registry.getRepos(guild_id);
@@ -117,22 +143,22 @@ export const scheduleActivity = async (
   deps: ActivityDeps,
   guild_id: string,
   activity_id: string,
-) => {
+): Promise<ScheduleActivityOutcome> => {
   const guild = deps.client.guilds.cache.get(guild_id);
-  if (!guild) return 'Guild not found';
+  if (!guild) return { status: 'guild_not_found' };
   const repos = deps.registry.getRepos(guild_id);
-  if (!repos) return 'Database not found';
+  if (!repos) return { status: 'no_db' };
 
   // An `err` is re-thrown for the caller's surrounding catch.
   const activityResult = await repos.activity.findByActivityId(activity_id);
   if (!activityResult.ok) throw activityResult.error;
   const activity = activityResult.value;
-  if (!activity) return 'Activity not found';
+  if (!activity) return { status: 'activity_not_found' };
   const activityChannel = guild.channels.cache.get(activity.channel_id);
-  if (!activityChannel?.isSendable()) return 'Activity channel not found';
+  if (!activityChannel?.isSendable()) return { status: 'channel_not_found' };
 
   const message = await activityChannel.messages.fetch(activity.message_id).catch(() => null);
-  if (!message) return 'Activity message not found';
+  if (!message) return { status: 'message_not_found' };
 
   const reaction = message.reactions.cache.get('✅');
   const users = await reaction?.users.fetch().catch(() => null);
@@ -164,20 +190,43 @@ export const scheduleActivity = async (
   await activityChannel.send({ content: resultContent });
 
   new JobManager(deps.jobMap).cancel(activityJobKey(activity_id));
-  return null;
+  return { status: 'completed' };
 };
 
-export const deleteActivity = async (deps: ActivityDeps, guild_id: string, activity_id: string) => {
+export const deleteActivity = async (
+  deps: ActivityDeps,
+  guild_id: string,
+  activity_id: string,
+): Promise<DeleteActivityOutcome> => {
   const guild = deps.client.guilds.cache.get(guild_id);
-  if (!guild) return 'Guild not found';
+  if (!guild) return { status: 'guild_not_found' };
   const repos = deps.registry.getRepos(guild_id);
-  if (!repos) return 'Database not found';
+  if (!repos) return { status: 'no_db' };
 
   new JobManager(deps.jobMap).cancel(activityJobKey(activity_id));
   // An `err` is re-thrown for the caller's surrounding catch.
   const deleteResult = await repos.activity.deleteByActivityId(activity_id);
   if (!deleteResult.ok) throw deleteResult.error;
-  return null;
+  return { status: 'deleted' };
+};
+
+/**
+ * Run a deferred roll-up, recording a non-success outcome on the
+ * operator channel. The job callback has no user to answer, so a silent
+ * return would make a missing channel or message indistinguishable from
+ * a completed roll-up.
+ */
+export const runActivityRollUp = async (
+  deps: ActivityDeps,
+  guildId: string,
+  activityId: string,
+): Promise<void> => {
+  const outcome = await scheduleActivity(deps, guildId, activityId);
+  if (outcome.status === 'completed') return;
+  deps.logger.warn(
+    { guildId, activityId, outcome: outcome.status },
+    'activity roll-up did not complete',
+  );
 };
 
 /**
@@ -203,7 +252,7 @@ const rebootRetry = async <T>(op: () => Promise<T>): Promise<T> => {
 };
 
 export const rebootActivityJobs = async (deps: ActivityDeps): Promise<void> => {
-  const jobManager = new JobManager(deps.jobMap);
+  const jobManager = new JobManager(deps.jobMap, deps.logger);
   await Promise.all(
     deps.registry.listGuildIds().map(async (guildId) => {
       try {
@@ -223,7 +272,7 @@ export const rebootActivityJobs = async (deps: ActivityDeps): Promise<void> => {
             if (expired_at > new Date()) {
               jobManager.schedule(activityJobKey(a.activity_id), expired_at, async () => {
                 if (await findActivity(deps, guildId, a.activity_id)) {
-                  await scheduleActivity(deps, guildId, a.activity_id);
+                  await runActivityRollUp(deps, guildId, a.activity_id);
                 }
               });
             } else {
