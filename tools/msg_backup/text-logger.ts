@@ -84,7 +84,7 @@ export const formatServerTimezone = (d: Date = new Date()): string => {
 };
 
 /**
- * Replace the password portion of a `mongodb://user:pass@host/...`
+ * Replace the password portion of a credentialed Mongo connection
  * URI with `****`. Used to avoid leaking credentials into the log
  * file. Tolerates URIs without credentials (returns unchanged).
  */

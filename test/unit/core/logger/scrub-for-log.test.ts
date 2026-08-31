@@ -15,7 +15,7 @@ describe('scrubForLog', () => {
       bot: 'b1',
       token: 'secret-token',
       apiKey: 'sk-123',
-      mongoURI: 'mongodb://user:pw@host',
+      mongoURI: 'mongodb://user:pw@host', // gitleaks:allow
       okField: 'visible',
     }) as Record<string, unknown>;
     expect(out.token).toBe('[Redacted]');
@@ -125,7 +125,7 @@ describe('scrubForLog URL credentials', () => {
     // `buildGuildMongoUri` produces exactly this shape and mongoose
     // embeds it verbatim in MongoServerSelectionError messages.
     const out = scrubForLog(
-      'MongoServerSelectionError: mongodb://acaccel:hunter2@127.0.0.1:27017/12345?authSource=admin failed',
+      'MongoServerSelectionError: mongodb://acaccel:hunter2@127.0.0.1:27017/12345?authSource=admin failed', // gitleaks:allow
     ) as string;
     expect(out).not.toContain('hunter2');
     expect(out).toContain('mongodb://');
