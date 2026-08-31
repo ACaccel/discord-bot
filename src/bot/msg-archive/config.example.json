@@ -3,9 +3,7 @@
   "language": "zh-TW",
   "guilds": {
     "YOUR_GUILD_ID": {
-      "channels": {
-        "debug": "YOUR_DEBUG_CHANNEL_ID"
-      },
+      "channels": { "debug": "YOUR_DEBUG_CHANNEL_ID" },
       "roles": {}
     }
   },

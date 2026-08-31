@@ -3,9 +3,7 @@
   "language": "zh-TW",
   "guilds": {
     "YOUR_GUILD_ID": {
-      "channels": {
-        "debug": "YOUR_DEBUG_CHANNEL_ID"
-      }
+      "channels": { "debug": "YOUR_DEBUG_CHANNEL_ID" }
     }
   },
   "commands": ["help"],
@@ -18,11 +16,7 @@
     "endpoint": "https://YOUR_LLM_HOST/chat",
     "timeoutMs": 10000
   },
-  "settings_api": {
-    "enabled": false,
-    "host": "127.0.0.1",
-    "basePath": "/settings"
-  },
+  "settings_api": { "enabled": false, "host": "127.0.0.1", "basePath": "/settings" },
   "identity_sync": {
     "enabled": false,
     "syncWithSource": false,

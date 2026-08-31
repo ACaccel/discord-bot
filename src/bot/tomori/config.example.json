@@ -3,14 +3,9 @@
   "language": "zh-TW",
   "guilds": {
     "YOUR_GUILD_ID": {
-      "channels": {
-        "debug": "YOUR_DEBUG_CHANNEL_ID",
-        "event": "YOUR_EVENT_CHANNEL_ID"
-      },
+      "channels": { "debug": "YOUR_DEBUG_CHANNEL_ID", "event": "YOUR_EVENT_CHANNEL_ID" },
       "permission_rank": {
-        "channels": {
-          "YOUR_PRIVATE_CHANNEL_ID": 1
-        },
+        "channels": { "YOUR_PRIVATE_CHANNEL_ID": 1 },
         "features": {
           "guild_events": { "maxChannelRank": 0 },
           "channel_logging": { "maxChannelRank": 0 },
@@ -21,11 +16,7 @@
   },
   "commands": ["help", "temp_role", "weather_forecast", "random_restaurant", "COMMAND_NAME"],
   "guild_events": {
-    "attachment_cache": {
-      "enabled": true,
-      "ttlHours": 24,
-      "minFreeDiskMb": 5120
-    }
+    "attachment_cache": { "enabled": true, "ttlHours": 24, "minFreeDiskMb": 5120 }
   },
   "social_link_preview": {
     "enabled": false,
@@ -56,10 +47,6 @@
     ],
     "globalLuckyProbability": 0.005
   },
-  "weather_forecast": {
-    "locationKey": "315078"
-  },
-  "random_restaurant": {
-    "apiUrl": "https://food-api-kappa-hazel.vercel.app/recommend"
-  }
+  "weather_forecast": { "locationKey": "315078" },
+  "random_restaurant": { "apiUrl": "https://food-api-kappa-hazel.vercel.app/recommend" }
 }
