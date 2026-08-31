@@ -11,6 +11,10 @@ or [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Changed
+
+- Split the contributing guide into per-topic documents ([72ecc17](https://github.com/ACaccel/BotFleet/commit/72ecc17)).
+
 ### Fixed
 
 - Cache attachments before deletion and retry the download, so deleted-attachment archival stops losing files (see [`README.md`](README.md) for the cache settings) ([5491f89](https://github.com/ACaccel/BotFleet/commit/5491f89)).
