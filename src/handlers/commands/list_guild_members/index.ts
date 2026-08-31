@@ -32,9 +32,11 @@ const chunkLines = (lines: string[], maxLength: number): string[] => {
   return chunks;
 };
 
-const buildMemberLine = (member: GuildMember): string => {
+export const buildMemberLine = (member: GuildMember): string => {
   const user = member.user;
-  const displayName = member.displayName.replace(/\]/g, '\\]');
+  // Escape backslashes before brackets so a trailing "\" in the display
+  // name cannot neutralise the escaped "]" and break out of the link text.
+  const displayName = member.displayName.replace(/\\/g, '\\\\').replace(/\]/g, '\\]');
   const profileUrl = `https://discord.com/users/${user.id}`;
   const badge = user.bot ? '`[BOT]` ' : '';
   return `${badge}[${displayName}](${profileUrl}) - <@${user.id}>`;
