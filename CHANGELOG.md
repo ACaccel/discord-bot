@@ -12,7 +12,7 @@ or [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ### Fixed
 
-- Cache guild attachments on the bot host before deletion and retry the CDN proxy URL, so deleted-attachment archival stops losing files to Discord's near-synchronous purge (on by default — it retains a copy of every recent attachment for `guild_events.attachment_cache.ttlHours`, and pauses new cache writes while the volume has less than `guild_events.attachment_cache.minFreeDiskMb` free, default 5 GiB; see [`README.md`](README.md)) ([HASH](https://github.com/ACaccel/BotFleet/commit/HASH)).
+- Cache guild attachments on the bot host before deletion and retry the CDN proxy URL, so deleted-attachment archival stops losing files to Discord's near-synchronous purge (on by default — it retains a copy of every recent attachment for `guild_events.attachment_cache.ttlHours`, and pauses new cache writes while the volume has less than `guild_events.attachment_cache.minFreeDiskMb` free, default 5 GiB; see [`README.md`](README.md)) ([5491f89](https://github.com/ACaccel/BotFleet/commit/5491f89)).
 
 ## [1.1.0] - 2026-08-31
 
