@@ -317,6 +317,63 @@ per-invocation by the `/traffic` / `/traffic_me` / `/traffic_user` handlers
 through the `bot.permissionRankPolicy` accessor. It replaced the bot-wide `blocked_channels` list (suppression is now
 per-guild).
 
+### Privacy-aware data commands
+
+A command that surfaces aggregated guild data (message counts,
+rankings, traffic) must not reveal activity from channels the invoker
+cannot see. `/traffic`, `/traffic_me`, and `/traffic_user` realise the
+pattern on top of the `PermissionRankPolicy` primitives above; follow
+it for any new one. The two per-user commands share one body in
+`src/handlers/commands/traffic-shared/user-traffic-command.ts`,
+so a third per-user report is a spec (`command` + `resolveSubject`),
+not a fourth copy of the filter.
+
+1. **Dual filter.** A channel's data is included only when it clears
+   BOTH the operator-defined `permission_rank` ceiling AND the
+   Discord-native `ViewChannel` check for the invoking member. Either
+   one alone is insufficient: an unconfigured rank map must still never
+   leak a Discord-private channel. Resolve the policy through
+   `bot.permissionRankPolicy` (handlers never touch the container or
+   `TOKENS`) and fetch the invoking `GuildMember` via
+   `guild.members.fetch(...)` so `roles.cache` and permission
+   overwrites are populated.
+2. **The reply audience sets the ceiling.** A `public` reply is posted
+   into the room, so it caps at
+   `visibilityCeiling(guildId, roles, commandChannelId, ancestors)` =
+   `min(userRank, channelRank(commandChannel))` — never above the
+   command channel's own ancestry-aware rank. An `ephemeral` reply only
+   the invoker sees caps at `userRank` alone. Either way the invoker is
+   bounded by their own clearance.
+3. **Gate the invoker, not the subject.** When a command reports on a
+   named target, build the visible-channel set from the **invoker** and
+   count the target's activity only within it, so the target's own
+   clearance never widens the view. A target with no visible activity —
+   including a non-member — must yield the same neutral no-data reply.
+4. **Build the allowed set from the live cache and fail safe.** Walk
+   `guild.channels.cache`; a channel present only in archived data
+   (deleted or uncached) is never added. Each channel's effective rank
+   is the max over its full ancestry, so a ranked category gates every
+   channel and thread beneath it. Apply the filter _before_ aggregation
+   so an excluded channel contributes nothing.
+5. **Every derived statistic uses the filtered set — including
+   cross-window ones.** A "change vs previous period" trend must
+   re-count the preceding window through the _same_ allowed set, or the
+   comparison leaks an unseen channel's volume.
+6. **Keep the copy neutral.** Option labels and the empty-result
+   message must not hint that restricted channels exist (`visibility`
+   choices read "Only you" / "Everyone", not "your full clearance
+   view"), so a low-clearance user cannot infer higher-clearance
+   channels from the wording.
+7. **Split emoji by surface.** The chart font has no emoji glyphs, so
+   `stripEmoji` (`traffic-shared/chart-common`) removes them from every
+   canvas label and header, falling back to the original when stripping
+   would empty the label. Discord-native **embed** text keeps its
+   emoji, rendering a custom emoji as its `<:name:id>` (animated
+   `<a:…>`) token and a unicode one as the character itself.
+
+When an embed builder outgrows the 150-line cap, split it into a
+sibling file rather than thinning the privacy logic.
+
 ### `MongoConnectionManager` ([src/infra/mongo/connection-manager.ts](../src/infra/mongo/connection-manager.ts))
 
 Process-wide pool keyed by URI, shared across personalities. Owns

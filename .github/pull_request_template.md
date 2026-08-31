@@ -1,6 +1,7 @@
 <!--
   Fill every section. Empty sections will be rejected. See
-  CONTRIBUTING.md for the full submission flow.
+  docs/contributing/branching-and-releases.md for the full
+  submission flow.
 -->
 
 ## Summary
@@ -26,7 +27,7 @@ unchecked rather than deleting the line.
 - [ ] `.github/workflows/`
 - [ ] `tsconfig*` / `eslint.config.mjs` / `vitest.config.ts`
 - [ ] Tests added or updated
-- [ ] Docs (`docs/architecture.md` / `README.md` / `CONTRIBUTING.md` / `CLAUDE.md`)
+- [ ] Docs (`docs/architecture.md` / `README.md` / `CONTRIBUTING.md` / `docs/contributing/` / `CLAUDE.md`)
 - [ ] `config.example.json` (a config field was added, removed, or redefaulted)
 - [ ] `CHANGELOG.md` (one entry under `[Unreleased]`, closing with its commit link)
 

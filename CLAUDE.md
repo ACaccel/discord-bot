@@ -10,8 +10,10 @@ in strict mode.
 
 - [`docs/architecture.md`](docs/architecture.md) — layers, key abstractions,
   request flow, plugin lifecycle, design trade-offs
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution recipes, quality-gate
-  reference, branching model, security reporting
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution index: quality-gate
+  reference, architectural rules, security reporting; links the
+  step-by-step guides under [`docs/contributing/`](docs/contributing/)
+  (local setup, command / plugin / model recipes, operations, branching)
 - [`README.md`](README.md) — feature tour and the `.env` / `config.json`
   field reference
 - [`CHANGELOG.md`](CHANGELOG.md) — Keep a Changelog; one entry per notable
@@ -59,12 +61,13 @@ Codegen:    yarn handlers:gen       (after adding or deleting a handler)
 ## Architectural rules
 
 Four load-bearing rules; a CI gate or a reviewer will catch violations.
-The walkthrough for each is in `CONTRIBUTING.md`.
+The full text of each is in `CONTRIBUTING.md`; the recipes under
+`docs/contributing/` walk them through.
 
 1. **No CJK literals in `src/handlers/` or `src/plugins/`.** Use translator keys; add `// i18n-ignore: <reason>` only when the literal is not user-facing.
 2. **No `process.env.X` outside `src/core/config/env.ts`.**
 3. **No new handler / plugin without a test.**
-4. **No code change without its documentation.** A change to user-visible behaviour, a config field, a public contract, or a command must update every documentation surface it touches — `docs/architecture.md`, `README.md`, `CONTRIBUTING.md`, the matching `config.example.json`, and one `CHANGELOG.md` entry (imperative sentence + commit link, see [`CONTRIBUTING.md`](CONTRIBUTING.md)) — in the same commit. A missing doc update is a defect, like a missing test.
+4. **No code change without its documentation.** A change to user-visible behaviour, a config field, a public contract, or a command must update every documentation surface it touches — `docs/architecture.md`, `README.md`, `CONTRIBUTING.md` and the guides under `docs/contributing/`, the matching `config.example.json`, and one `CHANGELOG.md` entry (imperative sentence + commit link, see [`CONTRIBUTING.md`](CONTRIBUTING.md)) — in the same commit. A missing doc update is a defect, like a missing test.
 
 ## Quality gates (non-negotiable)
 
@@ -96,4 +99,4 @@ root-cause it; do not bypass.
 
 - **Commit only when the user explicitly asks — then commit AND push together.** Do not auto-commit (or `git commit --amend`) after making changes, completing a task, or fixing review-gate / stop-hook findings — make the edits, run the gates, report, and wait for an explicit "commit" instruction. When the user does ask, push to `dev` in the same step; `git push` is part of the commit action, not a separate authorisation. A one-off "commit this" authorises that commit and its push only.
 - Commits are small and focused: `<type>(<scope>): <subject>` where `<type>` is `feat`, `fix`, `refactor`, `chore`, `docs`, or `test`. The body explains the why.
-- Routine work is committed **directly to `dev`** — no per-change branch or PR. PRs are required only for `dev` → `main` releases and hotfixes, and are optional for large / risky `feature/*` work. The full branching model is in `CONTRIBUTING.md`.
+- Routine work is committed **directly to `dev`** — no per-change branch or PR. PRs are required only for `dev` → `main` releases and hotfixes, and are optional for large / risky `feature/*` work. The full branching model is in `docs/contributing/branching-and-releases.md`.

@@ -51,8 +51,8 @@ expects to change). No external task-tracker file is required.
    `yarn handlers:gen:check`, `yarn knip`. Root-cause any failure; do
    not bypass.
 8. **Sync the documentation surfaces** — `docs/architecture.md`,
-   `README.md`, `CONTRIBUTING.md`, the matching `config.example.json`,
-   and one `CHANGELOG.md` line, for each surface the change touches
+   `README.md`, `CONTRIBUTING.md` / `docs/contributing/`, the matching
+   `config.example.json`, and one `CHANGELOG.md` line, for each surface the change touches
    (`contribute-change` Step 7). They land in the same commit as the
    code.
 9. **Produce the commit message** — conventional-commits prefix,

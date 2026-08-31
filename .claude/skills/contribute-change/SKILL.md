@@ -13,7 +13,8 @@ prevents a class of regression.
 
 Authoritative public sources:
 [`README.md`](../../../README.md),
-[`CONTRIBUTING.md`](../../../CONTRIBUTING.md),
+[`CONTRIBUTING.md`](../../../CONTRIBUTING.md) and the guides under
+[`docs/contributing/`](../../../docs/contributing/),
 [`CLAUDE.md`](../../../CLAUDE.md),
 [`docs/architecture.md`](../../../docs/architecture.md).
 
@@ -96,13 +97,13 @@ Documentation lands in the **same commit** as the code. There are five
 surfaces; update each one the change actually touches, and no others —
 each fact lives in exactly one place, everywhere else links to it.
 
-| Surface                              | Update it when                                                                |
-| ------------------------------------ | ----------------------------------------------------------------------------- |
-| `docs/architecture.md`               | A layer, abstraction, contract, lifecycle order, or design trade-off changed. |
-| `README.md`                          | A user-visible feature, an `.env` key, or a `config.json` field changed.      |
-| `CONTRIBUTING.md`                    | A recipe, convention, quality gate, or architectural rule changed.            |
-| `src/bot/<name>/config.example.json` | A config field was added, removed, renamed, or its default changed.           |
-| `CHANGELOG.md`                       | Any notable change — **one entry** under `[Unreleased]`.                      |
+| Surface                                  | Update it when                                                                |
+| ---------------------------------------- | ----------------------------------------------------------------------------- |
+| `docs/architecture.md`                   | A layer, abstraction, contract, lifecycle order, or design trade-off changed. |
+| `README.md`                              | A user-visible feature, an `.env` key, or a `config.json` field changed.      |
+| `CONTRIBUTING.md` / `docs/contributing/` | A recipe, convention, quality gate, or architectural rule changed.            |
+| `src/bot/<name>/config.example.json`     | A config field was added, removed, renamed, or its default changed.           |
+| `CHANGELOG.md`                           | Any notable change — **one entry** under `[Unreleased]`.                      |
 
 The changelog follows Keep a Changelog. An entry is one imperative
 sentence closing with a link to the commit that made it —
@@ -110,9 +111,19 @@ sentence closing with a link to the commit that made it —
 — filed under Added / Changed / Fixed / Removed / Security. The hash
 only exists once the commit does, so the entry is written against the
 commit that introduced the change — the next commit, or the release
-preparation, carries it. Mark a change that needs operator action as
-**breaking** and describe the action in README or CONTRIBUTING; the
-changelog stays one line.
+preparation, carries it.
+
+The changelog is public and permanent, so every entry obeys four content
+rules (full text in `CONTRIBUTING.md`, Architectural rule 4):
+
+- High-level, one sentence, at most two rendered lines — what changed for
+  a user or an operator, never class names, paths, catalog keys, or
+  rationale.
+- No personal, nickname, private-joke, or guild-specific references.
+- Keep the **breaking** marker, but point at README for the operator
+  step: `(**breaking** — see [`README.md`](README.md))`.
+- Shorten and scrub, never drop an entry; merge two entries only when
+  they share a commit link.
 
 Missing documentation is a defect, exactly like a missing test.
 

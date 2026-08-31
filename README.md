@@ -234,9 +234,13 @@ Several fields carry a required-when rule worth calling out:
 
 ## Adding a command, button, modal, or plugin
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) — it documents the recipe,
-the 150-line cap for handler `index.ts`, the i18n discipline, the
-plugin / IoC contract, and the quality gates.
+See the step-by-step guides under
+[`docs/contributing/`](docs/contributing/) —
+[adding a slash command](docs/contributing/adding-a-command.md)
+(recipe, the 150-line cap for handler `index.ts`, the i18n discipline)
+and [adding a plugin](docs/contributing/adding-a-plugin.md) (the
+plugin / IoC contract). The quality gates live in
+[`CONTRIBUTING.md`](CONTRIBUTING.md#quality-gates).
 
 ## Architecture
 
@@ -266,10 +270,11 @@ listed with what it covers in
 ## Contributing
 
 Bug reports, feature suggestions, and pull requests are welcome. Read
-[`CONTRIBUTING.md`](CONTRIBUTING.md) first; it covers the local setup,
-the quality gates that must pass before review, the architectural rules
-a reviewer will hold you to, and how to report a security vulnerability
-privately.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) first; it carries the quality
+gates that must pass before review, the architectural rules a reviewer
+will hold you to, how to report a security vulnerability privately, and
+links to the per-topic guides (local setup, recipes, branching) under
+[`docs/contributing/`](docs/contributing/).
 
 ## License
 
