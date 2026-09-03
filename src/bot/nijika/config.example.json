@@ -29,7 +29,7 @@
     "validationBudgetMs": 8000,
     "maxUrlsPerMessage": 1,
     "twitterProxyHosts": ["vxtwitter.com", "fxtwitter.com", "fixupx.com"],
-    "instagramProxyHosts": ["uuinstagram.com", "mbdinstagram.com", "kkinstagram.com"],
+    "instagramProxyHosts": ["mbdinstagram.com", "toinstagram.com", "uuinstagram.com", "kkinstagram.com"],
     "threadsProxyHosts": ["viewthreads.com", "fzthreads.com", "fixthreads.seria.moe"],
     "facebookProxyHosts": ["facebed.com"],
     "redditProxyHosts": ["vxreddit.com", "redditez.com"],
