@@ -36,10 +36,24 @@
  *     so a hostile or huge page cannot exhaust memory.
  *   - `timeout` bounds time-to-headers; an explicit read deadline bounds the
  *     body read, so a slow trickle cannot stall the event handler.
+ *
+ * Name resolution is bounded separately, because the request timeout
+ * cannot reach it: Node's default `dns.lookup` runs `getaddrinfo` on the
+ * libuv threadpool, where a query to a host whose name servers have gone
+ * silent (a dead embed proxy, typically) holds a thread for tens of seconds
+ * after axios has already given up. A few such probes fill the pool and
+ * every other lookup in the process — the Discord API, the database, the
+ * LLM providers — queues behind them. So every probe resolves through a
+ * c-ares resolver with its own per-query timeout, off the threadpool (see
+ * {@link createBoundedLookup}); a dead proxy costs one short DNS timeout
+ * and nothing else.
  * Only the `<head>` is scanned for `<meta>` tags via a bounded regex, so
  * no heavy HTML parser dependency is introduced.
  */
-import { isIP } from 'node:net';
+import { promises as dnsPromises, type LookupAddress, type LookupOptions } from 'node:dns';
+import http from 'node:http';
+import https from 'node:https';
+import { isIP, type LookupFunction } from 'node:net';
 import type { Readable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 
@@ -91,6 +105,17 @@ interface OgClientOptions {
 }
 
 const DEFAULT_MAX_CONTENT_LENGTH = 512 * 1024;
+/**
+ * First-attempt timeout of a probe's DNS query. Short because the hosts in
+ * play are public, well-provisioned names: an answer that takes longer is
+ * almost always a dead name server. c-ares doubles the wait on the retry,
+ * so a silent name server costs about three seconds in total — inside the
+ * operator's per-host request timeout, which would otherwise absorb the
+ * whole wait and report it as a generic abort.
+ */
+const DNS_TIMEOUT_MS = 1000;
+/** Query attempts per name server, so one dropped UDP packet is not a miss. */
+const DNS_TRIES = 2;
 /**
  * Discord's crawler User-Agent. Embed-proxy hosts (fxtwitter, kkinstagram,
  * facebed, ...) serve OpenGraph only to a recognised bot UA and redirect
@@ -428,6 +453,74 @@ export const parseOpenGraph = (html: string): OpenGraphMeta => {
   };
 };
 
+/**
+ * The slice of a `dns.promises.Resolver` the bounded lookup relies on —
+ * the plain-address overloads only, so a test can supply a fake without
+ * reproducing the resolver's TTL-record overloads.
+ */
+export interface AddressResolver {
+  resolve4(hostname: string): Promise<string[]>;
+  resolve6(hostname: string): Promise<string[]>;
+}
+
+/** Whether a `dns.lookup` family option asks for records of `target`. */
+const wantsFamily = (family: LookupOptions['family'], target: 4 | 6): boolean =>
+  family === undefined ||
+  family === 0 ||
+  family === target ||
+  family === (target === 4 ? 'IPv4' : 'IPv6');
+
+/**
+ * The error a failed lookup reports. A timeout wins over any other reason
+ * because it is the actionable one (a dead name server) and it maps to
+ * `LINK_PREVIEW_TIMEOUT`; a non-`Error` rejection or an empty answer is
+ * reported as `ENOTFOUND`, the code `getaddrinfo` would have used.
+ */
+const lookupFailure = (
+  outcomes: readonly PromiseSettledResult<unknown>[],
+  hostname: string,
+): NodeJS.ErrnoException => {
+  const reasons = outcomes.flatMap((o) => (o.status === 'rejected' ? [o.reason as unknown] : []));
+  const errors = reasons.filter((r): r is NodeJS.ErrnoException => r instanceof Error);
+  const timeout = errors.find((e) => e.code === 'ETIMEOUT');
+  const chosen = timeout ?? errors[0];
+  if (chosen !== undefined) return chosen;
+  return Object.assign(new Error(`link-preview: no address for "${hostname}"`), {
+    code: 'ENOTFOUND',
+    hostname,
+  });
+};
+
+/**
+ * A `net.connect`-compatible `lookup` that resolves through `resolver`
+ * (c-ares: asynchronous, per-query timeout, no threadpool) instead of
+ * `getaddrinfo`. Honours the `family` filter and the `all` flag the socket
+ * layer passes (Node's happy-eyeballs path asks for `all` and both
+ * families). `/etc/hosts` is not consulted, which is fine for the public
+ * proxy and source hosts this client ever probes. Exported for unit tests.
+ */
+export const createBoundedLookup =
+  (resolver: AddressResolver): LookupFunction =>
+  (hostname, options, callback) => {
+    const query = async (target: 4 | 6): Promise<LookupAddress[]> => {
+      if (!wantsFamily(options.family, target)) return [];
+      const records =
+        target === 4 ? await resolver.resolve4(hostname) : await resolver.resolve6(hostname);
+      return records.map((address) => ({ address, family: target }));
+    };
+    void Promise.allSettled([query(4), query(6)]).then((outcomes) => {
+      const addresses = outcomes.flatMap((o) => (o.status === 'fulfilled' ? o.value : []));
+      const first = addresses[0];
+      if (first === undefined) {
+        callback(lookupFailure(outcomes, hostname), []);
+      } else if (options.all === true) {
+        callback(null, addresses);
+      } else {
+        callback(null, first.address, first.family);
+      }
+    });
+  };
+
 interface CacheEntry {
   readonly value: OpenGraphMeta;
   readonly expiresAt: number;
@@ -441,6 +534,9 @@ export class OgClient {
   private readonly now: () => number;
   /** Insertion-ordered (Map preserves it) cache of successful fetches by URL. */
   private readonly cache = new Map<string, CacheEntry>();
+  /** Per-protocol agents whose sockets resolve names via the bounded lookup. */
+  private readonly httpAgent: http.Agent;
+  private readonly httpsAgent: https.Agent;
 
   public constructor(options: OgClientOptions = {}) {
     this.maxContentLength = options.maxContentLength ?? DEFAULT_MAX_CONTENT_LENGTH;
@@ -448,6 +544,11 @@ export class OgClient {
     this.cacheTtlMs = options.cacheTtlMs ?? 0;
     this.cacheMaxEntries = options.cacheMaxEntries ?? DEFAULT_CACHE_MAX_ENTRIES;
     this.now = options.now ?? Date.now;
+    const lookup = createBoundedLookup(
+      new dnsPromises.Resolver({ timeout: DNS_TIMEOUT_MS, tries: DNS_TRIES }),
+    );
+    this.httpAgent = new http.Agent({ keepAlive: true, lookup });
+    this.httpsAgent = new https.Agent({ keepAlive: true, lookup });
   }
 
   /**
@@ -575,6 +676,8 @@ export class OgClient {
     const response = await axios.get<Readable>(url, {
       responseType: 'stream',
       timeout: timeoutMs,
+      httpAgent: this.httpAgent,
+      httpsAgent: this.httpsAgent,
       maxRedirects: SAFE_MAX_REDIRECTS,
       beforeRedirect: (options) => {
         assertSafeRedirect(options);
@@ -608,6 +711,8 @@ export class OgClient {
       // stream, so the read is bounded explicitly in `readHead`.
       responseType: 'stream',
       timeout: timeoutMs,
+      httpAgent: this.httpAgent,
+      httpsAgent: this.httpsAgent,
       // Follow a few redirects (proxies redirect to a render / CDN host, as
       // Discord does), but the SSRF guard refuses internal hops. Record each
       // hop's target for media-file recognition on failure.

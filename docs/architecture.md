@@ -428,7 +428,10 @@ share token on the follow-up request and bounces the chase to an error
 page, leaving the permalink reachable only as an intermediate hop;
 `bahamut` scrapes OpenGraph via the SSRF-safe
 `OgClient` (streamed, bounded redirect-following behind a `beforeRedirect`
-SSRF guard, host allow-list).
+SSRF guard, host allow-list, and a bounded c-ares name lookup so a proxy
+whose name servers have died costs one short DNS timeout instead of
+holding a libuv threadpool thread that every other lookup in the process
+then queues behind).
 Failures map into `LinkPreviewError`. `LinkPreviewProviderRegistry`
 matches by URL in registration order. The per-source proxy-host lists are
 operator configuration (the bot's `social_link_preview` block), not code
