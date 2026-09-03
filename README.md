@@ -181,7 +181,7 @@ guild's `permission_rank.features` map.
 | `llm_auto_reply`          | gopher         | `enabled` (`false`), `probability` (`0.05`), `messageCount` (`5`), `windowSeconds` (`30`), `cooldownSeconds` (`30`), `endpoint` (placeholder), `timeoutMs` (`10000`)                                                                                                                             |
 | `settings_api`            | gopher         | `enabled` (`false`), `host` (`127.0.0.1`), `basePath` (`/settings`). The bearer key comes from `GOPHER_SETTINGS_API_KEY`, never this block; an enabled API with no key refuses to start. The listen port is `PORT`.                                                                              |
 | `identity_sync`           | gopher         | `enabled` (`false`), `syncWithSource` (`false`), `sourceUserId` (**required** when `enabled && syncWithSource`), `schedule` (`0 4 * * *`), `syncAvatar` / `syncNickname` (`true`), `fallbackNickname` (empty = leave untouched), `fallbackAvatarPath` (`assets/gopher.png`)                      |
-| `social_link_preview`     | nijika, tomori | `enabled` (`false`), `originalMessageStrategy` (`suppress`), `providers` (all), `timeoutMs` (`4000`), `validationBudgetMs` (`8000`), `maxUrlsPerMessage` (`1`), plus six `*ProxyHosts` lists — see below                                                                                         |
+| `social_link_preview`     | nijika, tomori | `enabled` (`false`), `originalMessageStrategy` (`suppress`), `providers` (all), `timeoutMs` (`4000`), `maxUrlsPerMessage` (`1`), plus six `*ProxyHosts` lists — see below                                                                                                                        |
 | `x_media_feed`            | nijika         | `enabled` (`false`), `accounts` (`{ handle, channel? }[]`), `defaultChannel` (`x_feed`), `pollIntervalMs` (`300000`, floor `60000`), `fullSweepEveryPolls` (`12`), `apiBaseUrl` (`https://api.fxtwitter.com`), `timeoutMs` (`8000`), `maxPostsPerPoll` (`5`), `embedProxyHost` (`fxtwitter.com`) |
 | `guild_events`            | nijika, tomori | `attachment_cache.enabled` (`true`), `attachment_cache.ttlHours` (`24`), `attachment_cache.minFreeDiskMb` (`5120`) — the pre-delete attachment cache; see below                                                                                                                                  |
 | `level_roles`             | nijika         | `level_<n>` → role name for the level-role sync. Required by `/update_role`; a malformed block disables the command with `replies:update_role.no_config`.                                                                                                                                        |
@@ -209,7 +209,10 @@ Several fields carry a required-when rule worth calling out:
   without one fails the boot with an error naming the missing key. Copy
   the audited values from the personality's `config.example.json` rather
   than inventing hosts. While `enabled` is `false` the lists are
-  accepted but unread.
+  accepted but unread. Each list is probed in order until a host yields
+  a playable video or the list ends, so every dead host ahead of a live
+  one costs `timeoutMs` before the preview is posted — keep the lists
+  short and put the hosts that answer first.
 - `x_media_feed.accounts[].channel` / `defaultChannel` — a symbolic
   channel name, so the guild's `channels` map must carry a matching
   entry. A guild without it silently opts out.

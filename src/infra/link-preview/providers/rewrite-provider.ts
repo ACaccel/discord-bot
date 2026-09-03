@@ -21,8 +21,11 @@
  *     and NO bare/dead link is ever posted.
  *
  * Per-host probe failures are logged at debug (proxy flakiness is expected),
- * never surfaced as `Err`. The whole probe sequence is bounded by
- * `ctx.budgetMs` (cumulative) on top of `ctx.timeoutMs` (per host).
+ * never surfaced as `Err`, and never end the walk: every host is probed
+ * until one yields a video or the list runs out, so a dead host early in
+ * the list costs its `ctx.timeoutMs` and nothing more. That per-host
+ * timeout is the only bound, which makes worst-case latency the list
+ * length times the timeout — the operator keeps the lists short.
  *
  * The per-source files supply `matches` (pure predicate), the `proxyHosts`
  * list, and `toProxyUrl`. This file performs network I/O but returns only a
@@ -164,19 +167,11 @@ const validate = async (
   url: URL,
   ctx: LinkPreviewBuildContext,
 ): Promise<Result<LinkPreviewResult | null, LinkPreviewFailure>> => {
-  const now = ctx.now ?? Date.now;
-  const deadline = ctx.budgetMs !== undefined ? now() + ctx.budgetMs : undefined;
-
   let bestImage: string | undefined; // candidate whose OG had >=1 post image
   let bestWeakImage: string | undefined; // candidate whose images were all stand-ins
   let bestText: string | undefined; // candidate whose OG had only a title
-  let probed = 0;
 
   for (const host of spec.proxyHosts) {
-    // Always probe the first host; after that, stop once the cumulative
-    // budget elapses (regardless of whether a fallback was found yet).
-    if (probed > 0 && deadline !== undefined && now() >= deadline) break;
-    probed += 1;
     const candidate = spec.toProxyUrl(url, host);
     const res = await spec.ogClient.fetch(candidate, spec.name, ctx.timeoutMs);
     if (!res.ok) {

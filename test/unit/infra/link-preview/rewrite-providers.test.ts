@@ -294,30 +294,30 @@ describe('rewrite-provider validation loop', () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
-  it('stops probing once the validation budget elapses, using the best so far', async () => {
+  it('walks past every failed host until one succeeds, however far down the list', async () => {
+    const hosts = ['a.example', 'b.example', 'c.example'];
+    const at = (host: string): string => `https://${host}/jack/status/20`;
     const { client, fetch } = makeOgClient({
-      [fx]: ok(meta({ images: ['a.jpg'] })), // image-only -> remembered
-      [vx]: ok(meta({ video: 'v.mp4' })), // would win, but we never reach it
+      [at('a.example')]: err(invalidResponseError('twitter')),
+      [at('b.example')]: err(invalidResponseError('twitter')),
+      [at('c.example')]: ok(meta({ images: ['c.jpg'] })),
     });
-    const provider = createTwitterProvider({ proxyHosts: HOSTS, ogClient: client });
-    // now(): first call computes the deadline (0 + 100); the loop-top check
-    // after host 1 sees 10_000 >= 100 and breaks before probing host 2.
-    const times = [0, 10_000];
-    const now = (): number => times.shift() ?? 10_000;
-    expect(await buildUrl(provider, tweet, { timeoutMs: 1000, budgetMs: 100, now })).toBe(fx);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    const provider = createTwitterProvider({ proxyHosts: hosts, ogClient: client });
+    expect(await buildUrl(provider, 'https://x.com/jack/status/20')).toBe(at('c.example'));
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 
-  it('returns null when the budget elapses before any host yields a candidate', async () => {
+  it('probes the whole list before giving up when every host fails', async () => {
+    const hosts = ['a.example', 'b.example', 'c.example'];
+    const at = (host: string): string => `https://${host}/jack/status/20`;
     const { client, fetch } = makeOgClient({
-      [fx]: err(invalidResponseError('twitter')), // host 1 fails -> no candidate remembered
-      [vx]: ok(meta({ video: 'v.mp4' })), // would win, but budget stops us first
+      [at('a.example')]: err(invalidResponseError('twitter')),
+      [at('b.example')]: err(invalidResponseError('twitter')),
+      [at('c.example')]: err(invalidResponseError('twitter')),
     });
-    const provider = createTwitterProvider({ proxyHosts: HOSTS, ogClient: client });
-    const times = [0, 10_000];
-    const now = (): number => times.shift() ?? 10_000;
-    expect(await buildUrl(provider, tweet, { timeoutMs: 1000, budgetMs: 100, now })).toBeNull();
-    expect(fetch).toHaveBeenCalledTimes(1);
+    const provider = createTwitterProvider({ proxyHosts: hosts, ogClient: client });
+    expect(await buildUrl(provider, 'https://x.com/jack/status/20')).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 });
 

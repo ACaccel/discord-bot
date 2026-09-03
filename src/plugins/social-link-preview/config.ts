@@ -24,8 +24,6 @@ import { LINK_PREVIEW_PROVIDER_NAMES } from '../../infra/link-preview';
 
 /** Hard cap so a typo cannot hold a single host probe open for minutes. */
 const MAX_TIMEOUT_MS = 15_000;
-/** Hard cap on the cumulative validation budget across all host probes. */
-const MAX_VALIDATION_BUDGET_MS = 30_000;
 /** Hard cap on previews per message, bounding reply fan-out / spam. */
 const MAX_URLS_PER_MESSAGE = 5;
 
@@ -56,17 +54,16 @@ const commonShape = {
    * per-source kill-switch when a proxy service is misbehaving.
    */
   providers: z.array(z.enum(LINK_PREVIEW_PROVIDER_NAMES)).optional(),
-  /** Per-host OpenGraph probe / scrape timeout, in milliseconds. */
-  timeoutMs: z.number().int().positive().max(MAX_TIMEOUT_MS).default(4_000),
   /**
-   * Cumulative budget for probing a single URL's proxy-host list, in
-   * milliseconds. Caps worst-case latency (per-host timeout × list length).
+   * Per-host OpenGraph probe / scrape timeout, in milliseconds. A rewrite
+   * provider walks its whole host list, so this times the list length is
+   * the worst case for one URL.
    */
-  validationBudgetMs: z.number().int().positive().max(MAX_VALIDATION_BUDGET_MS).default(8_000),
+  timeoutMs: z.number().int().positive().max(MAX_TIMEOUT_MS).default(4_000),
   /**
    * Maximum number of previews to post for a single message. Probing is
    * sequential, so worst-case per-message latency scales as
-   * `maxUrlsPerMessage × (validationBudgetMs + timeoutMs)`; keep this small.
+   * `maxUrlsPerMessage × hosts per list × timeoutMs`; keep this small.
    */
   maxUrlsPerMessage: z.number().int().positive().max(MAX_URLS_PER_MESSAGE).default(1),
 };

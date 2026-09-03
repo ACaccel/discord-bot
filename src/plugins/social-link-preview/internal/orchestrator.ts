@@ -24,7 +24,7 @@ interface RunSocialLinkPreviewDeps {
   readonly registry: LinkPreviewProviderRegistry;
   readonly config: Pick<
     SocialLinkPreviewPluginConfig,
-    'originalMessageStrategy' | 'timeoutMs' | 'validationBudgetMs' | 'maxUrlsPerMessage'
+    'originalMessageStrategy' | 'timeoutMs' | 'maxUrlsPerMessage'
   >;
   readonly translator: Translator;
   readonly logger: Logger;
@@ -46,7 +46,6 @@ export const runSocialLinkPreview = async (
 
     const result = await provider.build(url, {
       timeoutMs: deps.config.timeoutMs,
-      budgetMs: deps.config.validationBudgetMs,
       logger: deps.logger,
     });
     if (!result.ok) {

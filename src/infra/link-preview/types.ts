@@ -96,17 +96,12 @@ export type LinkPreviewResult =
 
 /** Per-call collaborators handed to {@link LinkPreviewProvider.build}. */
 export interface LinkPreviewBuildContext {
-  /** Per-host hard timeout for any network the provider performs, in milliseconds. */
-  readonly timeoutMs: number;
   /**
-   * Cumulative validation budget across all proxy-host probes for this one
-   * URL, in milliseconds. A rewrite provider stops probing further hosts
-   * once this elapses and falls back to its best candidate so far. When
-   * omitted, providers probe their whole list bounded only by `timeoutMs`.
+   * Per-host hard timeout for any network the provider performs, in
+   * milliseconds. A rewrite provider probes its whole host list, so this
+   * times the list length is the worst case for one URL.
    */
-  readonly budgetMs?: number;
-  /** Optional injectable clock (ms) for deterministic budget tests. Default `Date.now`. */
-  readonly now?: () => number;
+  readonly timeoutMs: number;
   /** Optional scoped logger for provider-internal diagnostics. */
   readonly logger?: Logger;
 }

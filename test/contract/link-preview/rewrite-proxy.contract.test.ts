@@ -34,7 +34,7 @@ const provider = (): LinkPreviewProvider =>
   createTwitterProvider({ proxyHosts: HOSTS, ogClient: new OgClient() });
 
 const build = async (): Promise<string | null> => {
-  const result = await provider().build(TWEET, { timeoutMs: 4000, budgetMs: 8000 });
+  const result = await provider().build(TWEET, { timeoutMs: 4000 });
   if (!isOk(result)) throw new Error('expected ok');
   if (result.value === null) return null;
   if (result.value.kind !== 'rewritten-url') throw new Error('expected rewritten-url');
@@ -152,7 +152,7 @@ describe('facebook share-link resolution contract', () => {
       proxyHosts: ['facebed.com'],
       ogClient: new OgClient(),
     });
-    const result = await provider.build(url, { timeoutMs: 4000, budgetMs: 8000 });
+    const result = await provider.build(url, { timeoutMs: 4000 });
     if (!isOk(result)) throw new Error('expected ok');
     return result.value;
   };
@@ -242,7 +242,7 @@ describe('bilibili b23.tv resolution contract', () => {
       proxyHosts: ['vxbilibili.com'],
       ogClient: new OgClient(),
     });
-    const result = await provider.build(url, { timeoutMs: 4000, budgetMs: 8000 });
+    const result = await provider.build(url, { timeoutMs: 4000 });
     if (!isOk(result)) throw new Error('expected ok');
     return result.value;
   };
@@ -329,7 +329,7 @@ describe('threads share-link resolution contract', () => {
       proxyHosts: ['vxthreads.net'],
       ogClient: new OgClient(),
     });
-    const result = await provider.build(url, { timeoutMs: 4000, budgetMs: 8000 });
+    const result = await provider.build(url, { timeoutMs: 4000 });
     if (!isOk(result)) throw new Error('expected ok');
     return result.value;
   };
@@ -458,7 +458,7 @@ describe('threads weak-image host selection contract', () => {
 
   const buildThreads = async (): Promise<string | null> => {
     const provider = createThreadsProvider({ proxyHosts: HOSTS, ogClient: new OgClient() });
-    const result = await provider.build(PERMALINK, { timeoutMs: 4000, budgetMs: 8000 });
+    const result = await provider.build(PERMALINK, { timeoutMs: 4000 });
     if (!isOk(result)) throw new Error('expected ok');
     if (result.value === null) return null;
     if (result.value.kind !== 'rewritten-url') throw new Error('expected rewritten-url');

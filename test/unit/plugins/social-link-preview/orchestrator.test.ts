@@ -72,7 +72,6 @@ const registryReturning = (
 const config = {
   originalMessageStrategy: 'suppress' as const,
   timeoutMs: 1000,
-  validationBudgetMs: 8000,
   maxUrlsPerMessage: 1,
 };
 

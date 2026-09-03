@@ -52,7 +52,6 @@ describe('parseSocialLinkPreviewConfig', () => {
     expect(config.originalMessageStrategy).toBe('suppress');
     expect(config.maxUrlsPerMessage).toBe(1);
     expect(config.timeoutMs).toBe(4000);
-    expect(config.validationBudgetMs).toBe(8000);
     expect(config.providers).toBeUndefined();
     // No host list is invented in code: a disabled feature probes nothing.
     for (const key of PROXY_HOST_KEYS) {
@@ -114,9 +113,8 @@ describe('parseSocialLinkPreviewConfig', () => {
     ).toContain('redditProxyHosts');
   });
 
-  it('rejects an out-of-range timeout / budget and an invalid provider name', () => {
+  it('rejects an out-of-range timeout and an invalid provider name', () => {
     expect(() => parseSocialLinkPreviewConfig({ timeoutMs: 999_999 })).toThrow(z.ZodError);
-    expect(() => parseSocialLinkPreviewConfig({ validationBudgetMs: 999_999 })).toThrow(z.ZodError);
     expect(() => parseSocialLinkPreviewConfig({ providers: ['myspace'] })).toThrow(z.ZodError);
   });
 });
