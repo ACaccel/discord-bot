@@ -34,6 +34,7 @@ const TRACKING_PARAMS: ReadonlySet<string> = new Set([
   'fbclid',
   'igsh',
   'igshid',
+  'igsi',
   'si',
   'ref',
   'ref_src',

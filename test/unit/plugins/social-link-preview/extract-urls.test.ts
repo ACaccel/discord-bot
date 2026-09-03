@@ -54,7 +54,7 @@ describe('extractUrls', () => {
     expect(extractUrls(many, 100)).toHaveLength(HARD_SCAN_LIMIT);
   });
 
-  it('strips tracking params (mibextid / utm_* / fbclid / igsh) from extracted URLs', () => {
+  it('strips tracking params (mibextid / utm_* / fbclid / igsh / igsi) from extracted URLs', () => {
     expect(hrefs('https://www.facebook.com/share/r/1afkq5HHtD/?mibextid=WC7FNe')).toEqual([
       'https://www.facebook.com/share/r/1afkq5HHtD/',
     ]);
@@ -63,6 +63,9 @@ describe('extractUrls', () => {
     ]);
     expect(hrefs('https://www.instagram.com/reel/Cabc/?igsh=xyz&igshid=q')).toEqual([
       'https://www.instagram.com/reel/Cabc/',
+    ]);
+    expect(hrefs('https://www.instagram.com/p/DcmAigKJr9-/?igsi=MTlldjlrcm8zNHc4Yg==')).toEqual([
+      'https://www.instagram.com/p/DcmAigKJr9-/',
     ]);
   });
 
