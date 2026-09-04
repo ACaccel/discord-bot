@@ -364,10 +364,10 @@
     "list_empty": "這個伺服器還沒有任何動態訂閱。",
     "list_header": "動態訂閱 ({{total}} 筆):",
     "filter_media": {
-      "media_only": "限有媒體",
+      "media_only": "限圖片或影片",
       "photo_only": "限圖片",
       "video_only": "限影片",
-      "any": "含純文字貼文"
+      "any": "所有貼文"
     },
     "filter_keyword": "關鍵字:{{keyword}}",
     "never_forwarded": "尚未轉發",

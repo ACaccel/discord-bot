@@ -178,12 +178,12 @@
         "description": "Channel to forward into (default: this channel)"
       },
       "media": {
-        "description": "Which posts to forward, by attached media (default: with media)",
+        "description": "Which posts to forward, by attached media (default: photos or videos only)",
         "choices": {
-          "media_only": "Posts with any media (default)",
-          "photo_only": "Posts with a photo",
-          "video_only": "Posts with a video",
-          "any": "Text-only posts included"
+          "media_only": "Only posts with a photo or video, no text-only posts (default)",
+          "photo_only": "Only posts with a photo",
+          "video_only": "Only posts with a video",
+          "any": "Every post: text-only, photo and video"
         }
       },
       "keyword": {

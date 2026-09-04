@@ -364,10 +364,10 @@
     "list_empty": "This server has no feed subscriptions yet.",
     "list_header": "Feed subscriptions ({{total}}):",
     "filter_media": {
-      "media_only": "with media",
+      "media_only": "photos or videos",
       "photo_only": "photos",
       "video_only": "videos",
-      "any": "text posts included"
+      "any": "every post"
     },
     "filter_keyword": "keyword: {{keyword}}",
     "never_forwarded": "nothing forwarded yet",
