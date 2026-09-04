@@ -163,11 +163,15 @@ export const performBackup = async (
     log.writeln(`Total duration:         ${duration.toFixed(1)}s`);
     log.writeln(`Completed:              ${new Date().toISOString()}`);
 
+    // A channel that failed is only visible in the pino log and the
+    // opt-in transcript; surface the count here so an operator reading
+    // the debug channel does not mistake a partial pass for a clean one.
     await statusMsg.edit(
       `[ SYSTEM ] Backup complete. DB now contains (${existingCount}+${newCount}) messages. (${duration.toFixed(1)}s)` +
         (deletedChannelIds.length > 0
           ? ` Removed ${deletedChannelIds.length} stale channel record(s).`
-          : ''),
+          : '') +
+        (errorCount > 0 ? ` ${errorCount} channel(s) failed; see logs.` : ''),
     );
   } catch (err: unknown) {
     logError(pluginLogger, guildId, err);

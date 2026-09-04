@@ -391,6 +391,32 @@ describe('performBackup — channel isolation', () => {
     expect(h.edit.mock.calls.at(-1)?.[0]).toContain('(0+2)');
   });
 
+  it('tells the debug channel how many channels failed', async () => {
+    // The transcript is opt-in, so the status message is the only place
+    // an operator reliably sees that a pass was partial.
+    const h = harness({
+      channels: [
+        { id: 'c1', fetchError: new Error('Missing Access') },
+        { id: 'c2', fetchError: new Error('Missing Access') },
+        { id: 'c3', messageIds: ['100'] },
+      ],
+    });
+
+    await h.run();
+
+    const finalEdit = h.edit.mock.calls.at(-1)?.[0] as string;
+    expect(finalEdit).toContain('Backup complete.');
+    expect(finalEdit).toContain('2 channel(s) failed; see logs.');
+  });
+
+  it('reports no failures on a clean pass', async () => {
+    const h = harness({ channels: [{ id: 'c1', messageIds: ['100'] }] });
+
+    await h.run();
+
+    expect(h.edit.mock.calls.at(-1)?.[0]).not.toContain('failed');
+  });
+
   it('counts every enumerated channel in the overview, failures included', async () => {
     const h = harness({
       channels: [
