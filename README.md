@@ -232,7 +232,9 @@ Several fields carry a required-when rule worth calling out:
   `ttlHours`** (default `24`, swept hourly); size that against your
   disk and your privacy posture, and set `enabled: false` to go back to
   downloading only on delete. There is no total-size cap; the per-file
-  ceiling is 100 MB, and the bot stops writing new cache entries while
+  ceiling is 100 MB, a download is abandoned once no bytes arrive for
+  30 s or once it runs past 10 minutes in total (each logged as a
+  warning naming the reason), and the bot stops writing new cache entries while
   the volume holding the cache tree (`./data/attachment_cache/`) has
   less than `minFreeDiskMb` free (default `5120`, i.e. 5 GiB) — a pause
   logged once and lifted once space returns. The floor is checked per

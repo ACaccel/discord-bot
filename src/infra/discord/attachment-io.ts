@@ -23,22 +23,34 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 /** Root of the forensic archive tree. `data/` is gitignored. */
 const ARCHIVE_ROOT = './data/deleted_attachments';
 
 /**
- * Wall-clock budget for one CDN download. Discord's attachment CDN can
- * accept a connection and then stall, or trickle bytes indefinitely;
- * without a deadline the transfer promise never settles and the open
- * file descriptor leaks for the lifetime of the process.
+ * Longest silence tolerated inside one CDN download: connecting, waiting
+ * for headers, or the gap between two body chunks. Discord's attachment
+ * CDN can accept a connection and then stall; without a bound the
+ * transfer promise never settles and the open file descriptor leaks for
+ * the lifetime of the process.
  *
- * Enforced with `AbortSignal.timeout`, not axios's `timeout` option:
- * the latter maps to socket *inactivity*, which a slow trickle resets
- * forever.
+ * Progress-based rather than a fixed wall-clock budget, because a
+ * transfer that is merely slow — a large upload, four downloads sharing
+ * one link — must not be abandoned while bytes are still arriving. Not
+ * axios's `timeout` option either: that stops covering the body once
+ * the headers are in, so a stall mid-stream would never fire it.
  */
-const DOWNLOAD_TIMEOUT_MS = 30_000;
+const STALL_TIMEOUT_MS = 30_000;
+
+/**
+ * Hard ceiling on one download regardless of progress. The stall bound
+ * alone would let a trickle of one byte per stall window hold a
+ * download slot forever; this caps the damage. At the size ceiling it
+ * still allows a sustained rate well under what any usable link offers.
+ */
+const DOWNLOAD_CEILING_MS = 10 * 60_000;
 
 /**
  * Upper bound on a single downloaded attachment. Matches the largest
@@ -202,6 +214,67 @@ export const publishFile = async (source: string, destination: string): Promise<
   throw new Error(`publishFile: every candidate name for ${destination} is taken`);
 };
 
+/** The two ways a {@link DownloadDeadline} can end a download. */
+const stalledError = (): Error =>
+  new Error(`download stalled: no bytes for ${String(STALL_TIMEOUT_MS)} ms`);
+const ceilingError = (): Error =>
+  new Error(`download exceeded the ${String(DOWNLOAD_CEILING_MS)} ms ceiling`);
+
+interface DownloadDeadline {
+  /** Aborts once the stall window or the ceiling elapses. */
+  readonly signal: AbortSignal;
+  /** Record progress: restarts the stall window. */
+  readonly touch: () => void;
+  /** Release both timers; a download that finished must not fire them. */
+  readonly clear: () => void;
+}
+
+/**
+ * One download's abort signal: a stall window that every byte restarts,
+ * under a ceiling nothing restarts. The abort reason names which one
+ * fired, so the caller's log line says "stalled" rather than a bare
+ * "canceled".
+ */
+const createDownloadDeadline = (): DownloadDeadline => {
+  const controller = new AbortController();
+  const ceiling = setTimeout(() => controller.abort(ceilingError()), DOWNLOAD_CEILING_MS);
+  let stall: NodeJS.Timeout | undefined;
+
+  const touch = (): void => {
+    if (stall !== undefined) clearTimeout(stall);
+    stall = setTimeout(() => controller.abort(stalledError()), STALL_TIMEOUT_MS);
+  };
+  const clear = (): void => {
+    clearTimeout(ceiling);
+    if (stall !== undefined) clearTimeout(stall);
+  };
+
+  touch();
+  return { signal: controller.signal, touch, clear };
+};
+
+/**
+ * Pass-through that reports every chunk to the deadline. Placed in the
+ * pipeline rather than attached as a `data` listener, so the source
+ * stream's mode is left to `pipeline` alone.
+ */
+const progressReporter = (deadline: DownloadDeadline): Transform =>
+  new Transform({
+    transform(chunk, _encoding, callback): void {
+      deadline.touch();
+      callback(null, chunk);
+    },
+  });
+
+/**
+ * The failure to report for a rejected step. axios surfaces an abort as
+ * a generic `CanceledError`, so when the deadline is what fired, its
+ * own reason — which says whether the download stalled or overran the
+ * ceiling — replaces it.
+ */
+const failureOf = (deadline: DownloadDeadline, e: unknown): Error =>
+  deadline.signal.aborted ? toError(deadline.signal.reason) : toError(e);
+
 /**
  * Fetch `url` and write the body to `filePath`, creating the parent
  * directory first.
@@ -226,27 +299,35 @@ export const downloadToFile = async (
     return { stage: 'mkdir', error: toError(e), status: undefined };
   }
 
-  let response;
+  const deadline = createDownloadDeadline();
   try {
-    response = await axios.get<NodeJS.ReadableStream>(url, {
-      responseType: 'stream',
-      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-      maxContentLength: MAX_ATTACHMENT_BYTES,
-      maxRedirects: 3,
-    });
-  } catch (e) {
-    return { stage: 'fetch', error: toError(e), status: httpStatusOf(e) };
-  }
+    let response;
+    try {
+      response = await axios.get<NodeJS.ReadableStream>(url, {
+        responseType: 'stream',
+        signal: deadline.signal,
+        maxContentLength: MAX_ATTACHMENT_BYTES,
+        maxRedirects: 3,
+      });
+    } catch (e) {
+      return { stage: 'fetch', error: failureOf(deadline, e), status: httpStatusOf(e) };
+    }
 
-  try {
-    // `pipeline` propagates a failure from either end and destroys both
-    // streams; a hand-rolled `pipe` + `finish` listener ignores source
-    // errors, leaving the promise pending and the write handle open.
-    await pipeline(response.data, fs.createWriteStream(staging));
-    await publishFile(staging, filePath);
-  } catch (e) {
-    await fs.promises.unlink(staging).catch(() => undefined);
-    return { stage: 'write', error: toError(e), status: undefined };
+    try {
+      // Headers arrived: the stall window now measures the body.
+      deadline.touch();
+      // `pipeline` propagates a failure from either end and destroys
+      // every stream in it; a hand-rolled `pipe` + `finish` listener
+      // ignores source errors, leaving the promise pending and the
+      // write handle open.
+      await pipeline(response.data, progressReporter(deadline), fs.createWriteStream(staging));
+      await publishFile(staging, filePath);
+    } catch (e) {
+      await fs.promises.unlink(staging).catch(() => undefined);
+      return { stage: 'write', error: failureOf(deadline, e), status: undefined };
+    }
+  } finally {
+    deadline.clear();
   }
 
   return undefined;

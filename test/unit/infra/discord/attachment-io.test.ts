@@ -8,17 +8,22 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import axios from 'axios';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { Readable } from 'node:stream';
 
 import {
   PARTIAL_SUFFIX,
   archiveFilePath,
+  downloadToFile,
   publishFile,
   runBounded,
   sanitizeFileName,
 } from '../../../../src/infra/discord/attachment-io';
+
+vi.mock('axios');
 
 describe('sanitizeFileName', () => {
   it('reduces a traversal attempt to its last segment', () => {
@@ -216,6 +221,153 @@ describe('runBounded', () => {
     // If the failed run had leaked its slot, four more failures would
     // exhaust the pool and this call would hang forever.
     await expect(runBounded([1, 2], async () => undefined)).resolves.toBeUndefined();
+  });
+});
+
+describe('downloadToFile', () => {
+  const STALL_MS = 30_000;
+  const CEILING_MS = 10 * 60_000;
+
+  let dir: string;
+  let target: string;
+
+  beforeEach(() => {
+    // Only the deadline's own timers are faked; streams schedule their
+    // internal work on `nextTick` and `setImmediate`, which stay real.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'attachment-io-download-'));
+    target = path.join(dir, 'file.bin');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  type GetOptions = { signal: AbortSignal };
+
+  /**
+   * A body that emits `chunks` one every `intervalMs`, then ends unless
+   * `endless`. Mimics the axios adapter's abort handling: the signal
+   * firing destroys the stream with the abort reason.
+   */
+  const trickle = (
+    signal: AbortSignal,
+    chunks: readonly string[],
+    intervalMs: number,
+    endless = false,
+  ): Readable => {
+    const queue = [...chunks];
+    const stream = new Readable({
+      read(): void {
+        setTimeout(() => {
+          const next = queue.shift();
+          if (next !== undefined) stream.push(next);
+          else if (endless) stream.push('.');
+          else stream.push(null);
+        }, intervalMs);
+      },
+    });
+    signal.addEventListener('abort', () => stream.destroy(signal.reason as Error));
+    return stream;
+  };
+
+  /**
+   * Wait until the request has been issued. `downloadToFile` creates
+   * its directory over real I/O first; advancing the fake clock before
+   * the deadline exists would jump past the moment it is due to fire.
+   */
+  const requestIssued = async (): Promise<void> => {
+    while ((axios.get as unknown as ReturnType<typeof vi.fn>).mock.calls.length === 0) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+  };
+
+  const serveBody = (body: (signal: AbortSignal) => Readable): void => {
+    (axios.get as unknown as ReturnType<typeof vi.fn>) = vi.fn(
+      async (_url: string, options: GetOptions) => ({ data: body(options.signal) }),
+    );
+  };
+
+  it('keeps a slow but progressing transfer alive past the stall window', async () => {
+    // Four chunks 20 s apart run 80 s, well over the old fixed 30 s
+    // budget that abandoned an ordinary image on a shared link.
+    serveBody((signal) => trickle(signal, ['a', 'b', 'c', 'd'], 20_000));
+
+    const result = downloadToFile('https://cdn.invalid/slow.bin', target);
+    await requestIssued();
+    await vi.advanceTimersByTimeAsync(100_000);
+
+    await expect(result).resolves.toBeUndefined();
+    expect(fs.readFileSync(target, 'utf8')).toBe('abcd');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('abandons a body that stops sending, naming the stall, and removes the partial file', async () => {
+    // One chunk, then silence: a socket the CDN accepted and forgot.
+    serveBody((signal) => {
+      const stream = new Readable({ read(): void {} });
+      stream.push('a');
+      signal.addEventListener('abort', () => stream.destroy(signal.reason as Error));
+      return stream;
+    });
+
+    const result = downloadToFile('https://cdn.invalid/stalled.bin', target);
+    await requestIssued();
+    await vi.advanceTimersByTimeAsync(STALL_MS + 1);
+
+    const failure = await result;
+    expect(failure?.stage).toBe('write');
+    expect(failure?.error.message).toMatch(/stalled/);
+    expect(fs.existsSync(target)).toBe(false);
+    expect(fs.existsSync(`${target}${PARTIAL_SUFFIX}`)).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('abandons an endless trickle at the ceiling even though bytes keep arriving', async () => {
+    serveBody((signal) => trickle(signal, [], 20_000, true));
+
+    const result = downloadToFile('https://cdn.invalid/trickle.bin', target);
+    await requestIssued();
+    await vi.advanceTimersByTimeAsync(CEILING_MS + 1);
+
+    const failure = await result;
+    expect(failure?.stage).toBe('write');
+    expect(failure?.error.message).toMatch(/ceiling/);
+    expect(fs.existsSync(`${target}${PARTIAL_SUFFIX}`)).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('applies the stall window to the wait for headers too', async () => {
+    (axios.get as unknown as ReturnType<typeof vi.fn>) = vi.fn(
+      (_url: string, options: GetOptions) =>
+        new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(options.signal.reason));
+        }),
+    );
+
+    const result = downloadToFile('https://cdn.invalid/no-headers.bin', target);
+    await requestIssued();
+    await vi.advanceTimersByTimeAsync(STALL_MS + 1);
+
+    const failure = await result;
+    expect(failure?.stage).toBe('fetch');
+    expect(failure?.error.message).toMatch(/stalled/);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('reports a failure of the request itself untouched when no deadline fired', async () => {
+    (axios.get as unknown as ReturnType<typeof vi.fn>) = vi.fn(async () => {
+      throw Object.assign(new Error('gone'), { response: { status: 404 } });
+    });
+
+    const failure = await downloadToFile('https://cdn.invalid/gone.bin', target);
+
+    expect(failure?.stage).toBe('fetch');
+    expect(failure?.status).toBe(404);
+    expect(failure?.error.message).toBe('gone');
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
