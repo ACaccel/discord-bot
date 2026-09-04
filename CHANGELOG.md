@@ -19,6 +19,8 @@ or [`CONTRIBUTING.md`](CONTRIBUTING.md).
 ### Fixed
 
 - Probe two live Instagram embed-proxy hosts ahead of the two whose name servers stopped answering, so Instagram links preview again (copy the new `instagramProxyHosts` order from `config.example.json`) ([cf91447](https://github.com/ACaccel/BotFleet/commit/cf91447)).
+- Retry a Discord fetch that fails with a host- or network-unreachable socket error, and let the message backup wait out an outage of several minutes before giving up on a channel ([1e45d31](https://github.com/ACaccel/BotFleet/commit/1e45d31)).
+- Report the number of failed channels in the message backup's completion message, so a partial pass is visible in the debug channel ([57f6fa6](https://github.com/ACaccel/BotFleet/commit/57f6fa6)).
 - Bound the name lookup of every embed-proxy probe, so a proxy host with dead name servers no longer stalls the bot's other network calls ([74d8e05](https://github.com/ACaccel/BotFleet/commit/74d8e05)).
 - Strip Instagram's `igsi` share token from links before previewing them ([1096a50](https://github.com/ACaccel/BotFleet/commit/1096a50)).
 - Cache attachments before deletion and retry the download, so deleted-attachment archival stops losing files (see [`README.md`](README.md) for the cache settings) ([5491f89](https://github.com/ACaccel/BotFleet/commit/5491f89)).
