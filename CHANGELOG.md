@@ -13,12 +13,14 @@ or [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ### Changed
 
+- Spell out in the `/feed_subscribe` media choices which posts each one forwards (text-only, photo, video), and label the `/feed_list` filter the same way ([a11f752](https://github.com/ACaccel/BotFleet/commit/a11f752)).
 - Replace the configured X account list with per-channel feed subscriptions managed by `/feed_subscribe`, `/feed_unsubscribe` and `/feed_list`, which take several accounts at a time, and open the feed to further platforms (**breaking** — see [`README.md`](README.md)) ([40dd11e](https://github.com/ACaccel/BotFleet/commit/40dd11e)).
 - Probe every configured embed-proxy host until one yields a playable video or the list ends, and drop the `validationBudgetMs` setting (**breaking** — delete the key from each bot's `config.json`; see [`README.md`](README.md)) ([adcee34](https://github.com/ACaccel/BotFleet/commit/adcee34)).
 - Split the contributing guide into per-topic documents ([72ecc17](https://github.com/ACaccel/BotFleet/commit/72ecc17)).
 
 ### Fixed
 
+- Abandon an attachment download only when no bytes arrive for 30 s or it runs past 10 minutes, instead of after a fixed 30 s, so a large or slow attachment is cached rather than dropped with a bare `canceled` warning ([d34a4c5](https://github.com/ACaccel/BotFleet/commit/d34a4c5)).
 - Retry a Discord fetch that fails with a host- or network-unreachable socket error, and let the message backup wait out an outage of several minutes before giving up on a channel ([1e45d31](https://github.com/ACaccel/BotFleet/commit/1e45d31)).
 - Report the number of failed channels in the message backup's completion message, so a partial pass is visible in the debug channel ([57f6fa6](https://github.com/ACaccel/BotFleet/commit/57f6fa6)).
 - Probe two live Instagram embed-proxy hosts ahead of the two whose name servers stopped answering, so Instagram links preview again (copy the new `instagramProxyHosts` order from `config.example.json`) ([cf91447](https://github.com/ACaccel/BotFleet/commit/cf91447)).
