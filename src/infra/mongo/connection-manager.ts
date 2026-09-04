@@ -133,7 +133,10 @@ const buildModels = (connection: Connection): Models => ({
     'UserApiSetting',
     SCHEMAS.UserApiSetting,
   ),
-  XFeedCursor: connection.model<DocByName['XFeedCursor']>('XFeedCursor', SCHEMAS.XFeedCursor),
+  FeedSubscription: connection.model<DocByName['FeedSubscription']>(
+    'FeedSubscription',
+    SCHEMAS.FeedSubscription,
+  ),
 });
 
 /**

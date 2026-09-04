@@ -8,6 +8,7 @@
  */
 import type { RegisteredCommand } from './framework/command';
 import { dropTodoCommand } from './commands/drop-todo';
+import { dropXfeedCommand } from './commands/drop-xfeed';
 import { migrateTimestampCommand } from './commands/migrate-timestamp';
 import { verifyCommand } from './commands/verify';
 
@@ -16,6 +17,7 @@ const COMMANDS: readonly RegisteredCommand[] = [
   verifyCommand,
   migrateTimestampCommand,
   dropTodoCommand,
+  dropXfeedCommand,
 ];
 
 const BY_NAME: ReadonlyMap<string, RegisteredCommand> = new Map(

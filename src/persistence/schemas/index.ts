@@ -5,22 +5,30 @@
  * does not invite drive-by edits to the others.
  */
 import { activitySchema, type ActivityDoc } from './activity.schema';
+import { feedSubscriptionSchema, type FeedSubscriptionDoc } from './feed-subscription.schema';
 import { fetchSchema, type FetchDoc } from './fetch.schema';
 import { giveawaySchema, type GiveawayDoc } from './giveaway.schema';
 import { messageSchema, type MessageDoc } from './message.schema';
 import { replySchema, type ReplyDoc } from './reply.schema';
 import { tempRoleSchema, type TempRoleDoc } from './temp-role.schema';
 import { userApiSettingSchema, type UserApiSettingDoc } from './user-api-setting.schema';
-import { xFeedCursorSchema, type XFeedCursorDoc } from './x-feed-cursor.schema';
 
 export { activitySchema, type ActivityDoc } from './activity.schema';
+export {
+  feedSubscriptionSchema,
+  type FeedSubscriptionDoc,
+  type FeedSubscriptionFilter,
+  FEED_MEDIA_FILTERS,
+  type FeedMediaFilter,
+  DEFAULT_FEED_MEDIA_FILTER,
+  isFeedMediaFilter,
+} from './feed-subscription.schema';
 export { fetchSchema, type FetchDoc } from './fetch.schema';
 export { giveawaySchema, type GiveawayDoc } from './giveaway.schema';
 export { messageSchema, type MessageDoc } from './message.schema';
 export { replySchema, type ReplyDoc } from './reply.schema';
 export { tempRoleSchema, type TempRoleDoc } from './temp-role.schema';
 export { userApiSettingSchema, type UserApiSettingDoc } from './user-api-setting.schema';
-export { xFeedCursorSchema, type XFeedCursorDoc } from './x-feed-cursor.schema';
 
 export const SCHEMAS = {
   Fetch: fetchSchema,
@@ -30,7 +38,7 @@ export const SCHEMAS = {
   Activity: activitySchema,
   TempRole: tempRoleSchema,
   UserApiSetting: userApiSettingSchema,
-  XFeedCursor: xFeedCursorSchema,
+  FeedSubscription: feedSubscriptionSchema,
 } as const;
 
 export type SchemaName = keyof typeof SCHEMAS;
@@ -47,5 +55,5 @@ export interface DocByName {
   Activity: ActivityDoc;
   TempRole: TempRoleDoc;
   UserApiSetting: UserApiSettingDoc;
-  XFeedCursor: XFeedCursorDoc;
+  FeedSubscription: FeedSubscriptionDoc;
 }

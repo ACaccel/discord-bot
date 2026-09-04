@@ -31,7 +31,7 @@
     "src/infra/llm/index.ts",
     "src/infra/link-preview/index.ts",
     "src/infra/mongo/index.ts",
-    "src/infra/x-feed/index.ts",
+    "src/infra/social-feed/index.ts",
     "src/handlers/*/index.ts"
   ],
   "rules": {

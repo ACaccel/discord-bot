@@ -11,6 +11,7 @@ describe('db / registry', () => {
     expect(findCommand('verify')?.name).toBe('verify');
     expect(findCommand('migrate-timestamp')?.name).toBe('migrate-timestamp');
     expect(findCommand('drop-todo')?.name).toBe('drop-todo');
+    expect(findCommand('drop-xfeed')?.name).toBe('drop-xfeed');
   });
 
   it('returns undefined for an unknown subcommand', () => {
@@ -19,7 +20,7 @@ describe('db / registry', () => {
 
   it('lists every command exactly once', () => {
     const names = commandNames();
-    expect(names).toEqual(['verify', 'migrate-timestamp', 'drop-todo']);
+    expect(names).toEqual(['verify', 'migrate-timestamp', 'drop-todo', 'drop-xfeed']);
     expect(new Set(names).size).toBe(names.length);
   });
 

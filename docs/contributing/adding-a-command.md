@@ -182,6 +182,16 @@ re-deriving the behaviour:
   and both may import `infra`. An ESLint rule enforces the
   `plugins -> handlers` half.
 
+- **`src/infra/discord/send-paged-reply.ts`** —
+  `sendPagedEphemeralReply(interaction, pages, { logger, partialNotice })`
+  for a listing too long for Discord's 2000-character message limit. It
+  sends page 1 as the `editReply` and the rest as follow-ups, isolating
+  each one: a rejected page is logged and skipped, the remaining pages
+  still go out, and the gap is reported with one extra follow-up. Do not
+  hand-roll the loop — an unguarded `followUp` rejection escapes to the
+  handler's `catch`, where `replyForError` overwrites page 1 with the
+  error line and the user is left with no listing at all.
+
 - **`src/core/regex-capture.ts`** — `requireCapture(match, group)`.
   Never write `match[1] as string`: under `noUncheckedIndexedAccess` a
   capture group is `string | undefined`, and the cast turns a pattern

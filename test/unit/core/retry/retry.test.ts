@@ -190,7 +190,7 @@ describe('retryFetch', () => {
   });
 
   it('honours a caller-supplied predicate that narrows the default', async () => {
-    // The x-feed client uses this to stop retrying a 429: what counts as
+    // The social-feed client uses this to stop retrying a 429: what counts as
     // transient depends on who owns the rate-limit budget.
     const cause = Object.assign(new Error('Too Many Requests'), { response: { status: 429 } });
     const fn = vi.fn(async () => {

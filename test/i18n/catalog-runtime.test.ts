@@ -4,6 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 import { I18NextTranslator } from '../../src/core/i18n/i18next-translator';
 import { loadCatalogResources } from '../../src/core/i18n/catalog-loader';
+import { PERMISSION_LABEL_KEYS } from '../../src/handlers/commands/feed_subscribe/permission-requirements';
+import { SUPPORTED_FEED_PLATFORMS } from '../../src/infra/social-feed';
+import { FEED_MEDIA_FILTERS } from '../../src/persistence/schemas/feed-subscription.schema';
 
 /**
  * The loader does not reverse-resolve `src/i18n/locales` from its own
@@ -27,6 +30,11 @@ const LOCALES_DIR = path.resolve(__dirname, '..', '..', 'src', 'i18n', 'locales'
  *   the `{{traceId}}` interpolation slot so `replyForError` can surface a
  *   trace code for non-DomainError failures.
  */
+/** Every suffix `feed_subscribe` can render under `replies:feed.permission.`. */
+const FEED_PERMISSION_LABEL_SUFFIXES = [
+  ...new Set(Object.values(PERMISSION_LABEL_KEYS)),
+] as readonly string[];
+
 describe('catalog runtime behaviour', () => {
   it('loads both locales from disk', () => {
     const resources = loadCatalogResources({ localesDir: LOCALES_DIR });
@@ -58,6 +66,127 @@ describe('catalog runtime behaviour', () => {
     delete (trimmedEn.en.replies as Record<string, unknown>).help;
     const translator = await I18NextTranslator.create(trimmedEn, 'zh-TW');
     expect(translator.t('replies:help.no_commands', undefined, 'en')).toBe('沒有指令清單');
+  });
+
+  it('resolves every errors:feed.* FeedError messageKey with its params filled in', async () => {
+    // The eight FeedErrorCode sub-codes map to these keys via
+    // `infra/social-feed/platforms/error-translator.messageKeyFor`. That
+    // mapping and the catalog are joined only by matching string
+    // literals, so renaming one side alone would otherwise pass every
+    // gate and reach a user as a raw key.
+    const translator = await I18NextTranslator.create(
+      loadCatalogResources({ localesDir: LOCALES_DIR }),
+    );
+    const params = { platform: 'X', account: 'someaccount', status: '404' };
+    const feedKeys = [
+      'errors:feed.fetch_failed',
+      'errors:feed.timeout',
+      'errors:feed.upstream_failure',
+      'errors:feed.rate_limited',
+      'errors:feed.not_found',
+      'errors:feed.invalid_response',
+      'errors:feed.invalid_account',
+      'errors:feed.platform_not_configured',
+    ] as const;
+    for (const locale of ['zh-TW', 'en'] as const) {
+      for (const key of feedKeys) {
+        const resolved = translator.t(key, params, locale);
+        expect(resolved, `${key} (${locale}) must resolve to a real string`).not.toBe(key);
+        expect(resolved.length, `${key} (${locale}) must be non-empty`).toBeGreaterThan(0);
+        expect(
+          /\{\{\s*\w+\s*\}\}/.test(resolved),
+          `${key} (${locale}) must not contain an uninterpolated placeholder`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('resolves every replies:feed.* key the feed commands actually use', async () => {
+    // Companion to the `errors:feed.*` block above. These keys are
+    // joined to the handlers only by matching string literals, and the
+    // handler suites all run an echo translator, so a catalog typo is
+    // invisible to every other gate.
+    const translator = await I18NextTranslator.create(
+      loadCatalogResources({ localesDir: LOCALES_DIR }),
+    );
+    const params = {
+      platform: 'X (Twitter)',
+      account: 'someaccount',
+      channel: '<#c-1>',
+      permissions: 'View Channel',
+      keyword: 'live',
+      count: 2,
+      total: 3,
+      list: '`x @someaccount`',
+      max: 20,
+      reason: 'the account was not found',
+      traceId: 'abc123',
+    };
+    const replyKeys = [
+      'replies:feed.subscribe_header',
+      'replies:feed.account_subscribed',
+      'replies:feed.account_updated',
+      'replies:feed.account_failed',
+      'replies:feed.account_skipped',
+      'replies:feed.reason_unknown',
+      'replies:feed.no_accounts',
+      'replies:feed.too_many_accounts',
+      'replies:feed.unsubscribed',
+      'replies:feed.unsubscribed_more',
+      'replies:feed.unsubscribed_none',
+      'replies:feed.unsubscribed_none_hint',
+      'replies:feed.channel_not_supported',
+      'replies:feed.missing_bot_permissions',
+      'replies:feed.permissions_unknown',
+      'replies:feed.invoker_cannot_view',
+      'replies:feed.permission_separator',
+      'replies:feed.list_empty',
+      'replies:feed.list_header',
+      'replies:feed.filter_keyword',
+      'replies:feed.never_forwarded',
+      'replies:feed.failed',
+      'replies:common.pages_failed',
+    ] as const;
+    for (const locale of ['zh-TW', 'en'] as const) {
+      for (const key of replyKeys) {
+        const resolved = translator.t(key, params, locale);
+        expect(resolved, `${key} (${locale}) must resolve to a real string`).not.toBe(key);
+        expect(resolved.length, `${key} (${locale}) must be non-empty`).toBeGreaterThan(0);
+        expect(
+          /\{\{\s*\w+\s*\}\}/.test(resolved),
+          `${key} (${locale}) must not contain an uninterpolated placeholder`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('has a label for every value the feed constants can produce', async () => {
+    // The command choices and the `/feed_list` filter label are built by
+    // mapping over `SUPPORTED_FEED_PLATFORMS` and `FEED_MEDIA_FILTERS`,
+    // so widening either constant without touching the catalog would
+    // ship the raw key to a user as a Discord choice label. Deriving the
+    // expectation from the constants makes that a test failure instead.
+    const translator = await I18NextTranslator.create(
+      loadCatalogResources({ localesDir: LOCALES_DIR }),
+    );
+    const derived = [
+      ...SUPPORTED_FEED_PLATFORMS.flatMap((id) => [
+        `commands:feed_subscribe.options.platform.choices.${id}`,
+        `commands:feed_unsubscribe.options.platform.choices.${id}`,
+      ]),
+      ...FEED_MEDIA_FILTERS.flatMap((value) => [
+        `commands:feed_subscribe.options.media.choices.${value}`,
+        `replies:feed.filter_media.${value}`,
+      ]),
+      ...FEED_PERMISSION_LABEL_SUFFIXES.map((suffix) => `replies:feed.permission.${suffix}`),
+    ];
+    for (const locale of ['zh-TW', 'en'] as const) {
+      for (const key of derived) {
+        const resolved = translator.t(key, undefined, locale);
+        expect(resolved, `${key} (${locale}) must resolve to a real label`).not.toBe(key);
+        expect(resolved.length, `${key} (${locale}) must be non-empty`).toBeGreaterThan(0);
+      }
+    }
   });
 
   it('resolves every errors:db.* DatabaseError messageKey with no leftover placeholder', async () => {

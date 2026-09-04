@@ -90,7 +90,7 @@ Two process-level safety nets are installed in step 1 (before login), so they sp
 
 Startup failure is terminal. Each personality entry point starts the bot through `bootstrapPersonality` ([src/bot/bootstrap.ts](../src/bot/bootstrap.ts)), which loads the personality's `.env`, validates it into a typed `Env`, builds the Discord client from the requested gateway intents, and hands the bot to `runOrExit` ([src/bot/run-or-exit.ts](../src/bot/run-or-exit.ts)). `runOrExit` exits 1 when `run()` rejects: a detached `run()` leaves a live process with no commands registered and no reason for a supervisor to restart it.
 
-Everything handlers and bridges read off a live bot goes through a typed accessor — `getRepos`, `guildRegistry`, `jobMap`, `permissionRankPolicy`, `connectionManager`, `voice`, `modelCatalog`, `requireLogger()`. Each resolves the container binding a plugin would reach through `ctx.resolve(TOKENS.X)`, so both sides of a feature observe one instance rather than two parallel copies.
+Everything handlers and bridges read off a live bot goes through a typed accessor — `getRepos`, `guildRegistry`, `jobMap`, `permissionRankPolicy`, `connectionManager`, `voice`, `modelCatalog`, `feedPlatformRegistry`, `requireLogger()`. Each resolves the container binding a plugin would reach through `ctx.resolve(TOKENS.X)`, so both sides of a feature observe one instance rather than two parallel copies.
 
 ### Plugin contract ([src/core/plugin/](../src/core/plugin/))
 
@@ -224,7 +224,7 @@ Translating it would split one audit trail across two languages. Do not
 
 `DomainError` is the root of the taxonomy: `ConfigurationError` and the
 `ExternalServiceError` branch (`DatabaseError`, `LlmProviderError`,
-`LinkPreviewError`, `XFeedError`). Every error carries `code`,
+`LinkPreviewError`, `FeedError`). Every error carries `code`,
 `messageKey` (i18n), `messageParams`, and the original `cause`.
 Dispatch is by `instanceof` — there is no discriminant string field,
 because a parallel tag can only drift out of sync with the class
@@ -245,10 +245,13 @@ socket and DNS errno codes a lost route or a dropped peer produces
 undici `UND_ERR_*` codes all justify a bounded retry. **The two
 predicates must never be widened into each other.** A retry is cheap;
 tolerating an uncaught exception is not, so a code that belongs in one
-list does not automatically belong in the other. A caller may pass
-`shouldRetry` to _narrow_ `isRetryableError` — `x-feed` does, to stop
+list does not automatically belong in the other — the socket codes the
+two lists share are each maintained in place. A caller may pass
+`shouldRetry` to _narrow_ `isRetryableError` — `social-feed` does, to stop
 retrying a 429 against a shared host whose rate-limit budget it does not
-own.
+own — or pass `maxAttempts` / `initialDelayMs` to stretch the budget:
+`message-backup` runs unattended, so its walker waits out an outage of
+several minutes before it gives up on a channel.
 
 ### Branded IDs ([src/core/ids.ts](../src/core/ids.ts))
 
@@ -376,6 +379,22 @@ not a fourth copy of the filter.
 When an embed builder outgrows the 150-line cap, split it into a
 sibling file rather than thinning the privacy logic.
 
+A lighter relative of the pattern governs the `/feed_*` subscription
+commands. They aggregate nothing and are not rank-gated, so only the
+Discord-native half applies: **authority is ungated — any member may
+subscribe or unsubscribe — but reach is not.** `/feed_subscribe` and
+`/feed_unsubscribe` refuse a destination channel the invoker cannot
+`ViewChannel` (checked against the parent for a thread), and `/feed_list`
+resolves each row's channel the same way — a thread through its parent —
+then drops every row the invoker cannot see, without hinting that any
+were withheld. A row whose channel or invoking member cannot be resolved
+from the cache is dropped too: for a filter whose job is to withhold,
+"unknown" must fail closed. Without that bound, ungated authority would let any
+member push content into, or quietly empty, a channel that is closed to
+them. `/feed_subscribe` additionally refuses a channel the **bot** cannot
+post in, which is a usability check rather than a privacy one: the
+subscription would otherwise fail silently on every pass.
+
 ### `MongoConnectionManager` ([src/infra/mongo/connection-manager.ts](../src/infra/mongo/connection-manager.ts))
 
 Process-wide pool keyed by URI, shared across personalities. Owns
@@ -442,20 +461,88 @@ ship — and each host is probed and ranked before anything is posted
 (`video > image > weak-image > text`), so a dead or media-less proxy ends
 in a silent skip rather than a bare link.
 
-### X-Feed Strategy ([src/infra/x-feed/](../src/infra/x-feed/))
+### Social-Feed Strategy ([src/infra/social-feed/](../src/infra/social-feed/))
 
-A third Provider Strategy, for the `XMediaFeedPlugin`, following the same
-shape as the two above. `XTimelineSource.fetchTimeline(handle)`
-returns a `Result<readonly XPost[], XFeedFailure>` of neutral, normalised
-posts; the plugin owns all Discord assembly. The shipped
-`FxTwitterTimelineSource` reads an FxTwitter-compatible JSON API — chosen
-because X's official API has no free tier and bills per post read, which a
-five-minute poller cannot justify. The Strategy, an operator-configurable
-`apiBaseUrl` (so a self-hosted instance can replace the public host), and a
+A third Provider Strategy, for the `SocialFeedPlugin` and the `/feed_*`
+commands, following the same shape as the two above. A `FeedPlatform`
+owns everything one social network spells differently: canonicalising an
+account handle (`normalizeAccount`), reading a timeline
+(`fetchTimeline`), ordering two post ids (`compareIds`), deriving the
+id floor a post created "now" would carry (`baselineIdAt`, the fallback
+anchor when a first read yields nothing the platform can order), and
+producing the link Discord can unfurl (`toEmbedUrl`). What comes back is
+a platform-neutral `FeedPost` (`id`, `authorAccount`, `createdTimestamp`,
+`url`, `text`, `isReply`, `isRepost`, `media[]`); the plugin owns all
+Discord assembly and all filtering, so no platform-specific arithmetic
+leaks upward. `FeedPost.id` stays a **string**: X post ids are 64-bit and
+exceed `Number.MAX_SAFE_INTEGER`, so ordering goes through the platform's
+own `compareIds` rather than `Number`.
+
+`FeedPlatformRegistry` looks a platform up by id and is built by each
+composition root from its `social_feed.platforms` block, then published
+under `TOKENS.FeedPlatformRegistry`. The poller and the subscription
+commands share that one instance, so an account accepted by
+`/feed_subscribe` is exactly one the next pass can read. A platform the
+operator did not configure is simply absent, and the caller renders the
+refusal.
+
+The shipped `XPlatform` wraps `FxTwitterTimelineSource`, which reads an
+FxTwitter-compatible JSON API — chosen because X's official API has no
+free tier and bills per post read, which a five-minute poller cannot
+justify. The Strategy, an operator-configurable `apiBaseUrl` (so a
+self-hosted instance can replace the public host), and a
 default-disabled plugin together absorb the risk of depending on a
-community-run upstream. `XPost.id` stays a **string**: X post ids are 64-bit
-and exceed `Number.MAX_SAFE_INTEGER`, so comparisons go through `BigInt`.
-Failures map into `XFeedError`.
+community-run upstream.
+
+What is followed is not configuration: `FeedSubscriptionRepo`
+(`src/persistence/`) stores one document per `(platform, account,
+channel_id)` triple — its unique index — holding the subscription, its
+filter, and its polling cursor together. Cursor and subscription share a
+lifetime, so removing a subscription cannot orphan cursor state and
+nothing has to be reconciled at boot. Re-running `/feed_subscribe` on an
+existing triple is an update, not a conflict, and it **replaces the
+filter wholesale**: an omitted `keyword` clears a stored one, while
+`created_by` and the cursor are preserved.
+
+`/feed_subscribe` and `/feed_unsubscribe` both take a list of accounts
+in one invocation, parsed by one shared rule so the two commands cannot
+disagree about what a member typed. The list is capped, because each new
+subscription costs one upstream read. Subscribing then gates the
+destination channel **once** and processes the accounts sequentially,
+each independent: an unusable handle or an upstream refusal costs that
+account only, and the reply reports every account as created, updated,
+failed with its reason, or not attempted.
+
+Two things end a batch early rather than isolating. A **systemic**
+failure — rate limited, database down — is a property of the batch, not
+of the account that met it, so continuing would only repeat the same
+error at an upstream that just asked to be left alone. And the batch
+holds a **time budget** measured from the interaction: Discord expires a
+deferred interaction after fifteen minutes, and a report that cannot be
+delivered would leave a member with subscriptions written and nothing on
+screen. The cap bounds the common case; the budget is what makes the
+worst case safe. Because per-account failures never reach the handler's
+error boundary, each is written to the operator log where it is
+absorbed, and one further line records the batch as a whole.
+
+Unsubscribing is the opposite shape — one query with an `$in` over the
+named accounts — and refuses the whole call if any entry is unusable,
+since a partial deletion would make a typo indistinguishable from an
+account that was never subscribed. An empty account list matches
+nothing rather than widening: "remove nothing" must never become
+"remove everything".
+
+Two tiers of rule decide what a pass forwards. The **hard rules** hold
+whatever a subscription asks for: only the followed account's own
+original posts go out, so a reply (including a self-thread continuation)
+and a repost of someone else's post are never forwarded. Only on top of
+those does the subscription's own `media` / `keyword` filter narrow
+further, its defaults reproducing the historical media-only behaviour.
+
+Failures map into `FeedError`, whose taxonomy also carries the two
+non-upstream refusals the commands raise (an unusable account handle,
+an unconfigured platform) so one feature keeps one `errors:feed.*`
+catalog section.
 
 ## 3. Interaction request flow
 
@@ -501,6 +588,8 @@ therefore live one layer down, in `infra/`: option reading
 ([src/infra/discord/options.ts](../src/infra/discord/options.ts)),
 error-to-reply mapping with the shared `traceId`
 ([src/infra/discord/reply-for-error.ts](../src/infra/discord/reply-for-error.ts)),
+per-page-isolated delivery of a listing too long for one message
+([src/infra/discord/send-paged-reply.ts](../src/infra/discord/send-paged-reply.ts)),
 and the bounded outbound HTTP client
 ([src/infra/http/](../src/infra/http/)). An ESLint
 `no-restricted-imports` rule fails the `plugins -> handlers` direction so
@@ -542,22 +631,22 @@ consume the whole shutdown budget the signal handler is working within.
 
 ## 5. Built-in plugins
 
-| Plugin                    | Path                               | Summary                                                                                                      |
-| ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `AutoReplyPlugin`         | `src/plugins/auto-reply/`          | `messageCreate` keyword replies, operator-configured per-user lucky replies, and a dice roller               |
-| `GuildEventsPlugin`       | `src/plugins/guild-events/`        | guild / member lifecycle events, plus the pre-delete attachment cache that beats Discord's CDN purge race    |
-| `GiveawayPlugin`          | `src/plugins/giveaway/`            | scheduled giveaways (modal-driven create, select-menu delete) with reaction-driven winner selection          |
-| `TempRolePlugin`          | `src/plugins/temp-role/`           | temporary, permission-less self-claim notification roles with a hard 30-day expiry (nijika, tomori)          |
-| `ActivityPlugin`          | `src/plugins/activity/`            | per-member activity tracking via message / reaction events                                                   |
-| `MessageBackupPlugin`     | `src/plugins/message-backup/`      | message create / delete / update archival (used by the `msg-archive` worker)                                 |
-| `LlmChatPlugin`           | `src/plugins/llm-chat/`            | multi-provider LLM chat with web-search toggle and session persistence                                       |
-| `VoicePlugin`             | `src/plugins/voice/`               | voice channel join + recording controller                                                                    |
-| `EarthquakePlugin`        | `src/plugins/earthquake/`          | earthquake alert broadcast (nijika exposes the HTTP webhook)                                                 |
-| `LlmAutoReplyPlugin`      | `src/plugins/llm-auto-reply/`      | probability-gated, context-aware `messageCreate` reply via a self-hosted LLM (gopher)                        |
-| `SocialLinkPreviewPlugin` | `src/plugins/social-link-preview/` | rewrites/embeds social-media share-link previews and suppresses the original (nijika, tomori)                |
-| `SettingsApiPlugin`       | `src/plugins/settings-api/`        | owner-only, bearer-authenticated HTTP REST API to update the LLM `endpoint` at runtime + persist it (gopher) |
-| `IdentitySyncPlugin`      | `src/plugins/identity-sync/`       | daily avatar/nickname sync with a source user, or a static fallback identity (gopher)                        |
-| `XMediaFeedPlugin`        | `src/plugins/x-media-feed/`        | polls followed X (Twitter) accounts and forwards their new image / video posts to a feed channel (nijika)    |
+| Plugin                    | Path                               | Summary                                                                                                                 |
+| ------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `AutoReplyPlugin`         | `src/plugins/auto-reply/`          | `messageCreate` keyword replies, operator-configured per-user lucky replies, and a dice roller                          |
+| `GuildEventsPlugin`       | `src/plugins/guild-events/`        | guild / member lifecycle events, plus the pre-delete attachment cache that beats Discord's CDN purge race               |
+| `GiveawayPlugin`          | `src/plugins/giveaway/`            | scheduled giveaways (modal-driven create, select-menu delete) with reaction-driven winner selection                     |
+| `TempRolePlugin`          | `src/plugins/temp-role/`           | temporary, permission-less self-claim notification roles with a hard 30-day expiry (nijika, tomori)                     |
+| `ActivityPlugin`          | `src/plugins/activity/`            | per-member activity tracking via message / reaction events                                                              |
+| `MessageBackupPlugin`     | `src/plugins/message-backup/`      | message create / delete / update archival (used by the `msg-archive` worker)                                            |
+| `LlmChatPlugin`           | `src/plugins/llm-chat/`            | multi-provider LLM chat with web-search toggle and session persistence                                                  |
+| `VoicePlugin`             | `src/plugins/voice/`               | voice channel join + recording controller                                                                               |
+| `EarthquakePlugin`        | `src/plugins/earthquake/`          | earthquake alert broadcast (nijika exposes the HTTP webhook)                                                            |
+| `LlmAutoReplyPlugin`      | `src/plugins/llm-auto-reply/`      | probability-gated, context-aware `messageCreate` reply via a self-hosted LLM (gopher)                                   |
+| `SocialLinkPreviewPlugin` | `src/plugins/social-link-preview/` | rewrites/embeds social-media share-link previews and suppresses the original (nijika, tomori)                           |
+| `SettingsApiPlugin`       | `src/plugins/settings-api/`        | owner-only, bearer-authenticated HTTP REST API to update the LLM `endpoint` at runtime + persist it (gopher)            |
+| `IdentitySyncPlugin`      | `src/plugins/identity-sync/`       | daily avatar/nickname sync with a source user, or a static fallback identity (gopher)                                   |
+| `SocialFeedPlugin`        | `src/plugins/social-feed/`         | polls each guild's stored feed subscriptions and forwards the new posts each subscription's own filter accepts (nijika) |
 
 ## 6. Personalities
 
@@ -568,7 +657,7 @@ is per deployment and `.gitignore`d.
 
 | Personality   | Notable surface                                                                                                                                                                                                                            |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `nijika`      | Web-facing; exposes an Express `/discord/earthquake` webhook, and polls followed X (Twitter) accounts into a media-feed channel                                                                                                            |
+| `nijika`      | Web-facing; exposes an Express `/discord/earthquake` webhook, and forwards new social-media posts into the channels each guild has subscribed them to                                                                                      |
 | `konata`      | Full interactive feature set                                                                                                                                                                                                               |
 | `tomori`      | Public-facing; nijika's interactive plugin set minus the self-guild-only surfaces (earthquake webhook, level-role sync), with a custom ready-time presence                                                                                 |
 | `msg-archive` | Worker-style; suppresses interaction / reaction / guildCreate listeners on its `BaseBot` subclass and runs only the `MessageBackupPlugin` (backup always runs; the per-run transcript log is opt-in via `backup_log_enabled`, default off) |
@@ -596,13 +685,22 @@ obvious alternative.
 - **Repository pattern + in-memory fakes** over raw Mongoose — handlers and
   plugins depend on `<X>Repo` interfaces, so tests inject fakes without a
   database.
-- **Provider Strategy mirrored for LLM, Link-Preview, and X-Feed** — every
+- **Provider Strategy mirrored for LLM, Link-Preview, and Social-Feed** — every
   outbound surface shares the same "interface + selection + per-provider SDK
   error translation" shape (`src/infra/llm/`, `src/infra/link-preview/`,
-  `src/infra/x-feed/`), so a new one is a directory here rather than a new
-  pattern. The first two carry an ordered registry because they pick among
-  several providers per call; `x-feed` has a single implementation and so
-  selects at composition time instead.
+  `src/infra/social-feed/`), so a new one is a directory here rather than a new
+  pattern. What differs is only how one is selected: LLM and Link-Preview walk
+  an ordered registry because they pick among several providers per call, while
+  a feed platform is looked up by the id the subscription already names.
+- **One upstream read per followed account per poll pass** — the feed poller
+  groups every subscription in the pass by `(platform, account)` across guilds
+  and channels, then asks for posts newer than the **oldest** cursor in the
+  group. A second guild following the same account therefore costs no extra
+  request, and no subscriber's posts can be hidden by a neighbour's newer
+  cursor. The hint is dropped entirely on a full sweep and whenever any member
+  of the group has never been seeded, since neither can be served by a floor.
+  Cursors still advance per subscription, and only after a post has actually
+  reached Discord.
 - **`PermissionRankPolicy` as a static, discord.js-free core service** built
   once in the `BaseBot` constructor, chosen over binding rank into
   `GuildRegistry` to avoid event-before-registration races.

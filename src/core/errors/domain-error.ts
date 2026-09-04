@@ -44,6 +44,21 @@ export interface DomainErrorInit<
   readonly messageParams?: Params;
 }
 
+/**
+ * The honest type of a value narrowed by `instanceof DomainError`.
+ *
+ * `instanceof` on a generic class narrows to `DomainError<any, any>`, so
+ * `code` and `messageParams` arrive as `any` and slip past every check
+ * the strict profile makes — a rendering boundary can pass an array
+ * where the translator expects params, and nothing complains. Anchoring
+ * the narrowed value to this alias restores `string` and the catalog
+ * params shape at the one place it matters.
+ */
+export type AnyDomainError = DomainError<
+  string,
+  Readonly<Record<string, string | number>> | undefined
+>;
+
 export abstract class DomainError<
   Code extends string = string,
   Params extends Readonly<Record<string, string | number>> | undefined = undefined,

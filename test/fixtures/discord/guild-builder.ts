@@ -5,7 +5,7 @@
  * spread extra fields into the return.
  */
 import { vi, type Mock } from 'vitest';
-import type { Guild } from 'discord.js';
+import type { Guild, GuildBasedChannel } from 'discord.js';
 
 /**
  * Role manager stand-in. `create` / `delete` stay `vi.fn()` mocks
@@ -49,10 +49,22 @@ export const buildGuildRoles = (input: BuildGuildRolesInput = {}): GuildRolesFak
 interface BuildGuildInput {
   readonly id?: string;
   readonly name?: string;
-  /** Pre-populated channel cache. Tests pass channels built by `buildTextChannel`. */
-  readonly channels?: readonly { id: string; name?: string; type?: number }[];
+  /**
+   * Pre-populated channel cache. Typed as the real channel union rather
+   * than `{ id }`, because callers read `isTextBased()` / `isSendable()`
+   * / `permissionsFor()` off whatever the cache returns — a looser type
+   * here would let a fixture compile and then fail at runtime.
+   * Build entries with `buildTextChannel`.
+   */
+  readonly channels?: readonly GuildBasedChannel[];
   /** Pre-populated member cache. Tests pass members built by `buildGuildMember`. */
   readonly members?: readonly { id: string; displayName?: string }[];
+  /**
+   * The bot's own member (`guild.members.me`), which permission checks
+   * on a target channel resolve against. `null` by default, the state a
+   * handler must survive rather than assume away.
+   */
+  readonly me?: { readonly id: string } | null;
   /** Role manager from {@link buildGuildRoles}; defaults to an empty one. */
   readonly roles?: GuildRolesFake;
   /** Id of the synthetic `@everyone` role. Ignored when `roles` is given. */
@@ -72,7 +84,7 @@ export const buildGuild = (input: BuildGuildInput = {}): Guild => {
     id: input.id ?? 'g-1',
     name: input.name ?? 'TestGuild',
     channels: { cache: channelCache },
-    members: { cache: memberCache },
+    members: { cache: memberCache, me: input.me ?? null },
     roles: input.roles ?? buildGuildRoles({ everyoneRoleId: input.everyoneRoleId }),
   } as unknown as Guild;
 };

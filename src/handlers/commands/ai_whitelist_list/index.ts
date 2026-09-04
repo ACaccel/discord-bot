@@ -6,6 +6,7 @@ import { Command } from '@cmd';
 import { requireGuildRepos } from '../../require-guild-repos';
 
 import { replyForError } from '../../../infra/discord/reply-for-error';
+import { sendPagedEphemeralReply } from '../../../infra/discord/send-paged-reply';
 export default class ai_whitelist_list extends Command {
   constructor() {
     super();
@@ -53,10 +54,14 @@ export default class ai_whitelist_list extends Command {
       }
       pages.push(current);
 
-      await interaction.editReply({ content: pages[0]! });
-      for (let i = 1; i < pages.length; i++) {
-        await interaction.followUp({ content: pages[i]!, flags: MessageFlags.Ephemeral });
-      }
+      // Each page is delivered independently: a rejected follow-up used
+      // to escape to the catch below, where `replyForError` overwrote
+      // page 1 with the error line.
+      await sendPagedEphemeralReply(interaction, pages, {
+        logger: bot.logger,
+        partialNotice: (failed) =>
+          bot.translator?.t('replies:common.pages_failed', { count: failed }) ?? '',
+      });
     } catch (err) {
       await replyForError(
         interaction,

@@ -3,7 +3,7 @@
   "language": "zh-TW",
   "guilds": {
     "YOUR_GUILD_ID": {
-      "channels": { "debug": "YOUR_DEBUG_CHANNEL_ID", "x_feed": "YOUR_X_FEED_CHANNEL_ID" },
+      "channels": { "debug": "YOUR_DEBUG_CHANNEL_ID" },
       "roles": { "ban_user": "YOUR_BAN_USER_ROLE_ID" },
       "permission_rank": {
         "channels": { "YOUR_PRIVATE_CHANNEL_ID": 1 },
@@ -16,7 +16,16 @@
       }
     }
   },
-  "commands": ["help", "weather_forecast", "random_restaurant", "update_role", "COMMAND_NAME"],
+  "commands": [
+    "help",
+    "weather_forecast",
+    "random_restaurant",
+    "update_role",
+    "feed_subscribe",
+    "feed_unsubscribe",
+    "feed_list",
+    "COMMAND_NAME"
+  ],
   "level_roles": { "level_1": "YOUR_LEVEL_1_ROLE_NAME" },
   "guild_events": {
     "attachment_cache": { "enabled": true, "ttlHours": 24, "minFreeDiskMb": 5120 }
@@ -44,16 +53,18 @@
       "bembedfix.vercel.app"
     ]
   },
-  "x_media_feed": {
+  "social_feed": {
     "enabled": false,
-    "accounts": [{ "handle": "YOUR_X_HANDLE" }, { "handle": "SECOND_HANDLE", "channel": "x_feed" }],
-    "defaultChannel": "x_feed",
     "pollIntervalMs": 300000,
     "fullSweepEveryPolls": 12,
-    "apiBaseUrl": "https://api.fxtwitter.com",
-    "timeoutMs": 8000,
     "maxPostsPerPoll": 5,
-    "embedProxyHost": "fxtwitter.com"
+    "platforms": {
+      "x": {
+        "apiBaseUrl": "https://api.fxtwitter.com",
+        "timeoutMs": 8000,
+        "embedProxyHost": "fxtwitter.com"
+      }
+    }
   },
   "auto_reply": {
     "luckyReplies": [

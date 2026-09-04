@@ -5,7 +5,7 @@
  * pure infrastructure with no Discord, Mongo, or SDK coupling (only
  * `setTimeout` and `Math.random`), and two independent background loops
  * share it — the message-backup channel walker (Discord REST) and the
- * x-media-feed poller (a third-party HTTP API). Both need the same
+ * social-feed poller (a third-party HTTP API). Both need the same
  * policy: absorb a transient blip, surface a real failure immediately.
  *
  * Relationship to `isTransientNetworkError` (`core/errors`): that

@@ -20,31 +20,34 @@ import { default as Handler_12 } from './change_nickname';
 import { default as Handler_13 } from './db_list_message';
 import { default as Handler_14 } from './delete_reply';
 import { default as Handler_15 } from './emoji_frequency';
-import { default as Handler_16 } from './gay';
-import { default as Handler_17 } from './get_avatar';
-import { default as Handler_18 } from './give_score';
-import { default as Handler_19 } from './giveaway_create';
-import { default as Handler_20 } from './giveaway_delete';
-import { default as Handler_21 } from './help';
-import { default as Handler_22 } from './level_detail';
-import { default as Handler_23 } from './list_guild_members';
-import { default as Handler_24 } from './list_reply';
-import { default as Handler_25 } from './menu_get_avatar';
-import { default as Handler_26 } from './menu_get_sticker';
-import { default as Handler_27 } from './random_restaurant';
-import { default as Handler_28 } from './record';
-import { default as Handler_29 } from './role_message';
-import { default as Handler_30 } from './roll_call';
-import { default as Handler_31 } from './search_anime_scene';
-import { default as Handler_32 } from './sticker_frequency';
-import { default as Handler_33 } from './talk';
-import { default as Handler_34 } from './talk_signed';
-import { default as Handler_35 } from './temp_role';
-import { default as Handler_36 } from './traffic';
-import { default as Handler_37 } from './traffic_me';
-import { default as Handler_38 } from './traffic_user';
-import { default as Handler_39 } from './update_role';
-import { default as Handler_40 } from './weather_forecast';
+import { default as Handler_16 } from './feed_list';
+import { default as Handler_17 } from './feed_subscribe';
+import { default as Handler_18 } from './feed_unsubscribe';
+import { default as Handler_19 } from './gay';
+import { default as Handler_20 } from './get_avatar';
+import { default as Handler_21 } from './give_score';
+import { default as Handler_22 } from './giveaway_create';
+import { default as Handler_23 } from './giveaway_delete';
+import { default as Handler_24 } from './help';
+import { default as Handler_25 } from './level_detail';
+import { default as Handler_26 } from './list_guild_members';
+import { default as Handler_27 } from './list_reply';
+import { default as Handler_28 } from './menu_get_avatar';
+import { default as Handler_29 } from './menu_get_sticker';
+import { default as Handler_30 } from './random_restaurant';
+import { default as Handler_31 } from './record';
+import { default as Handler_32 } from './role_message';
+import { default as Handler_33 } from './roll_call';
+import { default as Handler_34 } from './search_anime_scene';
+import { default as Handler_35 } from './sticker_frequency';
+import { default as Handler_36 } from './talk';
+import { default as Handler_37 } from './talk_signed';
+import { default as Handler_38 } from './temp_role';
+import { default as Handler_39 } from './traffic';
+import { default as Handler_40 } from './traffic_me';
+import { default as Handler_41 } from './traffic_user';
+import { default as Handler_42 } from './update_role';
+import { default as Handler_43 } from './weather_forecast';
 export const COMMAND_REGISTRY = {
   activity_create: Handler_0,
   activity_delete: Handler_1,
@@ -62,29 +65,32 @@ export const COMMAND_REGISTRY = {
   db_list_message: Handler_13,
   delete_reply: Handler_14,
   emoji_frequency: Handler_15,
-  gay: Handler_16,
-  get_avatar: Handler_17,
-  give_score: Handler_18,
-  giveaway_create: Handler_19,
-  giveaway_delete: Handler_20,
-  help: Handler_21,
-  level_detail: Handler_22,
-  list_guild_members: Handler_23,
-  list_reply: Handler_24,
-  menu_get_avatar: Handler_25,
-  menu_get_sticker: Handler_26,
-  random_restaurant: Handler_27,
-  record: Handler_28,
-  role_message: Handler_29,
-  roll_call: Handler_30,
-  search_anime_scene: Handler_31,
-  sticker_frequency: Handler_32,
-  talk: Handler_33,
-  talk_signed: Handler_34,
-  temp_role: Handler_35,
-  traffic: Handler_36,
-  traffic_me: Handler_37,
-  traffic_user: Handler_38,
-  update_role: Handler_39,
-  weather_forecast: Handler_40,
+  feed_list: Handler_16,
+  feed_subscribe: Handler_17,
+  feed_unsubscribe: Handler_18,
+  gay: Handler_19,
+  get_avatar: Handler_20,
+  give_score: Handler_21,
+  giveaway_create: Handler_22,
+  giveaway_delete: Handler_23,
+  help: Handler_24,
+  level_detail: Handler_25,
+  list_guild_members: Handler_26,
+  list_reply: Handler_27,
+  menu_get_avatar: Handler_28,
+  menu_get_sticker: Handler_29,
+  random_restaurant: Handler_30,
+  record: Handler_31,
+  role_message: Handler_32,
+  roll_call: Handler_33,
+  search_anime_scene: Handler_34,
+  sticker_frequency: Handler_35,
+  talk: Handler_36,
+  talk_signed: Handler_37,
+  temp_role: Handler_38,
+  traffic: Handler_39,
+  traffic_me: Handler_40,
+  traffic_user: Handler_41,
+  update_role: Handler_42,
+  weather_forecast: Handler_43,
 } as const satisfies Readonly<Record<string, new () => Command>>;

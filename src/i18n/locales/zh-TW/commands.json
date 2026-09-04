@@ -159,6 +159,55 @@
       }
     }
   },
+  "feed_list": {
+    "description": "列出本伺服器的社群動態訂閱"
+  },
+  "feed_subscribe": {
+    "description": "把某個社群帳號的新貼文轉發到頻道",
+    "options": {
+      "platform": {
+        "description": "帳號所在的社群平台",
+        "choices": {
+          "x": "X (Twitter)"
+        }
+      },
+      "account": {
+        "description": "帳號名稱,多個帳號用逗號分隔,前面加不加 @ 都可以"
+      },
+      "channel": {
+        "description": "要轉發到的頻道 (預設為目前頻道)"
+      },
+      "media": {
+        "description": "依附加媒體決定轉發哪些貼文 (預設:只轉有媒體的)",
+        "choices": {
+          "media_only": "有附任何媒體的貼文 (預設)",
+          "photo_only": "有附圖片的貼文",
+          "video_only": "有附影片的貼文",
+          "any": "含純文字貼文"
+        }
+      },
+      "keyword": {
+        "description": "只轉發內文包含這段文字的貼文 (最多 100 字)"
+      }
+    }
+  },
+  "feed_unsubscribe": {
+    "description": "停止把社群貼文轉發到某個頻道",
+    "options": {
+      "channel": {
+        "description": "要退訂的頻道 (預設為目前頻道)"
+      },
+      "platform": {
+        "description": "只移除這個平台的訂閱",
+        "choices": {
+          "x": "X (Twitter)"
+        }
+      },
+      "account": {
+        "description": "只移除這些帳號的訂閱,多個帳號用逗號分隔"
+      }
+    }
+  },
   "gay": {
     "description": "是不是給",
     "options": {

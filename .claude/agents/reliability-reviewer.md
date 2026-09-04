@@ -13,7 +13,7 @@ not just the happy path.
 
 - infra / persistence failures throw `DomainError` subclasses
   (`DatabaseError`, `LlmProviderError`, `LinkPreviewError`,
-  `XFeedError`, `ConfigurationError`) — never raw `Error` / `TypeError`
+  `FeedError`, `ConfigurationError`) — never raw `Error` / `TypeError`
   to express a domain failure. Each carries
   `code`, `messageKey`, `messageParams`, `context.operation`, `cause`.
 - Programmer errors (contract violations, invariants) use native

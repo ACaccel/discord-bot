@@ -46,6 +46,31 @@ export const ops = {
     handlerMissingConfig: (commandName: string): string =>
       `ops:command.handler_missing_config | Command ${commandName} has no config.`,
   },
+  feed: {
+    /**
+     * A destination channel the bot cannot post in. The permission
+     * names are the raw discord.js flag identifiers — the operator has
+     * to find them in Discord's own UI, which does not translate them.
+     */
+    missingBotPermissions: (channelId: string, permissions: string): string =>
+      `ops:feed.missing_bot_permissions | cannot deliver to channel ${channelId}; missing ${permissions}.`,
+    /**
+     * Subscriptions removed by `/feed_unsubscribe`, written before the
+     * confirmation is sent. The reply is bounded and can be lost to a
+     * delivery failure; this line is the durable record of what a
+     * member actually deleted.
+     */
+    subscriptionsRemoved: (channelId: string, count: number, keys: string): string =>
+      `ops:feed.subscriptions_removed | removed ${count} subscription(s) from channel ${channelId}: ${keys}`,
+    /**
+     * The result of one `/feed_subscribe` invocation, which may name
+     * several accounts. Per-account failures are isolated so the batch
+     * can finish, which means they never reach the handler's error
+     * boundary — this line is where an operator sees them.
+     */
+    subscriptionsProcessed: (channelId: string, count: number, outcomes: string): string =>
+      `ops:feed.subscriptions_processed | processed ${count} account(s) for channel ${channelId}: ${outcomes}`,
+  },
   guildDb: {
     slotMissing: (guildId: string): string =>
       `ops:guild_db.slot_missing | connectOneGuild: no guildInfo slot for ${guildId}`,
@@ -69,5 +94,13 @@ export const ops = {
      */
     handlerError: (traceId: string): string =>
       `ops:router.handler_error | handler boundary error (traceId=${traceId}).`,
+    /**
+     * One page of a paginated ephemeral reply could not be delivered.
+     * The index is 0-based and matches the page order the user sees, so
+     * an operator can tell "the header never landed" from "the tail was
+     * truncated".
+     */
+    pageSendFailed: (index: number, total: number): string =>
+      `ops:router.page_send_failed | paged reply page ${index + 1}/${total} could not be sent.`,
   },
 } as const;

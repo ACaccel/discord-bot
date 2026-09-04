@@ -18,7 +18,7 @@ unchecked rather than deleting the line.
 
 - [ ] `src/core/`
 - [ ] `src/persistence/` (schemas / repositories)
-- [ ] `src/infra/` (mongo / llm / link-preview / x-feed / discord)
+- [ ] `src/infra/` (mongo / llm / link-preview / social-feed / discord)
 - [ ] `src/handlers/` (commands / buttons / modals / select-menus / reactions)
 - [ ] `src/plugins/`
 - [ ] `src/bot/<name>/` (composition root)

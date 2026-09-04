@@ -46,13 +46,15 @@
     "invalid_response": "連結預覽來源 `{{provider}}` 回傳了非預期的內容(狀態 {{status}})。",
     "unknown": "建立 `{{provider}}` 連結預覽時發生未預期的錯誤(狀態 {{status}})。"
   },
-  "x_feed": {
-    "fetch_failed": "無法讀取 `@{{handle}}` 在 X 的貼文(狀態 {{status}})。",
-    "timeout": "讀取 `@{{handle}}` 在 X 的貼文逾時(狀態 {{status}})。",
-    "upstream_failure": "讀取 `@{{handle}}` 時 X 貼文來源暫時無法存取(狀態 {{status}}),請稍後再試。",
-    "rate_limited": "讀取 `@{{handle}}` 時 X 貼文來源觸發限流(狀態 {{status}}),請稍後再試。",
-    "not_found": "找不到 X 帳號 `@{{handle}}`(狀態 {{status}}),可能已改名、被停權,或設定中拼錯。",
-    "invalid_response": "X 貼文來源對 `@{{handle}}` 回傳了非預期的內容(狀態 {{status}})。"
+  "feed": {
+    "fetch_failed": "無法讀取 `@{{account}}` 在 {{platform}} 的貼文(狀態 {{status}})。",
+    "timeout": "讀取 `@{{account}}` 在 {{platform}} 的貼文逾時(狀態 {{status}})。",
+    "upstream_failure": "讀取 `@{{account}}` 時 {{platform}} 貼文來源暫時無法存取(狀態 {{status}}),請稍後再試。",
+    "rate_limited": "讀取 `@{{account}}` 時 {{platform}} 貼文來源觸發限流(狀態 {{status}}),請稍後再試。",
+    "not_found": "找不到 {{platform}} 帳號 `@{{account}}`(狀態 {{status}}),可能已改名、被停權,或是帳號名稱打錯了。",
+    "invalid_response": "{{platform}} 貼文來源對 `@{{account}}` 回傳了非預期的內容(狀態 {{status}})。",
+    "invalid_account": "`@{{account}}` 不是有效的 {{platform}} 帳號名稱。",
+    "platform_not_configured": "尚未設定 `{{platform}}` 這個貼文平台。"
   },
   "plugin": {
     "lifecycle_phase_violation": "Plugin `{{plugin}}` 在階段 `{{phase}}` 呼叫了 registerInstance(`{{token}}`),只有 `init` 階段允許此操作。"

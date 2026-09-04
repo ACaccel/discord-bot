@@ -9,6 +9,7 @@ layer and a single `config.json`.
 yarn db verify              # read-only structural validation (one guild)
 yarn db migrate-timestamp   # migrate Message.timestamp String -> numeric
 yarn db drop-todo           # drop the retired todo_list `todos` collection
+yarn db drop-xfeed          # drop the retired x-media-feed `xfeedcursors` collection
 ```
 
 Optional `--config <path>` overrides the default `tools/db/config.json`.
@@ -20,7 +21,7 @@ tools/db/
 ├── db.ts                 # entry point — argv parsing, dispatch, exit code
 ├── registry.ts           # subcommand registry (the extensibility point)
 ├── framework/            # shared layer (config, connection, runner, report, …)
-├── commands/             # one module per operation (verify / migrate-timestamp / drop-todo)
+├── commands/             # one module per operation (verify / migrate-timestamp / drop-todo / drop-xfeed)
 ├── config.example.json   # tracked — copy to config.json and edit
 ├── config.json           # gitignored — operator supplies credentials
 └── README.md
@@ -38,7 +39,7 @@ subcommand name; only the active subcommand's section is read on a run.
 | Field         | Type             | Required | Notes                                                                                                             |
 | ------------- | ---------------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
 | `mongo_uri`   | `string`         | yes      | Base cluster URI. The per-guild db name + `authSource=admin` are appended per guild; any query string is dropped. |
-| `guilds`      | `string[]`       | yes      | All-digit guild ids. `verify` requires **exactly one**; `migrate-timestamp` / `drop-todo` accept many.            |
+| `guilds`      | `string[]`       | yes      | All-digit guild ids. `verify` requires **exactly one**; every other subcommand accepts many.                      |
 | `output_path` | `string \| null` | no       | When set, the JSON report is written here instead of stdout. Default `null`.                                      |
 
 ### Per-operation options (`operations.<name>`)
@@ -50,6 +51,7 @@ subcommand name; only the active subcommand's section is read on a run.
 | `migrate-timestamp` | `dry_run`      | `boolean`      | `false` | `convert` only: count + sample, write nothing. |
 | `migrate-timestamp` | `sample_limit` | `integer >= 0` | `20`    | Cap on `_id` samples in reports.               |
 | `drop-todo`         | `dry_run`      | `boolean`      | `true`  | `true` counts only; `false` performs the drop. |
+| `drop-xfeed`        | `dry_run`      | `boolean`      | `true`  | `true` counts only; `false` performs the drop. |
 
 There are **no other CLI arguments** — everything else comes from
 `config.json`.
@@ -59,7 +61,8 @@ There are **no other CLI arguments** — everything else comes from
 Every command writes a JSON report to stdout (or `output_path`), then a
 final summary line. Exit `0` on success, `1` on failure. A single guild's
 failure never aborts the rest of the fleet (`migrate-timestamp` /
-`drop-todo`); it is recorded in the report and flips the exit code.
+`drop-todo` / `drop-xfeed`); it is recorded in the report and flips the
+exit code.
 
 ## `db verify`
 
@@ -203,6 +206,29 @@ yarn db drop-todo
 yarn db drop-todo
 # 3. (optional) Re-run to confirm every guild now reports "absent".
 yarn db drop-todo
+```
+
+## `db drop-xfeed`
+
+Permanently drops the retired X-media-feed `xfeedcursors` collection
+(one per guild database), left behind when subscriptions and their
+cursors moved into one `feedsubscriptions` document. Nothing is
+migrated: the old cursors were keyed by handle alone, and re-subscribing
+with `/feed_subscribe` seeds a fresh cursor from the present.
+**Dry-run by default** (`dry_run: true`): counts only, writes nothing.
+Set `dry_run: false` to perform the drop. Re-runs are idempotent — a
+guild whose collection is already gone is reported `absent`.
+
+Per-guild `status`: `would-drop` (dry run), `dropped`, `absent`, or
+`error`. Exit `0` when no guild errored, `1` otherwise.
+
+```bash
+# 1. Audit — confirm the per-guild counts (dry_run: true, the default).
+yarn db drop-xfeed
+# 2. Drop — set operations.drop-xfeed.dry_run = false, then re-run.
+yarn db drop-xfeed
+# 3. (optional) Re-run to confirm every guild now reports "absent".
+yarn db drop-xfeed
 ```
 
 ## Tests

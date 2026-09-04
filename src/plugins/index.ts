@@ -19,4 +19,4 @@ export { createLlmAutoReplyPlugin } from './llm-auto-reply';
 export { createSocialLinkPreviewPlugin } from './social-link-preview';
 export { createSettingsApiPlugin } from './settings-api';
 export { createIdentitySyncPlugin } from './identity-sync';
-export { createXMediaFeedPlugin } from './x-media-feed';
+export { createSocialFeedPlugin } from './social-feed';

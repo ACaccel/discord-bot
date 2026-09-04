@@ -104,7 +104,7 @@ There is no business-behavior carrier outside the plugin layer;
 
 - infra / persistence failures throw `DomainError` subclasses
   (`ConfigurationError`, `ExternalServiceError` -> `DatabaseError` /
-  `LlmProviderError` / `LinkPreviewError` / `XFeedError`). Never
+  `LlmProviderError` / `LinkPreviewError` / `FeedError`). Never
   `throw new Error()` / `throw new TypeError()` to express a domain
   failure. Add a subclass only when a real boundary needs one.
 - Dispatch on a `DomainError` with `instanceof`. There is no

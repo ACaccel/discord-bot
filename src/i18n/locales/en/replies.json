@@ -335,11 +335,47 @@
   "social_link_preview": {
     "embed_footer": "Preview via {{provider}}"
   },
-  "x_media_feed": {
-    "post": "**@{{author}}** posted new media on X\n{{url}}"
+  "feed": {
+    "post": "**@{{author}}** has a new post on {{platform}}\n{{url}}",
+    "subscribe_header": "{{platform}} subscription results for {{channel}}:",
+    "account_subscribed": "- **@{{account}}** — now forwarding",
+    "account_updated": "- **@{{account}}** — filter updated",
+    "account_failed": "- **@{{account}}** — not subscribed: {{reason}}",
+    "account_skipped": "- **@{{account}}** — not attempted; try again shortly.",
+    "reason_unknown": "Something went wrong on my side.",
+    "no_accounts": "Name at least one account.",
+    "too_many_accounts": "Name at most {{max}} accounts at a time, separated by commas.",
+    "unsubscribed_one": "Removed {{count}} subscription:\n{{list}}",
+    "unsubscribed_other": "Removed {{count}} subscriptions:\n{{list}}",
+    "unsubscribed_more": "…and {{count}} more.",
+    "unsubscribed_none": "Found nothing to unsubscribe in {{channel}}.",
+    "unsubscribed_none_hint": "Found nothing to unsubscribe in {{channel}}. Name a platform or an account to widen the search.",
+    "channel_not_supported": "That is not a channel I can post feed updates in. Pick a text channel in this server.",
+    "missing_bot_permissions": "I cannot post in {{channel}} — I am missing: {{permissions}}.",
+    "permissions_unknown": "I could not work out my permissions in {{channel}}. Try again in a moment.",
+    "invoker_cannot_view": "You cannot see {{channel}}, so I will not subscribe anything there.",
+    "permission_separator": ", ",
+    "permission": {
+      "view_channel": "View Channel",
+      "send_messages": "Send Messages",
+      "send_messages_in_threads": "Send Messages in Threads",
+      "embed_links": "Embed Links"
+    },
+    "list_empty": "This server has no feed subscriptions yet.",
+    "list_header": "Feed subscriptions ({{total}}):",
+    "filter_media": {
+      "media_only": "with media",
+      "photo_only": "photos",
+      "video_only": "videos",
+      "any": "text posts included"
+    },
+    "filter_keyword": "keyword: {{keyword}}",
+    "never_forwarded": "nothing forwarded yet",
+    "failed": "Could not complete the feed subscription action. (error code: {{traceId}})"
   },
   "common": {
-    "empty_value": "None"
+    "empty_value": "None",
+    "pages_failed": "{{count}} page(s) of this list could not be sent. Please run the command again."
   },
   "giveaway": {
     "missing_required_fields": "Please enter the duration, number of winners, and prize.",

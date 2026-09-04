@@ -7,11 +7,29 @@ import {
   createEarthquakePlugin,
   createGiveawayPlugin,
   createGuildEventsPlugin,
+  createSocialFeedPlugin,
   createSocialLinkPreviewPlugin,
   createTempRolePlugin,
   createVoicePlugin,
-  createXMediaFeedPlugin,
 } from '@plugins';
+
+import {
+  createDefaultFeedPlatformRegistry,
+  parseFeedPlatformsConfig,
+} from '../../infra/social-feed';
+import { TOKENS } from '../tokens';
+
+/**
+ * Config key retired by the social-feed rename.
+ *
+ * Subscriptions moved out of config and into each guild's database, so
+ * a config still carrying this block describes a feed that no longer
+ * exists. Nothing validates the top level of a bot's `config.json`, so
+ * the plugin's own `.strict()` schema never sees the stale key and the
+ * feed would simply go dark; rejecting it here is what makes the
+ * migration loud instead of silent.
+ */
+const RETIRED_FEED_CONFIG_KEY = 'x_media_feed';
 
 interface NijikaConfig extends Config {
   level_roles: Record<string, string>;
@@ -28,11 +46,12 @@ interface NijikaConfig extends Config {
    */
   social_link_preview?: unknown;
   /**
-   * Raw `x_media_feed` block. Parsed and defaulted by the plugin
-   * (see `createXMediaFeedPlugin`), so it is intentionally `unknown`
-   * here and may be omitted entirely.
+   * Raw `social_feed` block. Parsed and defaulted by the plugin
+   * (see `createSocialFeedPlugin`), so it is intentionally `unknown`
+   * here and may be omitted entirely. Its `platforms` sub-block is also
+   * read here to build the shared platform registry.
    */
-  x_media_feed?: unknown;
+  social_feed?: unknown;
   /**
    * Raw `guild_events` block. Parsed and defaulted by the plugin
    * (see `createGuildEventsPlugin`), so it is intentionally `unknown`
@@ -79,9 +98,22 @@ export class Nijika extends BaseBot<NijikaConfig> {
     // button and a hard 30-day expiry (see `createTempRolePlugin`).
     this.use(createTempRolePlugin());
     this.use(createVoicePlugin());
-    // Polls the configured X (Twitter) accounts and forwards their new
-    // image / video posts to the guild's feed channel.
-    this.use(createXMediaFeedPlugin(this.config.x_media_feed));
+    if (RETIRED_FEED_CONFIG_KEY in config) {
+      throw new Error(
+        `nijika config.json still declares "${RETIRED_FEED_CONFIG_KEY}"; it is now "social_feed", ` +
+          'and the accounts it listed must be re-added per channel with /feed_subscribe',
+      );
+    }
+    // Feed platforms are built once from config and shared: the poller
+    // reads timelines through the registry and the `/feed_*` commands
+    // validate an account against the same instances.
+    const feedPlatforms = createDefaultFeedPlatformRegistry(
+      parseFeedPlatformsConfig(this.config.social_feed),
+    );
+    this.container.registerSingleton(TOKENS.FeedPlatformRegistry, () => feedPlatforms);
+    // Polls each guild's stored feed subscriptions and forwards the new
+    // posts that match every subscription's own filter.
+    this.use(createSocialFeedPlugin(this.config.social_feed, { platforms: feedPlatforms }));
     // The earthquake webhook server + per-guild broadcast is a
     // bot-scoped plugin; its `start` hook owns the Express route.
     this.use(createEarthquakePlugin({ port: webhookPort }));

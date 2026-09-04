@@ -53,6 +53,7 @@ import { MongoConnectionManager, type ConnectionManager } from '../infra/mongo/c
 import { buildRepos, type Repos } from '../persistence/repositories';
 import type { ModelCatalog } from '../infra/llm/models-catalog';
 import type { DefaultModelResolver } from '../infra/llm/default-model-resolver';
+import type { FeedPlatformRegistry } from '../infra/social-feed';
 import type { VoiceController } from '../plugins/voice/internal';
 
 import {
@@ -276,6 +277,16 @@ export abstract class BaseBot<TConfig extends Config = Config> {
    */
   public get defaultModelResolver(): DefaultModelResolver | undefined {
     return this.container.tryResolve<DefaultModelResolver>(TOKENS.DefaultModelResolver);
+  }
+
+  /**
+   * Bot-scoped {@link FeedPlatformRegistry}, registered by the
+   * composition root from its `social_feed.platforms` block. The
+   * `/feed_*` commands read it through this getter rather than the
+   * container; bots that do not configure the feature see `undefined`.
+   */
+  public get feedPlatformRegistry(): FeedPlatformRegistry | undefined {
+    return this.container.tryResolve<FeedPlatformRegistry>(TOKENS.FeedPlatformRegistry);
   }
 
   /**

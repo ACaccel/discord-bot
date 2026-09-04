@@ -50,6 +50,7 @@ single-page overview.
 - Giveaways with reaction-driven winner selection.
 - Per-member activity tracking.
 - Social-media share-link previews (Twitter/X, Instagram, Threads, Facebook, Reddit, Bahamut, Bilibili) with original-embed suppression.
+- Subscription-driven social feed: `/feed_subscribe`, `/feed_unsubscribe`, and `/feed_list` forward followed accounts' new posts into a chosen channel, each subscription carrying its own media / keyword filter. Subscribing and unsubscribing take a comma-separated list of accounts, up to 20 per command.
 - Earthquake alert broadcast via HTTP webhook.
 - Scheduled jobs hosted by plugins.
 - Built-in `en` / `zh-TW` locales; per-guild command localisation.
@@ -148,7 +149,7 @@ Common fields:
 | `admin`                       | `string[]`          | no       | User ids with bot-admin privileges. Gates `/ai_whitelist_*`; `/bug_report` DMs every id. Default `[]`.                                                                        |
 | `language`                    | `"zh-TW"` \| `"en"` | no       | Default display locale, also used for registered slash-command text. Default `"zh-TW"`; an unsupported value warns and falls back.                                            |
 | `commands`                    | `string[]`          | no       | The slash commands this personality registers with Discord. Removing an entry only stops re-registering it — run `yarn deploy -t <name>` to take the command down on Discord. |
-| `guilds.<id>.channels`        | `Record<name, id>`  | no       | Symbolic channel names (`"debug"`, `"event"`, `"x_feed"`, …) → Discord ids, so handlers look channels up by name.                                                             |
+| `guilds.<id>.channels`        | `Record<name, id>`  | no       | Symbolic channel names (`"debug"`, `"event"`, …) → Discord ids, so handlers look channels up by name.                                                                         |
 | `guilds.<id>.roles`           | `Record<name, id>`  | no       | Symbolic role names → Discord ids.                                                                                                                                            |
 | `guilds.<id>.permission_rank` | object              | no       | Privacy / clearance ranks for this guild — see below. Validated at startup; a malformed block fails the boot naming the guild.                                                |
 
@@ -176,20 +177,20 @@ omitted entirely. Note that `guild_events` names two unrelated things:
 the top-level block below, and a rank-gated feature key inside each
 guild's `permission_rank.features` map.
 
-| Block                     | Loaded by      | Fields (default)                                                                                                                                                                                                                                                                                 |
-| ------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `llm_auto_reply`          | gopher         | `enabled` (`false`), `probability` (`0.05`), `messageCount` (`5`), `windowSeconds` (`30`), `cooldownSeconds` (`30`), `endpoint` (placeholder), `timeoutMs` (`10000`)                                                                                                                             |
-| `settings_api`            | gopher         | `enabled` (`false`), `host` (`127.0.0.1`), `basePath` (`/settings`). The bearer key comes from `GOPHER_SETTINGS_API_KEY`, never this block; an enabled API with no key refuses to start. The listen port is `PORT`.                                                                              |
-| `identity_sync`           | gopher         | `enabled` (`false`), `syncWithSource` (`false`), `sourceUserId` (**required** when `enabled && syncWithSource`), `schedule` (`0 4 * * *`), `syncAvatar` / `syncNickname` (`true`), `fallbackNickname` (empty = leave untouched), `fallbackAvatarPath` (`assets/gopher.png`)                      |
-| `social_link_preview`     | nijika, tomori | `enabled` (`false`), `originalMessageStrategy` (`suppress`), `providers` (all), `timeoutMs` (`4000`), `maxUrlsPerMessage` (`1`), plus six `*ProxyHosts` lists — see below                                                                                                                        |
-| `x_media_feed`            | nijika         | `enabled` (`false`), `accounts` (`{ handle, channel? }[]`), `defaultChannel` (`x_feed`), `pollIntervalMs` (`300000`, floor `60000`), `fullSweepEveryPolls` (`12`), `apiBaseUrl` (`https://api.fxtwitter.com`), `timeoutMs` (`8000`), `maxPostsPerPoll` (`5`), `embedProxyHost` (`fxtwitter.com`) |
-| `guild_events`            | nijika, tomori | `attachment_cache.enabled` (`true`), `attachment_cache.ttlHours` (`24`), `attachment_cache.minFreeDiskMb` (`5120`) — the pre-delete attachment cache; see below                                                                                                                                  |
-| `level_roles`             | nijika         | `level_<n>` → role name for the level-role sync. Required by `/update_role`; a malformed block disables the command with `replies:update_role.no_config`.                                                                                                                                        |
-| `auto_reply`              | nijika, tomori | `luckyReplies` (`{ userId, probability, reply }[]`, default `[]`) and `globalLuckyProbability` (`0.005`). Each entry fires `reply` verbatim for `userId` at `probability`; the lines are operator data, not catalog copy.                                                                        |
-| `weather_forecast`        | nijika, tomori | `locationKey` (**required** when `/weather_forecast` is enabled) — the AccuWeather location id, e.g. `315078` for Taipei. The API key stays in `ACCUWEATHER_KEY`.                                                                                                                                |
-| `random_restaurant`       | nijika, tomori | `apiUrl` (**required** when `/random_restaurant` is enabled) — absolute `http(s)` URL of the recommendation endpoint.                                                                                                                                                                            |
-| `backup_log_enabled`      | msg-archive    | `false` — when `true`, each backup pass also writes a transcript under `logs/backup/`                                                                                                                                                                                                            |
-| `backup_interval_minutes` | msg-archive    | `60` — minutes between backup passes                                                                                                                                                                                                                                                             |
+| Block                     | Loaded by      | Fields (default)                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `llm_auto_reply`          | gopher         | `enabled` (`false`), `probability` (`0.05`), `messageCount` (`5`), `windowSeconds` (`30`), `cooldownSeconds` (`30`), `endpoint` (placeholder), `timeoutMs` (`10000`)                                                                                                                                                                                                                     |
+| `settings_api`            | gopher         | `enabled` (`false`), `host` (`127.0.0.1`), `basePath` (`/settings`). The bearer key comes from `GOPHER_SETTINGS_API_KEY`, never this block; an enabled API with no key refuses to start. The listen port is `PORT`.                                                                                                                                                                      |
+| `identity_sync`           | gopher         | `enabled` (`false`), `syncWithSource` (`false`), `sourceUserId` (**required** when `enabled && syncWithSource`), `schedule` (`0 4 * * *`), `syncAvatar` / `syncNickname` (`true`), `fallbackNickname` (empty = leave untouched), `fallbackAvatarPath` (`assets/gopher.png`)                                                                                                              |
+| `social_link_preview`     | nijika, tomori | `enabled` (`false`), `originalMessageStrategy` (`suppress`), `providers` (all), `timeoutMs` (`4000`), `maxUrlsPerMessage` (`1`), plus six `*ProxyHosts` lists — see below                                                                                                                                                                                                                |
+| `social_feed`             | nijika         | `enabled` (`false`), `pollIntervalMs` (`300000`, floor `60000`, ceiling `2147483647`), `fullSweepEveryPolls` (`12`), `maxPostsPerPoll` (`5`, ceiling `20`, **per subscription**), `platforms.x.apiBaseUrl` (`https://api.fxtwitter.com`), `platforms.x.timeoutMs` (`8000`, ceiling `30000`), `platforms.x.embedProxyHost` (`fxtwitter.com`). Who is followed is **not** here — see below |
+| `guild_events`            | nijika, tomori | `attachment_cache.enabled` (`true`), `attachment_cache.ttlHours` (`24`), `attachment_cache.minFreeDiskMb` (`5120`) — the pre-delete attachment cache; see below                                                                                                                                                                                                                          |
+| `level_roles`             | nijika         | `level_<n>` → role name for the level-role sync. Required by `/update_role`; a malformed block disables the command with `replies:update_role.no_config`.                                                                                                                                                                                                                                |
+| `auto_reply`              | nijika, tomori | `luckyReplies` (`{ userId, probability, reply }[]`, default `[]`) and `globalLuckyProbability` (`0.005`). Each entry fires `reply` verbatim for `userId` at `probability`; the lines are operator data, not catalog copy.                                                                                                                                                                |
+| `weather_forecast`        | nijika, tomori | `locationKey` (**required** when `/weather_forecast` is enabled) — the AccuWeather location id, e.g. `315078` for Taipei. The API key stays in `ACCUWEATHER_KEY`.                                                                                                                                                                                                                        |
+| `random_restaurant`       | nijika, tomori | `apiUrl` (**required** when `/random_restaurant` is enabled) — absolute `http(s)` URL of the recommendation endpoint.                                                                                                                                                                                                                                                                    |
+| `backup_log_enabled`      | msg-archive    | `false` — when `true`, each backup pass also writes a transcript under `logs/backup/`                                                                                                                                                                                                                                                                                                    |
+| `backup_interval_minutes` | msg-archive    | `60` — minutes between backup passes                                                                                                                                                                                                                                                                                                                                                     |
 
 Several fields carry a required-when rule worth calling out:
 
@@ -213,9 +214,14 @@ Several fields carry a required-when rule worth calling out:
   a playable video or the list ends, so every dead host ahead of a live
   one costs `timeoutMs` before the preview is posted — keep the lists
   short and put the hosts that answer first.
-- `x_media_feed.accounts[].channel` / `defaultChannel` — a symbolic
-  channel name, so the guild's `channels` map must carry a matching
-  entry. A guild without it silently opts out.
+- `social_feed.platforms` — **must not be empty when `enabled` is
+  `true`**, or the boot fails: a feed with no platform registered could
+  only ever refuse every subscription. The block says which platforms
+  this bot recognises and how to reach them; only `x` ships today, and
+  omitting a platform is how you turn it off. The list of accounts is
+  not configuration at all — it lives in each guild's database and is
+  edited with `/feed_subscribe` and `/feed_unsubscribe`, so adding an
+  account needs neither a config edit nor a restart.
 - `guild_events.attachment_cache` — Discord purges an attachment's CDN
   object nearly synchronously with the message deletion, so downloading
   it at delete time usually fails. With the cache on (the default), the
@@ -234,6 +240,49 @@ Several fields carry a required-when rule worth calling out:
   ~400 MB that can already be downloading when it trips. That floor protects the host, not the archive:
   archiving an attachment that was already cached, and the delete-time
   download fallback, both keep running below it.
+
+### Migrating from `x_media_feed` to `social_feed`
+
+**Breaking.** The X-only media feed became a multi-platform,
+subscription-driven feed, and the followed accounts moved out of
+`config.json` into each guild's database. A bot whose `config.json`
+still declares `x_media_feed` refuses to start, with a message naming
+the replacement — the rename is deliberately loud, because a silently
+ignored block would leave the feed dark.
+
+1. **Rename the block and move the platform options.** `x_media_feed`
+   becomes `social_feed`; `apiBaseUrl`, `timeoutMs` and
+   `embedProxyHost` move under `platforms.x`. `enabled`,
+   `pollIntervalMs`, `fullSweepEveryPolls` and `maxPostsPerPoll` keep
+   their names and their defaults. One meaning changed:
+   `maxPostsPerPoll` now caps a pass **per subscription** rather than
+   per account, so an account followed from three channels can deliver
+   up to that many posts into each of them. Copy the new shape from
+   [`src/bot/nijika/config.example.json`](src/bot/nijika/config.example.json).
+2. **Keep the old account list.** `accounts` and `defaultChannel` are
+   gone. Write down what they held before you edit the file: every
+   account has to be re-added by hand.
+3. **Drop the `x_feed` symbolic channel** from each guild's `channels`
+   map. A subscription now names its Discord channel directly, so the
+   symbolic name is unused.
+4. **Register the commands.** Add `feed_subscribe`, `feed_unsubscribe`
+   and `feed_list` to the personality's `commands` array and run
+   `yarn deploy -t nijika`; they do not appear in Discord until then.
+5. **Re-add every account** with `/feed_subscribe`, naming the channel
+   it should post into. The `account` option takes a comma-separated
+   list, so one command per channel is usually enough — up to 20
+   accounts at a time, each reported back as added, updated, failed
+   with the reason, or not attempted (the batch stops early if the
+   source starts refusing). Each subscription starts from the moment it is
+   created: nothing published before then is backfilled, and nothing
+   already forwarded is repeated.
+
+The old cursors are not migrated: they were keyed by handle alone,
+while a subscription now tracks its own position per platform, account,
+and channel. The retired `xfeedcursors` collection is left behind in
+each guild's database — clear it with `yarn db drop-xfeed`, which counts
+only until you set `dry_run: false` (see
+[`tools/db/README.md`](tools/db/README.md)).
 
 ## Adding a command, button, modal, or plugin
 

@@ -11,7 +11,7 @@
  */
 export type { ErrorContext } from './error-context';
 export { isTransientNetworkError } from './transient-network-error';
-export { DomainError, type DomainErrorInit } from './domain-error';
+export { DomainError, type DomainErrorInit, type AnyDomainError } from './domain-error';
 export { ConfigurationError } from './configuration-error';
 export {
   ExternalServiceError,
@@ -22,6 +22,6 @@ export {
   type LlmProviderErrorCode,
   LinkPreviewError,
   type LinkPreviewErrorCode,
-  XFeedError,
-  type XFeedErrorCode,
+  FeedError,
+  type FeedErrorCode,
 } from './external-service-error';

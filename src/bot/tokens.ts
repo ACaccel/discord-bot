@@ -41,6 +41,7 @@ import type { Clock } from '../core/time';
 import type { DefaultModelResolver } from '../infra/llm/default-model-resolver';
 import type { ModelCatalog } from '../infra/llm/models-catalog';
 import type { ConnectionManager } from '../infra/mongo/connection-manager';
+import type { FeedPlatformRegistry } from '../infra/social-feed';
 import type { Repos } from '../persistence/repositories';
 import type { VoiceController } from '../plugins/voice/internal';
 
@@ -123,6 +124,13 @@ interface Tokens {
    * that do not register LlmChatPlugin.
    */
   readonly DefaultModelResolver: ServiceToken<DefaultModelResolver>;
+  /**
+   * Feed platform Strategy lookup, built by each composition root from
+   * its `social_feed.platforms` block. The `social-feed` plugin polls
+   * through it and the `/feed_*` commands validate an account against
+   * it. Unbound for bots that do not configure the feature.
+   */
+  readonly FeedPlatformRegistry: ServiceToken<FeedPlatformRegistry>;
 }
 
 export const TOKENS: Tokens = {
@@ -140,4 +148,5 @@ export const TOKENS: Tokens = {
   VoiceController: token<VoiceController>('VoiceController'),
   ModelCatalog: token<ModelCatalog>('ModelCatalog'),
   DefaultModelResolver: token<DefaultModelResolver>('DefaultModelResolver'),
+  FeedPlatformRegistry: token<FeedPlatformRegistry>('FeedPlatformRegistry'),
 };

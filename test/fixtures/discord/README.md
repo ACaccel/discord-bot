@@ -6,15 +6,22 @@ minimum the SUT reads — no third-party mock libraries.
 
 ## Files
 
-- `guild-builder.ts` — `buildGuild({ id, name, channels, members, roles })`
+- `guild-builder.ts` — `buildGuild({ id, name, channels, members, me, roles })`
   and `buildGuildRoles({ roleCount, roles, createdRoleId })`, whose
   `create` / `delete` mocks drive the role-creation failure branches.
 - `member-builder.ts` — `buildGuildMember({ id, displayName, voiceChannelId, roleIds, roles })`
   and `buildMemberRoles()` for the `roles.add` / `roles.remove` spies.
-- `channel-builder.ts` — `buildTextChannel({ id, name, viewableBy })` for
-  the `/traffic` visibility filter, and `buildSendableChannel({ sendable })`
-  for any path that posts a message and later deletes it.
-- `interaction-builder.ts` — `buildChatInputInteraction({ commandName, userId, guildId, options, sink })`
+- `channel-builder.ts` — `buildTextChannel({ id, name, type, parent, viewableBy, permissionsBySubject })`
+  for the `/traffic` visibility filter and for the `/feed_*` permission
+  checks (it answers `isTextBased()`, `isSendable()` and `isThread()`
+  from `type`), and `buildSendableChannel({ sendable })` for any path
+  that posts a message and later deletes it.
+- `interaction-builder.ts` — `buildChatInputInteraction({ commandName, userId, guildId, guild, options, channels, channel, sink })`.
+  The sink records `defers`, `replies`, `editReplies` and `followUps`,
+  each with the `flags` it was sent with — that is how a test asserts a
+  reply stayed ephemeral. `interaction.deferred` and `.replied` are live
+  getters over the sink, so an error boundary picks `editReply` over
+  `reply` exactly as it would at runtime.
 - `client-builder.ts` — `buildInertClient()`, the pre-login `Client` a
   composition-root test constructs a personality around.
 - `bot-fake.ts` — `buildFakeBot(fields)` plus

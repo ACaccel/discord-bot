@@ -335,11 +335,47 @@
   "social_link_preview": {
     "embed_footer": "預覽來源:{{provider}}"
   },
-  "x_media_feed": {
-    "post": "**@{{author}}** 在 X 發布了新的圖片 / 影片\n{{url}}"
+  "feed": {
+    "post": "**@{{author}}** 在 {{platform}} 發布了新貼文\n{{url}}",
+    "subscribe_header": "{{channel}} 的 {{platform}} 訂閱結果:",
+    "account_subscribed": "- **@{{account}}** — 已開始轉發",
+    "account_updated": "- **@{{account}}** — 已更新過濾條件",
+    "account_failed": "- **@{{account}}** — 沒有訂閱成功:{{reason}}",
+    "account_skipped": "- **@{{account}}** — 還沒處理到,請稍後再試一次。",
+    "reason_unknown": "我這邊出了點問題。",
+    "no_accounts": "請至少指定一個帳號。",
+    "too_many_accounts": "一次最多只能指定 {{max}} 個帳號,請用逗號分隔。",
+    "unsubscribed_one": "已移除 {{count}} 筆訂閱:\n{{list}}",
+    "unsubscribed_other": "已移除 {{count}} 筆訂閱:\n{{list}}",
+    "unsubscribed_more": "…另外還有 {{count}} 筆。",
+    "unsubscribed_none": "{{channel}} 沒有可以退訂的項目。",
+    "unsubscribed_none_hint": "{{channel}} 沒有可以退訂的項目。可以指定平台或帳號來擴大範圍。",
+    "channel_not_supported": "這個頻道無法接收貼文轉發,請選擇本伺服器的文字頻道。",
+    "missing_bot_permissions": "我無法在 {{channel}} 發文,缺少的權限:{{permissions}}。",
+    "permissions_unknown": "我無法判斷自己在 {{channel}} 的權限,請稍後再試一次。",
+    "invoker_cannot_view": "你看不到 {{channel}},所以不會把訂閱加到那裡。",
+    "permission_separator": "、",
+    "permission": {
+      "view_channel": "查看頻道",
+      "send_messages": "發送訊息",
+      "send_messages_in_threads": "在討論串發送訊息",
+      "embed_links": "嵌入連結"
+    },
+    "list_empty": "這個伺服器還沒有任何動態訂閱。",
+    "list_header": "動態訂閱 ({{total}} 筆):",
+    "filter_media": {
+      "media_only": "限有媒體",
+      "photo_only": "限圖片",
+      "video_only": "限影片",
+      "any": "含純文字貼文"
+    },
+    "filter_keyword": "關鍵字:{{keyword}}",
+    "never_forwarded": "尚未轉發",
+    "failed": "無法完成動態訂閱操作 (錯誤代碼:{{traceId}})"
   },
   "common": {
-    "empty_value": "無"
+    "empty_value": "無",
+    "pages_failed": "這份清單有 {{count}} 頁沒能送出,請重新執行一次指令。"
   },
   "giveaway": {
     "missing_required_fields": "請輸入持續時間、得獎人數和獎品",

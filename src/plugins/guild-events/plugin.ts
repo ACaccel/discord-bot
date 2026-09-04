@@ -130,7 +130,7 @@ interface GuildEventsDeps {
 interface CreateGuildEventsDeps {
   /**
    * Pre-delete attachment cache. Injectable (mirroring
-   * `createXMediaFeedPlugin`'s `source` seam) so tests drive the real
+   * `createSocialFeedPlugin`'s `platforms` seam) so tests drive the real
    * cache against a temporary directory instead of the production tree.
    */
   readonly cache?: AttachmentCache;
@@ -197,7 +197,7 @@ export const createGuildEventsPlugin = (
     /**
      * Start the TTL sweep. The first pass runs immediately so a restart
      * clears whatever expired while the bot was down, then a
-     * self-rescheduling timer takes over (the `x-media-feed` loop
+     * self-rescheduling timer takes over (the `social-feed` loop
      * shape): a throw is logged and the loop always reschedules.
      */
     async onReady(ctx): Promise<void> {
