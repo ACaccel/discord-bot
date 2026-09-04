@@ -239,7 +239,9 @@ network reset instead of crashing.
 
 `isRetryableError` ([src/core/retry/](../src/core/retry/)) answers a
 different question and is deliberately broader: transient 5xx / 429
-responses, `ConnectTimeoutError` / `AbortError` / `FetchError`, and
+responses, `ConnectTimeoutError` / `AbortError` / `FetchError`, the OS
+socket and DNS errno codes a lost route or a dropped peer produces
+(`EHOSTUNREACH`, `ENETUNREACH`, `ECONNREFUSED`, `ECONNRESET`, …), and
 undici `UND_ERR_*` codes all justify a bounded retry. **The two
 predicates must never be widened into each other.** A retry is cheap;
 tolerating an uncaught exception is not, so a code that belongs in one

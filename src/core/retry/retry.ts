@@ -16,7 +16,10 @@
  * {@link isRetryableError} is deliberately broader, because a bounded
  * retry is cheap whereas swallowing an uncaught exception is not. The
  * two stay separate so widening the retry policy can never widen what
- * the crash handler tolerates.
+ * the crash handler tolerates. The OS socket codes below overlap with
+ * that predicate's whitelist on purpose: the overlap is a consequence of
+ * both lists describing real transient failures, not a shared source,
+ * and each list is maintained on its own.
  */
 
 /** Attempts made before a retryable failure is rethrown. */
@@ -24,8 +27,30 @@ const DEFAULT_MAX_ATTEMPTS = 5;
 /** First backoff wait; doubled after every retryable failure. */
 const DEFAULT_INITIAL_DELAY_MS = 2000;
 
+/**
+ * Transport-level error codes worth another attempt. Node surfaces OS
+ * socket failures as a bare `Error` whose `code` is the errno name;
+ * undici uses its own `UND_ERR_*` family. Every entry describes a
+ * failure that clears on its own once the network path recovers — a
+ * route flap, a resolver hiccup, a peer that dropped mid-flight.
+ */
+const RETRYABLE_TRANSPORT_CODES: ReadonlySet<string> = new Set([
+  'ECONNRESET', // peer reset an established connection
+  'ECONNREFUSED', // peer refused the connection (restart / failover)
+  'ECONNABORTED', // connection aborted locally mid-flight
+  'ETIMEDOUT', // connection or socket timed out
+  'EPIPE', // wrote to a socket the peer had already closed
+  'EHOSTUNREACH', // no route to host
+  'ENETUNREACH', // network unreachable
+  'ENETDOWN', // local network interface is down
+  'ENOTFOUND', // DNS lookup failed (transient resolver/outage)
+  'EAI_AGAIN', // DNS lookup temporarily failed / timed out
+  'UND_ERR_SOCKET', // undici: socket error on an in-flight request
+  'UND_ERR_CONNECT_TIMEOUT', // undici: connect phase timed out
+]);
+
 /** Tunables for {@link retryFetch}. Every field has a production default. */
-interface RetryOptions {
+export interface RetryOptions {
   /** Total attempts, including the first. Values below 1 disable retrying. */
   readonly maxAttempts?: number;
   /** Backoff wait before the second attempt, in milliseconds. */
@@ -61,7 +86,8 @@ interface RetryableErrorShape {
  * Intentionally generous on the network-failure side: one outbound call
  * can fail as a `DiscordAPIError`, an undici `UND_ERR_*`, an axios
  * transport code, or a bare `Error` from the ws layer. Anything that
- * looks like a transient 5xx, a 429, or a socket error retries; 4xx,
+ * looks like a transient 5xx, a 429, or a transport-level socket / DNS
+ * failure retries; 4xx,
  * Unknown Channel, and validation errors propagate immediately so a
  * permanent failure is not paid for five times.
  */
@@ -78,16 +104,7 @@ export const isRetryableError = (err: unknown): boolean => {
   ) {
     return true;
   }
-  const code = anyErr.code;
-  if (
-    code === 'ECONNRESET' ||
-    code === 'ETIMEDOUT' ||
-    code === 'ECONNABORTED' ||
-    code === 'EAI_AGAIN' ||
-    code === 'ENOTFOUND' ||
-    code === 'UND_ERR_SOCKET' ||
-    code === 'UND_ERR_CONNECT_TIMEOUT'
-  ) {
+  if (typeof anyErr.code === 'string' && RETRYABLE_TRANSPORT_CODES.has(anyErr.code)) {
     return true;
   }
   const msg = String(err);

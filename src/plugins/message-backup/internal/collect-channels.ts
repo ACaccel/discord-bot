@@ -13,6 +13,7 @@ import { ChannelType, type Guild, type TextBasedChannel } from 'discord.js';
 
 import { logError, type Logger } from '../../../core/logger';
 import { retryFetch } from '../../../core/retry';
+import { BACKUP_RETRY_OPTIONS } from './retry-policy';
 
 const ALLOWED_CHANNEL_TYPES = new Set<ChannelType>([
   ChannelType.GuildText,
@@ -63,7 +64,10 @@ export const collectChannels = async (
       continue;
     }
     try {
-      const active = await retryFetch(() => anyChannel.threads!.fetchActive!());
+      const active = await retryFetch(
+        () => anyChannel.threads!.fetchActive!(),
+        BACKUP_RETRY_OPTIONS,
+      );
       active.threads.forEach((t) => addChannel(t));
     } catch (err) {
       logError(
@@ -88,7 +92,10 @@ export const collectChannels = async (
             fetchAll: type === 'private',
           };
           if (before !== undefined) opts.before = before;
-          const archived = await retryFetch(() => anyChannel.threads!.fetchArchived!(opts));
+          const archived = await retryFetch(
+            () => anyChannel.threads!.fetchArchived!(opts),
+            BACKUP_RETRY_OPTIONS,
+          );
           archived.threads.forEach((t) => {
             addChannel(t);
             const archivedAt = (t as { archivedAt: Date | null }).archivedAt;

@@ -3,8 +3,9 @@
  *
  * The plugin owns the full backup logic; the `MsgArchive` composition
  * root simply registers it. The hot loop and its helpers (channel
- * fetch, retry, pagination, log file format, stale-Fetch-doc cleanup)
- * live in `internal/` so this file stays lifecycle wiring only.
+ * fetch, the outage-tolerant retry policy, pagination, log file format,
+ * stale-Fetch-doc cleanup) live in `internal/` so this file stays
+ * lifecycle wiring only.
  *
  * Wiring:
  *   - Reads `backupServers` config — the list of guild ids the bot

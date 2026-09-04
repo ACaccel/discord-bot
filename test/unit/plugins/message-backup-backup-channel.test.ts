@@ -22,6 +22,7 @@ import { err, ok } from '../../../src/core/result';
 import { databaseErrorFrom } from '../../../src/persistence/error-translator';
 import type { Repos } from '../../../src/persistence/repositories';
 import { backupChannel } from '../../../src/plugins/message-backup/internal/backup-channel';
+import { BACKUP_RETRY_OPTIONS } from '../../../src/plugins/message-backup/internal/retry-policy';
 
 const GUILD = 'g-1';
 const PAGE_SIZE = 100;
@@ -360,11 +361,55 @@ describe('backupChannel — failure containment', () => {
     const { channel, fetch } = makeChannel([transient, fetchPage('100')]);
 
     const pending = backupChannel(channel, repos, GUILD, silent, noProgress);
-    // Backoff is jittered around 2s; run past the widest wait.
-    await vi.advanceTimersByTimeAsync(10_000);
+    // The first backoff is jittered up to 1.5x the policy's initial
+    // delay; run past the widest wait.
+    await vi.advanceTimersByTimeAsync(BACKUP_RETRY_OPTIONS.initialDelayMs! * 2);
     const { stats } = await pending;
 
     expect(fetch).toHaveBeenCalledTimes(2);
+    expect(stats.error).toBeUndefined();
+    expect(upsert).toHaveBeenCalledWith('general', 'chan-1', '100');
+  });
+
+  it('rides out a multi-minute outage before recording the channel as failed', async () => {
+    // A lost route surfaces as a bare Node socket error. The walker must
+    // keep trying for the policy's full budget — an unattended pass can
+    // afford to wait — and only then record the failure and move on.
+    vi.useFakeTimers();
+    const { repos, upsert } = makeRepos();
+    const unreachable = () =>
+      Object.assign(new Error('read EHOSTUNREACH'), { code: 'EHOSTUNREACH' });
+    const { channel, fetch } = makeChannel(
+      Array.from({ length: BACKUP_RETRY_OPTIONS.maxAttempts! }, unreachable),
+    );
+
+    const pending = backupChannel(channel, repos, GUILD, silent, noProgress);
+    // Sum of the jittered backoffs at their widest: initial * 1.5 * (2^n - 1).
+    const widestTotal =
+      BACKUP_RETRY_OPTIONS.initialDelayMs! *
+      1.5 *
+      (2 ** (BACKUP_RETRY_OPTIONS.maxAttempts! - 1) - 1);
+    await vi.advanceTimersByTimeAsync(widestTotal);
+    const { stats } = await pending;
+
+    expect(fetch).toHaveBeenCalledTimes(BACKUP_RETRY_OPTIONS.maxAttempts!);
+    expect(stats.error).toContain('EHOSTUNREACH');
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('recovers when the route comes back partway through the budget', async () => {
+    vi.useFakeTimers();
+    const { repos, upsert } = makeRepos();
+    const unreachable = () =>
+      Object.assign(new Error('read EHOSTUNREACH'), { code: 'EHOSTUNREACH' });
+    const { channel, fetch } = makeChannel([unreachable(), unreachable(), fetchPage('100')]);
+
+    const pending = backupChannel(channel, repos, GUILD, silent, noProgress);
+    // Two jittered waits at their widest: initial * 1.5 * (1 + 2).
+    await vi.advanceTimersByTimeAsync(BACKUP_RETRY_OPTIONS.initialDelayMs! * 1.5 * 3);
+    const { stats } = await pending;
+
+    expect(fetch).toHaveBeenCalledTimes(3);
     expect(stats.error).toBeUndefined();
     expect(upsert).toHaveBeenCalledWith('general', 'chan-1', '100');
   });

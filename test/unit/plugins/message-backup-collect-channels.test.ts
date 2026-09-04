@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Logger } from '../../../src/core/logger';
 import { collectChannels } from '../../../src/plugins/message-backup/internal/collect-channels';
+import { BACKUP_RETRY_OPTIONS } from '../../../src/plugins/message-backup/internal/retry-policy';
 
 const GUILD = 'g-1';
 
@@ -67,6 +68,8 @@ interface ChannelSpec {
    */
   readonly activeThreads?: readonly (ThreadSpec | null)[];
   readonly activeThreadsError?: Error;
+  /** Errors thrown by successive `fetchActive` calls before it succeeds. */
+  readonly activeThreadsFailures?: readonly Error[];
   readonly archivedPages?: Readonly<Record<'public' | 'private', readonly ArchivedPage[]>>;
   readonly archivedError?: Readonly<Partial<Record<'public' | 'private', Error>>>;
 }
@@ -94,9 +97,11 @@ const buildChannel = (
       hasMore: next.hasMore ?? false,
     };
   });
+  const activeFailures = [...(spec.activeThreadsFailures ?? [])];
   const hasThreads =
     spec.activeThreads !== undefined ||
     spec.activeThreadsError !== undefined ||
+    spec.activeThreadsFailures !== undefined ||
     spec.archivedPages !== undefined ||
     spec.archivedError !== undefined;
   const channel: Record<string, unknown> = {
@@ -109,6 +114,8 @@ const buildChannel = (
     channel.threads = {
       fetchActive: vi.fn(async () => {
         if (spec.activeThreadsError !== undefined) throw spec.activeThreadsError;
+        const transient = activeFailures.shift();
+        if (transient !== undefined) throw transient;
         return {
           threads: new Map(
             (spec.activeThreads ?? []).map((t, i) => [
@@ -155,6 +162,7 @@ const idsOf = (channels: readonly unknown[]): string[] =>
   channels.map((c) => (c as { id: string }).id);
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.clearAllMocks();
 });
 
@@ -345,5 +353,21 @@ describe('collectChannels — failure isolation', () => {
     expect(liveChannelIds).toEqual(new Set(['c1', 't-active']));
     // One log per failing visibility class — the failure is never silent.
     expect(error).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries a thread listing that fails on a lost route and logs nothing', async () => {
+    vi.useFakeTimers();
+    const unreachable = Object.assign(new Error('read EHOSTUNREACH'), { code: 'EHOSTUNREACH' });
+    const { guild } = makeGuild([
+      { id: 'c1', activeThreads: [{ id: 't1' }], activeThreadsFailures: [unreachable] },
+    ]);
+    const { logger, error } = makeLogger();
+
+    const pending = collectChannels(guild, logger);
+    await vi.advanceTimersByTimeAsync(BACKUP_RETRY_OPTIONS.initialDelayMs! * 2);
+    const { channels } = await pending;
+
+    expect(idsOf(channels)).toEqual(['c1', 't1']);
+    expect(error).not.toHaveBeenCalled();
   });
 });
