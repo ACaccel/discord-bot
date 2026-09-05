@@ -1,11 +1,12 @@
 /**
  * Unit tests for {@link runSocialLinkPreview}: provider routing, the
  * preview cap, and the silent-failure contract (Err logged + skipped,
- * null skipped, unmatched ignored). Uses a fake registry and a fake
- * Message that records replies and suppression calls.
+ * null skipped, unmatched ignored, a withdrawn message ends the pass at
+ * debug level). Uses a fake registry and a fake Message that records
+ * replies and suppression calls.
  */
 import { describe, expect, it, vi } from 'vitest';
-import type { Message } from 'discord.js';
+import { DiscordAPIError, type Message } from 'discord.js';
 
 import { runSocialLinkPreview } from '../../../../src/plugins/social-link-preview/internal/orchestrator';
 import type { Logger } from '../../../../src/core/logger';
@@ -173,5 +174,46 @@ describe('runSocialLinkPreview', () => {
     // First reply threw and was logged; the second URL still produced a preview.
     expect(replies).toHaveLength(1);
     expect(logger.error).toHaveBeenCalledTimes(1);
+  });
+
+  it('ends the pass at debug level when the message was deleted before the reply', async () => {
+    const { message, replies, calls } = makeMessage(
+      'https://x.com/a/status/1 https://x.com/b/status/2',
+    );
+    const withdrawn = new DiscordAPIError(
+      {
+        message: 'Invalid Form Body',
+        code: 50035,
+        errors: {
+          message_reference: {
+            _errors: [{ code: 'MESSAGE_REFERENCE_UNKNOWN_MESSAGE', message: 'Unknown message' }],
+          },
+        },
+      },
+      50035,
+      400,
+      'POST',
+      'https://discord.test/channels/c1/messages',
+      {},
+    );
+    const message2 = {
+      ...(message as unknown as Record<string, unknown>),
+      reply: vi.fn(async () => {
+        throw withdrawn;
+      }),
+    } as unknown as Message;
+    const provider = stubProvider(ok(rewritten));
+    const registry = registryReturning(provider);
+    const logger = makeLogger();
+    await runSocialLinkPreview(
+      { registry, config: { ...config, maxUrlsPerMessage: 2 }, translator, logger },
+      message2,
+    );
+    // No preview, no suppression, no error line; the second URL was never probed.
+    expect(replies).toHaveLength(0);
+    expect(calls.suppress).toBe(0);
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.debug).toHaveBeenCalledTimes(1);
+    expect(provider.build).toHaveBeenCalledTimes(1);
   });
 });

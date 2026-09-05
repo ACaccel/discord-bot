@@ -466,7 +466,10 @@ operator configuration (the bot's `social_link_preview` block), not code
 defaults — embed-proxy domains change availability faster than releases
 ship — and each host is probed and ranked before anything is posted
 (`video > image > weak-image > text`), so a dead or media-less proxy ends
-in a silent skip rather than a bare link.
+in a silent skip rather than a bare link. A message deleted while its
+preview was being built ends in the same silent skip: Discord rejects the
+reply's `message_reference`, and the plugin treats that as the author
+withdrawing the link, not as a fault.
 
 ### Social-Feed Strategy ([src/infra/social-feed/](../src/infra/social-feed/))
 
