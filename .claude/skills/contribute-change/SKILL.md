@@ -93,7 +93,7 @@ threshold. Root-cause any failure.
 
 ## Step 7 — Sync the documentation surfaces
 
-Documentation lands in the **same commit** as the code. There are five
+Documentation lands in the **same commit** as the code. There are four
 surfaces; update each one the change actually touches, and no others —
 each fact lives in exactly one place, everywhere else links to it.
 
@@ -103,15 +103,15 @@ each fact lives in exactly one place, everywhere else links to it.
 | `README.md`                              | A user-visible feature, an `.env` key, or a `config.json` field changed.      |
 | `CONTRIBUTING.md` / `docs/contributing/` | A recipe, convention, quality gate, or architectural rule changed.            |
 | `src/bot/<name>/config.example.json`     | A config field was added, removed, renamed, or its default changed.           |
-| `CHANGELOG.md`                           | Any notable change — **one entry** under `[Unreleased]`.                      |
 
-The changelog follows Keep a Changelog. An entry is one imperative
-sentence closing with a link to the commit that made it —
+`CHANGELOG.md` is **not** one of them: routine commits leave it alone.
+It is written in one pass when a release is cut — walk
+`git log <last tag>..HEAD` and file one entry per notable commit under
+the new version (`docs/contributing/branching-and-releases.md`,
+Releasing). The changelog follows Keep a Changelog. An entry is one
+imperative sentence closing with a link to the commit that made it —
 `- <Description> ([<7-char hash>](https://github.com/ACaccel/BotFleet/commit/<hash>)).`
-— filed under Added / Changed / Fixed / Removed / Security. The hash
-only exists once the commit does, so the entry is written against the
-commit that introduced the change — the next commit, or the release
-preparation, carries it.
+— filed under Added / Changed / Fixed / Removed / Security.
 
 The changelog is public and permanent, so every entry obeys four content
 rules (full text in `CONTRIBUTING.md`, Architectural rule 4):
@@ -139,5 +139,7 @@ Missing documentation is a defect, exactly like a missing test.
   the conventional-commits style used in this repo (`feat` / `fix` /
   `refactor` / `chore` / `docs` / `test`).
 - Commit message body explains the why, not the what.
-- Include `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
-- Do not push or open a PR unless the user explicitly asks.
+- No `Co-Authored-By` trailer or any other AI-attribution line.
+- Push to `dev` in the same step; a commit request authorises its push,
+  and `git push` is part of the commit action rather than a separate
+  approval. Do not open a PR unless the user explicitly asks.

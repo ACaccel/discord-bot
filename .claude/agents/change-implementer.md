@@ -51,14 +51,15 @@ expects to change). No external task-tracker file is required.
    `yarn handlers:gen:check`, `yarn knip`. Root-cause any failure; do
    not bypass.
 8. **Sync the documentation surfaces** — `docs/architecture.md`,
-   `README.md`, `CONTRIBUTING.md` / `docs/contributing/`, the matching
-   `config.example.json`, and one `CHANGELOG.md` line, for each surface the change touches
+   `README.md`, `CONTRIBUTING.md` / `docs/contributing/`, and the
+   matching `config.example.json`, for each surface the change touches
    (`contribute-change` Step 7). They land in the same commit as the
-   code.
-9. **Produce the commit message** — conventional-commits prefix,
-   explain the why, include
-   `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>`. Do not
-   push and do not open a PR unless explicitly asked.
+   code. Do not touch `CHANGELOG.md`; it is written at release time.
+9. **Commit and push together** — conventional-commits prefix,
+   explain the why. No `Co-Authored-By` trailer or any other
+   AI-attribution line. A commit request authorises its push to `dev`
+   in the same step; `git push` is part of the commit action, not a
+   separate approval. Do not open a PR unless explicitly asked.
 10. **Report** — return a concise summary: files changed, reviewers
     run, gate results, commit SHA (or staged-diff status if no commit
     was requested).
@@ -80,7 +81,7 @@ matching reviewer in parallel.
 ## Out of scope
 
 - Multi-task planning or batching of unrelated work into one run.
-- Deciding when to push, open a PR, or merge.
+- Deciding when to open a PR or merge.
 - Releasing, tagging, or anything that mutates remote state beyond
   what the user explicitly asked for in this task.
 

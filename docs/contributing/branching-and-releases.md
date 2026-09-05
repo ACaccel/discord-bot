@@ -30,7 +30,12 @@ This repo follows a **Git Flow** variant with two long-lived branches:
   want a pre-merge CI gate / review, branch off `dev`, open a PR back
   into `dev`, and delete the branch on merge. Otherwise commit straight
   to `dev`.
-- **Releasing** — open a `dev` → `main` PR (optionally via a `release/*`
+- **Releasing** — first write the changelog: on `dev`, walk
+  `git log <last tag>..HEAD`, rename `[Unreleased]` to the new version
+  and date, file one entry per notable commit under it (format and
+  content rules in [Architectural rule 4](../../CONTRIBUTING.md#architectural-rules)),
+  and open a fresh empty `[Unreleased]` above it. Then bump the version
+  and open a `dev` → `main` PR (optionally via a `release/*`
   stabilisation branch that takes only bug fixes, version bumps, and
   changelog edits). The full required CI gate set must be green. After
   merging into `main`, tag the release + cut the GitHub Release, then

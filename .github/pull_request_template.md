@@ -29,7 +29,7 @@ unchecked rather than deleting the line.
 - [ ] Tests added or updated
 - [ ] Docs (`docs/architecture.md` / `README.md` / `CONTRIBUTING.md` / `docs/contributing/` / `CLAUDE.md`)
 - [ ] `config.example.json` (a config field was added, removed, or redefaulted)
-- [ ] `CHANGELOG.md` (one entry under `[Unreleased]`, closing with its commit link)
+- [ ] `CHANGELOG.md` (release PRs only — one entry per notable commit since the last tag)
 
 ## Test plan
 

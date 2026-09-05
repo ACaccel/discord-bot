@@ -68,12 +68,20 @@ violations:
    commit as the code. The surfaces are
    [`docs/architecture.md`](docs/architecture.md),
    [`README.md`](README.md), this file and the guides under
-   [`docs/contributing/`](docs/contributing/), the matching
-   `src/bot/<name>/config.example.json`, and one entry in
-   [`CHANGELOG.md`](CHANGELOG.md) — an imperative sentence under
-   `[Unreleased]`, closing with a link to the commit that made it:
-   `- <Description> ([<7-char hash>](<commit URL>)).` A missing doc
-   update is a defect, like a missing test.
+   [`docs/contributing/`](docs/contributing/), and the matching
+   `src/bot/<name>/config.example.json`. A missing doc update is a
+   defect, like a missing test.
+
+   [`CHANGELOG.md`](CHANGELOG.md) is the one surface routine commits do
+   not touch. It is written in a single pass when a release is cut (see
+   [Releasing](docs/contributing/branching-and-releases.md)): walk every
+   commit since the last tag and file one entry per notable change under
+   the new version — an imperative sentence closing with a link to the
+   commit that made it:
+   `- <Description> ([<7-char hash>](<commit URL>)).` Deferring the
+   entry to release time keeps the hash available and spares each push a
+   trailing changelog commit; the price is that the release author must
+   read the log rather than rely on memory.
 
    A changelog entry is public, permanent, and written for a general
    audience. Four content rules:

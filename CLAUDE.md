@@ -17,7 +17,7 @@ in strict mode.
 - [`README.md`](README.md) — feature tour and the `.env` / `config.json`
   field reference
 - [`CHANGELOG.md`](CHANGELOG.md) — Keep a Changelog; one entry per notable
-  change, each linking its commit
+  change, each linking its commit, written when a release is cut
 
 ## Tech stack and versions
 
@@ -67,7 +67,7 @@ The full text of each is in `CONTRIBUTING.md`; the recipes under
 1. **No CJK literals in `src/handlers/` or `src/plugins/`.** Use translator keys; add `// i18n-ignore: <reason>` only when the literal is not user-facing.
 2. **No `process.env.X` outside `src/core/config/env.ts`.**
 3. **No new handler / plugin without a test.**
-4. **No code change without its documentation.** A change to user-visible behaviour, a config field, a public contract, or a command must update every documentation surface it touches — `docs/architecture.md`, `README.md`, `CONTRIBUTING.md` and the guides under `docs/contributing/`, the matching `config.example.json`, and one `CHANGELOG.md` entry (imperative sentence + commit link, see [`CONTRIBUTING.md`](CONTRIBUTING.md)) — in the same commit. A missing doc update is a defect, like a missing test.
+4. **No code change without its documentation.** A change to user-visible behaviour, a config field, a public contract, or a command must update every documentation surface it touches — `docs/architecture.md`, `README.md`, `CONTRIBUTING.md` and the guides under `docs/contributing/`, and the matching `config.example.json` — in the same commit. A missing doc update is a defect, like a missing test. `CHANGELOG.md` is the exception: it is not touched by routine commits and is written in one pass when a release is cut, one entry per notable commit since the last tag (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 
 ## Quality gates (non-negotiable)
 

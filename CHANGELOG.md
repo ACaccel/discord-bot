@@ -4,7 +4,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/):
 one imperative line per notable change, grouped by kind under the release
 it shipped in, each entry closing with a link to the commit that made it.
 Entries describe what changed for a user or an operator, not how it was
-implemented. This project follows
+implemented, and are written in one pass when a release is cut. This project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); entries marked
 **breaking** need an operator action described in [`README.md`](README.md)
 or [`CONTRIBUTING.md`](CONTRIBUTING.md).
