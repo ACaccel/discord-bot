@@ -17,30 +17,36 @@ const buildLogger = (): {
   logger: Logger;
   error: ReturnType<typeof vi.fn>;
   warn: ReturnType<typeof vi.fn>;
+  info: ReturnType<typeof vi.fn>;
 } => {
   const error = vi.fn();
   const warn = vi.fn();
-  return { logger: { error, warn } as unknown as Logger, error, warn };
+  const info = vi.fn();
+  return { logger: { error, warn, info } as unknown as Logger, error, warn, info };
 };
 
 describe('installClientSafetyListeners', () => {
-  it('swallows a client "error" emission and logs it instead of throwing', () => {
+  it('swallows a client "error" emission and logs it at warn instead of throwing', () => {
     const client = buildClient();
-    const { logger, error } = buildLogger();
+    const { logger, error, warn } = buildLogger();
     installClientSafetyListeners({ client: client as unknown as Client, logger });
 
     expect(() => client.emit('error', new Error('socket hang up'))).not.toThrow();
-    expect(error).toHaveBeenCalledTimes(1);
+    // A self-healing network blip is not a defect and must not trip an
+    // alert keyed on the error level.
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(error).not.toHaveBeenCalled();
   });
 
-  it('logs a shardError at error level with the shard id', () => {
+  it('logs a shardError at warn level with the shard id', () => {
     const client = buildClient();
-    const { logger, error } = buildLogger();
+    const { logger, error, warn } = buildLogger();
     installClientSafetyListeners({ client: client as unknown as Client, logger });
 
-    client.emit('shardError', new Error('reset'), 0);
-    expect(error).toHaveBeenCalledTimes(1);
-    expect(error.mock.calls[0]?.[0]).toMatchObject({ shardId: 0 });
+    client.emit('shardError', new Error('getaddrinfo ENOTFOUND gateway.discord.gg'), 0);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toMatchObject({ shardId: 0 });
+    expect(error).not.toHaveBeenCalled();
   });
 
   it('logs a shardDisconnect at warn level', () => {
@@ -53,9 +59,41 @@ describe('installClientSafetyListeners', () => {
     expect(warn.mock.calls[0]?.[0]).toMatchObject({ shardId: 0, code: 1006 });
   });
 
+  it('logs shardReconnecting at info level', () => {
+    const client = buildClient();
+    const { logger, info } = buildLogger();
+    installClientSafetyListeners({ client: client as unknown as Client, logger });
+
+    client.emit('shardReconnecting', 0);
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(info.mock.calls[0]?.[0]).toMatchObject({ shardId: 0 });
+  });
+
+  it('logs shardResume at info level with the replayed event count', () => {
+    const client = buildClient();
+    const { logger, info } = buildLogger();
+    installClientSafetyListeners({ client: client as unknown as Client, logger });
+
+    client.emit('shardResume', 0, 12);
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(info.mock.calls[0]?.[0]).toMatchObject({ shardId: 0, replayedEvents: 12 });
+  });
+
+  it('logs shardReady at info level with the unavailable-guild count', () => {
+    const client = buildClient();
+    const { logger, info } = buildLogger();
+    installClientSafetyListeners({ client: client as unknown as Client, logger });
+
+    client.emit('shardReady', 0, new Set(['1', '2']));
+    client.emit('shardReady', 1, undefined);
+    expect(info).toHaveBeenCalledTimes(2);
+    expect(info.mock.calls[0]?.[0]).toMatchObject({ shardId: 0, unavailableGuilds: 2 });
+    expect(info.mock.calls[1]?.[0]).toMatchObject({ shardId: 1, unavailableGuilds: 0 });
+  });
+
   it('is idempotent for the same client', () => {
     const client = buildClient();
-    const { logger, error } = buildLogger();
+    const { logger, warn } = buildLogger();
     installClientSafetyListeners({ client: client as unknown as Client, logger });
     installClientSafetyListeners({ client: client as unknown as Client, logger });
 
@@ -63,19 +101,19 @@ describe('installClientSafetyListeners', () => {
 
     // A repeated install used to double every connection-error line and
     // walk the emitter towards Node's max-listeners warning.
-    expect(error).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
     expect(client.listenerCount('error')).toBe(1);
   });
 
   it('still installs on a different client', () => {
     const first = buildClient();
     const second = buildClient();
-    const { logger, error } = buildLogger();
+    const { logger, warn } = buildLogger();
     installClientSafetyListeners({ client: first as unknown as Client, logger });
     installClientSafetyListeners({ client: second as unknown as Client, logger });
 
     second.emit('error', new Error('socket hang up'));
 
-    expect(error).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });
