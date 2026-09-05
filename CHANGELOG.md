@@ -11,8 +11,16 @@ or [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- Let slash-command string options offer autocomplete suggestions, answered by a per-command hook ([9425594](https://github.com/ACaccel/BotFleet/commit/9425594)).
+- Suggest the accounts a channel has already subscribed while the `/feed_unsubscribe` account list is being typed ([8557a98](https://github.com/ACaccel/BotFleet/commit/8557a98)).
+
 ### Changed
 
+- Ask for confirmation before `/feed_unsubscribe` clears a whole channel, and list its options as platform, account, then channel to match `/feed_subscribe` ([8557a98](https://github.com/ACaccel/BotFleet/commit/8557a98)).
+- Show the media filter on every `/feed_list` line, including subscriptions on the default photo-or-video filter, which previously carried no label ([8557a98](https://github.com/ACaccel/BotFleet/commit/8557a98)).
+- State the filter now in force on each account `/feed_subscribe` creates or updates, so a re-subscribe that clears a keyword no longer looks like it kept one ([8557a98](https://github.com/ACaccel/BotFleet/commit/8557a98)).
 - Spell out in the `/feed_subscribe` media choices which posts each one forwards (text-only, photo, video), and label the `/feed_list` filter the same way ([a11f752](https://github.com/ACaccel/BotFleet/commit/a11f752)).
 - Replace the configured X account list with per-channel feed subscriptions managed by `/feed_subscribe`, `/feed_unsubscribe` and `/feed_list`, which take several accounts at a time, and open the feed to further platforms (**breaking** — see [`README.md`](README.md)) ([40dd11e](https://github.com/ACaccel/BotFleet/commit/40dd11e)).
 - Probe every configured embed-proxy host until one yields a playable video or the list ends, and drop the `validationBudgetMs` setting (**breaking** — delete the key from each bot's `config.json`; see [`README.md`](README.md)) ([adcee34](https://github.com/ACaccel/BotFleet/commit/adcee34)).
