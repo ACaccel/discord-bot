@@ -2,38 +2,14 @@
  * Renders the guild's feed subscriptions into Discord-sendable pages.
  *
  * Pure: it takes the documents and a translate function, so every
- * grouping, filter-label and pagination rule is testable without an
- * interaction, a database, or a live catalog.
+ * grouping and pagination rule is testable without an interaction, a
+ * database, or a live catalog. The filter labels come from the module
+ * `/feed_subscribe` also reports through.
  */
 import type { BoundTranslate } from '../../../core/i18n';
 import { paginateLines } from '../../../infra/discord/paginate';
-import {
-  DEFAULT_FEED_MEDIA_FILTER,
-  type FeedSubscriptionDoc,
-  type FeedSubscriptionFilter,
-} from '../../../persistence/schemas/feed-subscription.schema';
-
-/** Separator between the trailing annotations on a subscription line. */
-const ANNOTATION_SEPARATOR = ' · ';
-
-/**
- * Labels for the filter options this subscription actually narrows on.
- *
- * Default values are omitted: with one line per subscription, repeating
- * "with media" on the majority of them costs a page break for no
- * information. What is shown is therefore exactly what differs from a
- * plain `/feed_subscribe`.
- */
-const describeFilter = (filter: FeedSubscriptionFilter, t: BoundTranslate): readonly string[] => {
-  const labels: string[] = [];
-  if (filter.media !== DEFAULT_FEED_MEDIA_FILTER) {
-    labels.push(t(`replies:feed.filter_media.${filter.media}`));
-  }
-  if (filter.keyword !== undefined && filter.keyword !== '') {
-    labels.push(t('replies:feed.filter_keyword', { keyword: filter.keyword }));
-  }
-  return labels;
-};
+import type { FeedSubscriptionDoc } from '../../../persistence/schemas/feed-subscription.schema';
+import { FEED_FILTER_SEPARATOR, describeFeedFilter } from '../../feed-filter-labels';
 
 /**
  * One subscription's line. The forwarding time is a Discord relative
@@ -45,8 +21,8 @@ const formatSubscription = (doc: FeedSubscriptionDoc, t: BoundTranslate): string
     doc.last_seen_timestamp === undefined
       ? t('replies:feed.never_forwarded')
       : `<t:${String(doc.last_seen_timestamp)}:R>`;
-  const annotations = [...describeFilter(doc.filter, t), forwarded];
-  return `- \`${doc.platform} @${doc.account}\` — ${annotations.join(ANNOTATION_SEPARATOR)}`;
+  const annotations = [...describeFeedFilter(doc.filter, t), forwarded];
+  return `- \`${doc.platform} @${doc.account}\` — ${annotations.join(FEED_FILTER_SEPARATOR)}`;
 };
 
 /**

@@ -1,26 +1,24 @@
 /**
  * `/feed_unsubscribe` — stop forwarding social posts into a channel.
  *
- * Authority is ungated, reach is not: like the other `/feed_*`
- * commands, this one only operates on a channel the invoker can already
- * see. Without that, any member could quietly empty the feeds of a
- * channel they have no access to.
- *
  * Channel-centric, matching the subscription key: the channel is always
- * part of the scope (defaulting to the invoking one) and `platform` /
- * `account` — which accepts a list — only narrow it. Naming neither
- * clears the channel, which is the operation a member most often wants.
+ * part of the scope (defaulting to the invoking one), and `platform` /
+ * `account` — which accepts a list — only narrow it. Reach is bounded
+ * by `gateFeedChannel`, for the deletion and for the suggestions alike.
  *
- * Nothing here consults the upstream. Removing a subscription must keep
- * working after a platform has been switched off in config, or a
- * retired platform's entries would be impossible to clear.
+ * Naming neither narrowing option is the widest scope a member can ask
+ * for, and the one an after-the-fact confirmation cannot undo, so it
+ * deletes nothing on its own: it counts what would go and asks. A
+ * narrowed scope names what it removes and applies at once. Nothing
+ * here consults the upstream — a subscription must stay removable after
+ * its platform has been switched off in config.
  */
-import type { ChatInputCommandInteraction } from 'discord.js';
-import { MessageFlags, PermissionFlagsBits } from 'discord.js';
+import type { AutocompleteInteraction, ChatInputCommandInteraction } from 'discord.js';
+import { MessageFlags } from 'discord.js';
 import type { BaseBot } from '@bot';
-import { Command } from '@cmd';
+import { Command, type CommandSuggestions } from '@cmd';
 
-import { bindTranslator } from '../../../core/i18n';
+import { bindTranslator, type TranslationKey, type TranslationParams } from '../../../core/i18n';
 import { logSystem, ops } from '../../../core/logger';
 import { getOptionalString } from '../../../infra/discord/options';
 import { replyForError } from '../../../infra/discord/reply-for-error';
@@ -29,9 +27,12 @@ import {
   feedAccountRefusal,
   parseFeedAccounts,
 } from '../../../infra/social-feed';
+import { gateFeedChannel } from '../../feed-channel-gate';
 import { requireGuildRepos } from '../../require-guild-repos';
-import { formatRemovedForLog, formatRemovedForReply } from './format-removed';
+import { buildClearConfirmation } from './confirm-prompt';
+import { formatRemovedForLog, formatRemovedForReply } from '../../feed-removed-list';
 import { resolveUnsubscribeAccounts } from './resolve-account';
+import { suggestUnsubscribeAccounts } from './suggest-accounts';
 
 const platformChoices = SUPPORTED_FEED_PLATFORMS.map((id) => ({ value: id }));
 
@@ -41,14 +42,24 @@ export default class feed_unsubscribe extends Command {
     this.setConfig({
       name: 'feed_unsubscribe',
       category: 'utility',
+      // Declaration order is registration order, so the narrowing
+      // options come first and `channel` last, matching how
+      // `/feed_subscribe` reads.
       options: {
-        channel: [{ name: 'channel', required: false }],
         string: [
           { name: 'platform', required: false, choices: platformChoices },
-          { name: 'account', required: false },
+          { name: 'account', required: false, autocomplete: true },
         ],
+        channel: [{ name: 'channel', required: false }],
       },
     });
+  }
+
+  public override autocomplete(
+    interaction: AutocompleteInteraction,
+    bot: BaseBot,
+  ): Promise<CommandSuggestions> {
+    return suggestUnsubscribeAccounts(interaction, bot);
   }
 
   public override async execute(
@@ -58,7 +69,7 @@ export default class feed_unsubscribe extends Command {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     // Falls back to the key, never to '', which Discord rejects.
     const t = bindTranslator(bot.translator);
-    const refuse = async (key: string, params?: Record<string, string | number>): Promise<void> => {
+    const refuse = async (key: TranslationKey, params?: TranslationParams): Promise<void> => {
       await interaction.editReply({ content: t(key, params) });
     };
     try {
@@ -68,21 +79,10 @@ export default class feed_unsubscribe extends Command {
       if (repos === null || guild === null) return;
 
       const selected = interaction.options.getChannel('channel');
-      const channel = guild.channels.cache.get(selected?.id ?? interaction.channelId);
-      if (channel === undefined) return refuse('replies:feed.channel_not_supported');
-      const mention = `<#${channel.id}>`;
-
-      // Same visibility rule as `/feed_subscribe`, and the same reason
-      // to resolve a `GuildMember` rather than pass an id: the id
-      // overload answers null for an uncached member, which would read
-      // as a refusal instead of as "unknown".
-      const gate = channel.isThread() ? channel.parent : channel;
-      const invoker = guild.members.cache.get(interaction.user.id);
-      const perms = gate === null || invoker === undefined ? null : gate.permissionsFor(invoker);
-      if (perms === null) return refuse('replies:feed.permissions_unknown', { channel: mention });
-      if (!perms.has(PermissionFlagsBits.ViewChannel)) {
-        return refuse('replies:feed.invoker_cannot_view', { channel: mention });
-      }
+      const channelId = selected?.id ?? interaction.channelId;
+      const gate = gateFeedChannel(guild, channelId, interaction.user.id);
+      if (gate.kind === 'refused') return refuse(gate.key, gate.params);
+      const { channel, mention } = gate;
 
       // The option names as many accounts as the member cares to list;
       // an unusable list is refused before anything is deleted.
@@ -101,6 +101,21 @@ export default class feed_unsubscribe extends Command {
       // deletion; `replyForError` renders its `errors:feed.*` copy.
       if (!accounts.ok) throw accounts.error;
 
+      if (platform === undefined && accounts.value === undefined) {
+        // Whole channel: count first, delete only once the member has
+        // seen the number and said yes. The confirm button re-reads
+        // before deleting, and reports what it actually removed.
+        const existing = await repos.feedSubscription.listByChannel(channel.id);
+        if (!existing.ok) throw existing.error;
+        const count = existing.value.length;
+        if (count === 0) return refuse('replies:feed.unsubscribed_none', { channel: mention });
+        const invokerId = interaction.user.id;
+        await interaction.editReply(
+          buildClearConfirmation({ channelId: channel.id, invokerId, count, mention }, t),
+        );
+        return;
+      }
+
       const deleted = await repos.feedSubscription.deleteWhere({
         channelId: channel.id,
         platform,
@@ -109,15 +124,10 @@ export default class feed_unsubscribe extends Command {
       if (!deleted.ok) throw deleted.error;
       const removed = deleted.value;
 
+      // Only a narrowed scope reaches here, so the narrowing is the
+      // likeliest reason nothing matched.
       if (removed.length === 0) {
-        // Without a platform or an account the scope was the whole
-        // channel, so "nothing here" is the complete answer. With one,
-        // the narrowing is the likelier reason nothing matched.
-        const key =
-          platform === undefined && accounts.value === undefined
-            ? 'replies:feed.unsubscribed_none'
-            : 'replies:feed.unsubscribed_none_hint';
-        return refuse(key, { channel: mention });
+        return refuse('replies:feed.unsubscribed_none_hint', { channel: mention });
       }
 
       // Logged before the reply: the deletion has already committed, and

@@ -9,27 +9,7 @@
  * otherwise only ever hear about it from a member.
  */
 import { FeedError } from '../../../core/errors';
-import {
-  FEED_PLATFORM_DISPLAY_NAMES,
-  SUPPORTED_FEED_PLATFORMS,
-  type FeedPlatformId,
-} from '../../../infra/social-feed';
-
-const isSupportedPlatform = (id: string): id is FeedPlatformId =>
-  (SUPPORTED_FEED_PLATFORMS as readonly string[]).includes(id);
-
-/**
- * How to spell a platform that has no adapter to ask for its own
- * display name.
- *
- * A shipped-but-unconfigured platform still gets its proper name from
- * the shared map, so the refusal reads the same as every other message
- * about it. Anything else — only reachable if Discord sends a value
- * outside the declared choices — echoes the raw id, which is more
- * useful to whoever has to explain it than a blank.
- */
-export const feedPlatformDisplayName = (id: string): string =>
-  isSupportedPlatform(id) ? FEED_PLATFORM_DISPLAY_NAMES[id] : id;
+import { feedPlatformDisplayName } from '../../feed-platform-name';
 
 export const platformNotConfiguredError = (id: string): FeedError<{ platform: string }> =>
   new FeedError({

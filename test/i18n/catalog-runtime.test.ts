@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { I18NextTranslator } from '../../src/core/i18n/i18next-translator';
 import { loadCatalogResources } from '../../src/core/i18n/catalog-loader';
 import { PERMISSION_LABEL_KEYS } from '../../src/handlers/commands/feed_subscribe/permission-requirements';
-import { SUPPORTED_FEED_PLATFORMS } from '../../src/infra/social-feed';
+import { FEED_PLATFORM_DISPLAY_NAMES, SUPPORTED_FEED_PLATFORMS } from '../../src/infra/social-feed';
 import { FEED_MEDIA_FILTERS } from '../../src/persistence/schemas/feed-subscription.schema';
 
 /**
@@ -115,6 +115,7 @@ describe('catalog runtime behaviour', () => {
       channel: '<#c-1>',
       permissions: 'View Channel',
       keyword: 'live',
+      filter: 'photos or videos · keyword: live',
       count: 2,
       total: 3,
       list: '`x @someaccount`',
@@ -135,9 +136,16 @@ describe('catalog runtime behaviour', () => {
       'replies:feed.unsubscribed_more',
       'replies:feed.unsubscribed_none',
       'replies:feed.unsubscribed_none_hint',
+      'replies:feed.clear_confirm',
+      'replies:feed.clear_confirm_label',
+      'replies:feed.clear_cancel_label',
+      'replies:feed.clear_cancelled',
+      'replies:feed.clear_not_invoker',
+      'replies:feed.clear_stale',
       'replies:feed.channel_not_supported',
       'replies:feed.missing_bot_permissions',
       'replies:feed.permissions_unknown',
+      'replies:feed.invoker_permissions_unknown',
       'replies:feed.invoker_cannot_view',
       'replies:feed.permission_separator',
       'replies:feed.list_empty',
@@ -156,6 +164,59 @@ describe('catalog runtime behaviour', () => {
           /\{\{\s*\w+\s*\}\}/.test(resolved),
           `${key} (${locale}) must not contain an uninterpolated placeholder`,
         ).toBe(false);
+      }
+    }
+    // Passing a param proves nothing on its own: dropping `{{filter}}`
+    // from both locales leaves every assertion above green, and the
+    // handler suites run an echo translator that cannot see the copy.
+    // `/feed_subscribe` replaces a stored filter wholesale, so these two
+    // lines have to state the one now in force.
+    const successKeys = [
+      'replies:feed.account_subscribed',
+      'replies:feed.account_updated',
+    ] as const;
+    for (const locale of ['zh-TW', 'en'] as const) {
+      for (const key of successKeys) {
+        expect(
+          translator.t(key, params, locale),
+          `${key} (${locale}) must name the filter it was given`,
+        ).toContain(params.filter);
+      }
+    }
+  });
+
+  it('renders the feed clear prompt and its button labels at every count', async () => {
+    // The prompt is plural-keyed, and the shared block above only ever
+    // resolves it at count 2 — which is how a dead `_one` string, or one
+    // that reads as "all 1 subscriptions", stays invisible to a green
+    // suite. zh-TW has no `one` plural category, so its two forms must
+    // both read correctly whichever i18next picks.
+    const translator = await I18NextTranslator.create(
+      loadCatalogResources({ localesDir: LOCALES_DIR }),
+    );
+    for (const locale of ['zh-TW', 'en'] as const) {
+      for (const count of [1, 2, 20]) {
+        const resolved = translator.t(
+          'replies:feed.clear_confirm',
+          { channel: '<#c-1>', count },
+          locale,
+        );
+        expect(resolved, `clear_confirm (${locale}, count=${String(count)})`).not.toBe(
+          'replies:feed.clear_confirm',
+        );
+        expect(resolved).toContain(String(count));
+        expect(/\{\{\s*\w+\s*\}\}/.test(resolved)).toBe(false);
+      }
+      // Discord rejects a button whose label is empty or past 80
+      // characters. A translator cannot see that limit, so the catalog
+      // is where it has to be held.
+      for (const key of ['replies:feed.clear_confirm_label', 'replies:feed.clear_cancel_label']) {
+        const label = translator.t(key, undefined, locale);
+        expect(label.length, `${key} (${locale}) must be a usable button label`).toBeGreaterThan(0);
+        expect(
+          label.length,
+          `${key} (${locale}) must fit Discord's 80-character limit`,
+        ).toBeLessThanOrEqual(80);
       }
     }
   });
@@ -241,6 +302,35 @@ describe('catalog runtime behaviour', () => {
         `replies:roll_call.announcement_header (${locale}) must start with trigger_prefix, ` +
           'otherwise the reaction tally never matches its own announcement',
       ).toBe(true);
+    }
+  });
+
+  it('spells each feed platform identically in the choice catalog and the shared map', () => {
+    // A platform now gets named from two places: the `platform` option's
+    // choice label, which is per-locale catalog copy, and
+    // `FEED_PLATFORM_DISPLAY_NAMES`, a code constant that labels
+    // `/feed_unsubscribe`'s account suggestions and the
+    // unconfigured-platform refusal. A member reading the choice list
+    // and the suggestion dropdown side by side sees both, so the two
+    // must agree — and nothing else would notice if a translator
+    // changed one of them.
+    const resources = loadCatalogResources({ localesDir: LOCALES_DIR });
+    for (const locale of ['zh-TW', 'en'] as const) {
+      const commands = resources[locale].commands as Record<string, unknown>;
+      for (const command of ['feed_subscribe', 'feed_unsubscribe'] as const) {
+        const choices = ((
+          (commands[command] as { options?: Record<string, unknown> } | undefined)?.options?.[
+            'platform'
+          ] as { choices?: Record<string, string> } | undefined
+        )?.choices ?? {}) as Record<string, string>;
+        for (const id of SUPPORTED_FEED_PLATFORMS) {
+          expect(
+            choices[id],
+            `commands:${command}.options.platform.choices.${id} (${locale}) must match ` +
+              'FEED_PLATFORM_DISPLAY_NAMES, which names the same platform elsewhere',
+          ).toBe(FEED_PLATFORM_DISPLAY_NAMES[id]);
+        }
+      }
     }
   });
 

@@ -391,7 +391,14 @@ were withheld. A row whose channel or invoking member cannot be resolved
 from the cache is dropped too: for a filter whose job is to withhold,
 "unknown" must fail closed. Without that bound, ungated authority would let any
 member push content into, or quietly empty, a channel that is closed to
-them. `/feed_subscribe` additionally refuses a channel the **bot** cannot
+them. `/feed_unsubscribe` applies that check twice — once when it
+proposes clearing a whole channel, and again on the button that
+confirms, by which time the invoker's access may have been revoked — so
+it reads the rule from `gateFeedChannel`
+([src/handlers/feed-channel-gate.ts](../src/handlers/feed-channel-gate.ts))
+rather than repeating it, as does `/feed_subscribe`; `/feed_list`
+applies the same rule per row while filtering.
+`/feed_subscribe` additionally refuses a channel the **bot** cannot
 post in, which is a usability check rather than a privacy one: the
 subscription would otherwise fail silently on every pass.
 
@@ -486,6 +493,16 @@ commands share that one instance, so an account accepted by
 operator did not configure is simply absent, and the caller renders the
 refusal.
 
+`/feed_unsubscribe` suggests accounts for its `account` option through
+the autocomplete hook described in §3. The suggestions come from the
+target channel's stored subscriptions — never from the upstream, which
+could not answer inside the three-second window and has nothing to say
+about what this guild subscribed. They are gated by the same
+`ViewChannel` check the command and its confirmation button share, so a
+channel the invoker cannot see yields none, and completion applies to
+the last comma-separated segment so accepting one extends the list
+instead of replacing it.
+
 The shipped `XPlatform` wraps `FxTwitterTimelineSource`, which reads an
 FxTwitter-compatible JSON API — chosen because X's official API has no
 free tier and bills per post read, which a five-minute poller cannot
@@ -502,7 +519,9 @@ lifetime, so removing a subscription cannot orphan cursor state and
 nothing has to be reconciled at boot. Re-running `/feed_subscribe` on an
 existing triple is an update, not a conflict, and it **replaces the
 filter wholesale**: an omitted `keyword` clears a stored one, while
-`created_by` and the cursor are preserved.
+`created_by` and the cursor are preserved. Because that replacement is
+silent from the member's side, every success line in the reply names the
+filter now in force, in the same words `/feed_list` uses for it.
 
 `/feed_subscribe` and `/feed_unsubscribe` both take a list of accounts
 in one invocation, parsed by one shared rule so the two commands cannot
@@ -532,6 +551,20 @@ account that was never subscribed. An empty account list matches
 nothing rather than widening: "remove nothing" must never become
 "remove everything".
 
+Clearing a **whole channel** — naming neither a platform nor an account
+— is the one scope that deletes nothing on sight. It counts what the
+channel holds and answers with that number plus two buttons; only the
+Danger one deletes. The receipt that used to follow the deletion was a
+record, not an undo, and the widest scope is also the easiest to reach
+by accident, since it is what a member gets by filling in no option at
+all. The buttons carry the channel and the asking member in their
+customId and the confirm handler
+([src/handlers/buttons/feed_clear_confirm/](../src/handlers/buttons/feed_clear_confirm/))
+trusts neither: it re-resolves the guild's repositories, re-runs
+`gateFeedChannel`, and reports what it actually removed rather than the
+count it promised. A narrowed scope still applies immediately — it names
+what it removes, so there is nothing to confirm.
+
 Two tiers of rule decide what a pass forwards. The **hard rules** hold
 whatever a subscription asks for: only the followed account's own
 original posts go out, so a reply (including a self-thread continuation)
@@ -556,7 +589,7 @@ ClientEventBridge          (src/bot/client-event-bridge.ts)
 InteractionRouter          (src/core/plugin/interaction-router.ts)
    |   Chain of Responsibility
    |   - subclass middleware (optional)
-   |   - createDispatchMiddleware
+   |   - createDispatchMiddleware  (incl. autocomplete)
    |   - createChannelLoggingMiddleware
    v
 Generated registry         (src/handlers/<type>/registry.generated.ts)
@@ -574,6 +607,18 @@ best-effort — a throwing handler constructor disables that family and
 leaves the rest of the bot serving — and dispatch routes on the leading
 `<type>` segment of `customId`. Reactions carry no customId, so every
 registered reaction handler sees every reaction and decides for itself.
+
+An autocomplete interaction takes the same route to a different verb.
+Dispatch routes it to `executeAutocomplete`
+([src/handlers/commands/autocomplete.ts](../src/handlers/commands/autocomplete.ts)),
+which asks the named command's optional `autocomplete` hook for
+suggestions, bounds them to Discord's limits (25 choices, 100 characters
+per field) and answers with `respond`. The hook returns a list rather
+than sending one, and every failure — unknown command, no hook, a hook
+that threw, a `respond` past the three-second window — resolves to an
+empty list plus an operator log line, because this is the one
+interaction kind that cannot be replied to and so cannot report a
+failure to the member.
 
 Middleware lives in [src/bot/middlewares.ts](../src/bot/middlewares.ts).
 Handler-thrown `DomainError`s are caught at the router edge and

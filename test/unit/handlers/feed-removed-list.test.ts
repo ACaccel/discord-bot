@@ -13,8 +13,8 @@ import {
   MAX_LISTED_REMOVALS,
   formatRemovedForLog,
   formatRemovedForReply,
-} from '../../../../src/handlers/commands/feed_unsubscribe/format-removed';
-import type { FeedSubscriptionDoc } from '../../../../src/persistence/schemas/feed-subscription.schema';
+} from '../../../src/handlers/feed-removed-list';
+import type { FeedSubscriptionDoc } from '../../../src/persistence/schemas/feed-subscription.schema';
 
 const t = (key: string, params?: Record<string, string | number>): string =>
   params === undefined ? key : `${key}:${JSON.stringify(params)}`;

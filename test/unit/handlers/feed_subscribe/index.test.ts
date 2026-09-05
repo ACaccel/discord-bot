@@ -213,8 +213,8 @@ describe('/feed_subscribe', () => {
     }
   });
 
-  it('carries the chosen filter options into the stored subscription', async () => {
-    const { bot, interaction, upsert } = build({
+  it('carries the chosen filter options into the stored subscription, and back to the member', async () => {
+    const { bot, interaction, sink, upsert } = build({
       options: { media: 'video_only', keyword: 'live' },
     });
 
@@ -223,13 +223,18 @@ describe('/feed_subscribe', () => {
     expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({ filter: { media: 'video_only', keyword: 'live' } }),
     );
+    const content = reply(sink);
+    expect(content).toContain('replies:feed.filter_media.video_only');
+    expect(content).toContain('replies:feed.filter_keyword');
   });
 
-  it('re-subscribing without filter options resets the stored filter, by design', async () => {
+  it('re-subscribing without filter options resets the stored filter, and says so', async () => {
     // The repository replaces the filter wholesale, and re-running the
     // command is the documented way to change one. Asserted so the
-    // reset stays a decision rather than becoming an accident.
-    const { bot, interaction, upsert } = build({
+    // reset stays a decision rather than becoming an accident — and so
+    // the member is told which filter they are left with rather than
+    // discovering the loss through `/feed_list`.
+    const { bot, interaction, sink, upsert } = build({
       existing: subscription({ filter: { media: 'video_only', keyword: 'live' } }),
     });
 
@@ -238,6 +243,10 @@ describe('/feed_subscribe', () => {
     expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({ filter: { media: 'media_only' } }),
     );
+    const content = reply(sink);
+    expect(content).toContain('replies:feed.account_updated');
+    expect(content).toContain('replies:feed.filter_media.media_only');
+    expect(content).not.toContain('replies:feed.filter_keyword');
   });
 
   it('never reads the upstream when the subscription already exists', async () => {
@@ -361,7 +370,7 @@ describe('/feed_subscribe', () => {
 
     await new FeedSubscribe().execute(interaction, bot);
 
-    expect(reply(sink)).toContain('replies:feed.permissions_unknown');
+    expect(reply(sink)).toContain('replies:feed.invoker_permissions_unknown');
     expect(reply(sink)).not.toContain('replies:feed.invoker_cannot_view');
   });
 

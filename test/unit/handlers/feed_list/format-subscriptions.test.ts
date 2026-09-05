@@ -2,14 +2,19 @@
  * `/feed_list`'s rendering rules.
  *
  * Three things are easy to get wrong once and never notice: a
- * subscription filed under the wrong channel heading, a default filter
- * shown as if the user had chosen it, and a page that grew past
+ * subscription filed under the wrong channel heading, a subscription
+ * whose filter labels never reach its line, and a page that grew past
  * Discord's 2000-character limit and got rejected. Each has a test.
+ *
+ * Which words a filter gets is `feed-filter-labels.ts`'s decision and is
+ * covered by its own suite; what is asserted here is that the line
+ * carries them, in place.
  */
 import { describe, expect, it } from 'vitest';
 import { Types } from 'mongoose';
 
 import { formatSubscriptionPages } from '../../../../src/handlers/commands/feed_list/format-subscriptions';
+import { FEED_FILTER_SEPARATOR } from '../../../../src/handlers/feed-filter-labels';
 import { MAX_PAGE_LENGTH } from '../../../../src/infra/discord/paginate';
 import type { FeedSubscriptionDoc } from '../../../../src/persistence/schemas/feed-subscription.schema';
 
@@ -63,26 +68,17 @@ describe('formatSubscriptionPages', () => {
     expect(page).toContain('`fake @someone`');
   });
 
-  it('shows no filter label when the subscription uses the defaults', () => {
-    const [page] = formatSubscriptionPages([subscription()], t);
-
-    expect(page).not.toContain('replies:feed.filter_media');
-    expect(page).not.toContain('replies:feed.filter_keyword');
-  });
-
-  it('labels a non-default media filter', () => {
-    const [page] = formatSubscriptionPages([subscription({ filter: { media: 'photo_only' } })], t);
-
-    expect(page).toContain('replies:feed.filter_media.photo_only');
-  });
-
-  it('labels a keyword filter with the keyword itself', () => {
+  it('carries the shared filter labels onto the line, ahead of the forwarding time', () => {
     const [page] = formatSubscriptionPages(
-      [subscription({ filter: { media: 'media_only', keyword: 'live' } })],
+      [subscription({ filter: { media: 'photo_only', keyword: 'live' }, last_seen_timestamp: 1 })],
       t,
     );
 
-    expect(page).toContain('replies:feed.filter_keyword:{"keyword":"live"}');
+    const line = (page ?? '').split('\n').at(-1) ?? '';
+    expect(line).toContain(
+      `replies:feed.filter_media.photo_only${FEED_FILTER_SEPARATOR}replies:feed.filter_keyword:{"keyword":"live"}`,
+    );
+    expect(line.indexOf('replies:feed.filter_media')).toBeLessThan(line.indexOf('<t:1:R>'));
   });
 
   it('renders the last forwarded time as a Discord relative timestamp', () => {
@@ -99,17 +95,6 @@ describe('formatSubscriptionPages', () => {
     const [page] = formatSubscriptionPages([subscription()], t);
 
     expect(page).toContain('replies:feed.never_forwarded');
-  });
-
-  it('shows no keyword label for a stored empty-string keyword', () => {
-    // `normalize` only collapses null to undefined, so `''` reaches the
-    // formatter intact and must read as "no keyword", not as an empty one.
-    const [page] = formatSubscriptionPages(
-      [subscription({ filter: { media: 'media_only', keyword: '' } })],
-      t,
-    );
-
-    expect(page).not.toContain('replies:feed.filter_keyword');
   });
 
   it('splits into pages within the message limit without cutting a line', () => {

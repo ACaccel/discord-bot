@@ -2,12 +2,13 @@
  * `/feed_subscribe`'s per-account report, and the operator line beside
  * it.
  *
- * Three things are easy to get wrong and hard to notice: an account
+ * Four things are easy to get wrong and hard to notice: an account
  * that silently drops out of the report — leaving a member believing a
  * handle was subscribed when it was refused — a report that grew past
  * Discord's message limit and was rejected whole after the
- * subscriptions had already been written, and a failure rendered as a
- * raw catalog key.
+ * subscriptions had already been written, a failure rendered as a raw
+ * catalog key, and a success line that does not say which filter is now
+ * in force, which is how a re-subscribe silently drops a keyword.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -16,6 +17,7 @@ import {
   formatOutcomesForLog,
 } from '../../../../src/handlers/commands/feed_subscribe/format-outcomes';
 import type { FeedSubscribeOutcome } from '../../../../src/handlers/commands/feed_subscribe/subscribe-accounts';
+import { FEED_FILTER_SEPARATOR } from '../../../../src/handlers/feed-filter-labels';
 import { DatabaseError, FeedError } from '../../../../src/core/errors';
 import { MAX_PAGE_LENGTH } from '../../../../src/infra/discord/paginate';
 
@@ -28,7 +30,14 @@ import { MAX_PAGE_LENGTH } from '../../../../src/infra/discord/paginate';
 const t = (key: string, params?: Record<string, string | number>): string =>
   `${key}:${JSON.stringify(params ?? {})}`;
 
-const context = { platform: 'Fake', channel: '<#chan-1>' };
+const context = {
+  platform: 'Fake',
+  channel: '<#chan-1>',
+  filter: { media: 'media_only' },
+} as const;
+
+/** The same report, written with a keyword filter. */
+const filtered = { ...context, filter: { media: 'video_only', keyword: 'live' } } as const;
 
 const notFound = (account: string): FeedError<{ platform: string; account: string }> =>
   new FeedError({
@@ -76,6 +85,45 @@ describe('formatOutcomePages', () => {
     expect(lines[2]).toContain('replies:feed.account_updated');
     expect(lines[3]).toContain('replies:feed.account_failed');
     expect(lines[4]).toContain('replies:feed.account_skipped');
+  });
+
+  it('tells both kinds of success which filter is now in force', () => {
+    // Re-subscribing replaces the stored filter wholesale, so an
+    // "updated" line that does not name the filter is how a member
+    // loses a keyword without being told.
+    const [page] = formatOutcomePages(
+      [
+        { account: 'alpha', status: 'created' },
+        { account: 'beta', status: 'updated' },
+        failed('ghost'),
+        { account: 'delta', status: 'skipped' },
+      ],
+      filtered,
+      t,
+    );
+
+    const lines = (page ?? '').split('\n');
+    expect(lines[1]).toContain('replies:feed.account_subscribed');
+    expect(lines[2]).toContain('replies:feed.account_updated');
+    for (const line of [lines[1] ?? '', lines[2] ?? '']) {
+      // Both labels, adjacent and in the order `/feed_list` prints them.
+      // The `:{}` is this suite's echo translator, not the copy.
+      expect(line).toContain(
+        `replies:feed.filter_media.video_only:{}${FEED_FILTER_SEPARATOR}replies:feed.filter_keyword`,
+      );
+      expect(line).toContain('live');
+    }
+    // Nothing was written for these two, so naming a filter on them
+    // would describe a subscription that does not exist.
+    expect(lines[3]).not.toContain('replies:feed.filter_media');
+    expect(lines[4]).not.toContain('replies:feed.filter_media');
+  });
+
+  it('names the default filter too, so every success line has the same shape', () => {
+    const [page] = formatOutcomePages([{ account: 'alpha', status: 'created' }], context, t);
+
+    expect(page).toContain('replies:feed.filter_media.media_only');
+    expect(page).not.toContain('replies:feed.filter_keyword');
   });
 
   it("renders a failure through the error's own catalog key", () => {

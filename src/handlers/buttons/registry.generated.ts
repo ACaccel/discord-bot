@@ -4,7 +4,11 @@
 // `yarn handlers:gen:check`.
 
 import type { ButtonHandler } from '.';
-import { default as Handler_0 } from './toggle_role';
+import { default as Handler_0 } from './feed_clear_cancel';
+import { default as Handler_1 } from './feed_clear_confirm';
+import { default as Handler_2 } from './toggle_role';
 export const BUTTON_REGISTRY = {
-  toggle_role: Handler_0,
+  feed_clear_cancel: Handler_0,
+  feed_clear_confirm: Handler_1,
+  toggle_role: Handler_2,
 } as const satisfies Readonly<Record<string, new () => ButtonHandler>>;

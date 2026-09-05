@@ -1,6 +1,7 @@
 /**
  * Renders what `/feed_unsubscribe` deleted, bounded so the confirmation
- * always fits in one Discord message.
+ * always fits in one Discord message. Shared with the button that
+ * confirms clearing a whole channel, which reports the same list.
  *
  * The bound is not cosmetic. `deleteMany` has already committed by the
  * time this runs, so a reply that overflowed the 2000-character limit
@@ -9,8 +10,8 @@
  * succeeded. Truncating with a count of the remainder keeps the message
  * deliverable and honest; the full list goes to the operator log.
  */
-import type { BoundTranslate } from '../../../core/i18n';
-import type { FeedSubscriptionDoc } from '../../../persistence/schemas/feed-subscription.schema';
+import type { BoundTranslate } from '../core/i18n';
+import type { FeedSubscriptionDoc } from '../persistence/schemas/feed-subscription.schema';
 
 /**
  * How many entries the confirmation lists. A line is at most a platform

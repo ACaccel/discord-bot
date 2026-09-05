@@ -17,6 +17,7 @@
 import { DomainError, type AnyDomainError } from '../../../core/errors';
 import type { BoundTranslate } from '../../../core/i18n';
 import { paginateLines } from '../../../infra/discord/paginate';
+import { formatFeedFilter, type DescribableFeedFilter } from '../../feed-filter-labels';
 import type { FeedSubscribeOutcome } from './subscribe-accounts';
 
 /** Copy used when a failure carries no renderable catalog key. */
@@ -34,6 +35,8 @@ interface SubscribeReportContext {
   readonly platform: string;
   /** Channel mention, rendered by the handler that resolved the channel. */
   readonly channel: string;
+  /** The filter this invocation wrote, worded here rather than by the handler. */
+  readonly filter: DescribableFeedFilter;
 }
 
 /**
@@ -79,13 +82,17 @@ const echoableAccount = (raw: string): string =>
  * exhaustiveness guard rather than a ternary chain: a fourth outcome
  * has to fail the build here instead of silently rendering as one of
  * the three that already exist.
+ *
+ * Both success lines carry `label`, the filter now in force: a
+ * re-subscribe replaces the stored filter wholesale, so a member can
+ * lose a keyword and only this line would say so.
  */
-const formatOutcome = (outcome: FeedSubscribeOutcome, t: BoundTranslate): string => {
+const formatOutcome = (outcome: FeedSubscribeOutcome, label: string, t: BoundTranslate): string => {
   switch (outcome.status) {
     case 'created':
-      return t('replies:feed.account_subscribed', { account: outcome.account });
+      return t('replies:feed.account_subscribed', { account: outcome.account, filter: label });
     case 'updated':
-      return t('replies:feed.account_updated', { account: outcome.account });
+      return t('replies:feed.account_updated', { account: outcome.account, filter: label });
     case 'skipped':
       return t('replies:feed.account_skipped', { account: echoableAccount(outcome.account) });
     case 'failed':
@@ -132,9 +139,11 @@ export const formatOutcomePages = (
   t: BoundTranslate,
 ): readonly string[] => {
   if (outcomes.length === 0) return [];
+  // Rendered once: the filter is per-invocation, not per-account.
+  const label = formatFeedFilter(context.filter, t);
   const lines: string[] = [
     t('replies:feed.subscribe_header', { platform: context.platform, channel: context.channel }),
-    ...outcomes.map((outcome) => formatOutcome(outcome, t)),
+    ...outcomes.map((outcome) => formatOutcome(outcome, label, t)),
   ];
   return paginateLines(lines);
 };

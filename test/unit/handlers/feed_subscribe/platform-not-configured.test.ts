@@ -2,31 +2,14 @@
  * The refusal raised for a platform this bot has no adapter for.
  *
  * It is a `FeedError` rather than a hand-rendered reply so the failure
- * is logged as well as shown; the display-name fallback is what stops
- * that message from being the one place a platform is named by its raw
- * registry id.
+ * is logged as well as shown. The display-name fallback it renders
+ * through is covered by `feed-platform-name.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 
 import { DomainError } from '../../../../src/core/errors';
-import {
-  feedPlatformDisplayName,
-  platformNotConfiguredError,
-} from '../../../../src/handlers/commands/feed_subscribe/platform-not-configured';
-import {
-  FEED_PLATFORM_DISPLAY_NAMES,
-  SUPPORTED_FEED_PLATFORMS,
-} from '../../../../src/infra/social-feed';
-
-describe('feedPlatformDisplayName', () => {
-  it.each(SUPPORTED_FEED_PLATFORMS)('spells %s the way every other message does', (id) => {
-    expect(feedPlatformDisplayName(id)).toBe(FEED_PLATFORM_DISPLAY_NAMES[id]);
-  });
-
-  it('echoes an unknown id rather than rendering a blank', () => {
-    expect(feedPlatformDisplayName('bluesky')).toBe('bluesky');
-  });
-});
+import { platformNotConfiguredError } from '../../../../src/handlers/commands/feed_subscribe/platform-not-configured';
+import { FEED_PLATFORM_DISPLAY_NAMES } from '../../../../src/infra/social-feed';
 
 describe('platformNotConfiguredError', () => {
   it('is a DomainError, so the boundary logs it and renders its own copy', () => {

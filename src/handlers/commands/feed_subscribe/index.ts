@@ -12,7 +12,7 @@
  * member who cannot see the channel learns nothing about the bot there.
  */
 import type { ChatInputCommandInteraction } from 'discord.js';
-import { MessageFlags, PermissionFlagsBits } from 'discord.js';
+import { MessageFlags } from 'discord.js';
 import type { BaseBot } from '@bot';
 import { Command } from '@cmd';
 
@@ -27,6 +27,7 @@ import {
   parseFeedAccounts,
 } from '../../../infra/social-feed';
 import { FEED_MEDIA_FILTERS } from '../../../persistence/schemas/feed-subscription.schema';
+import { gateFeedChannel } from '../../feed-channel-gate';
 import { requireGuildRepos } from '../../require-guild-repos';
 import { FEED_BATCH_BUDGET_MS } from './batch-policy';
 import { buildSubscriptionFilter } from './build-filter';
@@ -81,30 +82,28 @@ export default class feed_subscribe extends Command {
       // Already replied on null; the `guild` half restates that for tsc.
       if (repos === null || guild === null) return;
 
+      // The invoker's reach is decided by the same gate every `/feed_*`
+      // surface uses, before anything about the bot's side is revealed.
+      const selected = interaction.options.getChannel('channel');
+      const gated = gateFeedChannel(
+        guild,
+        selected?.id ?? interaction.channelId,
+        interaction.user.id,
+      );
+      if (gated.kind === 'refused') return refuse(gated.key, gated.params);
+      const { channel, mention } = gated;
       // `isSendable` is the exact predicate the poller demands of a
       // destination, so whatever passes here is what it can deliver to.
-      const selected = interaction.options.getChannel('channel');
-      const channel = guild.channels.cache.get(selected?.id ?? interaction.channelId);
-      if (channel === undefined || !channel.isSendable()) {
-        return refuse('replies:feed.channel_not_supported');
-      }
-      const mention = `<#${channel.id}>`;
+      if (!channel.isSendable()) return refuse('replies:feed.channel_not_supported');
 
       // A thread inherits its overwrites from the parent, and asking a
       // thread whose parent is uncached answers null — "unknown", never
-      // "denied". Members are resolved to `GuildMember` values rather
-      // than ids for the same reason: an id takes the nullable overload.
-      const gate = channel.isThread() ? channel.parent : channel;
+      // "denied"; the bot member is resolved for the same reason.
+      const parent = channel.isThread() ? channel.parent : channel;
       const me = guild.members.me;
-      const invoker = guild.members.cache.get(interaction.user.id);
-      const botPerms = gate === null || me === null ? null : gate.permissionsFor(me);
-      const invokerPerms =
-        gate === null || invoker === undefined ? null : gate.permissionsFor(invoker);
-      if (botPerms === null || invokerPerms === null) {
+      const botPerms = parent === null || me === null ? null : parent.permissionsFor(me);
+      if (botPerms === null) {
         return refuse('replies:feed.permissions_unknown', { channel: mention });
-      }
-      if (!invokerPerms.has(PermissionFlagsBits.ViewChannel)) {
-        return refuse('replies:feed.invoker_cannot_view', { channel: mention });
       }
 
       const missing = missingFeedPermissions((bit) => botPerms.has(bit), channel.isThread());
@@ -118,16 +117,17 @@ export default class feed_subscribe extends Command {
         });
       }
 
+      const filter = buildSubscriptionFilter(
+        getOptionalString(interaction, 'media'),
+        getOptionalString(interaction, 'keyword'),
+      );
       const outcomes = await subscribeAccounts({
         platform,
         repo: repos.feedSubscription,
         accounts: parsed.accounts,
         channelId: channel.id,
         createdBy: interaction.user.id,
-        filter: buildSubscriptionFilter(
-          getOptionalString(interaction, 'media'),
-          getOptionalString(interaction, 'keyword'),
-        ),
+        filter,
         deadlineMs: interaction.createdTimestamp + FEED_BATCH_BUDGET_MS,
         logFailure: (cause) => logError(bot.logger, interaction.guildId, cause),
       });
@@ -136,7 +136,7 @@ export default class feed_subscribe extends Command {
       const summary = formatOutcomesForLog(outcomes);
       logSystem(bot.logger, ops.feed.subscriptionsProcessed(channel.id, outcomes.length, summary));
 
-      const report = { platform: platform.displayName, channel: mention };
+      const report = { platform: platform.displayName, channel: mention, filter };
       await sendPagedEphemeralReply(interaction, formatOutcomePages(outcomes, report, t), {
         logger: bot.logger,
         partialNotice: (failed) => t('replies:common.pages_failed', { count: failed }),

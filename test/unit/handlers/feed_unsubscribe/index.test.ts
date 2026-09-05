@@ -7,13 +7,20 @@
  * silently does nothing. Every option combination therefore asserts on
  * the exact `deleteWhere` query, not just on the reply. The `account`
  * option accepts a list, which widens that scope one more way.
+ *
+ * The widest scope of all — the whole channel — deletes nothing here:
+ * it counts and asks. Those tests assert that no deletion is even
+ * attempted, because an after-the-fact confirmation is not an undo.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { ChannelType, MessageFlags, PermissionFlagsBits } from 'discord.js';
+import { ButtonStyle, ChannelType, MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { Types } from 'mongoose';
 
 import FeedUnsubscribe from '../../../../src/handlers/commands/feed_unsubscribe';
-import { MAX_LISTED_REMOVALS } from '../../../../src/handlers/commands/feed_unsubscribe/format-removed';
+import { localizeCommandConfig } from '../../../../src/handlers/commands/command';
+import { buildCommandJsonBody } from '../../../../src/handlers/commands/command-builder';
+import type { Translator } from '../../../../src/core/i18n';
+import { MAX_LISTED_REMOVALS } from '../../../../src/handlers/feed-removed-list';
 import { err, ok } from '../../../../src/core/result';
 import { FeedPlatformRegistry, MAX_FEED_ACCOUNTS } from '../../../../src/infra/social-feed';
 import { databaseErrorFrom } from '../../../../src/persistence/error-translator';
@@ -33,6 +40,15 @@ const OTHER_CHANNEL = 'chan-other';
 const THREAD_CHANNEL = 'chan-thread';
 const USER_ID = 'u-1';
 
+/**
+ * `buildCommandJsonBody` rejects an empty description, so the option
+ * order can only be read off a localised config.
+ */
+const echoTranslator = { t: (key: string) => key } as unknown as Translator;
+
+/** Any option that narrows the scope, so the command deletes at once. */
+const NARROWED = { platform: 'fake' } as const;
+
 const subscription = (overrides: Partial<FeedSubscriptionDoc> = {}): FeedSubscriptionDoc => ({
   _id: new Types.ObjectId(),
   platform: 'fake',
@@ -46,6 +62,8 @@ const subscription = (overrides: Partial<FeedSubscriptionDoc> = {}): FeedSubscri
 
 interface Fixture {
   readonly deleted?: readonly FeedSubscriptionDoc[];
+  /** What the channel currently holds, as `listByChannel` answers it. */
+  readonly existing?: readonly FeedSubscriptionDoc[];
   readonly repoFails?: boolean;
   readonly options?: Readonly<Record<string, string>>;
   readonly channelOption?: string;
@@ -73,16 +91,18 @@ const build = (fixture: Fixture = {}) => {
     members: fixture.invokerMemberMissing === true ? [] : [{ id: USER_ID }],
   });
 
+  const failure = () => err(databaseErrorFrom(new Error('boom'), { operation: 'test' }));
   const deleteWhere = vi.fn(async () =>
-    fixture.repoFails === true
-      ? err(databaseErrorFrom(new Error('boom'), { operation: 'test' }))
-      : ok(fixture.deleted ?? [subscription()]),
+    fixture.repoFails === true ? failure() : ok(fixture.deleted ?? [subscription()]),
+  );
+  const listByChannel = vi.fn(async () =>
+    fixture.repoFails === true ? failure() : ok(fixture.existing ?? [subscription()]),
   );
   const { bot, logger } = buildFakeBot({
     translator: echoTranslatorWithParams(),
     feedPlatformRegistry: new FeedPlatformRegistry([platform]),
     connectionManager: { isDisabled: () => undefined },
-    getRepos: () => ({ feedSubscription: { deleteWhere } }),
+    getRepos: () => ({ feedSubscription: { deleteWhere, listByChannel } }),
   });
 
   const sink = newInteractionSink();
@@ -98,7 +118,7 @@ const build = (fixture: Fixture = {}) => {
     sink,
   });
 
-  return { bot, interaction, sink, deleteWhere, logger };
+  return { bot, interaction, sink, deleteWhere, listByChannel, logger };
 };
 
 const reply = (sink: ReturnType<typeof newInteractionSink>): string => {
@@ -106,7 +126,56 @@ const reply = (sink: ReturnType<typeof newInteractionSink>): string => {
   return sink.editReplies[0]?.content ?? '';
 };
 
+/** The button rows the prompt carried, flattened to their JSON form. */
+interface RenderedButton {
+  readonly custom_id?: string;
+  readonly label?: string;
+  readonly style: ButtonStyle;
+}
+
+const buttonsOf = (sink: ReturnType<typeof newInteractionSink>): RenderedButton[] => {
+  const rows = sink.editReplies[0]?.components ?? [];
+  return rows.flatMap((row) => {
+    const json = (row as { toJSON: () => { components: RenderedButton[] } }).toJSON();
+    return json.components;
+  });
+};
+
 describe('/feed_unsubscribe', () => {
+  it('offers the narrowing options before the channel, as /feed_subscribe does', () => {
+    // Asserted on the payload Discord is actually sent, not on the
+    // config literal: the ordering rests on `Object.entries` insertion
+    // order and a stable required-first sort, neither of which the
+    // compiler checks, so swapping two keys in `setConfig` reads as a
+    // no-op while silently reordering the slash-command UI.
+    const body = buildCommandJsonBody(
+      localizeCommandConfig(new FeedUnsubscribe().config, echoTranslator),
+    ) as { readonly options?: readonly { readonly name: string }[] };
+
+    expect((body.options ?? []).map((option) => option.name)).toEqual([
+      'platform',
+      'account',
+      'channel',
+    ]);
+  });
+
+  it('asks Discord to autocomplete the account option, and only that one', () => {
+    // Asserted on the REST payload for the same reason as the ordering
+    // above: the flag has to survive `setConfig` -> localisation ->
+    // builder, and dropping it anywhere leaves the hook implemented but
+    // never called.
+    const body = buildCommandJsonBody(
+      localizeCommandConfig(new FeedUnsubscribe().config, echoTranslator),
+    ) as {
+      readonly options?: readonly { readonly name: string; readonly autocomplete?: boolean }[];
+    };
+
+    const autocompleting = (body.options ?? [])
+      .filter((option) => option.autocomplete === true)
+      .map((option) => option.name);
+    expect(autocompleting).toEqual(['account']);
+  });
+
   it('answers ephemerally', async () => {
     const { bot, interaction, sink } = build();
 
@@ -115,31 +184,72 @@ describe('/feed_unsubscribe', () => {
     expect(sink.defers[0]?.flags).toBe(MessageFlags.Ephemeral);
   });
 
-  it('clears the invoking channel when only the channel is implied', async () => {
-    const { bot, interaction, deleteWhere } = build();
+  it('asks before clearing the invoking channel rather than deleting', async () => {
+    // The scope a member reaches by naming nothing is also the one an
+    // ephemeral receipt cannot undo, so it must not delete on sight.
+    const { bot, interaction, sink, deleteWhere, listByChannel } = build({
+      existing: [subscription(), subscription({ account: 'another' })],
+    });
 
     await new FeedUnsubscribe().execute(interaction, bot);
 
-    expect(deleteWhere).toHaveBeenCalledWith({ channelId: HOME_CHANNEL });
+    expect(listByChannel).toHaveBeenCalledWith(HOME_CHANNEL);
+    expect(deleteWhere).not.toHaveBeenCalled();
+    const content = reply(sink);
+    expect(content).toContain('replies:feed.clear_confirm');
+    expect(content).toContain(`<#${HOME_CHANNEL}>`);
+    expect(content).toContain('"count":2');
   });
 
-  it('scopes to the chosen channel when the option is given', async () => {
-    const { bot, interaction, deleteWhere } = build({ channelOption: OTHER_CHANNEL });
+  it('offers a danger confirm and a secondary cancel, both scoped to the invoker', async () => {
+    const { bot, interaction, sink } = build();
 
     await new FeedUnsubscribe().execute(interaction, bot);
 
-    expect(deleteWhere).toHaveBeenCalledWith({ channelId: OTHER_CHANNEL });
+    expect(buttonsOf(sink)).toEqual([
+      expect.objectContaining({
+        custom_id: `feed_clear_confirm|${HOME_CHANNEL}|${USER_ID}`,
+        style: ButtonStyle.Danger,
+      }),
+      expect.objectContaining({
+        custom_id: `feed_clear_cancel|${HOME_CHANNEL}|${USER_ID}`,
+        style: ButtonStyle.Secondary,
+      }),
+    ]);
   });
 
-  it('refuses a channel the invoker cannot see, before deleting anything', async () => {
+  it('labels both buttons from the catalog', async () => {
+    const { bot, interaction, sink } = build();
+
+    await new FeedUnsubscribe().execute(interaction, bot);
+
+    expect(buttonsOf(sink).map((button) => button.label)).toEqual([
+      'replies:feed.clear_confirm_label',
+      'replies:feed.clear_cancel_label',
+    ]);
+  });
+
+  it('counts the chosen channel when the option is given', async () => {
+    const { bot, interaction, sink, listByChannel } = build({ channelOption: OTHER_CHANNEL });
+
+    await new FeedUnsubscribe().execute(interaction, bot);
+
+    expect(listByChannel).toHaveBeenCalledWith(OTHER_CHANNEL);
+    expect(buttonsOf(sink)[0]?.custom_id).toBe(`feed_clear_confirm|${OTHER_CHANNEL}|${USER_ID}`);
+  });
+
+  it('refuses a channel the invoker cannot see, before reading anything', async () => {
     // Reach is bounded by visibility even though authority is not: a
     // member must not be able to empty the feeds of a channel they have
     // no access to.
-    const { bot, interaction, sink, deleteWhere } = build({ invokerPermissions: [] });
+    const { bot, interaction, sink, deleteWhere, listByChannel } = build({
+      invokerPermissions: [],
+    });
 
     await new FeedUnsubscribe().execute(interaction, bot);
 
     expect(reply(sink)).toContain('replies:feed.invoker_cannot_view');
+    expect(listByChannel).not.toHaveBeenCalled();
     expect(deleteWhere).not.toHaveBeenCalled();
   });
 
@@ -150,17 +260,20 @@ describe('/feed_unsubscribe', () => {
     await new FeedUnsubscribe().execute(interaction, bot);
 
     const content = reply(sink);
-    expect(content).toContain('replies:feed.permissions_unknown');
+    expect(content).toContain('replies:feed.invoker_permissions_unknown');
     expect(content).not.toContain('replies:feed.invoker_cannot_view');
     expect(deleteWhere).not.toHaveBeenCalled();
   });
 
   it('clears a thread through the permissions of its parent', async () => {
-    const { bot, interaction, deleteWhere } = build({ channelOption: THREAD_CHANNEL });
+    const { bot, interaction, deleteWhere } = build({
+      channelOption: THREAD_CHANNEL,
+      options: NARROWED,
+    });
 
     await new FeedUnsubscribe().execute(interaction, bot);
 
-    expect(deleteWhere).toHaveBeenCalledWith({ channelId: THREAD_CHANNEL });
+    expect(deleteWhere).toHaveBeenCalledWith({ channelId: THREAD_CHANNEL, platform: 'fake' });
   });
 
   it('refuses a thread the invoker cannot see the parent of', async () => {
@@ -184,12 +297,15 @@ describe('/feed_unsubscribe', () => {
     expect(deleteWhere).not.toHaveBeenCalled();
   });
 
-  it('narrows by platform when one is named', async () => {
-    const { bot, interaction, deleteWhere } = build({ options: { platform: 'fake' } });
+  it('narrows by platform when one is named, and deletes at once', async () => {
+    // A narrowed scope names what it removes, so it needs no second
+    // look: only the whole-channel case is confirmed.
+    const { bot, interaction, deleteWhere, listByChannel } = build({ options: NARROWED });
 
     await new FeedUnsubscribe().execute(interaction, bot);
 
     expect(deleteWhere).toHaveBeenCalledWith({ channelId: HOME_CHANNEL, platform: 'fake' });
+    expect(listByChannel).not.toHaveBeenCalled();
   });
 
   it('normalises the account through the named platform', async () => {
@@ -273,6 +389,7 @@ describe('/feed_unsubscribe', () => {
 
   it('lists every subscription it removed', async () => {
     const { bot, interaction, sink } = build({
+      options: { account: 'someone, anotherone' },
       deleted: [
         subscription({ account: 'someone' }),
         subscription({ platform: 'other', account: 'anotherone' }),
@@ -292,6 +409,7 @@ describe('/feed_unsubscribe', () => {
     // The deletion has already committed and the confirmation is both
     // bounded and losable, so the log is the durable record.
     const { bot, interaction, logger } = build({
+      options: NARROWED,
       deleted: [subscription({ account: 'alpha' })],
     });
 
@@ -306,7 +424,7 @@ describe('/feed_unsubscribe', () => {
     const deleted = Array.from({ length: MAX_LISTED_REMOVALS + 30 }, (_, index) =>
       subscription({ account: `account-${String(index)}` }),
     );
-    const { bot, interaction, sink } = build({ deleted });
+    const { bot, interaction, sink } = build({ options: NARROWED, deleted });
 
     await new FeedUnsubscribe().execute(interaction, bot);
 
@@ -315,8 +433,8 @@ describe('/feed_unsubscribe', () => {
     expect(content).toContain(`"count":${String(deleted.length)}`);
   });
 
-  it('says so plainly when the whole channel was already empty', async () => {
-    const { bot, interaction, sink } = build({ deleted: [] });
+  it('says so plainly when the whole channel is already empty, and asks nothing', async () => {
+    const { bot, interaction, sink, deleteWhere } = build({ existing: [] });
 
     await new FeedUnsubscribe().execute(interaction, bot);
 
@@ -324,6 +442,8 @@ describe('/feed_unsubscribe', () => {
     expect(content).toContain('replies:feed.unsubscribed_none');
     expect(content).not.toContain('unsubscribed_none_hint');
     expect(content).toContain(`<#${HOME_CHANNEL}>`);
+    expect(sink.editReplies[0]?.components).toBeUndefined();
+    expect(deleteWhere).not.toHaveBeenCalled();
   });
 
   it('suggests widening the search when a narrowed scope matched nothing', async () => {
@@ -348,12 +468,21 @@ describe('/feed_unsubscribe', () => {
   });
 
   it('falls back to the traced failure copy when the database refuses', async () => {
-    const { bot, interaction, sink } = build({ repoFails: true });
+    const { bot, interaction, sink } = build({ options: NARROWED, repoFails: true });
 
     await new FeedUnsubscribe().execute(interaction, bot);
 
     const content = reply(sink);
     expect(content).toContain('replies:feed.failed');
     expect(content).toContain('traceId');
+  });
+
+  it('never shows a prompt it could not count, when the count itself fails', async () => {
+    const { bot, interaction, sink, deleteWhere } = build({ repoFails: true });
+
+    await new FeedUnsubscribe().execute(interaction, bot);
+
+    expect(reply(sink)).toContain('replies:feed.failed');
+    expect(deleteWhere).not.toHaveBeenCalled();
   });
 });
