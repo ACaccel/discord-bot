@@ -45,6 +45,23 @@ export const ops = {
       `ops:command.guild_sync_failed | Failed to sync commands for guild ${guildId}`,
     handlerMissingConfig: (commandName: string): string =>
       `ops:command.handler_missing_config | Command ${commandName} has no config.`,
+    /**
+     * Autocomplete could not be answered — the hook threw, or Discord
+     * refused the response for a reason other than the window closing.
+     * The member sees an empty suggestion list and nothing else, since
+     * an autocomplete interaction cannot carry an error, so this line
+     * is the only sign the feature is broken. Logged at error level
+     * with the original failure attached as `cause`.
+     */
+    autocompleteFailed: (commandName: string): string =>
+      `ops:command.autocomplete_failed | could not answer autocomplete for /${commandName}.`,
+    /**
+     * The three-second autocomplete window closed before the response
+     * landed. Routine under load rather than a defect — the member who
+     * kept typing has already moved on — so it stays an info line.
+     */
+    autocompleteExpired: (commandName: string, code: number | string): string =>
+      `ops:command.autocomplete_expired | autocomplete for /${commandName} not delivered (code=${code}).`,
   },
   feed: {
     /**
@@ -63,6 +80,14 @@ export const ops = {
     subscriptionsRemoved: (channelId: string, count: number, keys: string): string =>
       `ops:feed.subscriptions_removed | removed ${count} subscription(s) from channel ${channelId}: ${keys}`,
     /**
+     * A whole-channel clear refused at the moment the member confirmed
+     * it. They had already passed the same gate when the prompt was
+     * built, so this line marks a change between the two — the one
+     * denial in the flow that is worth an operator's attention.
+     */
+    clearDenied: (channelId: string, reason: string): string =>
+      `ops:feed.clear_denied | refused to clear channel ${channelId}: ${reason}`,
+    /**
      * The result of one `/feed_subscribe` invocation, which may name
      * several accounts. Per-account failures are isolated so the batch
      * can finish, which means they never reach the handler's error
@@ -70,6 +95,15 @@ export const ops = {
      */
     subscriptionsProcessed: (channelId: string, count: number, outcomes: string): string =>
       `ops:feed.subscriptions_processed | processed ${count} account(s) for channel ${channelId}: ${outcomes}`,
+    /**
+     * The subscription read behind `/feed_unsubscribe`'s account
+     * suggestions failed. Info rather than error because it fires once
+     * per keystroke, but it must fire: the member just sees an empty
+     * list, so without this line a degraded database is invisible on
+     * this surface.
+     */
+    suggestionsUnavailable: (channelId: string, detail: string): string =>
+      `ops:feed.suggestions_unavailable | could not read subscriptions of channel ${channelId} for suggestions: ${detail}`,
   },
   guildDb: {
     slotMissing: (guildId: string): string =>

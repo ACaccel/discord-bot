@@ -76,4 +76,70 @@ describe('buildCommandJsonBody', () => {
       ['count', 'file', 'mode', 'ratio', 'target', 'where'].sort(),
     );
   });
+
+  it('marks a string option autocomplete so Discord queries the handler hook', () => {
+    const config: LocalizedCommandConfig = {
+      name: 'feed_unsubscribe',
+      description: 'Stop forwarding posts',
+      options: {
+        string: [{ name: 'account', description: 'Account', required: false, autocomplete: true }],
+      },
+    };
+
+    const json = buildCommandJsonBody(config);
+    const options = 'options' in json ? (json.options ?? []) : [];
+
+    // Read off the REST payload rather than the config: `setAutocomplete`
+    // is the only thing that makes Discord send the interaction at all,
+    // and a builder that dropped the call would look identical upstream.
+    expect(options[0]).toMatchObject({ name: 'account', autocomplete: true });
+  });
+
+  it('leaves autocomplete off an option that did not ask for it', () => {
+    const config: LocalizedCommandConfig = {
+      name: 'remind',
+      description: 'Set a reminder',
+      options: { string: [{ name: 'note', description: 'Note', required: false }] },
+    };
+
+    const json = buildCommandJsonBody(config);
+    const options = 'options' in json ? (json.options ?? []) : [];
+
+    expect(options[0]).not.toHaveProperty('autocomplete', true);
+  });
+
+  it('rejects a string option carrying both choices and autocomplete', () => {
+    // Discord answers this combination with an opaque 400 at deploy
+    // time, naming neither the command nor the option.
+    const config: LocalizedCommandConfig = {
+      name: 'feed_unsubscribe',
+      description: 'Stop forwarding posts',
+      options: {
+        string: [
+          {
+            name: 'account',
+            description: 'Account',
+            required: false,
+            autocomplete: true,
+            choices: [{ name: 'One', value: 'one' }],
+          },
+        ],
+      },
+    };
+
+    expect(() => buildCommandJsonBody(config)).toThrow(TypeError);
+    expect(() => buildCommandJsonBody(config)).toThrow(/mutually exclusive/);
+  });
+
+  it('rejects autocomplete on an option kind Discord does not support it on', () => {
+    const config: LocalizedCommandConfig = {
+      name: 'remind',
+      description: 'Set a reminder',
+      options: {
+        number: [{ name: 'count', description: 'Count', required: false, autocomplete: true }],
+      },
+    };
+
+    expect(() => buildCommandJsonBody(config)).toThrow(/string options only/);
+  });
 });

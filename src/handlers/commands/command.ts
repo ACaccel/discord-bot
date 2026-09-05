@@ -8,6 +8,7 @@
  * `registry.generated.ts`).
  */
 import type {
+  AutocompleteInteraction,
   ChatInputCommandInteraction,
   ContextMenuCommandInteraction,
   ContextMenuCommandType,
@@ -69,6 +70,15 @@ export interface CommandOption {
   description?: string;
   required: boolean;
   choices?: CommandChoice[];
+  /**
+   * Have Discord query the handler's {@link Command.autocomplete} hook
+   * as the member types, instead of offering a fixed list.
+   *
+   * **String options only**, and **mutually exclusive with `choices`** —
+   * Discord rejects an option carrying both. `buildCommandJsonBody`
+   * fails on either misuse rather than letting it reach the REST call.
+   */
+  autocomplete?: boolean;
   /** Minimum numeric value (only applies to `number` and `float` options). */
   min?: number;
   /** Maximum numeric value (only applies to `number` and `float` options). */
@@ -117,6 +127,28 @@ export interface LocalizedCommandChoice extends CommandChoice {
 }
 
 /**
+ * What a {@link Command.autocomplete} hook hands back: the suggestions
+ * Discord should offer, best first.
+ *
+ * The hook returns them rather than sending them, so a handler never
+ * touches `AutocompleteInteraction.respond`. Discord's limits (25
+ * choices, 100 characters per name and per value) and the 3-second
+ * window are the dispatcher's problem, and centralising them there is
+ * what keeps a hook from being able to fail the interaction.
+ *
+ * Deliberately narrower than discord.js's `ApplicationCommandOptionChoiceData`:
+ * `value` is `string` because the flag only applies to string options,
+ * and `nameLocalizations` is absent because Discord applies the same
+ * 100-character ceiling to every localised name — a field the
+ * dispatcher would have to bound too, and one a suggestion built from
+ * stored data has no use for.
+ */
+export type CommandSuggestions = readonly {
+  readonly name: string;
+  readonly value: string;
+}[];
+
+/**
  * Abstract base for every slash-command / context-menu handler.
  *
  * Command pattern: each concrete handler is a self-describing command
@@ -148,6 +180,30 @@ export abstract class Command {
    * @throws when the required configuration is absent or invalid.
    */
   public validateBotConfig?(botConfig: unknown): void;
+
+  /**
+   * Suggestions for the option the member is currently typing into.
+   *
+   * Implemented by a handler that marks one of its string options
+   * `autocomplete: true`; the dispatcher routes the interaction here,
+   * bounds the result to Discord's limits and answers with it. A
+   * command without this hook — or one whose hook throws — offers an
+   * empty list, because an autocomplete interaction cannot be replied
+   * to and so has no way to report a failure to the member.
+   *
+   * Read the focused option with `interaction.options.getFocused()` and
+   * the sibling options with the accessors in `infra/discord/options`;
+   * the latter are the values as typed so far, and any of them may
+   * still be absent.
+   *
+   * Answer fast. Discord discards a response that arrives more than
+   * three seconds after the keystroke, so a hook belongs on a database
+   * read or a cache, never on an upstream call.
+   */
+  public autocomplete?(
+    interaction: AutocompleteInteraction,
+    bot: BaseBot,
+  ): Promise<CommandSuggestions>;
 
   public abstract execute(
     interaction: ChatInputCommandInteraction | ContextMenuCommandInteraction,

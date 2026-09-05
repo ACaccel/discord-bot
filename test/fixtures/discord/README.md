@@ -16,12 +16,25 @@ minimum the SUT reads — no third-party mock libraries.
   checks (it answers `isTextBased()`, `isSendable()` and `isThread()`
   from `type`), and `buildSendableChannel({ sendable })` for any path
   that posts a message and later deletes it.
-- `interaction-builder.ts` — `buildChatInputInteraction({ commandName, userId, guildId, guild, options, channels, channel, sink })`.
-  The sink records `defers`, `replies`, `editReplies` and `followUps`,
-  each with the `flags` it was sent with — that is how a test asserts a
-  reply stayed ephemeral. `interaction.deferred` and `.replied` are live
-  getters over the sink, so an error boundary picks `editReply` over
-  `reply` exactly as it would at runtime.
+- `interaction-builder.ts` — `buildChatInputInteraction({ commandName, userId, guildId, guild, options, channels, channel, sink })`,
+  `buildButtonInteraction({ customId, userId, guildId, guild, sink })`
+  and `buildAutocompleteInteraction({ commandName, userId, guild, options, channel, focusedOption, focused, respondError, sink })`.
+  The sink records `defers`, `replies`, `editReplies`, `updates`,
+  `followUps` and `responses`, each with the `flags` it was sent with —
+  that is how a test asserts a reply stayed ephemeral.
+  `interaction.deferred` and `.replied` are live getters over the sink,
+  so an error boundary picks `editReply` over `reply` exactly as it
+  would at runtime. The autocomplete builder records `respond` calls in
+  `responses` and answers `isRepliable()` with `false`, because an
+  autocomplete interaction has no reply channel at all. `focusedOption`
+  names the option `getFocused(true)` reports, and `respondError` drives
+  the refused-response branch — pass a `DiscordAPIError` with code
+  `10062` for the closed window specifically. Its `options` exposes
+  `get` but no entity resolvers, mirroring discord.js v14, where
+  `AutocompleteInteraction.options` omits `getChannel` / `getUser` /
+  `getRole` and friends: Discord resolves entities only once the command
+  is submitted, so an unsubmitted channel option carries its raw
+  snowflake as the option value.
 - `client-builder.ts` — `buildInertClient()`, the pre-login `Client` a
   composition-root test constructs a personality around.
 - `bot-fake.ts` — `buildFakeBot(fields)` plus

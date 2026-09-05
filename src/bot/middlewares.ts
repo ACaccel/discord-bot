@@ -8,8 +8,9 @@
  * Two middlewares ship today:
  *   - {@link createDispatchMiddleware} — terminal stage. Routes the
  *     interaction to the right `execute*` dispatcher based on its
- *     discriminant. Calls `next()` after dispatch so logging
- *     middleware runs.
+ *     discriminant, including the autocomplete branch, which is
+ *     answered with suggestions rather than a reply. Calls `next()`
+ *     after dispatch so logging middleware runs.
  *   - {@link createChannelLoggingMiddleware} — slash-command logging
  *     sink. Consults the {@link PermissionRankPolicy} so commands run in
  *     channels above the `channel_logging` rank ceiling stay out of the
@@ -19,7 +20,7 @@
  */
 import { MessageFlags } from 'discord.js';
 import type { BaseBot } from './index';
-import { executeCommand } from '@cmd';
+import { executeAutocomplete, executeCommand } from '@cmd';
 import { executeButton } from '@button';
 import { executeModal } from '@modal';
 import { executeSSM } from '@select-menu';
@@ -41,7 +42,13 @@ export const createDispatchMiddleware = (bot: BaseBot): InteractionMiddleware =>
   name: 'dispatch',
   async run(ctx: InteractionContext, next): Promise<void> {
     const interaction = ctx.interaction;
-    if (interaction.isChatInputCommand() || interaction.isContextMenuCommand()) {
+    // Autocomplete first: it is the one branch that must never reply,
+    // and answering it is a different verb (`respond`) with a
+    // three-second budget. `executeAutocomplete` swallows its own
+    // failures, so the chain below still runs either way.
+    if (interaction.isAutocomplete()) {
+      await executeAutocomplete(interaction, bot);
+    } else if (interaction.isChatInputCommand() || interaction.isContextMenuCommand()) {
       await executeCommand(interaction, bot);
     } else if (interaction.isModalSubmit()) {
       await executeModal(interaction, bot);
@@ -49,7 +56,7 @@ export const createDispatchMiddleware = (bot: BaseBot): InteractionMiddleware =>
       await executeButton(interaction, bot);
     } else if (interaction.isStringSelectMenu()) {
       await executeSSM(interaction, bot);
-    } else if (!interaction.isAutocomplete() && interaction.isRepliable()) {
+    } else if (interaction.isRepliable()) {
       await interaction.reply({
         content: bot.translator?.t('errors:command.unsupported_interaction_type') ?? '',
         flags: MessageFlags.Ephemeral,

@@ -32,6 +32,7 @@ export const barrelStubs = {
     registerCommands: noop,
     getCommandJsonBody: (): unknown[] => [],
     executeCommand: noop,
+    executeAutocomplete: noop,
   },
   button: {
     registerButtons: noop,

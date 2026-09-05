@@ -1,14 +1,21 @@
 /**
- * Unit coverage for `requireGuildRepos`.
+ * Unit coverage for `requireGuildRepos` and the non-replying
+ * `lookupGuildRepos` it is built on.
  *
  * The disabled-guild guard reads `ConnectionManager.isDisabled` straight
  * off `BaseBot.connectionManager`, and the `traceId` surfaced to the user
  * must be the one the manager stamped.
+ *
+ * The two are asserted separately on purpose: the split exists so that
+ * a caller which cannot reply — an autocomplete interaction — still
+ * resolves the same bundle, and a lookup that quietly answered
+ * differently from the replying path would be invisible until a
+ * suggestion list went empty for no stated reason.
  */
 import { describe, expect, it } from 'vitest';
 
 import type { BaseBot } from '../../../src/bot/index';
-import { requireGuildRepos } from '../../../src/handlers/require-guild-repos';
+import { lookupGuildRepos, requireGuildRepos } from '../../../src/handlers/require-guild-repos';
 import { buildFakeBot, echoTranslatorWithParams } from '../../fixtures/discord/bot-fake';
 
 /** Minimal interaction fake recording reply payloads. */
@@ -97,5 +104,38 @@ describe('requireGuildRepos — reads ConnectionManager.isDisabled', () => {
     const result = await requireGuildRepos(bot, interaction);
     expect(result).toBe(repos);
     expect(replies).toHaveLength(0);
+  });
+});
+
+describe('lookupGuildRepos — the same resolution, without a reply', () => {
+  it('reports the bundle for a healthy guild', () => {
+    const repos = { reply: {} };
+    const lookup = lookupGuildRepos(stubBot({ repos }), 'g-1');
+    expect(lookup).toEqual({ kind: 'ready', repos });
+  });
+
+  it('carries the guild_only copy for an absent guild id, without throwing', () => {
+    // The autocomplete path has no interaction to reply to, so the
+    // failure has to come back as a value.
+    expect(lookupGuildRepos(stubBot(), undefined)).toEqual({
+      kind: 'unavailable',
+      key: 'errors:command.guild_only',
+    });
+  });
+
+  it('carries the disabled-guild copy and the manager traceId', () => {
+    const bot = stubBot({ disabled: { guildId: 'g-1', traceId: '7f3a2c' } });
+    expect(lookupGuildRepos(bot, 'g-1')).toEqual({
+      kind: 'unavailable',
+      key: 'errors:db.guild_disabled',
+      params: { traceId: '7f3a2c' },
+    });
+  });
+
+  it('carries the not_found copy when the guild has no repos', () => {
+    expect(lookupGuildRepos(stubBot(), 'g-2')).toEqual({
+      kind: 'unavailable',
+      key: 'errors:db.not_found',
+    });
   });
 });

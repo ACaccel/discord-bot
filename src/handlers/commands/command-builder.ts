@@ -7,6 +7,37 @@ import { ContextMenuCommandBuilder, SlashCommandBuilder } from '@discordjs/build
 import type { LocalizedCommandConfig, LocalizedCommandOption } from './command';
 
 /**
+ * Reject the two ways `autocomplete` can be declared on an option
+ * Discord will not accept it on.
+ *
+ * Both are authoring mistakes in a handler's `setConfig`, and both
+ * would otherwise surface as an opaque REST 400 during `yarn deploy` —
+ * with no indication of which option of which command caused it.
+ * Failing here catches them in the unit suite instead, since every
+ * registration path funnels through this builder.
+ *
+ * A native `TypeError`, not a `DomainError`: nothing about this is
+ * recoverable at runtime or reportable to a member.
+ */
+const assertAutocompleteUsable = (
+  commandName: string,
+  optionType: string,
+  option: LocalizedCommandOption,
+): void => {
+  if (option.autocomplete !== true) return;
+  if (optionType !== 'string') {
+    throw new TypeError(
+      `command "${commandName}" option "${option.name}": autocomplete applies to string options only, not ${optionType}.`,
+    );
+  }
+  if (option.choices !== undefined) {
+    throw new TypeError(
+      `command "${commandName}" option "${option.name}": choices and autocomplete are mutually exclusive.`,
+    );
+  }
+};
+
+/**
  * Translates a {@link LocalizedCommandConfig} into the Discord REST JSON
  * payload for command registration.
  *
@@ -63,6 +94,7 @@ export const buildCommandJsonBody = (
         if (e.choices) {
           o.addChoices(...e.choices);
         }
+        if (e.autocomplete === true) o.setAutocomplete(true);
         return o;
       }),
 
@@ -94,9 +126,10 @@ export const buildCommandJsonBody = (
     const handler = optionHandlers[type as keyof typeof optionHandlers];
     if (!handler) continue;
 
-    options.forEach((opt) =>
-      allOptions.push({ type: type as keyof typeof optionHandlers, data: opt }),
-    );
+    options.forEach((opt) => {
+      assertAutocompleteUsable(config.name, type, opt);
+      allOptions.push({ type: type as keyof typeof optionHandlers, data: opt });
+    });
   }
 
   allOptions

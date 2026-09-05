@@ -46,6 +46,18 @@ describe('localizeCommandConfig', () => {
     );
   });
 
+  it('carries the autocomplete flag through to the localised option', () => {
+    // Localisation sits between `setConfig` and the REST builder, so a
+    // flag it dropped would disable autocomplete with nothing to show
+    // for it — the handler still declares the hook, Discord never asks.
+    const config: CommandConfig = {
+      name: 'feed_unsubscribe',
+      options: { string: [{ name: 'account', required: false, autocomplete: true }] },
+    };
+    const localized = localizeCommandConfig(config, echoTranslator());
+    expect(localized.options?.string?.[0]?.autocomplete).toBe(true);
+  });
+
   it('resolves a choice label by stable value when the choice carries no name', () => {
     const config: CommandConfig = {
       name: 'emoji_frequency',

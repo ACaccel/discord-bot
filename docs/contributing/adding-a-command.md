@@ -123,6 +123,83 @@ Discord.
    has been started at least once. Default is global; `--dev-guild <id>`
    is for fast iteration on a single test guild.
 
+## Option autocomplete
+
+A string option can ask Discord to query the handler as the member
+types, instead of offering a fixed list.
+
+1. **Flag the option.** Set `autocomplete: true` on it in `setConfig`.
+   The flag applies to **string options only** and is **mutually
+   exclusive with `choices`** — Discord rejects an option carrying both.
+   `buildCommandJsonBody` fails with a `TypeError` naming the command
+   and the option on either misuse, so the mistake surfaces in the unit
+   suite rather than as an opaque REST 400 at `yarn deploy` time.
+
+2. **Implement the hook.**
+
+   ```ts
+   public override autocomplete(
+     interaction: AutocompleteInteraction,
+     bot: BaseBot,
+   ): Promise<CommandSuggestions> {
+     return suggestSomething(interaction, bot);
+   }
+   ```
+
+   Read the option being typed into with
+   `interaction.options.getFocused()` and its siblings with the
+   accessors in `src/infra/discord/options.ts` — on an autocomplete
+   interaction `options.getChannel` and the other entity resolvers do
+   not exist, because Discord resolves entities only once the command is
+   submitted, so a channel option is read as its raw id string. Every
+   sibling option may still be absent.
+
+3. **Return suggestions; never send them.** The hook hands back a list
+   and `executeAutocomplete` answers with it. Discord's limits are
+   applied there — at most 25 choices, 100 characters per name and per
+   value — so no handler can produce a payload the API rejects. A hook
+   that could produce an over-long value should still drop that
+   candidate itself: truncation is a backstop, and half a value is
+   usually worse than no suggestion.
+
+4. **Never reply, never throw.** An autocomplete interaction cannot be
+   replied to and has no way to report a failure to the member. A
+   command with no hook, an unknown command name, a hook that throws,
+   and a `respond` Discord refused all end in an empty list. Return
+   `[]` for every unusable state rather than throwing — the dispatcher
+   would swallow the throw anyway, at the cost of an error-level line
+   per keystroke for something the member cannot act on.
+
+   Log the states an operator could act on yourself, at info level, and
+   include the reason. The dispatcher only logs a hook that threw and a
+   `respond` Discord refused; a hook that quietly returns `[]` after a
+   failed read would otherwise leave a degraded dependency with no
+   trace anywhere, because the member sees the same empty dropdown
+   either way.
+
+5. **Route any fixed wording through the translator.** A suggestion's
+   `name` is user-facing text in Discord's own dropdown, and it is the
+   one handler surface that renders copy with no `t` call in sight — the
+   CJK-literal scanner cannot see an English literal, so nothing else
+   will catch it. Interpolate data freely; take every fixed word from a
+   catalog key. A label assembled purely from stored values and a
+   locale-independent constant needs no key, but if that constant is
+   also spelled in the catalog somewhere (a platform name in an option's
+   `choices`, say), pin the two together with a test — a member reads
+   both lists side by side, and nothing else notices when they drift.
+
+6. **Answer within three seconds.** Discord discards a later response.
+   A hook belongs on a database read or a cache, never on an upstream
+   call. `/feed_unsubscribe` is the worked example: it suggests the
+   accounts the target channel has already subscribed, read from the
+   repository, and applies the same visibility gate the command does so
+   a channel the invoker cannot see yields nothing.
+
+7. **Test it.** Cover the suggestion shape, the refusal paths, and the
+   limits. Build the interaction with `buildAutocompleteInteraction`
+   from [`test/fixtures/discord/`](../../test/fixtures/discord/README.md),
+   whose sink records `respond` calls.
+
 ## Handler 150-line cap
 
 Every `src/handlers/<type>/<name>/index.ts` must follow these five

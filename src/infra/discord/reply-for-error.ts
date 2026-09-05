@@ -22,17 +22,19 @@
  * same one written to the operator log. A two-call shape
  * (`logError(...)` then a separate reply) would let the two ids drift.
  *
- * The helper swallows expired-interaction Discord errors (codes
- * `10062` / `40060`) the same way {@link requireGuildRepos}'s
- * `replyOrEdit` does — a dead interaction cannot be replied to and
+ * The helper swallows expired-interaction Discord errors — see
+ * `isExpiredInteractionError` — the same way {@link requireGuildRepos}'s
+ * `replyOrEdit` does: a dead interaction cannot be replied to, and
  * re-throwing would only walk into the dispatcher's outer catch.
  */
 import type { ContextMenuCommandInteraction, RepliableInteraction } from 'discord.js';
-import { DiscordAPIError, MessageFlags } from 'discord.js';
+import { MessageFlags } from 'discord.js';
 
 import { DomainError } from '../../core/errors';
 import type { Translator } from '../../core/i18n';
 import { logError, logSystem, ops, type Logger } from '../../core/logger';
+
+import { isExpiredInteractionError } from './expired-interaction';
 
 /**
  * Same widening rationale as `reply-translated.ts`: `executeCommand`
@@ -41,13 +43,6 @@ import { logError, logSystem, ops, type Logger } from '../../core/logger';
  * lists. Every value at runtime carries `.reply` / `.editReply`.
  */
 type HandlerInteraction = RepliableInteraction | ContextMenuCommandInteraction;
-
-/**
- * Discord error codes that mean the interaction is already dead — the
- * same set `require-guild-repos.ts` guards against. Re-replying just
- * rejection-spams, so we log once and swallow.
- */
-const EXPIRED_INTERACTION_CODES: ReadonlySet<number> = new Set([10062, 40060]);
 
 /**
  * Short, stable correlation id minted for the non-`DomainError`
@@ -72,7 +67,7 @@ const sendUserChannel = async (
     }
     await interaction.reply({ content, flags: MessageFlags.Ephemeral });
   } catch (err) {
-    if (err instanceof DiscordAPIError && EXPIRED_INTERACTION_CODES.has(Number(err.code))) {
+    if (isExpiredInteractionError(err)) {
       logSystem(bot.logger, ops.router.replySkipped(err.code));
       return;
     }
