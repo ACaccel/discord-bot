@@ -26,10 +26,11 @@
     "maxUrlsPerMessage": 1,
     "twitterProxyHosts": ["vxtwitter.com", "fxtwitter.com", "fixupx.com"],
     "instagramProxyHosts": [
+      "fxig.seria.moe",
+      "zzinstagram.com",
       "mbdinstagram.com",
       "toinstagram.com",
-      "uuinstagram.com",
-      "kkinstagram.com"
+      "uuinstagram.com"
     ],
     "threadsProxyHosts": ["viewthreads.com", "fzthreads.com", "fixthreads.seria.moe"],
     "facebookProxyHosts": ["facebed.com"],
