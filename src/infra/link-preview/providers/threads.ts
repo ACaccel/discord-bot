@@ -154,6 +154,7 @@ export const createThreadsProvider = (opts: {
   const rewrite = createRewriteProvider({
     name: PROVIDER_NAME,
     matches,
+    sourceDomains: ['threads.net', 'threads.com'],
     proxyHosts: opts.proxyHosts,
     ogClient: opts.ogClient,
     toProxyUrl,

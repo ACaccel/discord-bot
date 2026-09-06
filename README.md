@@ -213,7 +213,11 @@ Several fields carry a required-when rule worth calling out:
   accepted but unread. Each list is probed in order until a host yields
   a playable video or the list ends, so every dead host ahead of a live
   one costs `timeoutMs` before the preview is posted — keep the lists
-  short and put the hosts that answer first.
+  short and put the hosts that answer first. A host that answers by
+  redirecting back to the source site (a proxy that could not fetch the
+  post) counts as dead: Discord would follow that redirect and show the
+  source's login wall, so the bot skips it however the source page looks
+  from the bot's own address.
 - `social_feed.platforms` — **must not be empty when `enabled` is
   `true`**, or the boot fails: a feed with no platform registered could
   only ever refuse every subscription. The block says which platforms

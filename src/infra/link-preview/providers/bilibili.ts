@@ -104,6 +104,7 @@ export const createBilibiliProvider = (opts: {
   const rewrite = createRewriteProvider({
     name: PROVIDER_NAME,
     matches: isBilibiliVideoUrl,
+    sourceDomains: ['bilibili.com', 'b23.tv'],
     proxyHosts: opts.proxyHosts,
     ogClient: opts.ogClient,
     toProxyUrl: (url, host) =>

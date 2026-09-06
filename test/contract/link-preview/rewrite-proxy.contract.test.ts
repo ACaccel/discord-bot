@@ -3,8 +3,10 @@
  * boundary (nock, real axios + OgClient). The four rewrite providers share
  * one loop, so Twitter stands in for all. Pins: video short-circuit, fall-
  * through on a failed host, `ok(null)` when nothing yields media, that the
- * wire follows a legit public redirect under the Discordbot UA, and that a
- * redirect to an internal address (incl. IPv4-mapped IPv6) is refused.
+ * wire follows a legit public redirect under the Discordbot UA, that a
+ * redirect back to the source site is skipped whatever the source serves,
+ * and that a redirect to an internal address (incl. IPv4-mapped IPv6) is
+ * refused.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import nock from 'nock';
@@ -106,6 +108,31 @@ describe('rewrite-provider proxy validation contract', () => {
       .reply(302, '', { Location: 'http://[::ffff:169.254.169.254]/latest/meta-data/' });
     nock('https://vxtwitter.com').get(PATH).reply(200, ogHtml(VIDEO_HEAD));
     expect(await build()).toBe(vxUrl);
+  });
+
+  it('skips a proxy that redirects back to the source site, whatever the source serves us', async () => {
+    // A proxy that cannot fetch the post 302s to the source. The probe then
+    // reads the source's page from THIS host (a genuine image card here), but
+    // Discord's crawler follows the same redirect from its own address and
+    // gets a login wall — so the host is unusable and the loop moves on.
+    nock('https://fxtwitter.com')
+      .get(PATH)
+      .reply(302, '', { Location: `https://x.com${PATH}` });
+    nock('https://x.com').get(PATH).reply(200, ogHtml(IMAGE_HEAD));
+    nock('https://vxtwitter.com').get(PATH).reply(200, ogHtml(VIDEO_HEAD));
+    expect(await build()).toBe(vxUrl);
+  });
+
+  it('posts nothing when every proxy redirects back to the source site', async () => {
+    nock('https://fxtwitter.com')
+      .get(PATH)
+      .reply(302, '', { Location: `https://x.com${PATH}` });
+    nock('https://x.com').get(PATH).reply(200, ogHtml(IMAGE_HEAD));
+    nock('https://vxtwitter.com')
+      .get(PATH)
+      .reply(302, '', { Location: `https://twitter.com${PATH}` });
+    nock('https://twitter.com').get(PATH).reply(200, ogHtml(IMAGE_HEAD));
+    expect(await build()).toBeNull();
   });
 
   it('treats a redirect straight to a video file as a playable preview (kkinstagram-style)', async () => {

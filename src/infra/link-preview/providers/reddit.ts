@@ -37,6 +37,7 @@ export const createRedditProvider = (opts: {
   createRewriteProvider({
     name: 'reddit',
     matches: (url) => REDDIT_HOSTS.has(url.hostname.toLowerCase()) && POST_PATH.test(url.pathname),
+    sourceDomains: ['reddit.com'],
     proxyHosts: opts.proxyHosts,
     ogClient: opts.ogClient,
     // Drop the query (Reddit share links carry only tracking params); the proxy needs only the path.

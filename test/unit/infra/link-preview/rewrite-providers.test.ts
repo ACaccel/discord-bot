@@ -17,6 +17,10 @@
  * end-to-end through the Threads provider, whose proxies divide the work so
  * unevenly (one holds the real post asset, the others the video and the
  * gated posts) that the tier order decides which card a reader actually sees.
+ *
+ * The punt suite pins the case a real Instagram outage produced: a proxy
+ * that 302s back to instagram.com, where the bot host reads a genuine image
+ * card that Discord's own crawler never gets to see.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -31,6 +35,7 @@ import {
 import {
   scoreMeta,
   isJunkPreviewTitle,
+  landsOnSource,
 } from '../../../../src/infra/link-preview/providers/rewrite-provider';
 import { ok, err, isOk, type Result } from '../../../../src/core/result';
 import type {
@@ -336,6 +341,14 @@ describe('scoreMeta login-wall / junk rejection', () => {
     expect(scoreMeta(meta({ title: 'Log in or sign up to view' }))).toBe('none');
     // even when the wall serves a generic logo image
     expect(scoreMeta(meta({ title: 'Log in or sign up to view', images: ['logo.png'] }))).toBe(
+      'none',
+    );
+  });
+
+  it('rejects an Instagram proxy that answers "Post not found" under its product title', () => {
+    // eeinstagram cannot resolve a post: `og:title` is the product name and
+    // the description says "Post not found" — a text card with no content.
+    expect(scoreMeta(meta({ title: 'fix instagram embeds', description: 'Post not found' }))).toBe(
       'none',
     );
   });
@@ -1026,5 +1039,103 @@ describe('facebook legacy album-photo normalisation', () => {
       });
       expect(fetch.mock.calls.map((c) => c[0])).toEqual([expected]);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Proxy punt: a probe finally served from the source site is never posted
+// ---------------------------------------------------------------------------
+
+describe('landsOnSource', () => {
+  const domains = ['twitter.com', 'x.com'];
+
+  it('matches the apex, www, and any deeper subdomain of a source domain', () => {
+    expect(landsOnSource('https://x.com/jack/status/20', domains)).toBe(true);
+    expect(landsOnSource('https://www.twitter.com/jack/status/20', domains)).toBe(true);
+    expect(landsOnSource('https://mobile.Twitter.com/jack/status/20', domains)).toBe(true);
+  });
+
+  it('does not match the source CDN, look-alike hosts, or an unparseable URL', () => {
+    expect(landsOnSource('https://video.twimg.com/v.mp4', domains)).toBe(false);
+    expect(landsOnSource('https://fxtwitter.com/jack/status/20', domains)).toBe(false);
+    expect(landsOnSource('https://notx.com/jack/status/20', domains)).toBe(false);
+    expect(landsOnSource('not a url', domains)).toBe(false);
+  });
+});
+
+describe('proxy punt back to the source site', () => {
+  const HOSTS = ['mbdinstagram.com', 'kkinstagram.com'];
+  const reel = 'https://www.instagram.com/reel/Dc2tQQNs7RF/';
+  const mbd = 'https://mbdinstagram.com/reel/Dc2tQQNs7RF/';
+  const kk = 'https://kkinstagram.com/reel/Dc2tQQNs7RF/';
+  // What instagram.com serves the bot host once the proxy has 302'd there: a
+  // genuine image card. Discord's crawler, following the same redirect from
+  // its own address, gets "Login • Instagram" with no content.
+  const punted = ok(
+    meta({
+      title: 'eva on Instagram: "Let\'s draw a circle together"',
+      images: ['https://scontent.cdninstagram.com/v/t51/793573682_n.jpg'],
+      finalUrl: 'https://www.instagram.com/reel/Dc2tQQNs7RF/',
+    }),
+  );
+
+  it('skips a host that redirected to the source despite an image-bearing OG, logging at debug', async () => {
+    const { client, fetch } = makeOgClient({
+      [mbd]: punted,
+      [kk]: ok(meta({ video: 'https://scontent.cdninstagram.com/v/reel.mp4', finalUrl: kk })),
+    });
+    const provider = createInstagramProvider({ proxyHosts: HOSTS, ogClient: client });
+    const logger = makeLogger();
+    expect(await buildUrl(provider, reel, { timeoutMs: 1000, logger })).toBe(kk);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(logger.debug).toHaveBeenCalledTimes(1);
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'instagram', host: 'mbdinstagram.com' }),
+      expect.stringContaining('redirected back to the source site'),
+    );
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('skips a punt landing on the bare apex host as well as on www', async () => {
+    const { client } = makeOgClient({
+      [mbd]: ok(meta({ images: ['i.jpg'], finalUrl: 'https://instagram.com/reel/Dc2tQQNs7RF/' })),
+      [kk]: ok(meta({ images: ['k.jpg'] })),
+    });
+    const provider = createInstagramProvider({ proxyHosts: HOSTS, ogClient: client });
+    expect(await buildUrl(provider, reel)).toBe(kk);
+  });
+
+  it('returns null (no bare link) when every host punts to the source', async () => {
+    const { client, fetch } = makeOgClient({ [mbd]: punted, [kk]: punted });
+    const provider = createInstagramProvider({ proxyHosts: HOSTS, ogClient: client });
+    expect(await buildUrl(provider, reel)).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats a redirect to the source CDN as a real proxy answer, not a punt', async () => {
+    const video = 'https://scontent.cdninstagram.com/v/reel.mp4';
+    const { client } = makeOgClient({ [mbd]: ok(meta({ video, finalUrl: video })) });
+    const provider = createInstagramProvider({ proxyHosts: HOSTS, ogClient: client });
+    expect(await buildUrl(provider, reel)).toBe(mbd);
+  });
+
+  it('ranks a candidate normally when the probe reports no final URL', async () => {
+    const { client } = makeOgClient({ [mbd]: ok(meta({ images: ['i.jpg'] })) });
+    const provider = createInstagramProvider({ proxyHosts: HOSTS, ogClient: client });
+    expect(await buildUrl(provider, reel)).toBe(mbd);
+  });
+
+  it('recognises a punt onto a sibling source domain (x.com for a twitter.com link)', async () => {
+    const fx = 'https://fxtwitter.com/jack/status/20';
+    const vx = 'https://vxtwitter.com/jack/status/20';
+    const { client } = makeOgClient({
+      [fx]: ok(meta({ images: ['i.jpg'], finalUrl: 'https://x.com/jack/status/20' })),
+      [vx]: ok(meta({ images: ['v.jpg'], finalUrl: vx })),
+    });
+    const provider = createTwitterProvider({
+      proxyHosts: ['fxtwitter.com', 'vxtwitter.com'],
+      ogClient: client,
+    });
+    expect(await buildUrl(provider, 'https://twitter.com/jack/status/20')).toBe(vx);
   });
 });

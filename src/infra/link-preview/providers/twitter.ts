@@ -36,6 +36,7 @@ export const createTwitterProvider = (opts: {
     name: 'twitter',
     matches: (url) =>
       TWITTER_HOSTS.has(url.hostname.toLowerCase()) && STATUS_PATH.test(url.pathname),
+    sourceDomains: ['twitter.com', 'x.com'],
     proxyHosts: opts.proxyHosts,
     ogClient: opts.ogClient,
     // Drop the query string (usually tracking params); the proxy needs only the path.

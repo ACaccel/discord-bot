@@ -19,6 +19,11 @@
  * So the response is classified by its final `Content-Type`: a media type
  * is itself a valid playable preview (no body is downloaded), otherwise the
  * body is treated as HTML and only its `<head>` is read for `<meta>` tags.
+ * The URL the response was finally served from is reported alongside
+ * (`finalUrl`): a proxy that cannot fetch a post tends to redirect back to
+ * the source site, and what the source then serves THIS host says nothing
+ * about what it will serve Discord's crawler — the rewrite providers use
+ * `finalUrl` to recognise and skip that case.
  *
  * SSRF mitigations (the initial host always comes from the operator's
  * configured proxy-host allow-list, or the provider's `canHandle` host
@@ -74,6 +79,14 @@ export interface OpenGraphMeta {
   readonly video?: string;
   readonly url?: string;
   readonly siteName?: string;
+  /**
+   * URL the response was ultimately served from, after redirects (the
+   * requested URL when there were none). Absent from a pure
+   * {@link parseOpenGraph} result; `fetch` always sets it so a caller can
+   * tell a proxy that served the page itself from one that redirected
+   * elsewhere — in particular back to the source site.
+   */
+  readonly finalUrl?: string;
 }
 
 interface OgClientOptions {
@@ -336,9 +349,9 @@ const redirectTargetUrl = (options: {
  */
 const classifyRedirectMedia = (targets: readonly string[]): OpenGraphMeta | undefined => {
   const video = targets.find((t) => VIDEO_FILE_RE.test(t));
-  if (video !== undefined) return { images: [], video, url: video };
+  if (video !== undefined) return { images: [], video, url: video, finalUrl: video };
   const image = targets.find((t) => IMAGE_FILE_RE.test(t));
-  if (image !== undefined) return { images: [image], url: image };
+  if (image !== undefined) return { images: [image], url: image, finalUrl: image };
   return undefined;
 };
 
@@ -554,9 +567,11 @@ export class OgClient {
   /**
    * Fetch `url` and parse its OpenGraph metadata. `provider` is the
    * source name used to tag any error. Returns `Err` on transport / HTTP
-   * failure or when the page carries no usable OpenGraph tags. Only
-   * successful results are cached (a transient outage self-heals on the
-   * next call).
+   * failure or when the page carries no usable OpenGraph tags. The result
+   * carries `finalUrl`, the URL the response was served from after any
+   * redirects, so the caller can tell where the metadata really came from.
+   * Only successful results are cached (a transient outage self-heals on
+   * the next call).
    */
   public async fetch(
     url: string,
@@ -732,14 +747,14 @@ export class OgClient {
 
     if (contentType.startsWith('video/')) {
       discardStream(stream);
-      return { images: [], video: finalUrl, url: finalUrl };
+      return { images: [], video: finalUrl, url: finalUrl, finalUrl };
     }
     if (contentType.startsWith('image/')) {
       discardStream(stream);
-      return { images: [finalUrl], url: finalUrl };
+      return { images: [finalUrl], url: finalUrl, finalUrl };
     }
     const html = await this.readHead(stream, timeoutMs);
-    return parseOpenGraph(html);
+    return { ...parseOpenGraph(html), finalUrl };
   }
 
   /**

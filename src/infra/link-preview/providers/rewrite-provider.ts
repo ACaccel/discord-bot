@@ -20,6 +20,14 @@
  *   - else nothing usable -> `ok(null)` so the orchestrator skips silently
  *     and NO bare/dead link is ever posted.
  *
+ * A candidate is ranked only if the proxy actually served it. When the probe
+ * is finally served from the source site itself (`sourceDomains`) the proxy
+ * has punted: it could not fetch the post and redirected to instagram.com /
+ * x.com / ... instead. The OpenGraph read there is what the source serves to
+ * THIS host's address, not what Discord's crawler will get from its own —
+ * typically a login wall with a title and no content — so such a host is
+ * skipped outright, however good its metadata looks.
+ *
  * Per-host probe failures are logged at debug (proxy flakiness is expected),
  * never surfaced as `Err`, and never end the walk: every host is probed
  * until one yields a video or the list runs out, so a dead host early in
@@ -54,8 +62,10 @@ type CandidateQuality = 'video' | 'image' | 'weak-image' | 'text' | 'none';
  * to get data from Reddit". Threads and its embed proxies serve a login
  * wall — in English or zh-TW depending on the page — that still carries a
  * generic Instagram logo as `og:image`, so without a marker it would score
- * as a usable image card. Scoring any of these as a usable card would post
- * a broken embed.
+ * as a usable image card. An Instagram proxy that cannot resolve a post
+ * answers with its product name as the title and "Post not found" as the
+ * description. Scoring any of these as a usable card would post a broken
+ * embed.
  */
 const JUNK_MARKERS: readonly string[] = [
   'log in or sign up',
@@ -71,6 +81,7 @@ const JUNK_MARKERS: readonly string[] = [
   'threads • log in',
   "this content isn't available",
   'content not found',
+  'post not found',
   'page not found',
   'failed to get data from reddit',
 ];
@@ -103,6 +114,25 @@ export const isJunkPreviewTitle = (title: string): boolean =>
 export const isJunkPreview = (meta: OpenGraphMeta): boolean =>
   (meta.title !== undefined && isJunkPreviewTitle(meta.title)) ||
   (meta.description !== undefined && matchesJunkMarker(meta.description));
+
+/**
+ * True when `finalUrl` — where a probe was ultimately served from — sits on
+ * one of the source site's registrable domains: the apex itself or any
+ * subdomain (`www.`, `m.`, ...). An unparseable URL is not a source landing.
+ * Pure + exported for unit tests.
+ */
+export const landsOnSource = (finalUrl: string, sourceDomains: readonly string[]): boolean => {
+  let hostname: string;
+  try {
+    hostname = new URL(finalUrl).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return sourceDomains.some((domain) => {
+    const normalized = domain.toLowerCase();
+    return hostname === normalized || hostname.endsWith(`.${normalized}`);
+  });
+};
 
 /**
  * True when every image the candidate offers matches a low-value pattern,
@@ -148,6 +178,13 @@ interface RewriteSpec {
   readonly name: LinkPreviewProviderName;
   /** Pure predicate: does this URL point at a previewable post on this source? */
   readonly matches: (url: URL) => boolean;
+  /**
+   * Registrable domains of the source site itself (`instagram.com`; both
+   * `twitter.com` and `x.com` for X). A candidate whose probe is finally
+   * served from one of these, apex or subdomain, is a proxy that punted back
+   * to the source and is skipped — see {@link landsOnSource}.
+   */
+  readonly sourceDomains: readonly string[];
   /** Priority-ordered embed-proxy hosts to probe. Assumed non-empty (zod `.nonempty()`). */
   readonly proxyHosts: readonly string[];
   /** Build the candidate proxy URL for one host (e.g. host-swap, keep/drop query). */
@@ -178,6 +215,16 @@ const validate = async (
       ctx.logger?.debug(
         { provider: spec.name, host, code: res.error.code },
         'social-link-preview: proxy probe failed, trying next host',
+      );
+      continue;
+    }
+    if (res.value.finalUrl !== undefined && landsOnSource(res.value.finalUrl, spec.sourceDomains)) {
+      // The proxy redirected back to the source: the metadata read there is
+      // what the source serves to THIS host, not what Discord's crawler will
+      // get (a login wall), so the candidate is unusable whatever it scored.
+      ctx.logger?.debug(
+        { provider: spec.name, host, finalUrl: res.value.finalUrl },
+        'social-link-preview: proxy redirected back to the source site, trying next host',
       );
       continue;
     }

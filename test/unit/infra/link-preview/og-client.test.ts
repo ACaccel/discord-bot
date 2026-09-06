@@ -236,6 +236,7 @@ describe('OgClient.fetch', () => {
     if (isOk(result)) {
       expect(result.value.video).toBe('https://scontent.cdninstagram.com/reel.mp4');
       expect(result.value.images).toEqual([]);
+      expect(result.value.finalUrl).toBe('https://scontent.cdninstagram.com/reel.mp4');
     }
     expect(response.data.destroyed).toBe(true); // never drained the 4 MiB body
   });
@@ -250,7 +251,54 @@ describe('OgClient.fetch', () => {
     const result = await new OgClient().fetch('https://kkinstagram.com/p/X/', 'instagram', 4000);
 
     expect(isOk(result)).toBe(true);
-    if (isOk(result)) expect(result.value.images).toEqual(['https://cdn.example/photo.jpg']);
+    if (isOk(result)) {
+      expect(result.value.images).toEqual(['https://cdn.example/photo.jpg']);
+      expect(result.value.finalUrl).toBe('https://cdn.example/photo.jpg');
+    }
+  });
+
+  it('reports the URL an HTML page was finally served from, after redirects', async () => {
+    // A proxy that 302s back to instagram.com: the metadata is real, but the
+    // rewrite provider must be able to see it did not come from the proxy.
+    setGet(async () =>
+      streamResponse(
+        html('<meta property="og:image" content="https://scontent.cdninstagram.com/i.jpg">'),
+        'text/html; charset=utf-8',
+        'https://www.instagram.com/reel/X/',
+      ),
+    );
+    const result = await new OgClient().fetch(
+      'https://mbdinstagram.com/reel/X/',
+      'instagram',
+      4000,
+    );
+
+    expect(isOk(result)).toBe(true);
+    if (isOk(result)) {
+      expect(result.value.images).toEqual(['https://scontent.cdninstagram.com/i.jpg']);
+      expect(result.value.finalUrl).toBe('https://www.instagram.com/reel/X/');
+    }
+  });
+
+  it('treats a redirect to a media file the host cannot reach as that media, final URL included', async () => {
+    setGet(async (...args: unknown[]) => {
+      const { beforeRedirect } = args[1] as {
+        beforeRedirect: (options: Record<string, string>) => void;
+      };
+      beforeRedirect({
+        protocol: 'https:',
+        hostname: 'scontent.cdninstagram.com',
+        path: '/v/reel.mp4',
+      });
+      throw Object.assign(new Error('reset'), { code: 'ECONNRESET' });
+    });
+    const result = await new OgClient().fetch('https://kkinstagram.com/reel/X/', 'instagram', 4000);
+
+    expect(isOk(result)).toBe(true);
+    if (isOk(result)) {
+      expect(result.value.video).toBe('https://scontent.cdninstagram.com/v/reel.mp4');
+      expect(result.value.finalUrl).toBe('https://scontent.cdninstagram.com/v/reel.mp4');
+    }
   });
 
   it('reads only the head of a large HTML body — never buffers it, never throws', async () => {

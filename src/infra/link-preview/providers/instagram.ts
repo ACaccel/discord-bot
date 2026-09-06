@@ -34,6 +34,7 @@ export const createInstagramProvider = (opts: {
     name: 'instagram',
     matches: (url) =>
       INSTAGRAM_HOSTS.has(url.hostname.toLowerCase()) && POST_PATH.test(url.pathname),
+    sourceDomains: ['instagram.com'],
     proxyHosts: opts.proxyHosts,
     ogClient: opts.ogClient,
     toProxyUrl: (url, host) => `https://${host}${url.pathname}`,

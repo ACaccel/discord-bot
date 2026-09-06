@@ -182,6 +182,7 @@ export const createFacebookProvider = (opts: {
   const rewrite = createRewriteProvider({
     name: PROVIDER_NAME,
     matches,
+    sourceDomains: ['facebook.com', 'fb.watch'],
     proxyHosts: opts.proxyHosts,
     ogClient: opts.ogClient,
     toProxyUrl,
